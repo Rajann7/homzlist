@@ -25,6 +25,8 @@ export interface ConfirmDialogProps {
   /** If set, user must type this string to enable confirm (e.g. "DELETE"). */
   typeToConfirm?: string;
   loading?: boolean;
+  /** Single-action dialogs (e.g. an info popup with only "Got it"). */
+  hideCancel?: boolean;
 }
 
 export function ConfirmDialog({
@@ -39,6 +41,7 @@ export function ConfirmDialog({
   consequence,
   typeToConfirm,
   loading = false,
+  hideCancel = false,
 }: ConfirmDialogProps) {
   const [typed, setTyped] = useState("");
 
@@ -75,9 +78,11 @@ export function ConfirmDialog({
           />
         )}
         <div className="mt-6 flex gap-3">
-          <Button variant="secondary" fullWidth onClick={onClose} disabled={loading}>
-            {cancelLabel}
-          </Button>
+          {!hideCancel && (
+            <Button variant="secondary" fullWidth onClick={onClose} disabled={loading}>
+              {cancelLabel}
+            </Button>
+          )}
           <Button
             variant={destructive ? "destructive" : "primary"}
             fullWidth

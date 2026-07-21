@@ -1,93 +1,60 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { updateSession } from "@/lib/supabase/middleware";
+import { verifyAccessEdge } from "@/lib/auth/edge";
 
 /**
  * Subdomain routing + session isolation + login-bypass sealing (Doc6 §4, Doc9 §28).
+ *   homzlist.com          → (public) group   (served at "/")
+ *   seller.homzlist.com   → (seller) group   (rewritten to "/seller/*")
+ *   account.homzlist.com  → (admin)  group   (rewritten to "/account/*")
  *
- * One codebase, three subdomains — resolved by internal REWRITE to a path prefix
- * so route groups don't collide:
- *   homzlist.com          → (public) group          (served at "/")
- *   seller.homzlist.com   → (seller) group          (rewritten to "/seller/*")
- *   account.homzlist.com  → (admin)  group          (rewritten to "/account/*")
- *
- * The internal prefixes (/seller, /account) are NEVER reachable from the public
- * host — guessing them 404s (bypass sealing). Cookies are subdomain-scoped by the
- * Supabase middleware helper, so an admin session is invalid on seller/public and
- * vice-versa.
+ * The access-token cookie (hz_at) is verified here on the Edge (jose only). Cookies
+ * are host-only → per-subdomain isolation. Refresh/rotation is a Node route; a
+ * stale-access user hitting a gated route is bounced to /login, which silently
+ * refreshes and returns them. Internal prefixes unreachable from the public host.
  */
+const ACCESS_COOKIE = "hz_at";
 
 type Zone = "public" | "seller" | "admin";
-
 function getZone(host: string): Zone {
-  // Strip port, take the first label.
-  const hostname = host.split(":")[0].toLowerCase();
-  const label = hostname.split(".")[0];
+  const label = host.split(":")[0].toLowerCase().split(".")[0];
   if (label === "seller") return "seller";
   if (label === "account") return "admin";
-  return "public"; // homzlist.com, www, localhost, previews
-}
-
-/** Copy refreshed auth cookies from the session response onto a new response. */
-function withCookies(from: NextResponse, to: NextResponse): NextResponse {
-  from.cookies.getAll().forEach((cookie) => to.cookies.set(cookie));
-  return to;
+  return "public";
 }
 
 export async function middleware(request: NextRequest) {
-  const { response: sessionResponse, user } = await updateSession(request);
-
   const url = request.nextUrl.clone();
   const { pathname } = url;
   const zone = getZone(request.headers.get("host") ?? "");
 
-  // API is a shared namespace across subdomains — never rewritten. Each route
-  // enforces its own auth + zone check server-side (Doc7 §0).
-  if (pathname.startsWith("/api")) {
-    return sessionResponse;
-  }
+  if (pathname.startsWith("/api")) return NextResponse.next();
 
-  // ----- PUBLIC (homzlist.com) ---------------------------------------------
+  const user = await verifyAccessEdge(request.cookies.get(ACCESS_COOKIE)?.value);
+
   if (zone === "public") {
-    // Internal-only prefixes must not be reachable from the public host.
     if (pathname.startsWith("/seller") || pathname.startsWith("/account")) {
-      return withCookies(sessionResponse, NextResponse.rewrite(new URL("/404", request.url)));
+      return NextResponse.rewrite(new URL("/404", request.url));
     }
-    // Guests browse freely (SEO). Gated actions handle their own login redirect.
-    return sessionResponse;
+    return NextResponse.next();
   }
 
-  // ----- SELLER (seller.homzlist.com) --------------------------------------
+  const isLogin = pathname === "/login" || pathname.startsWith("/login/");
+
   if (zone === "seller") {
-    const isLogin = pathname === "/login" || pathname.startsWith("/login/");
-
-    // Already logged in hitting /login → send home (no re-login bypass, Doc9 §28).
-    if (isLogin && user) {
-      return withCookies(sessionResponse, NextResponse.redirect(new URL("/", request.url)));
-    }
-    // Unauthenticated on any gated route → login (server-side guard, no flash).
-    if (!isLogin && !user) {
-      return withCookies(sessionResponse, NextResponse.redirect(new URL("/login", request.url)));
-    }
-    // Serve the seller route group.
+    if (isLogin && user) return NextResponse.redirect(new URL("/", request.url));
+    if (!isLogin && !user) return NextResponse.redirect(new URL("/login", request.url));
     url.pathname = `/seller${pathname === "/" ? "" : pathname}`;
-    return withCookies(sessionResponse, NextResponse.rewrite(url));
+    return NextResponse.rewrite(url);
   }
 
-  // ----- ADMIN (account.homzlist.com) --------------------------------------
-  // Fully isolated; Google-auth whitelist is enforced server-side in the route.
-  const isAdminLogin = pathname === "/login" || pathname.startsWith("/login/");
-  if (isAdminLogin && user) {
-    return withCookies(sessionResponse, NextResponse.redirect(new URL("/", request.url)));
-  }
-  if (!isAdminLogin && !user) {
-    return withCookies(sessionResponse, NextResponse.redirect(new URL("/login", request.url)));
-  }
+  // admin — Google-auth whitelist enforced server-side (Module 11)
+  if (isLogin && user) return NextResponse.redirect(new URL("/", request.url));
+  if (!isLogin && !user) return NextResponse.redirect(new URL("/login", request.url));
   url.pathname = `/account${pathname === "/" ? "" : pathname}`;
-  return withCookies(sessionResponse, NextResponse.rewrite(url));
+  return NextResponse.rewrite(url);
 }
 
 export const config = {
-  // Run on everything except Next internals + static assets + the service worker.
   matcher: [
     "/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|sw.js|offline|icons/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|woff2?)$).*)",
   ],

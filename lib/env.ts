@@ -88,5 +88,7 @@ export function assertProdSecrets(): string[] {
   if (!publicEnv.supabaseAnonKey) missing.push("NEXT_PUBLIC_SUPABASE_ANON_KEY");
   if (!e.supabaseServiceRoleKey) missing.push("SUPABASE_SERVICE_ROLE_KEY");
   if (!e.jwt.accessSecret) missing.push("JWT_ACCESS_SECRET");
+  // Audit M1: the dev OTP provider must never ship to production.
+  if (e.otp.provider !== "msg91") missing.push("OTP_PROVIDER=msg91 (dev OTP provider is not allowed in production)");
   return missing;
 }

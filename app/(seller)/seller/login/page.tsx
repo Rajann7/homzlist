@@ -1,20 +1,12 @@
-import { AppShell, Wordmark, EmptyState } from "@/components";
+import { AuthFlow } from "@/components/auth/AuthFlow";
 
 /**
- * Seller login placeholder. The full P1 auth flow (phone + OTP, dev mode) is
- * Module 1. Middleware already seals the bypass: a logged-in user hitting
- * /login is redirected home before this renders (Doc9 §28).
+ * seller.homzlist.com/login — the P1 Auth & Entry flow (Module 1).
+ * Full-screen, no bottom nav. Middleware seals the bypass (logged-in → home);
+ * the flow silent-refreshes on splash to catch a valid-but-expired session.
  */
+export const metadata = { title: "Sign in" };
+
 export default function SellerLogin() {
-  return (
-    <AppShell showNav={false}>
-      <div className="flex min-h-[100dvh] flex-col items-center justify-center gap-4 px-6">
-        <Wordmark className="text-24" />
-        <EmptyState
-          title="Sign in"
-          subtitle="Phone + OTP login arrives in Module 1 (dev mode: fixed code, no SMS)."
-        />
-      </div>
-    </AppShell>
-  );
+  return <AuthFlow />;
 }

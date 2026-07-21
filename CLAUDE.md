@@ -18,6 +18,38 @@ Roles: Guest, Owner, Broker, Builder (+ Admin/Staff on separate subdomain).
 - seller.homzlist.com → Owner/Broker/Builder: create, chat, leads, profile, plans
 - account.homzlist.com → Admin/Staff only (Google auth, fully isolated)
 
+## DESIGN LOCK (STRICT — highest priority, never violate)
+
+The mobile design I provided in designs/ is FINAL and LOCKED.
+
+1. Implement the mobile design EXACTLY as given — same layout, spacing, sizing,
+   colors, fonts, components, icons, popups, sheets, toasts, dialogs, notifications,
+   positions, and hierarchy. Pixel-for-pixel. Zero creativity, zero "improvement",
+   zero rearranging, zero adding, zero removing.
+
+2. The mobile design must NOT change by even 0.001%. It is untouchable.
+
+3. The ONLY thing allowed is FIXING genuine technical problems that break the design,
+   WITHOUT changing the design's look:
+   - overflow / clipping / cut-off text
+   - broken alignment
+   - unresponsive popup/sheet open-close
+   - a dead/non-working button or flow
+   - console errors
+   These are FIXES (making the given design work correctly), not design changes.
+   A fix must keep the exact same visual appearance — if a "fix" changes how it
+   looks, it is NOT allowed; ask me first.
+
+4. Desktop and tablet get SEPARATE native layouts (user-side only) — but building
+   those must NEVER alter the mobile design in any way. Admin (P13-14-15) already
+   has all 3 device layouts — implement as-is, don't re-design it.
+
+5. If anything in the design is unclear or seems wrong, STOP and ASK me before
+   changing anything. Never assume and build your own version.
+
+Rule of thumb: I am the PAINTER (design is done). You are the ENGINEER (make it
+work exactly as painted). Never repaint.
+
 ## Absolute rules
 1. DESIGN IS FINAL. Implement designs/ pixel-exact. Never redesign/improve/rearrange.
    Mobile design = 0% change. Every popup/sheet/toast/dialog/notification kept as-is, only wired.

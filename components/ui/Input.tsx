@@ -38,10 +38,11 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
       <div
         className={cn(
           "flex items-center gap-2 rounded-8 border bg-surface-2 px-3 transition-colors duration-150",
-          "h-11 focus-within:bg-surface-1",
+          // Doc1 §5 / P1: inputs have a 1px --border at rest, accent 1.5px on focus.
+          "h-11",
           error
             ? "border-error"
-            : "border-transparent focus-within:border-accent focus-within:border-[1.5px]",
+            : "border-border focus-within:border-accent focus-within:border-[1.5px]",
           disabled && "opacity-60",
         )}
       >

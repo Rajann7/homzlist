@@ -18,21 +18,6 @@ const config: Config = {
     "./lib/**/*.{ts,tsx}",
   ],
   theme: {
-    // Doc1 §1.4 — ONLY these spacing values (4/8/12/16/24/32) beyond 0.
-    spacing: {
-      "0": "0px",
-      "1": "4px",
-      "2": "8px",
-      "3": "12px",
-      "4": "16px",
-      "6": "24px",
-      "8": "32px",
-      // fixed layout constants (Doc1 §3)
-      header: "56px",
-      "header-morph": "48px",
-      nav: "52px", // P3 canonical bottom nav height
-      "sticky-bar": "64px",
-    },
     // Doc1 §1.3 — one font stack, locked.
     fontFamily: {
       sans: [
@@ -63,6 +48,16 @@ const config: Config = {
       full: "9999px", // chips, pills, avatars, rings, FAB
     },
     extend: {
+      // Default Tailwind spacing (1=4px…8=32px = Doc1's 4/8/12/16/24/32) is kept,
+      // so component dimensions (h-11=44px touch target, h-9, h-12, w-5…) work.
+      // Only these fixed layout constants are added (Doc1 §3). Usage discipline:
+      // still use only 4/8/12/16/24/32 for content spacing (gaps/padding).
+      spacing: {
+        header: "56px",
+        "header-morph": "48px",
+        nav: "52px", // P3 canonical bottom nav height
+        "sticky-bar": "64px",
+      },
       colors: {
         page: v("bg-page"),
         "page-desktop": v("bg-page-desktop"),
