@@ -65,6 +65,25 @@ export async function verifyRegisterToken(token: string): Promise<string | null>
   }
 }
 
+/** Number-change token: proves the OLD number was re-verified (Doc2 §3.3 dual-OTP). */
+export const COOKIE_NUMBER_CHANGE = "hz_nc";
+export async function signNumberChangeToken(profileId: string): Promise<string> {
+  return new SignJWT({ typ: "nc" })
+    .setProtectedHeader({ alg: "HS256" })
+    .setSubject(profileId)
+    .setIssuedAt()
+    .setExpirationTime("15m")
+    .sign(accessSecret());
+}
+export async function verifyNumberChangeToken(token: string): Promise<string | null> {
+  try {
+    const { payload } = await jwtVerify(token, accessSecret());
+    return payload.typ === "nc" && payload.sub ? (payload.sub as string) : null;
+  } catch {
+    return null;
+  }
+}
+
 const refreshKey = (profileId: string, sid: string) => `sess:${profileId}:${sid}`;
 const sessionSetKey = (profileId: string) => `sess:index:${profileId}`;
 const hashSecret = (secret: string) => createHash("sha256").update(secret).digest("hex");

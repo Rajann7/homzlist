@@ -40,7 +40,9 @@ export function BottomNav({ items = DEFAULT_NAV }: { items?: NavItem[] }) {
     <nav
       aria-label="Primary"
       className={cn(
-        "chrome fixed inset-x-0 bottom-0 z-nav mx-auto flex h-[calc(52px+env(safe-area-inset-bottom))] w-full max-w-column",
+        // In normal flow (shrink-0) at the bottom of a fixed-height shell → always
+        // visible, never scrolls, mobile-address-bar-proof (CLAUDE.md rule 6).
+        "chrome z-nav flex h-[calc(52px+env(safe-area-inset-bottom))] w-full shrink-0",
         "items-start border-t border-border bg-surface-1 pb-[env(safe-area-inset-bottom)]",
       )}
     >

@@ -6,7 +6,7 @@ import { Icon } from "./Icon";
  * accent-soft; fallback icon. Optional story ring (Doc1 §2 #7).
  */
 
-type AvatarSize = 24 | 32 | 48 | 64 | 84;
+type AvatarSize = 24 | 32 | 40 | 48 | 56 | 64 | 84;
 
 export interface AvatarProps {
   src?: string | null;

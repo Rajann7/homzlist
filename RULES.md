@@ -41,6 +41,44 @@ work exactly as painted). Never repaint.
 
 ---
 
+## BACKEND & DATA LOCK (STRICT — highest priority, ALL modules, never violate)
+
+Everything is backend/database-driven. NOTHING business-related is stored or
+decided in the frontend or localStorage.
+
+1. Source of truth = server + Supabase. The frontend only displays what the
+   server returns; it never holds the source of truth. No business data, flags,
+   prices, paid-status, roles, entitlements, counts, or locked content in
+   frontend state or localStorage (UI-only prefs like theme/onboarding are fine).
+
+2. Identity & data live in Supabase. User identity, role, and all user data live
+   in Supabase (auth.users + tables). Signup/registration writes to Supabase
+   server-side via the service-role key, NEVER to frontend state. profiles.id =
+   auth.users.id.
+
+3. Server-verified every request. Auth session, role and permissions are checked
+   server-side on EVERY request. Access + refresh tokens are httpOnly cookies
+   (refresh server-tracked, rotating). NEVER put session/refresh tokens or
+   business data in localStorage/sessionStorage.
+
+4. Two walls, always. (a) API authorization (server checks role + ownership) and
+   (b) Supabase RLS on EVERY table. service_role key is server-only, never in the
+   client bundle. Private fields (Views/Leads/numbers/docs/email/locked data) are
+   stripped server-side before the payload — never hidden with CSS.
+
+5. Real migrations, run. Every schema change is a file in supabase/migrations,
+   applied to Supabase (dev now; staged + human-run for prod). No table ships
+   without RLS.
+
+6. Never trust the browser. Every input validated + authorized server-side;
+   generic responses (no enumeration leaks); secrets in env only. Prices/GST/
+   entitlements computed server-side.
+
+Rule of thumb: the frontend is a thin view over a server that owns and verifies
+all truth.
+
+---
+
 ## PART A — DESIGN (follow strictly, every time)
 
 1. I have provided the wireframe/design (mobile is final; tablet + desktop are built as

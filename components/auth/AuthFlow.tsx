@@ -10,7 +10,6 @@ import { Details } from "./screens/Details";
 import { Coach } from "./screens/Coach";
 import { BrowserUnsupported, Placeholder, OfflineBanner } from "./screens/Misc";
 import { authApi } from "@/lib/auth/client";
-import { publicEnv } from "@/lib/env";
 
 /**
  * P1 Auth & Entry orchestrator. Single-file flow (matches the design) with a
@@ -86,8 +85,10 @@ export function AuthFlow() {
     localStorage.setItem(ONBOARDED_KEY, "1");
     replace("login");
   };
+  // Relative so it works on any host (localhost, a LAN IP via nip.io, the real
+  // domain). The seller dashboard lives on the same host as /login already.
   const goHome = () => {
-    window.location.href = publicEnv.sellerUrl || "/";
+    window.location.href = "/";
   };
 
   return (
