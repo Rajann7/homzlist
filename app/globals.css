@@ -1,0 +1,236 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ==========================================================================
+   Doc1 Design Foundation — CSS variables (the runtime source of truth).
+   Light = :root, Dark = .dark (class, set by ThemeProvider) OR system default.
+   Components reference tokens via Tailwind classes; dark mode = pure token swap.
+   ========================================================================== */
+
+:root {
+  /* Base & surfaces */
+  --bg-page: #ffffff;
+  --bg-page-desktop: #fafafa;
+  --surface-1: #ffffff;
+  --surface-2: #f5f5f5;
+  --surface-3: #efefef;
+  --border: #dbdbdb;
+  --divider: #efefef;
+  /* Ink */
+  --ink-primary: #111111;
+  --ink-secondary: #555555;
+  --ink-tertiary: #8e8e8e;
+  --ink-disabled: #c7c7c7;
+  --ink-inverse: #ffffff;
+  /* Accent — Trust Green (Option B) */
+  --accent: #0f9d58;
+  --accent-pressed: #0c7c46;
+  --accent-soft: #e6f4ec;
+  --accent-disabled: #a8d5bd;
+  /* Semantic */
+  --error: #ed4956;
+  --error-soft: #fdecee;
+  --warning: #f5a623;
+  --warning-soft: #fef5e7;
+  --info: #0095f6;
+  --info-soft: #e7f3fd;
+  /* Overlays & scrims (same both modes) */
+  --scrim-sheet: rgba(0, 0, 0, 0.4);
+  --scrim-viewer: rgba(0, 0, 0, 0.6);
+  --gradient-photo: linear-gradient(transparent 60%, rgba(0, 0, 0, 0.6) 100%);
+  /* Photo dim overlay (dark only overrides below) */
+  --photo-dim: rgba(0, 0, 0, 0);
+
+  color-scheme: light;
+}
+
+/* Explicit dark class (user toggle) */
+.dark {
+  --bg-page: #000000;
+  --bg-page-desktop: #000000;
+  --surface-1: #121212;
+  --surface-2: #1e1e1e;
+  --surface-3: #262626;
+  --border: #363636;
+  --divider: #262626;
+  --ink-primary: #f5f5f5;
+  --ink-secondary: #b0b0b0;
+  --ink-tertiary: #8e8e8e;
+  --ink-disabled: #4d4d4d;
+  --ink-inverse: #ffffff;
+  --accent: #1db868;
+  --accent-pressed: #17a05a;
+  --accent-soft: #0e2b1c;
+  --accent-disabled: #a8d5bd;
+  --error: #ff5c6a;
+  --error-soft: #2b1214;
+  --warning: #ffb74d;
+  --warning-soft: #2b2210;
+  --info: #3ba7f8;
+  --info-soft: #0f2233;
+  --photo-dim: rgba(0, 0, 0, 0.06); /* Doc1 §1.2 — 6% dim on photos in dark */
+
+  color-scheme: dark;
+}
+
+/* System dark preference (only when the user hasn't forced a theme via [data-theme]) */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg-page: #000000;
+    --bg-page-desktop: #000000;
+    --surface-1: #121212;
+    --surface-2: #1e1e1e;
+    --surface-3: #262626;
+    --border: #363636;
+    --divider: #262626;
+    --ink-primary: #f5f5f5;
+    --ink-secondary: #b0b0b0;
+    --ink-tertiary: #8e8e8e;
+    --ink-disabled: #4d4d4d;
+    --accent: #1db868;
+    --accent-pressed: #17a05a;
+    --accent-soft: #0e2b1c;
+    --accent-disabled: #a8d5bd;
+    --error: #ff5c6a;
+    --error-soft: #2b1214;
+    --warning: #ffb74d;
+    --warning-soft: #2b2210;
+    --info: #3ba7f8;
+    --info-soft: #0f2233;
+    --photo-dim: rgba(0, 0, 0, 0.06);
+    color-scheme: dark;
+  }
+}
+
+/* ==========================================================================
+   Base layer
+   ========================================================================== */
+@layer base {
+  * {
+    -webkit-tap-highlight-color: transparent; /* no grey flash on tap */
+  }
+
+  html {
+    /* One font stack, locked (Doc1 §1.3 / CLAUDE.md rule 7) */
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
+      Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    /* iOS momentum scroll + no scroll hijack (Doc1 §11 / Doc8 §8) */
+    -webkit-overflow-scrolling: touch;
+    text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--bg-page);
+    color: var(--ink-primary);
+    min-height: 100dvh;
+    /* Doc1 §11 — momentum + bounce preserved; no horizontal overflow */
+    overflow-x: hidden;
+  }
+
+  /* Doc1 §12 — visible focus rings on all interactive for keyboard users only */
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+  :focus:not(:focus-visible) {
+    outline: none;
+  }
+
+  /* Readable content stays selectable (Doc6 §5.3). Everything else = chrome. */
+  p,
+  span.selectable,
+  .selectable,
+  article,
+  [data-selectable="true"] {
+    -webkit-user-select: text;
+    user-select: text;
+  }
+}
+
+/* ==========================================================================
+   Utilities
+   ========================================================================== */
+@layer utilities {
+  /* UI chrome: no accidental text selection (CLAUDE.md rule 8 / Doc6 §5.3).
+     Apply to nav, buttons, labels, chips, badges, headers. */
+  .chrome {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  /* Safe-area insets for every fixed element (Doc1 §3) */
+  .safe-top {
+    padding-top: env(safe-area-inset-top);
+  }
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .pb-nav-safe {
+    padding-bottom: calc(52px + env(safe-area-inset-bottom));
+  }
+
+  /* Edge fades for horizontal rows (story row, chip rows) — Doc1 §11 */
+  .edge-fade-x {
+    -webkit-mask-image: linear-gradient(
+      to right,
+      transparent 0,
+      #000 16px,
+      #000 calc(100% - 16px),
+      transparent 100%
+    );
+    mask-image: linear-gradient(
+      to right,
+      transparent 0,
+      #000 16px,
+      #000 calc(100% - 16px),
+      transparent 100%
+    );
+  }
+
+  /* Instagram-web centred column (Doc1 §3) */
+  .app-column {
+    width: 100%;
+    max-width: 470px;
+    margin-inline: auto;
+  }
+
+  /* Hide scrollbar but keep scroll (chip/story rows) */
+  .no-scrollbar {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* GPU hint for animated elements — use sparingly (Doc8 §8) */
+  .gpu {
+    will-change: transform;
+  }
+}
+
+/* ==========================================================================
+   Reduced motion (Doc1 §4 / §12) — durations→0, shimmer static, springs→fades
+   ========================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Block long-press image save / drag on protected imagery (Doc6 §6.4) */
+img[data-protected="true"] {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  pointer-events: none;
+}

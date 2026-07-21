@@ -1,0 +1,101 @@
+PACKET P8 — VISITS, LEADS, REQUIREMENTS & PROPOSALS (6 screens)
+Copy everything below → new Claude Design session → paste → generate → save.
+
+Build a fully interactive, clickable HTML prototype for HomzList — a premium Instagram-style real estate listing PWA. This module: My Visits, Leads Pipeline, Requirements Browse, My Requirements, Proposals Received, My Proposals Sent — plus all sheets, dialogs and states — in ONE single HTML file with working click-navigation.
+OUTPUT REQUIREMENTS
+
+ONE self-contained HTML file (inline CSS + vanilla JS), no external libraries. Inline SVG outline icons (Lucide, 1.5px stroke) — no emoji/cartoon icons.
+Screens = sections; JS click-navigation; browser back works; sheets close on X / backdrop / swipe-down / back.
+Dev-toolbar (top-right, collapsible, minimal gray): jump to any screen/sheet/state, toggle Light/Dark, Mobile/Tablet/Desktop, toggle role (Owner / Broker / Builder), toggle plan (no plan / ₹999 / ₹2,999 active), toggle states (skeleton / empty / offline / expired / fulfilled / quota-exhausted).
+Responsive: mobile-first 390px; at ≥768px the SAME design centered in a 470px column, #FAFAFA outside, hairline #DBDBDB borders. No separate desktop layout.
+English only. Realistic Rajkot data.
+Production polish, Instagram-level.
+
+DESIGN SYSTEM (mandatory — follow exactly)
+Colors light: page #FFFFFF · surface1 #FFFFFF · surface2 #F5F5F5 · surface3 #EFEFEF · border #DBDBDB · divider #EFEFEF · ink1 #111111 · ink2 #555555 · ink3 #8E8E8E · inkDisabled #C7C7C7 · accent #0F9D58 · accentPressed #0C7C46 · accentSoft #E6F4EC · accentDisabled #A8D5BD · error #ED4956 · errorSoft #FDECEE · warning #F5A623 · warningSoft #FEF5E7 · info #0095F6 · infoSoft #E7F3FD.
+Colors dark: page #000000 · surface1 #121212 · surface2 #1E1E1E · surface3 #262626 · border #363636 · divider #262626 · ink1 #F5F5F5 · ink2 #B0B0B0 · ink3 #8E8E8E · accent #1DB868 · accentSoft #0E2B1C · error #FF5C6A · warning #FFB74D · info #3BA7F8. Dark: no shadows → 1px borders.
+Font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif. 24/700 · 20/700 · 17/600 · 15/400 (15/600 buttons/tabs) · 13/400 (13/600 labels) · 11/400 (11/600 badges uppercase +0.3px).
+Spacing: 4/8/12/16/24/32 only. Gutters 16px. Radius: 4 badges · 8 buttons/inputs · 12 cards/sheets · 16 dialogs · 999 chips/avatars/pills.
+Shadows (light): L1 0 1px 2px rgba(0,0,0,.06) · L2 0 4px 12px rgba(0,0,0,.10) · L3 0 8px 24px rgba(0,0,0,.16).
+Icons: 24px outline 1.5px.
+Buttons: Primary accent/white 15/600 h44 r8 (disabled accentDisabled; loading spinner) · Secondary surface2/ink1 · Outline 1px · Text-link accent · Icon-button 44×44. Press scale .98.
+Badges: Verified (accentSoft/accent) · Promoted (black-60%/white) · Active (accentSoft/accent) · Expired (surface3/ink3) · Fulfilled (accentSoft/accent ✓) · Pending (surface2/ink2) · Accepted (accentSoft/accent) · Declined (errorSoft/error) · Urgent (warningSoft/warning + flame icon).
+Touch targets: min 44×44.
+Motion: ease-out cubic-bezier(0.2,0,0,1); sheets 300/250ms drag-dismiss; tab crossfade 150ms + underline slide 200ms; stage-move card slide 250ms; toast 200/3s/200; skeleton shimmer 1.2s; blur-lock cards static. Reduced-motion respected.
+Brand: wordmark "Homz" ink1-700 + "List" accent-700.
+SCREENS TO BUILD
+S1. MY VISITS
+Header: back + title "My visits" 17/600 + filter icon (44px → sheet: "All" / "Upcoming" / "Completed" / "Cancelled").
+Body: date-section groups (13/600 ink3 uppercase sticky headers): "TOMORROW · SAT, 25 JAN" → visit cards (surface1 r12 1px border, 12px pad): 56px listing thumb + "3 BHK Flat, Shree Residency" 15/600 + "₹85 Lakh · Mavdi, Rajkot" 11 ink3 + time row: clock icon + "11:00 AM" 13/600 + status chip ("Confirmed" accentSoft / "Proposed" surface2 / "Completed" surface3 / "Cancelled" errorSoft) + person row: 20px avatar + "with Nirav Shah (Owner)" 11 ink3 + right: message icon-button (44px → placeholder Chat) · footer row (for upcoming): text-link "Reschedule" + text-link "Cancel" (error) · footer (for past-due): outcome prompt strip (warningSoft r8): "How did this visit go?" 11 + chips: "Done" · "Cancelled" · "Reschedule" → tapping sets status + toast "Visit updated".
+Groups: "TOMORROW", "THIS WEEK", "COMPLETED" (past cards, dimmed 60% opacity + status chips), "CANCELLED".
+Reschedule sheet: title "Reschedule visit" + X + date chips row (next 7 days) + time chips + note input ("Add a note (optional)") + primary "Send new time" → toast "New time proposed — waiting for confirmation".
+Cancel dialog: "Cancel this visit?" + "Nirav Shah will be notified." + reason select rows (Changed my mind / Property not suitable / Schedule conflict / Other) + Cancel / error-primary "Cancel visit".
+Empty state: line-art calendar 96px + "No visits scheduled" 17/600 + "Site visits you schedule from chats appear here" 13 ink2 + primary "Explore Properties".
+Skeleton + offline states.
+S2. LEADS PIPELINE (Broker/Builder — Owner sees simple list variant)
+Header: back + title "Leads" 17/600 + right: export icon (44px → export sheet: "Export as CSV" + fields checklist (Name / Phone / Property / Stage / Date / Last activity) + primary "Download CSV" → toast "CSV downloaded") + filter icon (→ filter sheet: by listing (select rows) / by date range / by stage / "Verified leads only" toggle).
+Stage segmented bar (horizontally scrollable chips with counts, tappable = filters): "All 24" · "New 6" (accent dot) · "Contacted 8" · "Visit 4" · "Negotiation 3" · "Closed 3".
+Summary strip (surface2 r12, 3 columns): "24" 17/700 + "Total leads" 11 ink3 · "6" + "New this week" · "12%" + "Conversion" (Builder/Broker only).
+Lead cards (surface1 r12 1px border, 12px pad, 8px gap): top row: 40px avatar + "Meet Patel" 15/600 + accent verified check + stage chip right (color per stage: New = infoSoft · Contacted = surface2 · Visit = warningSoft · Negotiation = accentSoft · Closed = accent/white) · trust strip (11 ink3, icons): "Phone verified ✓ · Member since Mar 2025 · Profile 80%" · property row (surface2 r8, 48px): thumb + "3 BHK Flat, Mavdi" 13/600 + "₹85 L" 11 ink3 · activity line 11 ink3: "Last activity: Visit confirmed for Sat 25 Jan" · action row: outline "Message" (→ placeholder Chat) + outline "Move stage" (→ stage sheet: radio rows New/Contacted/Visit scheduled/Negotiation/Closed-won/Closed-lost + note field + primary "Update" → card animates to new stage + toast "Lead moved to Negotiation") + ⋯ (44px → sheet: "View profile" · "Add note" (→ note sheet: textarea + Save) · "Mark not relevant" (error)).
+Owner variant (dev-toolbar role = Owner): simplified — no pipeline chips/summary; plain rows: avatar + name + property + time + chevron + "New" dot.
+Empty state: line-art funnel 96px + "No leads yet" 17/600 + "Leads from your listings and requirements appear here" 13 ink2 + primary "Boost a Listing".
+Skeleton + offline.
+S3. REQUIREMENTS BROWSE (bottom-nav center tab)
+Header: title "Requirements" 20/700 left + right: my-requirements icon (44px, list icon with accent dot if active) → S4 + filter icon (44px).
+Mode strip (small, contextual): chips row "All" (selected) · "Buy" · "Rent" · "Type ▾" (→ type sheet).
+Unpaid state (dev-toolbar plan = no plan / ₹999 only) — build fully:
+
+Persistent unlock banner (accentSoft r12, sticky under header, 12px pad): lock icon accent + "Unlock all requirements" 15/600 + "See full details and contact posters — ₹2,999/month" 11 ink2 + primary small "Unlock" → paywall sheet.
+Locked requirement cards (build 4): surface1 r12 1px border; top chips: "Looking to Buy" (accentSoft) + "Urgent" (warningSoft flame) · budget blurred: "₹••L – ₹••L" with 6px CSS blur + lock icon 16px overlay · partial info visible 15 ink1: "3 BHK · Buy · Mavdi area" · poster row blurred (avatar shape + name shape, blur 6px) + centered lock icon · "Posted 2h ago" 11 ink3 · button: accent "Unlock — ₹2,999/mo" (lock icon inline).
+One card = boosted + locked: "Promoted" badge (black-60%) top-right, still blurred (demonstrates locked-but-shown-first).
+Paid state (dev-toolbar plan = ₹2,999):
+Unlocked cards: 3px accent left strip · chips "Looking to Buy" + "Urgent" · budget "₹40 Lakh – ₹60 Lakh" 17/700 · details line "3 BHK · Flat · Ready to move preferred" 13 ink2 · areas chips: "Mavdi" "University Road" "+1" · poster row: 24px avatar + "Meet Patel" 13/600 + accent verified + "Owner" tag + "Rajkot · 2h ago" 11 ink3 · footer: "12 proposals sent so far" 11 ink3 left + primary "Send Proposal" right.
+Cascade section header after 3 cards: pin icon + "NEARBY: UNIVERSITY ROAD" 13/600 ink3 uppercase → 2 more cards; then "OTHER AREAS IN RAJKOT" → 1 card.
+Proposal counter strip (sticky bottom or under header, surface2 r8): "24 proposals remaining" 13 accent + "Top up" text-link → top-up sheet.
+Paywall sheet: hero "₹2,999" 24/700 + "/month" ink3 · checklist (accent checks): "Unlock every requirement" · "30 proposals included" · "Instant match alerts for your areas" · "Direct chat after acceptance" · primary "Continue to Payment" (→ placeholder Checkout) · text-link "Compare plans" · note 11 ink3: "Auto-renewal is off. You'll be reminded before expiry."
+Top-up sheet: title "Add proposals" + X + card: "+10 proposals" 17/600 + "₹499" 24/700 + "Valid with your active plan" 11 ink3 + primary "Pay ₹499" → toast "10 proposals added".
+Proposal sheet (from any unlocked card): title "Send Proposal" + X · two option cards (radio): "I have a property" (house icon; selected → reveals horizontal listing picker: your live listings as selectable mini-cards (photo + "₹82 L · 3 BHK Mavdi"), one selectable = accent border + check; below: "No matching listing? Send a suggestion instead" 11 accent link → deselects picker) · "Can we chat" (chat icon) · message textarea (prefilled per option: "Hi, I have a 3 BHK in Mavdi that matches your requirement — ₹82 Lakh, ready to move." / "Hi, I have a few options that match your requirement. Can we discuss?") · duplicate guard state (dev-toolbar): warningSoft strip "You've already sent a proposal for this requirement" + button disabled · footer: "6 proposals remaining" 11 ink3 + primary "Send Proposal" → sheet closes → toast "Proposal sent — 5 remaining" → card's button becomes disabled "Proposal sent ✓" · quota-exhausted state: footer strip errorSoft "0 proposals remaining" + primary changes to "Add 10 proposals — ₹499" → opens top-up inline within the same sheet (no navigation away) → after "payment" → returns to sheet → auto-sends → toast "Proposal sent — 9 remaining".
+Empty state: line-art megaphone + "No requirements in your area yet" 17/600 + "Check back soon or expand your city" 13 ink2.
+Skeleton (blurred-card skeletons) + offline. Bottom nav (Requirements active).
+
+S4. MY REQUIREMENTS
+Header: back + title "My requirements" 17/600 + "+" icon (44px → placeholder Requirement Form).
+Plan strip (surface2 r8): "1 of 1 requirement used · 22 days left" 13 ink2 + ⓘ tooltip → popup: "Your ₹999 plan includes 1 requirement post for 30 days. Turning it off or deleting it still uses the quota."
+Requirement cards (surface1 r12 1px border, 16px pad — build all states):
+
+Active card: status chip "Active · 22 days left" (accentSoft) + budget "₹40 Lakh – ₹60 Lakh" 17/700 + "3 BHK · Flat · Buy" 13 ink2 + areas chips + toggle row (surface2 r8, 48px): "Requirement active" 15/600 + accent toggle (ON) → turning OFF → confirm dialog: "Turn off this requirement?" + "It will stop receiving proposals. This still counts against your plan quota — turning it back on won't restore it." + Cancel / primary "Turn Off" → chip becomes "Off" (surface3) + toast · proposals row (56px tappable): "12 proposals received" 15/600 + accent badge "4 new" + chevron → S5 · matching strip: 13/600 ink3 "MATCHING PROPERTIES" + horizontal mini-cards (3: photo + price + area) + a "Nearby: Raiya Road" cascade micro-label on the 3rd card · action row: outline "Edit" (→ placeholder Form) + outline "Mark Fulfilled" + ⋯ (→ sheet: "Boost requirement" · "Share" · "Delete" (error)).
+Expired card (dev-toolbar): "Expired" chip (surface3) + dimmed content + banner (warningSoft r8): "This requirement expired on 12 Jan. Renew your plan to reactivate it." + "Activate" toggle shown but disabled with helper 11 ink3: "Renew a plan to turn this back on — it will use a requirement slot." + primary "View Plans".
+Fulfilled card: "Fulfilled ✓" chip (accentSoft) + note 11 ink3 "Proposals are closed for this requirement" + text-link "Reopen" (opens dialog: "Reopen this requirement?" + "It will use a requirement slot from your current plan." + Cancel / primary "Reopen").
+Mark Fulfilled dialog: "Mark as fulfilled?" + "New proposals will stop. You can reopen it later — it will use a slot again." + Cancel / primary "Mark Fulfilled" → toast.
+Delete dialog (double-confirm): "Delete this requirement?" 17/600 + "This can't be undone. Deleting still uses your plan quota — you won't get the slot back." (bold the warning) + Cancel / error-primary "Delete" → toast "Requirement deleted".
+Empty state: line-art search-list + "No requirements posted" + "Tell us what you're looking for and matching properties will find you" + primary "Post a Requirement".
+
+S5. PROPOSALS RECEIVED (per requirement)
+Header: back + title "Proposals" 17/600 + sub 11 ink3: "3 BHK · ₹40–60 L · Mavdi" (the requirement ref).
+Filter chips: "All 12" · "New 4" · "Accepted 2" · "Declined 3" · "Not relevant 1".
+Proposal cards (surface1 r12 1px border, 16px pad, 12px gap — build 3 variants):
+
+New proposal with property: sender row: 48px avatar + "RK Properties" 15/600 + accent verified + "Broker" tag + "· 2h ago" 11 ink3 + "New" dot · trust strip (surface2 r8, 11 ink3): "Phone verified ✓ · RERA verified ✓ · Member since Jan 2025 · Responds in 2h" · number row (auto-visible — the rule) accentSoft r8: phone icon + "+91 98250 12345" 15/600 + Copy icon-button + Call icon-button + note 11 ink3 below: "Numbers of people responding to your requirement are shown automatically." · message 15/400: "Hi, I have a 3 BHK in Shree Residency, Mavdi — ₹82 Lakh, semi-furnished, east facing. Ready to move." · attached listing rich card (surface2 r8, 12px pad): 56px thumb + "3 BHK Flat, Shree Residency" 13/600 + "₹82 Lakh · 1,450 sqft · Mavdi" 11 ink3 + chevron → placeholder Property Detail · action row: outline "Decline" + primary "Accept & Chat" + text-link "Not relevant" (error-tinted, small, right).
+"Can we chat" proposal (no listing): same minus attached card + message "Hi, I have a few options in Mavdi. Can we discuss your needs?".
+Accepted proposal (past): dimmed slightly + "Accepted" chip (accentSoft) + action row replaced by outline "Open chat" (→ placeholder Chat).
+Interactions: Accept → toast "Chat started with RK Properties" → card gets Accepted chip. Decline → dialog: "Decline this proposal?" + "They'll be notified. You can still see this in your declined list." + Cancel / error-primary "Decline". "Not relevant" → dialog: "Mark as not relevant?" + "This helps us keep proposal quality high. Senders with repeated flags are reviewed." + Cancel / primary "Mark" → toast.
+Empty state: line-art inbox + "No proposals yet" + "Brokers and owners will respond soon — boost your requirement to get more" + primary "Boost Requirement".
+
+S6. MY PROPOSALS SENT
+Header: back + title "My proposals" 17/600.
+Counter strip (surface2 r8): "6 of 10 proposals remaining" 13 accent + linear progress bar (accent, 40% filled) + "Top up" text-link → top-up sheet.
+Status filter chips: "All 8" · "Pending 3" · "Accepted 2" · "Declined 1" · "Expired 2" · "Fulfilled 0".
+Proposal rows (surface1 r12 1px border, 12px pad, 8px gap): top row: requirement ref 15/600 ("3 BHK · ₹40–60 L · Mavdi") + status chip right · poster line: 20px avatar + "Meet Patel · Owner" 11 ink3 · your attached listing mini-row (surface2 r8, 40px): thumb + "3 BHK Flat, Mavdi — ₹82 L" 11 ink3 (or, for chat-only proposals: chat icon + "Chat request — no listing attached" 11 ink3) · sent time 11 ink3 "Sent 12 Jan · 2:30 PM" · status-specific footer:
+
+Pending: clock icon + "Waiting for response" 11 ink3 + text-link "View requirement".
+Accepted: accent check + "Accepted — chat is open" 11 accent + outline "Open chat".
+Declined: "Declined on 14 Jan" 11 ink3 + note 11 ink3 "Your proposal count isn't refunded".
+Expired: "No response in 30 days — expired" 11 ink3 + same non-refund note.
+Fulfilled: "Requirement was fulfilled by someone else" 11 ink3.
+Empty state: line-art handshake + "No proposals sent" + "Browse requirements and offer your matching properties" + primary "Browse Requirements".
+Skeleton + offline.
+
+GLOBAL / SHEETS TO BUILD
+Filter sheets (visits/leads/requirements/type) · export sheet · stage sheet · note sheet · reschedule sheet · cancel dialog · paywall sheet · top-up sheet (standalone + inline-in-proposal-sheet variant) · proposal sheet (2 options + listing picker + duplicate guard + quota-exhausted inline top-up) · toggle-off dialog · mark-fulfilled dialog · reopen dialog · delete double-confirm dialog · decline dialog · not-relevant dialog · tooltips (ⓘ) · toasts ("Proposal sent — 5 remaining" / "Lead moved to Negotiation" / "Visit updated" / "CSV downloaded" / "Requirement deleted" / "10 proposals added" / "Chat started") · offline banners · skeletons · placeholders for other batches + back.
+BUILD CHECKLIST (build EVERY item — nothing skipped)
+My Visits (date groups + visit cards + status chips + person row + reschedule/cancel + outcome prompt + filter sheet + reschedule sheet + cancel dialog with reasons + empty + skeleton + offline) · Leads Pipeline (stage chips with counts + summary strip + lead cards with trust strip + property row + activity line + Message/Move-stage/⋯ + stage sheet + note sheet + export sheet with field checklist + filter sheet + Owner simplified variant + empty + skeleton) · Requirements Browse (unpaid: persistent banner + 4 locked cards with blur+lock + boosted-locked; paid: unlocked cards + cascade section headers ×2 + proposal counter strip; paywall sheet; top-up sheet; proposal sheet with 2 options + listing picker + suggestion link + duplicate guard + quota-exhausted inline top-up + sent state; type/filter sheets; empty; skeleton; nav) · My Requirements (plan strip + tooltip + active card with toggle + confirm dialog + proposals row + matching strip + cascade label + edit/fulfil/⋯ + expired card with disabled toggle + renew CTA + fulfilled card + reopen dialog + delete double-confirm with quota warning + empty) · Proposals Received (filter chips + 3 card variants + trust strips + auto-visible number row with copy/call + attached rich card + accept/decline/not-relevant + dialogs + accepted state + empty) · My Proposals Sent (counter strip + progress bar + status filter chips + rows for all 5 statuses + non-refund notes + open-chat + empty) · Dev toolbar (screens/states/role/plan/light-dark/viewport) · Full click-navigation + browser back · Responsive centered-470 at ≥768px.

@@ -1,0 +1,133 @@
+PACKET P9 — PROFILE SUITE (6 screens, interactive)
+Copy everything below → new Claude Design session → paste → generate → save.
+
+Build a fully interactive, clickable HTML prototype for HomzList — a premium Instagram-style real estate listing PWA (website, mobile-first). This is the PROFILE module: Own Profile, Other User Profile, Edit Profile, Verification, Listing Stats, My Listings Manager — plus all sheets, dialogs and states — in ONE single HTML file with working click-navigation.
+OUTPUT REQUIREMENTS
+
+ONE self-contained HTML file (inline CSS + vanilla JS), no external libraries. Inline SVG outline icons (Lucide style, 1.5px stroke) — never emoji/cartoon icons.
+Every screen = a section; JS click-navigation; browser back works (history.pushState); back arrows work; sheets close on X / backdrop tap / swipe-down / browser back.
+Dev-toolbar (top-right, collapsible, minimal gray): jump to any screen/sheet/state, toggle Light/Dark, toggle Mobile/Tablet/Desktop, toggle role (Owner / Broker / Builder), toggle verification level (Phone / ID / RERA / revoked), toggle profile view (own / other / view-as-visitor / suspended / deleted), toggle listing states (Live / Pending / Changes requested / Rejected / Hidden / Archived / Sold / Rented), toggle states (skeleton / empty / offline).
+Responsive: mobile-first 390px. At ≥768px the SAME design renders centered in a 470px column with #FAFAFA outside and hairline #DBDBDB column borders — no separate desktop layout (Instagram-web pattern).
+English only. Realistic Rajkot data (RK Properties, Nirav Shah, Meet Patel, Shreeji Builders; areas: Mavdi, University Road, Kalawad Road, 150 Feet Ring Road, Raiya Road; society: Shree Residency, Green Valley Heights).
+Production polish, Instagram-level. Not a wireframe.
+
+DESIGN SYSTEM (mandatory — follow exactly)
+Colors light: page #FFFFFF · surface1 #FFFFFF · surface2 #F5F5F5 · surface3 #EFEFEF · border #DBDBDB · divider #EFEFEF · ink1 #111111 · ink2 #555555 · ink3 #8E8E8E · inkDisabled #C7C7C7 · accent #0F9D58 · accentPressed #0C7C46 · accentSoft #E6F4EC · accentDisabled #A8D5BD · error #ED4956 · errorSoft #FDECEE · warning #F5A623 · warningSoft #FEF5E7 · info #0095F6 · infoSoft #E7F3FD.
+Colors dark: page #000000 · surface1 #121212 · surface2 #1E1E1E · surface3 #262626 · border #363636 · divider #262626 · ink1 #F5F5F5 · ink2 #B0B0B0 · ink3 #8E8E8E · inkDisabled #4D4D4D · accent #1DB868 · accentPressed #17A05A · accentSoft #0E2B1C · error #FF5C6A · warning #FFB74D · info #3BA7F8. Dark: no shadows → 1px border outlines; photos 6% dim; badges keep light colours.
+Font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif. 24/700 hero · 20/700 page title · 17/600 emphasis · 15/400 body (15/600 buttons/tabs) · 13/400 meta (13/600 labels/usernames) · 11/400 caption (11/600 badges uppercase +0.3px). Line-height headings 1.25, body 1.45.
+Spacing: only 4/8/12/16/24/32. Gutters 16px.
+Radius: 4 badges · 8 buttons/inputs · 12 cards/sheets-top · 16 dialogs · 999 chips/avatars/pills.
+Shadows (light only): L1 0 1px 2px rgba(0,0,0,.06) · L2 0 4px 12px rgba(0,0,0,.10) · L3 0 8px 24px rgba(0,0,0,.16).
+Icons: 24px outline 1.5px round-cap; nav 26px.
+Buttons: Primary accent/white 15/600 h44 r8 (pressed accentPressed + scale .98; disabled accentDisabled; loading spinner replaces label) · Secondary surface2/ink1 · Outline 1px border · Text-link accent · Icon-button 44×44.
+Inputs: h44 surface2 r8 1px border; focus accent 1.5px; error border + 11px message + 14px alert icon; top-label 13/600 ink2; helper 11 ink3.
+Verification badges (3 levels — one system): Phone verified = gray outline check 14px · ID verified = accent outline check · RERA verified = accent filled check. Never use the words "property verified" or "guaranteed" anywhere.
+Status badges (11/600 uppercase r4): Live (accentSoft/accent) · Under Review (infoSoft/info) · Changes Requested (warningSoft/warning) · Rejected (errorSoft/error) · Hidden (surface3/ink3) · Sold (ink1/white) · Rented (warningSoft/warning) · Archived (surface3/ink3) · Promoted (black-60%/white) · Expired (surface3/ink3).
+Profile grid: 3 columns, 2px gaps, 1:1 tiles (Instagram-exact).
+Touch targets: min 44×44 everywhere.
+Motion: ease-out cubic-bezier(0.2,0,0,1). Sheets in 300ms spring / out 250ms drag-dismiss, scrim rgba(0,0,0,.40). Collapsing header: on scroll the profile header shrinks — avatar 84px → 32px, stats fade, tabs stick to top (scroll-linked, implement). Tab switch: content crossfade 150ms + underline slide 200ms; tabs also swipeable. Grid lazy-load: 9 tiles at a time with shimmer. Press scale .98. Toast up 200ms/hold 3s/down 200ms. Reduced-motion respected.
+Brand: wordmark "Homz" ink1-700 + "List" accent-700.
+SCREENS TO BUILD
+S1. OWN PROFILE (main screen — build fully)
+Header (56px): left: username "rkproperties" 17/600 + chevron-down (44px target) → account-switch sheet · right: "+" create icon (44px → placeholder "Create — Batch P5") + ⋯ icon (44px → profile menu sheet).
+Profile header block (collapses on scroll):
+
+Row: 84px avatar (photo, with thin accent story-ring if the user has active listings-stories) + stats row (3 equal columns, tappable): "12" 17/700 + "Listings" 11 ink3 · "4,280" + "Views" 11 ink3 · "36" + "Leads" 11 ink3 (tap Listings → S6 · Views → info popup "Views = unique property detail opens per day. Your own views aren't counted." · Leads → placeholder "Leads — Batch P8").
+Name row: "RK Properties" 15/600 ink1 + verification badges inline (Phone ✓ gray, ID ✓ accent, RERA ✓ accent-filled) + role tag ("Broker" surface2 pill 11 ink2).
+Bio 13/400 ink2 (2 lines): "Residential & commercial properties in Rajkot. Site visits 7 days a week."
+Meta line 11 ink3: "Member since Jan 2025 · Usually responds in 2 hours".
+Button row: outline "Edit profile" (flex) + outline "Share profile" (flex) + icon-button (QR icon, 44px → QR sheet).
+Featured circles row (horizontal scroll, under buttons): 64px circles with thin border (not story rings) + 11px labels: "Ready to move" · "Under ₹50 L" · "Commercial" · "+ New" (dashed circle + plus) → tap "+ New" → featured sheet: title "Create featured" + name input + listing multi-picker grid (selectable thumbs) + primary "Create".
+Pinned listings strip: 13/600 ink3 uppercase "PINNED" + horizontal 3 mini-cards (1:1 photo + "₹85 L" 13/600 + "3 BHK Mavdi" 11 ink3 + pin icon top-right) + note 11 ink3: "Pin up to 3 listings to the top of your profile."
+Tabs (sticky when header collapses; swipeable; 15/600; active = ink1 + accent underline) — role-based (dev-toolbar):
+Owner/Broker: "Sell" · "Rent" · "Requirements"
+Builder: "Projects" · "Sell / Rent" · "Requirements"
+Grid/List toggle (right of tabs, icon-button pair: grid icon | list icon).
+Grid content (3-col, 2px gaps, 1:1 tiles): realistic property photos; tile overlays — photo-count icon (stack + "6") bottom-right on multi-photo tiles; status ribbons: diagonal "SOLD" ribbon (ink1 bg, white 11/600, top-right corner) on one tile; "RENTED" (warning) on another; "UNDER REVIEW" (infoSoft, non-diagonal small chip top-left) on one; "PROMOTED" chip on one. Tap tile → S5 (Listing Stats).
+List view variant: rows (72px): 56px thumb + title 15/600 + "₹85 Lakh · 3 BHK · Mavdi" 13 ink3 + status badge + chevron.
+Requirements tab content: requirement cards (compact): budget + type + areas chips + status chip (Active 22d / Expired / Fulfilled) + "12 proposals" 11 ink3 + chevron → placeholder "My Requirements — Batch P8".
+Account-switch sheet: title "Switch account" + X + rows (56px): 40px avatar + "rkproperties" 15/600 + "Broker · Rajkot" 11 ink3 + accent check on current + rows for a second account ("nirav.shah" / "Owner") + divider + "+ Add account" accent row (→ placeholder Login) + "Log out" (error row).
+Profile menu sheet (⋯): rows with icons: "Settings" (→ placeholder "Settings — Batch P10") · "Saved" (→ placeholder P10) · "Your activity" (→ placeholder P10) · "Drafts" (badge "2" → placeholder P6) · "Archived" (→ placeholder P10) · "Account status" (→ account status sub-screen, build it: back + title "Account status" + sections: "Your listings are in good standing ✓" (accentSoft card with check) + list rows of past actions: "Listing rejected — Duplicate listing · 12 Jan" (errorSoft dot) + "Warning — Photos unclear · 5 Jan" (warningSoft dot) + note 11 ink3 "Repeated violations can limit your account.") · "View as visitor" (→ S1 in view-as mode: a persistent top strip appears — surface3, "Viewing as visitor" 11 + "Exit" accent link — and Leads/Views stats + Edit button are hidden, only public info shows) · "QR code" · "Help" (→ placeholder P12).
+QR sheet: white card (r16, 24px pad, centered): QR code graphic (styled, accent-tinted with small "H" logo in center) + "RK Properties" 17/600 + "Broker · Rajkot" 13 ink3 + link row "homzlist.com/rkproperties" 11 ink3 + row: outline "Download" + primary "Share" → toast "Link copied".
+States: skeleton (avatar circle + stat blocks + 9 gray tiles, shimmer) · empty grid (line-art house-plus 96px + "No listings yet" 17/600 + "Post your first property — it stays live forever with the ₹999 plan" 13 ink2 + primary "Create Listing") · offline banner.
+Bottom nav (5 icons; Profile active = avatar with ink1 ring).
+
+S2. OTHER USER PROFILE
+Header: back arrow + username "shreejibuilders" 17/600 + ⋯ (44px → sheet: "Share profile" · "Copy link" · "Report profile" (error) · "Block user" (error)).
+Profile header: 84px avatar + stats row (public only): "24" Listings · "6" Projects (Builder) — no Views/Leads for other users (verify hidden) · name + verification badges (RERA filled ✓) + role tag "Builder" · bio 13 ink2: "Building homes in Rajkot since 2019. RERA registered." · meta 11 ink3: "Member since Mar 2019 · Usually responds in 1 hour" · About this account row (11 ink3 with info icon → popup: "Joined March 2019 · Verified March 2019 · 24 listings posted · Based in Rajkot") · button row: primary "Message" (flex) + outline icon "Call" + outline icon "WhatsApp" (only when their number is public + verified — dev-toolbar toggles this: when private, show only "Message" full-width).
+Featured circles (public ones) + tabs (role-based) + grid (their live listings only — no drafts/pending/archived; verify) → tap tile → placeholder "Property Detail — Batch P4".
+States (dev-toolbar):
+
+Suspended: grid replaced by centered card: line-art lock + "This account is unavailable" 17/600 + "This profile is temporarily unavailable." 13 ink2 (no listings shown, Message button hidden).
+Deleted: "Deleted user" ink3 name + gray avatar + "This account no longer exists" card.
+Report profile sheet: radio rows: "Fake profile" · "Spam" · "Abusive behaviour" · "Fraud attempt" · "Impersonation" + optional note + error-primary "Submit Report" → toast "Report submitted — we'll review it".
+Block dialog: "Block Shreeji Builders?" + "They won't be able to message you. Existing chats stay visible but you can't message each other." + Cancel / error-primary "Block" → toast.
+
+S3. EDIT PROFILE
+Header: back (→ unsaved dialog if changed: "Discard changes?" + Cancel / error-primary "Discard") + title "Edit profile" 17/600 + "Save" text-link (accent, right; disabled until change; becomes spinner on tap → toast "Profile updated").
+Body:
+
+Avatar block (centered): 84px avatar + accent text-link "Change photo" → photo sheet: "Take photo" · "Choose from gallery" · "Remove current photo" (error) → crop sheet: square frame with circular mask preview + pinch/drag hint + zoom slider (accent) + "Cancel" / primary "Done".
+Form rows (ListRow style with label above value, 56–64px, dividers):
+
+"Name" input → "RK Properties"
+"Bio" textarea (3 rows) + counter "72 / 150" 11 ink3 + auto-flag helper (warningSoft inline note, shown when a 10-digit number or URL is typed — implement): "Phone numbers and links aren't allowed in bios. Buyers can contact you through the app."
+"City" select row (pin icon + "Rajkot" + chevron) → city sheet (search + list + selected check) + helper 11 ink3: "Changing your city updates your feed and stories."
+"Phone number" row: "+91 98250 12345" + "Change" accent link → number-change flow (build as 2 mini-screens): (1) "Verify current number" — 6 OTP boxes + "Sent to +91 98250 12345" + resend countdown + primary "Verify"; (2) "Enter new number" — +91 input + primary "Send OTP" → OTP boxes → primary "Verify & Update" → toast "Number updated" → back to Edit. Include note 11 ink3: "You'll verify both your old and new number."
+"Email (optional)" input + helper "For invoices and important updates only. You can't log in with email."
+
+
+Builder-only section (dev-toolbar role = Builder): 13/600 ink3 "COMPANY DETAILS" + "Company logo" upload row (48px logo preview + "Change") + "Established year" input (2019) + "Projects completed" input (12) + "Office address" textarea.
+Broker-only: 13/600 ink3 "BUSINESS DETAILS" + "Office address" + "Areas you cover" multi-select row → sheet (checkbox areas, "Select up to 10").
+Verification row (surface2 r8, 56px, tappable → S4): shield icon + "Verification" 15/600 + right: badge summary ("ID ✓ · RERA ✓" 11 accent) or "Not verified" 11 ink3 + chevron.
+
+S4. VERIFICATION
+Header: back + title "Verification" 17/600.
+Intro card (surface2 r8): "Verified sellers get more genuine inquiries. Verification is free." 13 ink2.
+Level cards (3, stacked, 12px gap):
+
+Phone verified — accentSoft card + gray check icon 32px + "Phone verified" 15/600 + "+91 98250 12345" 13 ink3 + "Verified on 12 Jan 2025" 11 ink3 + status chip "Verified ✓".
+ID verification — surface1 r12 1px border: accent outline check icon + "ID verification" 15/600 + "Upload a government ID or property document" 13 ink2 + states: (a) Not started: doc-type select row → sheet (Aadhaar / PAN / Driving licence / Property tax receipt / Index copy / Electricity bill) + upload tile (dashed, "Upload document", note 11 ink3 "PDF or JPG · Only visible to HomzList admins") + primary "Submit for verification"; (b) Pending: infoSoft strip + clock icon + "Under review — usually within 24 hours" + text-link "Cancel request"; (c) Approved: accent check + chip "Verified ✓" + "Verified on 14 Jan"; (d) Rejected: errorSoft strip + "Rejected: Document unclear — please re-upload" + primary "Try again".
+RERA verification (Broker/Builder only — hidden for Owner) — accent-filled check + "RERA verification" 15/600 + "Add your RERA number to get the verified badge" 13 ink2 + RERA number input (+ helper 11 ink3: "e.g. PR/GJ/RAJKOT/RAJKOT/Others/MAA12345/240424") + certificate upload tile + primary "Submit" + states: pending / approved (chip "RERA verified ✓" + "Valid till 24 Apr 2027" 11 ink3) / revoked (errorSoft banner: "Your RERA verification was revoked on 2 Feb — reason: certificate expired." + primary "Re-submit").
+Footer note (surface2 r8) 11 ink3: "HomzList verifies identity and RERA registration only. We do not verify property titles or guarantee listings."
+
+S5. LISTING STATS (own listing)
+Header: back + title "Listing insights" 17/600 + ⋯ (44px → sheet: "Edit listing" · "Boost listing" · "Share" · "Pin to profile" · "Mark as sold" (→ dialog) · "Delete" (error → dialog)).
+Body:
+
+Hero card (surface1 r12 1px border): 72px thumb + "3 BHK Flat, Shree Residency" 15/600 + "₹85 Lakh · Mavdi, Rajkot" 13 ink3 + status badge ("Live" accentSoft) + posted line 11 ink3: "Live since 12 Jan · Lifetime listing".
+Metrics grid (2×2 cards, surface2 r12, 16px pad): "1,240" 24/700 + "Views" 13 ink2 + sub 11 ink3 "unique, per day" · "86" + "Saves" · "42" + "Shares" · "6" + "Leads" (accent tint, tappable → placeholder "Leads — Batch P8").
+Note strip 11 ink3: "Your own views and shares aren't counted."
+Boost card (accentSoft r12): rocket icon + "Boost this listing" 15/600 + "Appear at the top of the feed, stories and search in your area" 13 ink2 + primary "Boost — from ₹499" (→ placeholder "Boost — Batch P11") · active-boost variant: accent 1.5px border + "Boost active" chip + "Active till 25 Jan · 7-day plan" 13 + note 11 ink3: "Detailed boost analytics aren't available." + text-link "View boost".
+Performance nudge card (warningSoft r12 — dev-toolbar state, shows when 0 leads in 30 days): lightbulb icon + "No inquiries in 30 days" 15/600 + "Listings with 5+ daylight photos and a clear price get up to 3× more inquiries." 13 ink2 + row: outline "Add photos" + outline "Edit price".
+Status actions (bottom sticky bar): outline "Edit" + outline "Boost" + primary "Mark as Sold" → dialog: "Mark this property as sold?" + "It will be archived and removed from feed and search. You can restore it later." + Cancel / primary "Mark as Sold" → toast.
+Still-available prompt (inline card — dev-toolbar): infoSoft r12 card at top: clock icon + "Is this property still available?" 15/600 + "We check every 2 months to keep listings fresh. No response within 15 days will hide it automatically." 11 ink2 + row: outline "No, it's sold" + primary "Yes, still available" → toast "Thanks — your listing stays live".
+
+S6. MY LISTINGS MANAGER
+Header: back + title "My listings" 17/600 + "+" icon (44px → placeholder Create) + filter icon (44px → sheet: sort by Newest / Most viewed / Most leads).
+Plan strip (surface2 r8): "1 of 1 listing slots used" 13 ink2 + accent "Buy another slot" text-link → placeholder Plans.
+Status filter chips (horizontal scroll, with counts): "All 12" · "Live 8" · "Pending 1" · "Changes requested 1" · "Rejected 1" · "Hidden 0" · "Sold 1" · "Archived 2" · then a divider chip "Trash" (→ placeholder "Trash — Batch P10").
+Listing rows (surface1 r12 1px border, 12px pad, 8px gap — build ALL states):
+
+Live: 64px thumb + title 15/600 + "₹85 Lakh · 3 BHK · Mavdi" 13 ink3 + "Live" badge + mini-stats row 11 ink3 ("1,240 views · 6 leads") + action row: outline "Edit" + outline "Boost" + ⋯ (→ sheet: Share / Pin to profile / Mark sold / Mark rented / Delete).
+Under review: "Under Review" badge (infoSoft) + line 11 ink3 "Submitted 2h ago · usually approved within 24 hours" + dimmed thumb + only ⋯ (Withdraw / Edit).
+Changes requested (important — build fully): "Changes Requested" badge (warningSoft) + admin note card (warningSoft r8, 12px pad): "Photos are too dark — please re-upload daylight photos. — HomzList Team" 11 ink2 + a second note "Price seems unusually low for this area — please confirm." + primary "Edit & Resubmit" (→ placeholder Edit — Batch P6).
+Rejected: "Rejected" badge (errorSoft) + reason line 13 ink2 "Reason: Duplicate listing" + note 11 ink3 "You can edit and resubmit. After 3 rejections the listing is locked — contact support." + row: outline "Edit & Resubmit" + text-link "Appeal" (→ placeholder Support).
+Hidden (no expiry response): "Hidden" badge (surface3) + warningSoft note "Hidden because you didn't confirm availability. It will be deleted in 18 days." + primary "Re-activate".
+Sold: "Sold" badge + dimmed + text-link "Restore listing" (→ dialog: "Restore this listing?" + "It will be re-reviewed before going live." + Cancel / primary "Restore").
+Rented: "Rented" badge (warning) + primary "Re-activate listing" (→ dialog: "Re-activate this listing?" + "It uses the same slot — no extra payment. It will be re-reviewed." + Cancel / primary "Re-activate") → toast.
+Archived: "Archived" badge + text-link "Restore".
+Inline still-available banners (on 2 live rows — dev-toolbar): infoSoft strip inside the row: "Still available?" 11 + inline buttons "Yes" (primary small) / "No" (outline small) → tapping updates row + toast.
+Empty state: line-art house-plus + "No listings yet" 17/600 + "Your first listing stays live forever with the ₹999 plan" 13 ink2 + primary "Create Listing".
+Skeleton + offline states.
+
+GLOBAL / SHEETS TO BUILD
+Account-switch sheet · profile menu sheet · account status sub-screen · view-as-visitor mode strip · QR sheet · featured sheet · photo sheet + crop sheet · city sheet · number-change mini-flow (2 screens + OTP) · doc-type sheets · report profile sheet · block dialog · unsaved dialog · listing ⋯ sheets · mark-sold / restore / re-activate dialogs · delete dialog · filter/sort sheets · info popups (Views definition, About this account) · toasts ("Profile updated" / "Number updated" / "Link copied" / "Listing marked as sold" / "Re-activated" / "Report submitted" / "Featured created") · offline banner · skeletons · placeholders for other batches + back.
+BUILD CHECKLIST (build EVERY item — nothing skipped)
+Own Profile: header (username + switch + create + ⋯) · collapsing header (avatar 84→32, stats fade, tabs stick) · stats row ×3 tappable + Views info popup · name + 3 verification badges + role tag · bio + meta + response-time · Edit/Share/QR buttons · featured circles + new-featured sheet · pinned strip + note · role-based tabs (Owner/Broker vs Builder) + swipeable + underline slide · grid/list toggle · 3-col 2px grid + photo-count icons + SOLD/RENTED ribbons + UNDER REVIEW + PROMOTED chips · list-view rows · requirements tab cards · account-switch sheet + add account + logout · profile menu sheet (all rows) · account status sub-screen · view-as-visitor mode (stats/edit hidden + exit strip) · QR sheet · empty grid · skeleton · offline · bottom nav.
+Other Profile: back + ⋯ sheet · public stats only (no Views/Leads) · badges + About-this-account popup · Message/Call/WhatsApp variants (public vs private number) · featured + tabs + live-only grid · suspended state · deleted state · report sheet · block dialog.
+Edit Profile: unsaved dialog · avatar + photo sheet + crop sheet with zoom · name · bio + counter + number/URL auto-flag warning · city sheet + helper · number-change dual-OTP mini-flow · email optional + helper · Builder company section · Broker business section + areas multi-select · verification row → S4 · Save states.
+Verification: intro · Phone level (verified) · ID level (not-started/pending/approved/rejected + doc sheet + upload) · RERA level (Broker/Builder only + input + certificate + pending/approved/revoked) · footer disclaimer (no property verification wording).
+Listing Stats: hero card + status badge · 2×2 metrics + definitions note · leads tap · boost card + active-boost variant + no-analytics note · performance nudge card · sticky actions · mark-sold dialog · still-available inline prompt · ⋯ sheet.
+My Listings Manager: plan strip · status filter chips with counts + Trash · rows for ALL 8 states (Live/Under review/Changes requested with admin field-notes/Rejected + 3-reject note + appeal/Hidden + delete countdown/Sold/Rented + re-activate/Archived) · inline still-available banners · ⋯ sheets · dialogs · empty · skeleton.
+Dev toolbar (screens/states/role/verification/profile-view/listing-states/light-dark/viewport) · Full click-navigation + browser back · Responsive centered-470 at ≥768px.

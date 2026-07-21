@@ -1,0 +1,62 @@
+PACKET P1 — AUTH & ENTRY (8 screens, interactive)
+Copy everything below → paste in Claude Design → generate → save.
+
+Build a fully interactive, clickable HTML prototype for HomzList — a premium Instagram-style real estate listing PWA (website, mobile-first). This is the AUTH & ENTRY module: 8 screens in ONE single HTML file with working click-navigation between them.
+OUTPUT REQUIREMENTS
+
+ONE self-contained HTML file (inline CSS + vanilla JS). No external libraries except Google Fonts if needed (prefer system fonts).
+Every screen = a <section>; JS switches views on click. Browser back must work (use history.pushState). A visible back arrow where specified also navigates back.
+Include a small floating dev-toolbar (top-right, collapsible) to jump to any screen and to toggle: Light/Dark mode, Mobile/Tablet/Desktop view, and error/loading states. This is for review only — style it minimal gray.
+Responsive rule (critical): design is mobile-first at 390px. On tablet (≥768px) and desktop (≥1024px) the SAME design renders centered in a 470px column with #FAFAFA page background on either side and hairline #DBDBDB column borders — NO separate desktop layout (Instagram-web pattern).
+English only. Real, realistic Indian (Rajkot) data — never lorem ipsum.
+Production polish, not a wireframe. No cartoon icons, no emoji as icons — use inline SVG outline icons (Lucide style, 1.5px stroke).
+
+DESIGN SYSTEM (mandatory — follow exactly)
+Colors light: page #FFFFFF · surface1 #FFFFFF · surface2 #F5F5F5 · surface3 #EFEFEF · border #DBDBDB · divider #EFEFEF · ink1 #111111 · ink2 #555555 · ink3 #8E8E8E · inkDisabled #C7C7C7 · accent #0F9D58 · accentPressed #0C7C46 · accentSoft #E6F4EC · accentDisabled #A8D5BD · error #ED4956 · errorSoft #FDECEE · warning #F5A623 · warningSoft #FEF5E7 · info #0095F6 · infoSoft #E7F3FD.
+Colors dark: page #000000 · surface1 #121212 · surface2 #1E1E1E · surface3 #262626 · border #363636 · divider #262626 · ink1 #F5F5F5 · ink2 #B0B0B0 · ink3 #8E8E8E · inkDisabled #4D4D4D · accent #1DB868 · accentPressed #17A05A · accentSoft #0E2B1C · error #FF5C6A · warning #FFB74D · info #3BA7F8. In dark mode: no shadows — use 1px border outlines instead.
+Font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif. Scale: 24/700 hero · 20/700 page title · 17/600 emphasis · 15/400 body (15/600 buttons/tabs) · 13/400 meta (13/600 labels/usernames) · 11/400 caption (11/600 badges, uppercase, +0.3px letter-spacing). Line-height: headings 1.25, body 1.45.
+Spacing: only 4/8/12/16/24/32px. Screen gutters 16px.
+Radius: 4 badges · 8 buttons/inputs/cards · 12 sheets top corners · 16 dialogs · 999px chips/avatars/pills.
+Shadows (light only): L1 cards 0 1px 2px rgba(0,0,0,.06) · L2 raised 0 4px 12px rgba(0,0,0,.10) · L3 sheets/dialogs 0 8px 24px rgba(0,0,0,.16).
+Icons: 24px inline SVG, outline, 1.5px stroke, round caps.
+Buttons: Primary = accent bg, white 15/600, height 44, radius 8, pressed = accentPressed + scale .98, disabled = accentDisabled. Secondary = surface2 bg + ink1 text. Outline = 1px border, transparent. Text-link = accent, no bg. Icon-button = 44×44.
+Inputs: height 44, surface2 bg, radius 8, 1px border; focus = accent 1.5px; error = error border + 11px error message with 14px alert icon below. Top-label pattern (13/600 ink2 above field) — never placeholder-only.
+Touch targets: minimum 44×44px on every tappable element.
+Motion: ease-out cubic-bezier(0.2,0,0,1). Page transition slide 250ms. Sheet in 300ms spring / out 250ms, scrim rgba(0,0,0,.40) fades with it. Press: scale .98 (100ms). Toast: slide-up 200ms, hold 3s, slide-down 200ms. Respect prefers-reduced-motion (durations → 0).
+Brand: wordmark = "Homz" in ink1 700 + "List" in accent 700 (single line, geometric sans). App icon = accent rounded-square with white "H" that has a house-notch cut in the crossbar. Favicon-style small version too.
+SCREENS TO BUILD (all 8 + all states — nothing skipped)
+S1. SPLASH — Full page. Center: app icon 96px + wordmark 24px below (8px gap). Bottom 48px: three 6px accent loader dots pulsing in sequence. Auto-advances to S3 (Login) after 1.2s (JS timer) — but dev-toolbar can re-open it.
+Variants (reachable from dev-toolbar): (a) Update required — icon + "A new version is available" 15 ink2 + primary "Refresh" button; (b) Maintenance — small tools line-art + "We'll be back shortly" 17/600 + "Estimated: 30 minutes" 13 ink3.
+S2. ONBOARDING — 3 horizontally swipeable/clickable slides (dots + Next). Each: "Skip" top-right (44px, ink3) → jumps to S3; centered line-art illustration 240px (single-color ink3 strokes + one accent element); title 20/700 center; subtitle 15/400 ink2 center (max 2 lines); bottom: 3 progress dots (active accent 8px, inactive surface3 6px) + full-width primary button.
+
+house-search art · "Find properties without spam calls" · "Browse verified listings across India — from owners, brokers and builders." · [Next]
+chat-shield art · "Chat safely. Share your number when YOU want" · "Your phone number stays private until you allow it." · [Next]
+matching art · "Post a requirement, get matched" · "Tell us what you need — matching properties come to you." · [Get Started] → S3
+
+S3. LOGIN — Wordmark centered 48px from top → 32px gap → label "Phone number" → input row: fixed "+91" prefix (ink2 + divider line) + 10-digit numeric field → 16px gap → primary "Continue" (disabled until 10 digits; JS enables live) → tap Continue → S4 → 12px gap → consent line 11 ink3 centered: "By continuing, you agree to our Terms & Privacy Policy" (both accent links → open a simple legal placeholder view with back) → 24px gap → divider with centered "or" → text-link "Browse as Guest" 15/600 accent (→ placeholder screen "Feed — Batch P2").
+States (dev-toolbar): (a) rate-limited warningSoft banner at top: "Too many attempts. Try again in 1 hour."; (b) number-locked errorSoft banner: "This number is locked for 24 hours. Contact support."
+S4. OTP — Back arrow (→S3, number preserved) → title "Enter verification code" 20/700 → sub 15 ink2 "Sent to +91 98250 12345" + inline "Edit" accent link (→S3) → 24px gap → 6 OTP boxes (48×52, radius 8, surface2, 20/700, auto-advance on typing, active box accent border) → 16px gap → resend row 13: countdown "Resend code in 00:27" (ink3, live JS countdown) that becomes accent link "Resend code" at 0 → primary "Verify" (auto-submits when 6 digits filled → loading spinner replaces label 1s → S6).
+States: (a) wrong OTP — boxes error border + shake animation + "Incorrect code. 2 attempts left." error 13; (b) attempts exhausted — errorSoft banner "Too many wrong attempts. Try again later." + Verify disabled; (c) resend-limit — "Resend limit reached" ink3.
+S5. SAVED ACCOUNTS — (reachable from dev-toolbar; represents returning user) Wordmark top-center → label 13/600 ink2 "Continue as" → 2 account rows (56px): 48px avatar (one "RK" initials on accentSoft, one photo) + name 15/600 + masked "+91 98••• ••345" 13 ink3 + chevron → tap → S4 (prefilled) → divider between → text-link "Use another account" accent center → S3.
+S6. ROLE SELECTION — Progress dots (step 1 of 2) → title "I am a…" 24/700 → sub 15 ink2 "Choose how you'll use HomzList" → 24px gap → 3 selectable cards (12px gap; selected = accent 1.5px border + accentSoft tint; default = surface1 + L1 shadow): 48px outline icon in accentSoft rounded-square + role 17/600 + one-liner 13 ink2 + ⓘ icon top-right (→ info dialog):
+
+Owner (house icon) — "Buy, sell or rent my own property"
+Broker (briefcase icon) — "List and manage client properties"
+Builder (building icon) — "Post my projects and reach buyers"
+Bottom: primary "Continue" (disabled until a card selected) → S7.
+Info dialog: centered modal max 320px, radius 16, L3 shadow, scrim behind: title "Broker account" 17/600 + body 13 ink2 ("Brokers can list client properties and get a verified badge after RERA verification. You can request verification anytime from your profile.") + primary small "Got it".
+
+S7. BASIC DETAILS — Back arrow (→S6) + progress dots (step 2 of 2) → title "Set up your profile" 24/700 → 24px gap → avatar uploader: 84px dashed-border circle + camera icon + "Add photo" 11 ink3 below + "Skip" micro text-link (tap → opens photo sheet) → label+input "Full name" → label + city selector row styled like an input: pin icon + "Select your city" ink3 + chevron (tap → city sheet; after selection shows "Rajkot" ink1 + change chevron) → 16px gap → checkbox row 1 (20px, radius 4, accent when checked): "I confirm I am 18 years or older" 13 ink2 → checkbox row 2: "I agree to the processing of my data as per the Privacy Policy" 13 ink2 (accent link) → bottom primary "Start Exploring" (disabled until name + city + both checks) → S8 (coach marks over a simplified feed placeholder).
+City sheet: 75% height, radius 12 top, drag handle (36×4 surface3 in 32px zone), title "Select city" 17/600 + X (44px), search bar (40px surface2, search icon, "Search city or area…"), section 11/600 ink3 "POPULAR CITIES", rows 48px: pin ink3 + "Rajkot / Ahmedabad / Surat / Vadodara / Mumbai" 15 ink1 + trailing property count 13 ink3 ("1,240 properties"), dividers, selected row = accentSoft tint + accent check. Swipe-down/X/back closes.
+Photo sheet: rows "Take photo" / "Choose from gallery" / "Remove photo" (last in error color), 48px each, icons leading.
+S8. COACH MARKS — Simplified feed background (header with wordmark + city chip + bell/messages, a story row strip, one property card silhouette) dimmed with rgba(0,0,0,.60) scrim; a circular cutout highlights the city chip with a pulsing accent ring; dark tooltip card (radius 12, #262626, white 13 text) with arrow pointing to it: "Change your city anytime — your feed and stories update instantly" + sequence dots (1 of 3) + "Next" accent text button → moves highlight to Requirements nav item ("Post what you need — matching properties find you") → then to Messages icon ("All inquiries and leads live here") → "Got it" → dismisses to placeholder "Feed — Batch P2".
+S9 (extra). BROWSER UNSUPPORTED — center: browser line-art 96px + "Please update your browser" 20/700 + "HomzList needs a modern browser to run smoothly" 15 ink2 + two outline buttons stacked ("Get Chrome" / "Get Edge").
+GLOBAL BEHAVIOR
+
+Any tap on a link/button that belongs to a future batch (e.g., "Browse as Guest" → Feed) opens a clean placeholder view: centered ink3 text "Feed — coming in Batch P2" + a back arrow.
+All sheets close on: X, backdrop tap, swipe-down gesture, browser back.
+Include working loading state on Verify + Start Exploring buttons (spinner replaces label, width locked).
+Include an offline banner component (warningSoft strip below header: "No internet connection" + Retry) — toggleable from dev-toolbar.
+
+BUILD CHECKLIST (build EVERY item — nothing skipped)
+Splash + update variant + maintenance variant · Onboarding ×3 slides + skip · Login + disabled/enabled + rate-limited + number-locked + guest link + legal links · OTP + countdown + resend-ready + wrong-code + exhausted + resend-limit + loading · Saved accounts ×2 rows + use-another · Role selection ×3 cards + selected state + info dialog · Basic details + photo uploader + photo sheet + city sheet (search/popular/selected) + 2 checkboxes + disabled/enabled · Coach marks ×3 steps · Browser unsupported · Offline banner · Dev toolbar (screen jump, light/dark, mobile/tablet/desktop) · Full click-navigation + browser back · Responsive 390 → centered 470 column on ≥768px.

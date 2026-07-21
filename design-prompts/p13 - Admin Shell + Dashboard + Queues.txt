@@ -1,0 +1,172 @@
+PACKET P13 — ADMIN: SHELL, DASHBOARD & ALL QUEUES (9 screens)
+
+Copy everything below → new Claude Design session → paste → generate → save.
+
+Build a fully interactive, clickable HTML prototype for the HomzList Admin Panel — the internal back-office for a premium real estate listing platform (admin.homzlist.com). This module: Admin Login, Dashboard, Listings Queue, Review Detail, Requirements Queue, Boost Queue, Verification Queue, Appeals Queue, Reports Queue — plus the global admin shell, all side-panels, sheets, dialogs and states — in ONE single HTML file with working click-navigation.
+
+OUTPUT REQUIREMENTS
+ONE self-contained HTML file (inline CSS + vanilla JS), no external libraries. Inline SVG outline icons (Lucide style, 1.5px stroke) — never emoji/cartoon icons.
+Every screen = a section; JS click-navigation; browser back works (history.pushState); back/breadcrumbs navigate back; side-panels and sheets close on X / backdrop / Esc / browser back.
+Dev-toolbar (bottom-right for admin, collapsible, minimal gray): jump to any screen/panel/state, toggle Light/Dark, toggle viewport (Desktop 1440 / Tablet 768 / Mobile 390), toggle admin role (Super Admin / Admin / Staff), toggle states (skeleton / empty / offline / locked-by-other / SLA-overdue).
+Responsive rule (admin is different from the user app): desktop-first — sidebar 240px (collapsible to 64px icon rail) + content area max 1200px centered. At ≤767px: sidebar becomes a bottom drawer (hamburger in header), tables collapse into stacked cards, side-panels become full-screen. Everything must remain usable on a phone (approvals from phone at night is a real use case).
+English only. Realistic Rajkot data (RK Properties, Nirav Shah, Meet Patel, Shreeji Builders; areas: Mavdi, University Road, Kalawad Road, 150 Feet Ring Road; society: Shree Residency, Green Valley Heights).
+Production polish — a serious, dense, professional back-office. Not a wireframe.
+DESIGN SYSTEM (mandatory — follow exactly; same tokens as the user app)
+
+Colors light: page 
+#FFFFFF · surface1 
+#FFFFFF · surface2 
+#F5F5F5 · surface3 
+#EFEFEF · border 
+#DBDBDB · divider 
+#EFEFEF · ink1 
+#111111 · ink2 
+#555555 · ink3 
+#8E8E8E · inkDisabled 
+#C7C7C7 · accent 
+#0F9D58 · accentPressed 
+#0C7C46 · accentSoft 
+#E6F4EC · accentDisabled 
+#A8D5BD · error 
+#ED4956 · errorSoft 
+#FDECEE · warning 
+#F5A623 · warningSoft 
+#FEF5E7 · info 
+#0095F6 · infoSoft 
+#E7F3FD.
+Colors dark: page 
+#000000 · surface1 
+#121212 · surface2 
+#1E1E1E · surface3 
+#262626 · border 
+#363636 · divider 
+#262626 · ink1 
+#F5F5F5 · ink2 
+#B0B0B0 · ink3 
+#8E8E8E · inkDisabled 
+#4D4D4D · accent 
+#1DB868 · accentPressed 
+#17A05A · accentSoft 
+#0E2B1C · error 
+#FF5C6A · warning 
+#FFB74D · info 
+#3BA7F8. Dark: no shadows → 1px border outlines.
+Font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif. 24/700 page hero · 20/700 page title · 17/600 emphasis/panel titles · 15/400 body (15/600 buttons/tabs) · 13/400 table cells & meta (13/600 labels/column headers) · 11/400 caption (11/600 badges uppercase +0.3px). Tables: 13/400 rows, 13/600 headers, line-height 1.4.
+Spacing: only 4/8/12/16/24/32. Content padding 24px desktop / 16px mobile. Table cell padding 12px vertical, 16px horizontal.
+Radius: 4 badges · 8 buttons/inputs/cards · 12 panels/sheets · 16 dialogs · 999 chips/avatars/pills.
+Shadows (light only): L1 0 1px 2px rgba(0,0,0,.06) · L2 0 4px 12px rgba(0,0,0,.10) · L3 0 8px 24px rgba(0,0,0,.16) (side-panels & dialogs).
+Icons: 24px outline 1.5px; 20px inside table rows/sidebar.
+Buttons: Primary accent/white 15/600 h40 (admin is denser than the app) r8 · Secondary surface2/ink1 · Outline 1px · Text-link accent · Icon-button 40×40 (still ≥44px hit area via padding on mobile) · Destructive = error bg.
+Inputs: h40 surface2 r8 1px border; focus accent 1.5px; error border + 11px message.
+Tables: header row surface2 + 13/600 ink2 + sticky on scroll; rows 56px with hairline dividers; hover = surface2 tint; selected = accentSoft tint; sortable columns show chevrons; checkbox column 40px.
+Risk score badge: 4px radius pill, 11/600: 0–2 = surface2/ink2 ("Low") · 3–5 = warningSoft/warning ("Medium") · 6+ = errorSoft/error ("High") — always with the number ("High · 7").
+Status badges (single system, 11/600 uppercase r4): Pending (infoSoft/info) · Approved (accentSoft/accent) · Changes Requested (warningSoft/warning) · Rejected (errorSoft/error) · Live (accentSoft/accent) · Hidden (surface3/ink3) · Sold (ink1/white) · Rented (warningSoft/warning) · Expired (surface3/ink3) · Promoted (black-60%/white) · Verified (accentSoft/accent) · Suspended (errorSoft/error) · Locked (surface3/ink3) · Open/Replied/Closed (infoSoft / accentSoft / surface3).
+SLA timer: 13/600 — under 12h = ink3 · 12–24h = warning · over 24h = error + red left border on the row.
+Motion: ease-out cubic-bezier(0.2,0,0,1). Side-panel slides in from right 250ms (mobile: bottom-up full-screen 300ms). Queue auto-advance: current card fades out 150ms → next fades in. Dialogs 200ms scale-in from .96. Toasts up 200ms/hold 3s/down 200ms. Skeleton shimmer 1.2s. Reduced-motion respected.
+Brand: wordmark "Homz" ink1-700 + "List" accent-700 + "Admin" 11/600 ink3 chip beside it in the sidebar header.
+
+PART A — GLOBAL ADMIN SHELL (used by every screen)
+
+Sidebar (240px, collapsible → 64px icon rail): header: wordmark + "ADMIN" chip + collapse chevron. Nav items (20px icon + 15/400 label + count badge where relevant; active = accentSoft bg + accent left bar 3px + ink1 text):
+
+Dashboard
+Queues (expandable group with chevron): Listings (badge "12") · Requirements (3) · Boosts (2) · Verifications (4) · Appeals (1) · Reports (5)
+Users
+Listings (master)
+Payments
+Finance
+Plans (group): Plans · Coupons · Grants
+Master Data
+CMS
+Templates
+Support (group): Tickets (badge "3") · Disputes (1)
+Staff (Super Admin only — hidden for Admin/Staff via dev-toolbar)
+Analytics
+Audit Log (Super Admin only)
+System (group): Cron & Status · Settings & Flags · Trash · Exports
+Sidebar footer: 32px avatar + "Priya Shah" 13/600 + role chip ("Super Admin" accentSoft / "Admin" infoSoft / "Staff" surface2) + logout icon.
+Top header (56px): left: hamburger (mobile only) + breadcrumb trail (13 ink3, accent links: "Queues › Listings › Review #4521") · center: global search (h40, 420px max, surface2, search icon, placeholder "Search phone, name, listing ID, payment ID…") → results dropdown (L3, grouped sections with 11/600 ink3 headers: USERS (avatar + name + phone + role chip) · LISTINGS (thumb + title + ID + status) · PAYMENTS (payment ID + amount + status) · REQUIREMENTS · TICKETS; each row → its deep-drill panel) · right: notification bell (badge "7" → admin bell drawer: rows — "12 listings pending review · oldest 26h" (SLA-overdue red dot) · "Payment failure spike detected" · "New RERA verification request" · "Report escalated: fraud attempt" + "Mark all read") · staff-online strip (Super only: 3 tiny avatars with green dots + "3 online" 11 ink3) · env badge (dev-toolbar toggle: red "STAGING" chip) · light/dark toggle · avatar menu (→ sheet: "My profile" · "Switch account" · "Log out").
+Mobile shell: header with hamburger → sidebar as bottom drawer (rounded top, list of nav items with badges); global search becomes a full-width row under header; tables → cards.
+PART B — SCREENS
+
+A1. ADMIN LOGIN
+Full-page centered card (max 380px, surface1, r16, L3, 32px pad): wordmark + "ADMIN" chip + 24px gap + title "Admin sign in" 20/700 + sub 13 ink2 "Only authorised HomzList staff can access this panel." + 24px gap + "Sign in with Google" button (outline, 44px, Google G glyph + 15/600 "Sign in with Google") — no email/password fields anywhere (verify) + 16px gap + note 11 ink3: "Access is granted by a Super Admin. Contact them if you can't sign in."
+States (dev-toolbar): (a) Unauthorised email: errorSoft card + alert icon + "This Google account doesn't have admin access" 15/600 + "Signed in as: nirav@gmail.com" 11 ink3 + text-link "Use a different account" + "Contact a Super Admin" · (b) Revoked mid-session: full-page: lock art + "Your admin access was removed" + "Contact a Super Admin if this is unexpected." + outline "Back to HomzList" · (c) Loading: button shows spinner. Footer: "Protected by Google authentication · All admin actions are logged" 11 ink3.
+
+A2. DASHBOARD
+Page title "Dashboard" 24/700 + date chip ("Today · 18 Jul 2026") + refresh icon-button.
+Row 1 — Pending tiles (7 tiles, responsive grid 4-col desktop / 2-col mobile; each: surface1 r12 1px border, 16px pad, tappable → its queue): icon (20px accent) + count 24/700 + label 13 ink2 + oldest-age line 11 (ink3 or error when >24h): "Listings 12 · oldest 26h" (red) · "Requirements 3 · oldest 4h" · "Boosts 2 · oldest 1h" · "Verifications 4 · oldest 8h" · "Appeals 1 · oldest 2d" (red) · "Reports 5 · oldest 12h" (warning) · "Tickets 3 · oldest 3h".
+Row 2 — Today stats (4 cards): "Signups" 24/700 "38" + delta chip ("▲ 12% vs last Thu" accentSoft / "▼ 8%" errorSoft) + tiny 7-bar sparkline · "Revenue" "₹18,940" + delta · "New listings" "24" + delta · "Inquiries" "146" + delta.
+Row 3 — Anomaly banners (conditional, stacked, dismissible ×): errorSoft: alert icon + "Payment failure spike — 14 failures in the last hour (usual: 2)" 13/600 + text-link "Open payments" · warningSoft: "OTP request spike from 3 IPs — possible bot activity" + "View rate limits" · warningSoft: "Report spike — 5 reports on one listing" + "Open reports".
+Row 4 — two columns: (a) Revenue graph card: title "Revenue · last 7 days" 15/600 + tab chips ("7d" selected / "30d" / "6m") + a clean bar chart (accent bars, ink3 axis labels, ₹ values on hover tooltip) + legend chips (Plans / Boosts / Top-ups with color dots); (b) SLA overdue list card: title "Overdue (>24h)" 15/600 + error count chip "3" + rows (48px): thumb + "3 BHK Flat, Mavdi" 13/600 + "26h in queue" 11 error + chevron → A4.
+Row 5 — system strips (3 small cards): "Cron jobs" — accent check + "All 8 jobs healthy · last run 2:00 AM" 13 + link → A27-placeholder ("Cron & Status — Batch P15") · "Backups" — accent check + "Last backup 2:00 AM · restore drill 12 Jan" · "Uptime" — accent dot + "99.98% · 30 days".
+States: skeleton (tiles/cards as shimmer) · offline banner.
+
+A3. LISTINGS QUEUE
+Page title "Listings queue" 20/700 + count chip "12 pending" + right: saved-views dropdown ("All pending" / "Rajkot pending flats" / "High risk only" / "+ Save current view") + column-settings icon + export icon (→ export sheet: format radios CSV/XLSX + field checkboxes + "Export 12 rows" primary → toast "Export ready — check Exports Center").
+Sub-tabs: "Pending 12" · "Updated after edit 2" (warning dot) · "Changes requested 3" · "Payment pending 4" (info dot) · "Rejected 6".
+Filter bar (chips row): "Type ▾" · "City ▾" · "Risk ▾" · "Date ▾" · "Role ▾" + "Clear all" text-link.
+Bulk bar (appears when rows selected): "3 selected" 13/600 + buttons: outline "Approve selected" + outline "Reject selected" + text-link "Clear" + note 11 ink3 "Max 20 at a time" → bulk dialog: "Approve 3 listings?" + list preview (3 thumbs+titles) + warning 11 ink3 "This will publish them immediately and generate stories." + Cancel / primary "Approve 3".
+Table (desktop) / cards (mobile) — columns: [checkbox] · Listing (48px thumb + title 13/600 + "ID #4521" 11 ink3) · Type (chip "Flat / Sale") · Location ("Mavdi, Rajkot") · Poster (24px avatar + name 13 + role chip + "New account" flag warningSoft micro-chip where applicable) · Risk (risk badge "High · 7" + ⓘ tooltip → popup listing the score reasons: "New account +2 · Prior rejection +2 · Phone number in description +3") · In queue (SLA timer: "26h" in error + red row left-border) · Status (badge) · Lock ("Priya is reviewing" surface3 chip + lock icon; row dimmed 50% and its checkbox disabled — dev-toolbar state) · Actions (chevron → A4).
+Sorting default: risk desc, then oldest first (show sort indicator on Risk column).
+Rows: build 8 with variety (high/medium/low risk, one new-account, one locked-by-other, two SLA-overdue red, one "updated after edit" with a warning flag chip, one payment-pending).
+Empty state: line-art inbox-zero 96px + "Queue is clear" 17/600 + "All listings are reviewed. Nice work." 13 ink2.
+Skeleton + offline.
+
+A4. REVIEW DETAIL (the most important admin screen — build fully)
+Layout: two columns on desktop (left 60% = exact user-render preview; right 40% = review panel), stacked on mobile (preview first, sticky action bar at bottom).
+Top bar: breadcrumb ("Queues › Listings › #4521") + queue position ("3 of 12" 13 ink3) + prev/next icon-buttons + keyboard hints chip (surface2, 11 ink3: "A approve · R reject · → next") + close X (→ A3).
+Left — Preview: tab pills "Feed card" | "Full listing" (crossfade 150ms) — render the exact user-facing components: feed card (4:5 carousel with dots + "1/6" counter, price "₹85 Lakh" + "For Sale" badge, "3 BHK · 1,450 sqft · ₹5,862/sqft", pin + "Mavdi, Rajkot", poster row with verified check + "Broker" tag, action bar Save / "View Property" / "Inquiry" / ⋯) and full-listing render (photo carousel, price block, key-specs strip, details list, amenities grid, description, poster card, safety note). Note strip 11 ink3 above the preview: "This is exactly what users will see."
+Right — Review panel (scrollable, sections with 13/600 ink3 headers):
+
+Risk block (top): risk badge "High · 7" + reason rows (11 ink3 with icons): "New account (registered 2h ago) +2" · "Phone number detected in description +3" · "Prior rejection on 5 Jan +2" + text-link "How scoring works".
+Submitted fields (label/value list, 13): Title · Type · Looking to · BHK · Bathrooms · Built-up · Carpet · Floor · Furnishing · Facing · Age · Parking · Water · Maintenance · Society · Ownership · Price + "₹85,00,000" with word-check ("₹85 Lakh") · Negotiable · Deposit (—) · Description (expandable, with the detected number highlighted in warningSoft) · Contact toggle ("Number hidden") · Display number · Alternate number · Each field row has a small "note" icon (20px) → clicking attaches a per-field note (see Request Changes).
+Location breadcrumb: "Gujarat › Rajkot › Rajkot › Mavdi · 360004" 13 + map-pin icon (no map — text only).
+Ownership document viewer (when submitted): surface2 card: doc thumb (tap → doc viewer: dark overlay, zoomable image/PDF page, X, download icon, "Property tax receipt · uploaded 2h ago" caption) + side-by-side compare note 11 ink3: "Check the name and address against the submitted fields." + rows: "Doc type: Property tax receipt" · "Name on doc: Rajesh Kumar" · "Name on account: RK Properties" (⚠ warningSoft mismatch chip + note "Co-ownership and POA are normal — see SOP").
+Poster panel (surface2 r8): 40px avatar + "RK Properties" 15/600 + verified badges + role chip + rows 11 ink3: "Registered 12 Jan 2025 · 2h ago" (warningSoft "New account" chip) · "Listings: 1 · Rejections: 1 · Reports: 0" · "Phone verified ✓ · ID pending" + text-link "Open user →" (→ placeholder "User Detail — Batch P14") + first-listing note (infoSoft 11): "First listing from this account — profile photo and bio are shown below for review." + mini profile-preview (avatar + bio text + flagged-terms highlight if any).
+Prior history strip: rows 11 ink3: "5 Jan — Rejected (Duplicate listing) by Priya" · "6 Jan — Resubmitted" · "12 Jan — Submitted (this version)" + "2 of 3 rejections used" warning chip.
+Report context (dev-toolbar state, errorSoft card): flag icon + "This listing was reported 3 times" + reason chips ("Fake listing ×2", "Wrong price") + text-link "Open reports →".
+SOP checklist (collapsible card, surface2): "Review checklist" 13/600 + checkbox rows (11 ink2): "Photos show the actual property (not screenshots or brochures)" · "Price is plausible for the area" · "Title and description match the type" · "Location is complete (area + pincode)" · "No phone numbers or links in text" · "Co-ownership / POA is acceptable" · "Multiple brokers listing the same property is allowed" + text-link "Open full SOP".
+Action bar (sticky bottom of the panel; desktop: inside panel, mobile: fixed): [Approve] (primary, key "A") · [Request changes] (outline, warning-tinted) · [Reject] (outline, error-tinted, key "R") · ⋯ (→ sheet: "Open in user view" · "Assign to another admin" · "Add internal note" · "Skip for now").
+Dialogs / flows (build all):
+Approve dialog: "Approve this listing?" + summary line ("3 BHK Flat, Mavdi · ₹85 Lakh · RK Properties") + info 11 ink3: "It will go live immediately, generate a 24-hour story and notify the poster." + Cancel / primary "Approve" → toast "Approved · next in queue" → auto-advance (fade to next item).
+Request changes flow (important): opens a note composer panel: instruction 13 ink2 "Attach notes to the fields that need fixing. The poster sees each note next to that field." + field chips (tap to attach): "Photos" · "Price" · "Title" · "Description" · "Location" · "Contact" → each selected chip expands to a textarea (prefilled templates dropdown: "Photos are too dark — please re-upload daylight photos." / "Price seems unusually low for this area — please confirm." / "Title doesn't match the property type." / "Location is incomplete — add the area and pincode.") + preview panel showing how the poster will see it + note 11 ink3: "This keeps the listing pending and does not count as a rejection." + primary "Send change request" → toast "Change request sent".
+Reject dialog: reason radio list (templates): "Duplicate listing" · "Fake or misleading" · "Photos don't match the property" · "Price is unrealistic" · "Wrong category or type" · "Contact details in content" · "Prohibited content" · "Other" (→ reveals textarea) + optional per-field notes + warning strip (warningSoft 11): "This is rejection 3 of 3 — the listing will be locked and the poster must contact support." + Cancel / error-primary "Reject" → toast "Rejected".
+Locked-by-other state: whole panel read-only + top banner (surface3): lock icon + "Priya Shah is reviewing this listing (started 3 min ago)" + text-link "Skip to next".
+States: skeleton · offline (banner: "You're offline — actions will fail. Reconnect before approving.").
+
+A5. REQUIREMENTS QUEUE + REVIEW
+Same table/queue pattern as A3 (columns: Requirement (budget + type chip + "ID #REQ-8842"), Areas, Poster, Risk, In queue, Status, Actions). Review detail: left = exact RequirementCard render (both unlocked view and the locked view users see, in tabs: "Unlocked" | "Locked (what unpaid users see)"); right panel = submitted fields (type / buy-rent / budget min-max with word-check "₹40 Lakh – ₹60 Lakh" / BHK / preferred areas chips / urgency / notes with number-detection highlight) + poster panel + prior history + SOP checklist ("Budget range is realistic" · "Areas exist in master data" · "No contact details in notes" · "Not a disguised advertisement") + same 3 actions + dialogs.
+
+A6. BOOST QUEUE + REVIEW
+Table columns: Boost (thumb + listing title + "Boost #B-2291"), Duration ("1 Month"), Targeting ("Mavdi, Rajkot" / "All India"), Amount ("₹1,499" + "Paid ✓" accent micro-chip), Requested ("2h ago"), Listing status (badge — must be Live), Actions.
+Review panel: listing preview (feed card with "Promoted" badge applied — show exactly how it will look) + payment block (surface2: "Payment ID pay_NxK2p9 · UPI · ₹1,499 · verified ✓" + text-link "Open payment →") + targeting summary + eligibility checks (auto-check rows with green ticks / red crosses): "Listing is live ✓" · "Payment verified ✓" · "No active reports ✓" · "City boost cap: 4 of 10 used ✓" + actions: primary "Approve boost" (→ dialog: "Approve boost? It starts immediately and runs till 25 Jan.") · error-outline "Reject & refund" (→ dialog: reason radios ("Listing hidden during review" / "Content violates policy" / "Duplicate boost") + auto-refund note (accentSoft 11): "₹1,499 will be refunded automatically within 5–7 days and the poster notified." + error-primary "Reject & refund") → toast.
+
+A7. VERIFICATION QUEUE
+Tabs: "Pending 4" · "Approved" · "Rejected" · "Revoked".
+Table: User (avatar + name + role chip), Level (chip: "ID" / "RERA"), Submitted ("8h ago"), Docs ("2 files"), Status, Actions.
+Review panel: side-by-side viewer — left: document image/PDF (zoomable, rotate icon, page nav for multi-page, download); right: entered fields (for ID: doc type / name on doc / number (masked "XXXX XXXX 4521") ; for RERA: RERA number "PR/GJ/RAJKOT/RAJKOT/Others/MAA12345/240424" + copy icon + text-link "Open Gujarat RERA portal ↗" + validity date + certificate) + user panel + checklist ("Name matches account" · "Document is legible and unexpired" · "RERA number format is valid" · "Certificate matches the number") + actions: primary "Approve & grant badge" (→ dialog: "Grant ID Verified badge to RK Properties?" + note 11 ink3: "Badges say identity verified — never property verified.") · outline "Reject" (reason radios: "Document unclear" / "Name mismatch" / "Expired document" / "Invalid RERA number" + textarea) · Approved tab rows get an extra "Revoke" action (→ dialog: "Revoke RERA verification?" + reason input ("Certificate expired") + warning 11: "The badge is removed immediately and the user is notified." + error-primary "Revoke").
+
+A8. APPEALS QUEUE
+Two tabs: "Auto-flag appeals 1" · "Reject-lock reopens 2".
+
+Auto-flag appeal card: user row + flagged content block (surface2: the bio/description text with the flagged term highlighted warningSoft) + "Flag reason: Phone number pattern detected" 13 + user's appeal message (quoted block, 13 ink2: "This is my office landline shown in my bio, not a personal number — brokers usually list it.") + actions: primary "Dismiss flag" (→ content restored, user notified) · outline "Uphold flag" (→ content stays hidden + reason).
+Reject-lock reopen card: listing row + rejection history timeline (3 rows with dates/reasons/admins) + user's message + actions: primary "Unlock & allow resubmit" (→ dialog: "Unlock this listing? The poster gets one more resubmission." ) · outline "Keep locked" (+ reason) → toast.
+Empty state: "No appeals" + "Appeals from auto-flags and locked listings appear here".
+
+A9. REPORTS QUEUE
+Filter chips: "All 5" · "Listings 3" · "Users 1" · "Messages 1" · "High priority 2".
+Report cards (surface1 r12 1px border, 16px pad): top row: reason chip (errorSoft "Fake listing") + count chip ("3 reports" — grouped) + "12h ago" 11 ink3 + priority flag (error dot when 3+ reports).
+
+Entity preview inline: for a listing → mini feed-card render + "ID #4521 · Live" + text-link "Open review →"; for a user → profile row + "24 listings · 1 prior report"; for a message → chat context block (surface2, read-only: 3 bubbles around the reported message, the reported one highlighted errorSoft + "Reported message" label) + note 11 ink3: "Admins can read chat context for reported messages only — sending is disabled everywhere."
+Reporters list (collapsible): rows (24px avatar + name + reason + time) ×3.
+Actions row: outline "Dismiss" (→ dialog + note "Reporters will be told no action was needed") · outline "Hide entity" (→ dialog: "Hide this listing? It will be removed from feed and search; the poster is notified.") · outline "Warn user" (→ warn sheet: template dropdown ("Photos don't match", "Contact details in content", "Misleading price") + message textarea + primary "Send warning") · error-outline "Suspend user" (→ dialog: duration radios ("7 days" / "30 days" / "Until review") + reason + warning 11: "Their listings will be hidden and chats frozen.") · error "Ban device/IP" (Super only → dialog with fingerprint/IP shown) · ⋯ ("Escalate to Super Admin" · "Add internal note").
+Reporter-outcome note (accentSoft 11 strip at the bottom of the card): "Reporters are notified automatically when you take an action."
+Empty state: "No open reports".
+GLOBAL / PANELS / SHEETS TO BUILD
+
+Sidebar (expanded + collapsed rail + mobile drawer) · global search + grouped results dropdown · admin bell drawer · avatar menu sheet · saved-views dropdown + save-view dialog · column-settings sheet · export sheet · filter chips + filter sheets · bulk bar + bulk dialogs · risk-score tooltip popup · doc viewer overlay · note composer panel (request changes) · reject dialog with templates · approve dialog · revoke dialog · warn sheet · suspend dialog · escalate/internal-note sheets · locked-by-other banner · SLA red rows · toasts ("Approved · next in queue" / "Change request sent" / "Rejected" / "Boost approved" / "Badge granted" / "Refund queued" / "Export ready") · offline banner · skeletons · placeholders for other batches ("User Detail — Batch P14" etc.) + back.
+
+BUILD CHECKLIST (build EVERY item — nothing skipped)
+
+Shell (sidebar with all groups + badges + role-hiding + collapse rail + mobile drawer · header with breadcrumbs + global search + grouped results + bell drawer + staff-online + env badge + light/dark + avatar menu) · A1 Login (Google-only + no password fields + unauthorised + revoked + loading + logged note) · A2 Dashboard (7 pending tiles with oldest-age SLA colors + 4 stat cards with prior-period deltas + sparklines + 3 anomaly banners + revenue chart with tabs/legend/tooltip + overdue list + cron/backup/uptime strips + skeleton) · A3 Listings Queue (saved views + sub-tabs incl. updated-after-edit & payment-pending + filters + bulk bar with 20-max + table columns incl. risk badge + tooltip + new-account flag + SLA timers + lock state + sorting + mobile cards + empty + skeleton) · A4 Review Detail (queue position + prev/next + keyboard hints + exact user-render tabs + risk block with reasons + full submitted fields with per-field note icons + number-detection highlight + location breadcrumb + doc viewer + name-mismatch note + poster panel + first-listing profile preview + prior history + 2-of-3 rejections chip + report context + SOP checklist + Approve/Request-changes/Reject + note composer with field chips & templates + reject templates + 3rd-rejection lock warning + auto-advance + locked-by-other read-only) · A5 Requirements Queue+Review (locked/unlocked render tabs + budget word-check + areas + SOP) · A6 Boost Queue+Review (promoted preview + payment block + eligibility checks + city cap + approve + reject&refund with auto-refund note) · A7 Verification Queue (4 tabs + side-by-side doc viewer + RERA portal link + checklist + grant badge dialog with wording note + reject reasons + revoke flow) · A8 Appeals (auto-flag appeals with highlighted content + reject-lock reopens with history timeline + dismiss/uphold/unlock/keep-locked) · A9 Reports (filters + grouped counts + entity previews for listing/user/message + read-only chat context + reporters list + dismiss/hide/warn/suspend/ban + reporter-outcome note + escalate) · Dev toolbar (screens/states/admin-role/viewport/light-dark) · Full click-navigation + browser back · Desktop-first responsive (sidebar → drawer, tables → cards at ≤767px).

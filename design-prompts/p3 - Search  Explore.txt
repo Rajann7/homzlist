@@ -1,0 +1,97 @@
+PACKET P3 — SEARCH & EXPLORE (5 screens, interactive)
+Copy everything below → new Claude Design session → paste → generate → save.
+
+Build a fully interactive, clickable HTML prototype for HomzList — a premium Instagram-style real estate listing PWA (website, mobile-first). This is the SEARCH & EXPLORE module: 5 screens + all sheets + all states in ONE single HTML file with working click-navigation.
+OUTPUT REQUIREMENTS
+
+ONE self-contained HTML file (inline CSS + vanilla JS), no external libraries. Inline SVG outline icons (Lucide style, 1.5px stroke) — never emoji or cartoon icons.
+Every screen = a section; JS click-navigation; browser back works (history.pushState); back arrows navigate back.
+Dev-toolbar (top-right, collapsible, minimal gray): jump to any screen/sheet, toggle Light/Dark, toggle Mobile/Tablet/Desktop, toggle states (skeleton / empty / zero-results / offline / guest).
+Responsive rule: mobile-first 390px. At ≥768px the SAME design renders centered in a 470px column with #FAFAFA page background outside and hairline #DBDBDB column borders — no separate desktop layout (Instagram-web pattern).
+English only. Realistic Rajkot data (areas: Mavdi, Kalawad Road, University Road, 150 Feet Ring Road, Raiya Road, Kuvadva Road; societies: Shree Residency, Green Valley Heights; names: RK Properties, Shreeji Builders, Meet Patel, Nirav Shah). Realistic property photos — no gray boxes except skeleton.
+Production polish, Instagram-level. Not a wireframe.
+
+DESIGN SYSTEM (mandatory — follow exactly)
+Colors light: page #FFFFFF · surface1 #FFFFFF · surface2 #F5F5F5 · surface3 #EFEFEF · border #DBDBDB · divider #EFEFEF · ink1 #111111 · ink2 #555555 · ink3 #8E8E8E · inkDisabled #C7C7C7 · accent #0F9D58 · accentPressed #0C7C46 · accentSoft #E6F4EC · accentDisabled #A8D5BD · error #ED4956 · errorSoft #FDECEE · warning #F5A623 · warningSoft #FEF5E7 · info #0095F6 · infoSoft #E7F3FD.
+Colors dark: page #000000 · surface1 #121212 · surface2 #1E1E1E · surface3 #262626 · border #363636 · divider #262626 · ink1 #F5F5F5 · ink2 #B0B0B0 · ink3 #8E8E8E · accent #1DB868 · accentSoft #0E2B1C · error #FF5C6A · warning #FFB74D · info #3BA7F8. Dark mode: no shadows → 1px border outlines; photos get 6% black dim; badges keep light colors.
+Font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif. 24/700 hero · 20/700 page title · 17/600 emphasis · 15/400 body (15/600 buttons/tabs) · 13/400 meta (13/600 labels/usernames) · 11/400 caption (11/600 badges uppercase +0.3px). Line-height headings 1.25, body 1.45.
+Spacing: only 4/8/12/16/24/32. Gutters 16px.
+Radius: 4 badges · 8 buttons/inputs · 12 cards/sheets-top · 16 dialogs · 999 chips/avatars/pills.
+Shadows (light only): L1 0 1px 2px rgba(0,0,0,.06) · L2 0 4px 12px rgba(0,0,0,.10) · L3 0 8px 24px rgba(0,0,0,.16).
+Icons: 24px outline 1.5px; nav 26px; fill-pairs (Save/Home/Bell/Message). On-photo icons white 92% + 0 1px 2px rgba(0,0,0,.3).
+Buttons: Primary accent/white 15/600 h44 r8 (pressed accentPressed + scale .98; disabled accentDisabled) · Secondary surface2/ink1 · Outline 1px border · Text-link accent · Icon-button 44×44.
+Inputs: h44, surface2, r8, 1px border; focus accent 1.5px; error = error border + 11px message + 14px alert icon. Top-label pattern (13/600 ink2), never placeholder-only.
+Touch targets: min 44×44 everywhere.
+Motion: ease-out cubic-bezier(0.2,0,0,1). Sheets in 300ms spring / out 250ms, drag-follow, dismiss >50%, scrim rgba(0,0,0,.40). Press scale .98 (100ms). Toast up 200ms/hold 3s/down 200ms. Skeleton shimmer 1.2s. Tab switch: content crossfade 150ms + underline slide 200ms. Respect prefers-reduced-motion.
+Aspect ratios (locked): feed/list card photo 4:5 · explore grid tile 1:1 · avatar circle 1:1 · area-page hero none. Cover-crop, never stretch.
+Card hierarchy (locked): Photo → Price → BHK/Area → Location → Poster.
+Brand: wordmark "Homz" ink1-700 + "List" accent-700.
+SCREENS TO BUILD
+S1. SEARCH HOME (Explore)
+Header (56px): full-width SearchBar (h40, surface2, r8, leading search icon ink3, placeholder "Search area, city or society…", tap = focus state showing keyboard-implied) + below it the mode toggle (pill segmented: "Property" active | "Requirement").
+Body:
+
+Section "RECENT SEARCHES" 11/600 ink3 uppercase + "Clear all" accent text-link right-aligned → rows (44px): clock icon ink3 + query text 15 ink1 + × icon right (44px target, removes row with fade). Rows: "3 BHK Mavdi", "Flats under 50 lakh", "Shree Residency", "Plots Kuvadva Road".
+Section "POPULAR AREAS IN RAJKOT" + horizontal chip row: "Mavdi" · "University Road" · "Kalawad Road" · "150 Feet Ring Road" · "Raiya Road" (tap → S2 Results with that filter).
+Section "EXPLORE" + grid: 3-column, 2px gaps, 1:1 tiles with realistic property photos; mixed sizing — one tile is 2×2 (spans 2 cols/rows) marked with a small "Promoted" chip (black-60%) top-left; small photo-count icon (stack icon + "6") bottom-right on tiles with multiple photos. Tap tile → placeholder "Property Detail — Batch P4". Long-press any tile → peek popup: centered card (r12, L3 shadow, scrim behind) showing photo 4:5 + price 17/700 + "3 BHK · Mavdi" 13 ink2 + two buttons "View" / "Save" — release/tap outside closes.
+Bottom nav (5 icons, Search active/filled).
+Autocomplete state (show on search focus + typing "mav"): dropdown panel below the bar (surface1, L3 shadow, r8, max-height 60%): section "SUGGESTIONS" rows 48px — pin icon + "Mavdi, Rajkot" 15 + "1,240 properties" 13 ink3 · pin + "Mavdi Chowk, Rajkot" · then section "PAGES" rows — grid icon + "Flats for Sale in Mavdi — 45 listings" 15 (accent-tinted) → these navigate to S4 Area Page · then "RECENT" rows with clock icons. Typing filters live (JS).
+States: skeleton (grid + rows as shimmer blocks) · offline banner (warningSoft strip below header + Retry).
+
+S2. SEARCH RESULTS
+Header: back arrow (44px) + editable search field (compact, shows "3 BHK Mavdi", tap = re-focus autocomplete) + filter icon (44px) with accent count badge "2" when filters active.
+Below header: tabs row (swipeable, 15/600, active = ink1 + 1.5px accent underline, inactive ink3): "All" · "Properties" · "Projects" · "Brokers & Builders" · "Areas".
+Under tabs: result count line "142 properties" 13 ink3 left + sort pill "Latest ▾" right (→ sort sheet).
+Content (All tab):
+
+Landing-page suggestion row (accentSoft strip, r8, 16px margins): grid icon + "Browse all Flats for Sale in Mavdi (45)" 13/600 + chevron → S4.
+Property cards (3 shown, full card design): 4:5 photo carousel (dots + "1/6" counter pill), price "₹85 Lakh" 17/700 + "For Sale" badge (accentSoft), meta "3 BHK · 1,450 sqft · ₹5,862/sqft" 13 ink2, location pin + "Mavdi, Rajkot" 13 ink3, poster row (24px avatar + "RK Properties" 13/600 + accent verified check + "Broker" tag), action bar: Save icon left + "View Property" (outline) + "Inquiry" (primary) + ⋯ (44px → ⋯ sheet with Share/Report/Not interested).
+Cascade section header after the 3rd card: 13/600 ink3 uppercase with pin icon — "NEARBY: UNIVERSITY ROAD" — then 2 more cards below it (demonstrating the location-cascade expansion when exact area runs out).
+Other tabs (build all): Projects tab = project cards ("New Project" infoSoft badge, "Green Valley Heights" 17/600, "2/3 BHK from ₹45 Lakh", "Ready to move · RERA approved", builder poster row, "View Project" + "Inquiry"). Brokers & Builders tab = list rows (56px): 48px avatar + name 15/600 + verified badge + role tag + "24 listings · Usually responds in 2 hours" 13 ink3 + chevron. Areas tab = rows: pin icon + "Mavdi, Rajkot" 15/600 + "1,240 properties · Avg ₹4,800/sqft" 13 ink3 + chevron → S4.
+States: skeleton · zero-results (magnifier-with-dots line-art 96px + "No properties found" 17/600 + "Try a different spelling or nearby area" 13 ink2 + popular area chips row + accent primary "Post a Requirement" button + text-link "Clear filters") · offline.
+
+S3. FILTER SHEET (opens from filter icon; full-height sheet 90%)
+Drag handle + title "Filters" 17/600 + "Clear all" accent text-link right + X (44px).
+Scrollable sections (each with 13/600 ink2 label):
+
+Looking to: chips "Buy" (selected accentSoft) · "Rent"
+Property type: chips wrapping — "Flat" (selected) · "Bungalow" · "Tenement" · "Farmhouse" · "Office" · "Shop" · "Showroom" · "Godown" · "Plot" · "Agriculture Land" · "PG/Hostel". Dynamic behavior (implement): selecting "Flat" reveals BHK + Bathrooms + Furnishing + Floor + Facing sections; selecting "Plot" hides BHK/Bathrooms/Furnishing and reveals "Area unit" + "Road width" + "Corner plot" toggle; selecting "PG/Hostel" reveals "Tenant type" (Family/Bachelors) + "Veg only" toggle; selecting "Shop/Office" reveals "Carpet area" + "Washrooms".
+Budget: dual-range slider (accent track/thumbs) + two value pills showing "₹20 L" — "₹1.5 Cr" (live JS update)
+BHK: chips "1" · "2" · "3" (selected) · "4" · "5+"
+Bathrooms: chips "1" · "2" · "3+"
+Furnishing: chips "Unfurnished" · "Semi-furnished" (selected) · "Fully furnished"
+Facing: chips "East" · "West" · "North" · "South" · "North-East" · "North-West" · "South-East" · "South-West"
+Location: row (opens nested area sheet — sheet stacking: second sheet slides over first, back closes only the top one): search bar + checkbox list of areas (Mavdi ✓, University Road ✓, Kalawad Road, Raiya Road, 150 Feet Ring Road) + "Apply" — selected areas appear as removable chips in the main filter sheet.
+Amenities: checkbox chips — "Lift" · "Parking" · "Security" · "Garden" · "Gym" · "24hr Water" · "Gas line" · "Power backup"
+More: toggle rows — "Price negotiable only" · "Ready to move" · "New construction" · "Verified sellers only"
+Sticky bottom bar (surface1, top hairline, L2 shadow): "Clear all" text-link left + primary "Show 142 properties" (count updates live as filters change).
+
+S4. AREA PAGE (SEO landing)
+Header: back arrow + area name "Mavdi, Rajkot" 17/600 center + share icon right.
+Body:
+
+Breadcrumbs 11 ink3: "Home › Rajkot › Mavdi › Flats for Sale" (each part accent-tinted, tappable)
+H1: "Flats for Sale in Mavdi, Rajkot" 24/700
+Stats strip: 3 equal columns (surface2 card, r12, 16px padding): "45" 17/700 + "Listings" 11 ink3 · "₹4,800" + "Avg /sqft" · "₹35L–₹1.2Cr" + "Price range"
+Area highlights block (surface2 r12 card): "About Mavdi" 15/600 + body 13 ink2: "Mavdi is one of Rajkot's fastest-growing residential areas, well connected to 150 Feet Ring Road. Schools, markets and hospitals are within 2 km. Popular with families and first-time buyers."
+Filter chips row: "For Sale" (selected) · "For Rent" · "2 BHK" · "3 BHK" · "Under ₹50L"
+Listings grid/list: 4 property cards (same card design as S2)
+"Nearby areas" block: 13/600 ink3 uppercase + chips: "University Road (38)" · "Raiya Road (22)" · "Kalawad Road (56)" · "150 Feet Ring Road (41)" → each tappable
+"Also explore" cross-links block: text-link rows (accent 15): "2 BHK Flats in Mavdi" · "Plots in Mavdi" · "Flats for Rent in Mavdi" · "Commercial Shops in Mavdi" · "New Projects in Mavdi"
+FAQ accordions (3): "What is the average price of a flat in Mavdi?" / "Is Mavdi good for families?" / "Are there new projects in Mavdi?" — each expands (chevron rotate) showing 13 ink2 answer built from data
+Footer strip: "Updated this week" 11 ink3 + legal links row (Terms · Privacy · Grievance Officer) 11 accent
+Bottom nav visible. Guest-viewable (no login wall on this screen — show it as fully public).
+
+S5. CITY COMING SOON
+Centered: line-art map-pin-with-dotted-circle 96px + "HomzList is coming to Surat" 20/700 + "We're adding properties in your city soon. Get notified when we launch." 15 ink2 center (max 280px) + primary "Notify me" button → becomes disabled "You'll be notified ✓" + toast "We'll notify you when we launch in Surat" + below: text-link "Explore Rajkot instead" accent.
+SHEETS & GLOBAL
+
+Sort sheet: title "Sort by" + radio rows: "Latest" (selected) · "Nearby" · "Price: Low to High" · "Price: High to Low".
+⋯ card sheet: "Share" · "Report" (error text) · "Not interested" (eye-off) → toast.
+Share sheet: preview card + link row + Copy accent link (toast "Link copied") + WhatsApp/Copy/More destinations.
+Toast component (dark pill, 13px, bottom 80px above nav).
+Any tap toward another module (property card → detail, Inquiry, nav items) opens a clean placeholder view: centered ink3 "Property Detail — coming in Batch P4" + back arrow.
+Include the offline banner and skeleton for every list/grid screen.
+
+BUILD CHECKLIST (build EVERY item — nothing skipped)
+Search Home (searchbar + focus + autocomplete with suggestions/pages/recent + recents with × + clear-all + popular chips + explore grid with 2×2 promoted tile + photo-count icons + long-press peek popup) · Search Results (back + editable query + filter icon with badge + 5 tabs incl. Projects/Brokers/Areas + result count + sort pill + landing suggestion row + property cards full anatomy + cascade "NEARBY" section + zero-results + skeleton) · Filter Sheet (all sections + dynamic type-based fields for Flat/Plot/PG/Commercial + dual budget slider + nested location sheet with stacking + amenities + toggles + sticky Show-count bar + clear-all) · Area Page (breadcrumbs + H1 + stats strip + highlights + chips + cards + nearby areas + cross-links + FAQ accordions + footer legal) · City Coming Soon (+ notified state + toast) · Sort sheet · ⋯ sheet · Share sheet · Toasts · Offline banner · Skeletons · Dev toolbar (screens, light/dark, mobile/tablet/desktop, states) · Full click-navigation + browser back · Responsive centered-470 column at ≥768px.

@@ -1,0 +1,106 @@
+PACKET P4 — DETAIL SCREENS (6 screens, interactive)
+Copy everything below → new Claude Design session → paste → generate → save.
+
+Build a fully interactive, clickable HTML prototype for HomzList — a premium Instagram-style real estate listing PWA. This is the DETAIL module: Property Detail, Photo Viewer, Project Detail, Requirement Detail, Sold page, 404/Crash — plus all sheets and states — in ONE single HTML file with working click-navigation.
+OUTPUT REQUIREMENTS
+
+ONE self-contained HTML file (inline CSS + vanilla JS), no external libraries. Inline SVG outline icons (Lucide, 1.5px) — no emoji/cartoon.
+Screens = sections; JS navigation; browser back works; back arrows work; sheets open/close (X, backdrop, swipe-down, back).
+Dev-toolbar (collapsible, top-right, minimal gray): jump to any screen/sheet/state, toggle Light/Dark, Mobile/Tablet/Desktop, and toggle these variants: viewer role (Guest / Buyer / Owner-of-this-listing), contact mode (public number / private number), listing status (Live / Under review / Sold), requirement state (Locked / Unlocked / Own).
+Responsive: mobile-first 390px; at ≥768px same design centered in 470px column, #FAFAFA outside, hairline #DBDBDB borders. No separate desktop layout.
+English only. Realistic Rajkot data. Realistic property photos.
+Production polish.
+
+DESIGN SYSTEM (mandatory — follow exactly)
+Colors light: page #FFFFFF · surface1 #FFFFFF · surface2 #F5F5F5 · surface3 #EFEFEF · border #DBDBDB · divider #EFEFEF · ink1 #111111 · ink2 #555555 · ink3 #8E8E8E · inkDisabled #C7C7C7 · accent #0F9D58 · accentPressed #0C7C46 · accentSoft #E6F4EC · accentDisabled #A8D5BD · error #ED4956 · errorSoft #FDECEE · warning #F5A623 · warningSoft #FEF5E7 · info #0095F6 · infoSoft #E7F3FD.
+Colors dark: page #000000 · surface1 #121212 · surface2 #1E1E1E · surface3 #262626 · border #363636 · divider #262626 · ink1 #F5F5F5 · ink2 #B0B0B0 · ink3 #8E8E8E · accent #1DB868 · accentSoft #0E2B1C · error #FF5C6A · warning #FFB74D · info #3BA7F8. Dark: no shadows → 1px borders; photos 6% dim; badges keep light colors.
+Font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif. 24/700 · 20/700 · 17/600 · 15/400 (15/600 buttons) · 13/400 (13/600 labels) · 11/400 (11/600 badges uppercase +0.3px).
+Spacing: only 4/8/12/16/24/32. Gutters 16px. Radius: 4 badges · 8 buttons/inputs · 12 cards/sheets · 16 dialogs · 999 chips/avatars.
+Shadows (light): L1 0 1px 2px rgba(0,0,0,.06) · L2 0 4px 12px rgba(0,0,0,.10) · L3 0 8px 24px rgba(0,0,0,.16).
+Icons: 24px outline 1.5px; on-photo white 92% + shadow.
+Buttons: Primary accent/white 15/600 h44 r8 · Secondary surface2/ink1 · Outline 1px · Text-link accent · Icon-button 44×44. Press scale .98.
+Touch targets: min 44×44.
+Motion: ease-out cubic-bezier(0.2,0,0,1); sheets 300/250ms spring + drag-dismiss; header scroll-morph (transparent-over-photo → solid + title, linked to scroll over first 200px); photo viewer: pinch-zoom + swipe-down-to-dismiss; expandable sections 200ms; toast 200/3s/200. Reduced-motion respected.
+Aspect ratios: detail gallery = full-width natural (letterbox #000 in viewer) · similar-properties mini-cards 1:1 · avatars circle.
+Overlay rules: text on photos only inside bottom-40% gradient (transparent → rgba(0,0,0,.6)); top badges use black-60% chips; max 2 badges per photo.
+Brand: wordmark "Homz" ink1-700 + "List" accent-700.
+SCREENS TO BUILD
+S1. PROPERTY DETAIL (the most important screen — build fully)
+Header: starts transparent over the photo — back arrow, Save icon, Share icon, ⋯ icon (all white 92% + shadow, 44px targets). On scroll → morphs to solid surface1 with hairline border + centered title "3 BHK Flat, Mavdi" 15/600 ink1 (icons turn ink1).
+Body (top → bottom):
+
+Photo carousel: full-width, natural ratio (~4:3 look), swipeable; dots bottom-center (active accent 6px, others white/50% 4px); counter pill "1/6" top-right (black-60%, white 11/600); tap photo → S2 Photo Viewer. Badges: "Promoted" top-left (black-60% chip) — toggleable.
+Price block: "₹85 Lakh" 24/700 ink1 + "Negotiable" chip (surface2, 11/600 ink2) inline; right side: "For Sale" badge (accentSoft/accent). Second line: "₹5,862 / sqft" 13 ink3. Variant (dev-toolbar): "Price on Request" 20/700 ink1 instead of number.
+Title: "3 BHK Flat in Shree Residency" 17/600 + location row: pin icon + "Mavdi, Rajkot – 360004" 13 ink2.
+Key specs strip (surface2 card r12, 4 columns with icons + values 13/600 + labels 11 ink3): bed icon "3 BHK" · bath icon "3 Bath" · area icon "1,450 sqft" · floor icon "4 / 7".
+Highlights chips row (tappable → placeholder search): "Semi-furnished" · "East facing" · "Ready to move" · "Lift" · "Covered parking".
+Details section (13/600 ink2 header "Property Details" + 2-column label/value list, 15/400): Property type: Flat · Built-up area: 1,450 sqft · Carpet area: 1,180 sqft · Furnishing: Semi-furnished · Facing: East · Floor: 4 of 7 · Age: 3 years · Bathrooms: 3 · Balconies: 2 · Parking: 1 covered car + 2 two-wheeler · Water: Municipal + Bore · Maintenance: ₹2,200/month · Ownership: Freehold · Society: Shree Residency.
+Amenities grid: 3-column icon tiles (24px icon + 11px label): Lift · Parking · Security · Garden · Gym · 24hr Water · Power backup · Gas line.
+Furnishing included (chips): AC (2) · Wardrobes (3) · Geyser · Modular kitchen.
+Description: 15/400 ink2, 3 lines visible + "Read more" accent link (expands, JS): "Spacious 3 BHK in a well-maintained society close to 150 Feet Ring Road. Corner flat with cross ventilation, morning sunlight and a large balcony overlooking the garden. Schools and market within walking distance. Ideal for families."
+Price history (small card, only if drop happened): "Price dropped ₹5 Lakh on 12 Jan" 13 accent + down-arrow icon.
+About the area (surface2 r12 card): "About Mavdi" 15/600 + 13 ink2 text + "Explore Mavdi" accent link → placeholder Area Page.
+Poster card (surface1, r12, 1px border, 12px padding): 48px avatar + "RK Properties" 15/600 + accent verified check + "Broker" tag + second line "Member since Jan 2025 · Usually responds in 2 hours" 11 ink3 + chevron → placeholder "Profile — Batch P9".
+Safety note (warningSoft r8 strip): shield icon + "Never pay token or advance before a site visit. HomzList is not responsible for off-platform payments." 11 ink2.
+Similar properties: 13/600 ink3 uppercase header + horizontal 1:1 mini-cards (3 visible: photo + "₹78 Lakh" 13/600 + "3 BHK · Mavdi" 11 ink3).
+Breadcrumbs 11 ink3: "Home › Rajkot › Mavdi › 3 BHK Flat".
+Sticky bottom bar (surface1, top hairline, L2 shadow, 64px + safe-area) — build all 3 variants (dev-toolbar switch):
+
+
+Private number (default): outline "Request Number" (phone icon) + primary "Send Inquiry" (50/50 split).
+Public number: icon-button "Call" (phone icon, outline) + icon-button "WhatsApp" (WhatsApp glyph, outline green-tinted) + primary "Send Inquiry" (flex).
+Own listing: outline "Edit" + outline "Boost" + primary "Mark as Sold" + above the bar a stats strip (surface2, 3 columns: "1,240 Views" · "18 Saves" · "6 Leads" — 13/600 + 11 ink3 labels; tap Leads → placeholder).
+States (dev-toolbar):
+Guest: same screen; tapping Save/Inquiry/Request Number → login sheet (mini: wordmark + "Sign in to continue" 17/600 + "Save properties, send inquiries and chat securely" 13 ink2 + primary "Continue with phone").
+Under review (own): infoSoft banner under header: clock icon + "This listing is under review. It will go live once approved." + watermark diagonal text "UNDER REVIEW" faint over the photo.
+Sold: grayscale photo + errorSoft banner "This property has been sold" + bottom bar replaced by outline "Browse similar properties".
+Skeleton: shimmer blocks for photo/price/specs/details.
+Offline banner.
+Sheets from this screen (build all):
+Inquiry sheet: title "Send Inquiry" + X · textarea prefilled "Hi, I'm interested in your 3 BHK Flat at Mavdi, Rajkot (₹85 Lakh). Is it still available?" · label "Quick questions" + 4 chips (2 rows): "Site visit?" (selected) · "Negotiable?" · "Documents ready?" · "Loan available?" · toggle row "Share my number with owner" (on, accent) · primary "Send Inquiry" → toast "Inquiry sent — waiting for owner to accept" → bottom bar changes to disabled "Inquiry sent ✓".
+Number-request confirm dialog: centered modal 320px r16 L3: "Request owner's number?" 17/600 + "The owner will be asked to share their number with you. You'll be notified when they respond." 13 ink2 + row: text-link "Cancel" + primary "Send Request" → toast "Number request sent".
+Share sheet: preview card (thumb + "3 BHK Flat, Mavdi" + "₹85 Lakh") + link row "homzlist.com/property/rajkot-mavdi-3bhk-flat-x7k2" + "Copy" accent (toast "Link copied") + destinations (WhatsApp / Copy Link / More).
+⋯ sheet: "Share" · "Report" (error) · "Not interested".
+Report sheet: 6 radio rows (Fake listing / Already sold / Wrong price / Wrong photos / Abusive content / Duplicate) + optional note + error-colored "Submit Report" (disabled till selection).
+Mark-as-sold confirm dialog (own listing): "Mark this property as sold?" + "It will be archived and removed from search. You can restore it later." + Cancel / primary "Mark as Sold" → toast.
+
+S2. PHOTO VIEWER (fullscreen black)
+Black bg; top bar: X (white, 44px) left + counter "3 / 6" white 13 center + share icon right. Photo centered, letterboxed, pinch-zoom enabled (JS) + double-tap to zoom; swipe left/right = next/prev; swipe-down = dismiss (returns to detail at same scroll). Bottom: alt-label caption "Master bedroom" white/70 11 center. Thumbnail strip at very bottom (6 thumbs 48px, active = white 2px border). Right-click/long-press save disabled (add JS preventing context menu on images).
+S3. PROJECT DETAIL
+Same header pattern + photo carousel. Body:
+
+Price/title block: "Green Valley Heights" 24/700 + "New Project" badge (infoSoft) + "by Shreeji Builders" 13 ink2. Line 2: "₹45 Lakh – ₹78 Lakh" 17/600.
+Status chips row: "Under Construction" (warningSoft) · "Possession: Dec 2026" (surface2) · "RERA Approved" (accentSoft).
+RERA line: shield icon + "RERA No: PR/GJ/RAJKOT/RAJKOT/Others/MAA12345/240424" 11 ink3 (selectable text).
+Project facts strip (surface2 card, 4 cols): "3 Towers" · "G+7 Floors" · "84 Units" · "26 Available".
+Unit types table (build as expandable rows): header 13/600 "Available Units"; rows (each r8 border, 12px padding, chevron): "2 BHK — 1,100 sqft — ₹45 L onwards" → expands to show: carpet area 920 sqft · 12 units available · floor plan thumbnail (tap → S2 viewer) · "Enquire about this unit" accent text-link. Second row: "3 BHK — 1,450 sqft — ₹62 L onwards" (expand similar). Third: "3 BHK Premium — 1,680 sqft — ₹78 L onwards".
+Bank approvals: 13/600 label + chips with tiny bank glyphs: "SBI" · "HDFC" · "ICICI" · "Axis" — accentSoft chips.
+Amenities grid (3-col icons): Clubhouse · Swimming pool · Gym · Kids play area · Garden · Security · Power backup · Parking.
+Brochure row (surface2 r8, 56px): PDF icon + "Project Brochure" 15/600 + "2.4 MB" 11 ink3 + download icon (44px) → toast "Downloading brochure…".
+Location: pin + "150 Feet Ring Road, Rajkot – 360005" + "About the area" card.
+Builder card: 48px logo avatar + "Shreeji Builders" 15/600 + accent verified (RERA level) + "Builder" tag + "12 projects · Member since 2019" 11 ink3 + chevron.
+Similar projects strip.
+Sticky bottom bar (always public numbers for projects): "Call" (outline icon-btn) + "WhatsApp" (outline icon-btn) + primary "Send Inquiry".
+Own-project variant (dev-toolbar): stats strip ("1,240 Views · 18 Leads · 26/84 Units") + bar: outline "Edit" + outline "Update Units" + outline "Boost".
+State: "Completed" project → "Completed" badge (surface3/ink2) + possession row shows "Ready to move".
+
+S4. REQUIREMENT DETAIL — build all 3 variants
+(a) Locked (unpaid viewer): Header: back + share (disabled/hidden) + ⋯. Body: top chips "Looking to Buy" (accentSoft) + "Urgent" (warningSoft, flame icon) · budget hidden: "₹••L – ₹••L" blurred (6px CSS blur) with a lock icon overlay · visible partial info: "2 BHK · Rent · University Road area" 15 ink1 · poster row fully blurred (avatar + name shapes) + centered lock 16px · "Posted 2h ago" 11 ink3 · Paywall card (accentSoft r12, 16px padding, centered): lock icon 32px accent + "Unlock all requirements" 17/600 + "See full details, budgets and contact posters directly" 13 ink2 + "₹2,999" 24/700 + "/month" ink3 + checklist (accent checks): "View all requirements" · "30 proposals included" · "Instant match alerts" + primary "Continue to Payment" → placeholder "Checkout — Batch P6" + text-link "Compare plans".
+(b) Unlocked (paid viewer): full data — budget "₹40 Lakh – ₹60 Lakh" 24/700 · "Looking to Buy" + "Urgent" chips · details list: Property type: Flat · Configuration: 3 BHK · Preferred areas: chips "Mavdi" "University Road" "Raiya Road" · Urgency: "Immediate (within 1 month)" · Posted: "2 hours ago" · Requirement ID: #REQ-8842 · Notes: "Looking for a ready-to-move 3 BHK, preferably east facing, near a good school. Budget slightly flexible for the right property." · Poster card: 48px avatar + "Meet Patel" 15/600 + accent verified check + "Owner" tag + "Rajkot · Member since Mar 2025" 11 ink3 (NO phone number shown — number only flows to poster from sender) · Sticky bottom: primary "Send Proposal" full-width + "6 proposals remaining" 11 ink3 above it.
+(c) Own requirement: Header + body same as (b) but: status chip "Active · 22 days left" (accentSoft) + toggle row (surface2 r8): "Requirement active" 15/600 + accent toggle (on) → turning OFF opens confirm dialog: "Turn off this requirement?" + "It will stop receiving proposals. This requirement will still count against your plan quota." + Cancel / primary "Turn Off" · Proposals row (56px, tappable): "12 proposals received" 15/600 + accent count badge + chevron → placeholder "Proposals — Batch P8" · Matching properties strip: 13/600 ink3 "MATCHING PROPERTIES ON HOMZLIST" + horizontal mini-cards (3) + "Nearby: Raiya Road" cascade label on the 3rd · Bottom bar: outline "Edit" + outline "Mark Fulfilled" + error-tinted text "Delete" → delete dialog (double-confirm): "Delete this requirement?" + "This cannot be undone. The requirement will still count against your plan quota." + Cancel / error-primary "Delete".
+States: Expired variant (surface3 "Expired" chip + banner "This requirement expired on 12 Jan" + primary "Renew plan to reactivate"); Fulfilled variant (accentSoft "Fulfilled ✓" chip + proposals closed note).
+Proposal sheet (from b): title "Send Proposal" + X · two radio option cards: "I have a property" (house icon — when selected reveals horizontal listing-picker: your live listings as selectable mini-cards + "No listing? Send a suggestion instead" 11 accent link) · "Can we chat" (chat icon) · message textarea prefilled: "Hi, I have a 3 BHK in Mavdi that matches your requirement. Let me know if you'd like details." · footer "6 proposals remaining" 11 ink3 + primary "Send Proposal" → toast "Proposal sent — 5 remaining" → button becomes disabled "Proposal sent ✓".
+S5. SOLD / UNAVAILABLE PAGE (what shared old links open)
+Centered: line-art house-with-sold-tag 96px + "This property is no longer available" 20/700 + "It may have been sold, rented or removed by the owner." 15 ink2 + primary "Browse similar properties" → placeholder Search + text-link "Go to Home". Below: "Similar properties" section with 3 property cards.
+S6. 404 / CRASH / GENERIC ERROR (3 frames)
+
+404: compass line-art 96px + "Page not found" 20/700 + "The link may be broken or the page may have been removed." 15 ink2 + primary "Go to Home" + outline "Search properties".
+Crash: broken-plug line-art + "Something went wrong" 20/700 + "Please try again. If it keeps happening, contact support." 15 ink2 + primary "Reload" + text-link "Contact Support".
+Generic error inline: errorSoft banner sample "Couldn't load this listing" + "Retry" accent link.
+
+BUILD CHECKLIST (build EVERY item — nothing skipped)
+Property Detail: transparent→solid scroll-morph header · carousel (dots/counter/promoted/tap→viewer) · price block (+negotiable, +on-request variant) · title/location · key specs strip · highlight chips · full details list · amenities grid · furnishing chips · description + read-more · price history · about-area card · poster card · safety note · similar strip · breadcrumbs · sticky bar ×3 variants (private / public+Call+WhatsApp / own+stats) · guest state + login sheet · under-review state + watermark · sold state · skeleton · offline · Inquiry sheet · number-request dialog · Share sheet · ⋯ sheet · Report sheet · mark-sold dialog · toasts.
+Photo Viewer: counter · thumbnails strip · pinch-zoom · double-tap zoom · swipe next/prev · swipe-down dismiss · alt caption · save-blocked.
+Project Detail: all facts · status chips · RERA line · unit-type expandable rows + floor plans · bank chips · amenities · brochure row · builder card · always-public bottom bar · own-project variant · completed state.
+Requirement Detail: locked (blur+lock+paywall card) · unlocked (full + poster without number + proposal bar + counter) · own (toggle + confirm dialog + proposals row + matching strip + cascade label + edit/fulfil/delete + double-confirm delete) · expired · fulfilled · Proposal sheet (2 options + listing picker + counter + sent state).
+Sold page · 404 · Crash · inline error · Dev toolbar (screens/states/role/contact-mode/status) · Full click-navigation + browser back · Responsive centered-470 at ≥768px.

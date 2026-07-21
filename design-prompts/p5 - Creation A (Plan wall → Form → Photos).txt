@@ -1,0 +1,141 @@
+PACKET P5 — CREATION A: PLAN WALL → TYPE → FORM → PHOTOS (5 screens)
+Copy everything below → new Claude Design session → paste → generate → save.
+
+Build a fully interactive, clickable HTML prototype for HomzList — a premium Instagram-style real estate listing PWA (website, mobile-first). This is CREATION MODULE A: Plan Wall, Post Type, Property Type, Listing Form (dynamic), Photo Upload — in ONE single HTML file with working click-navigation.
+OUTPUT REQUIREMENTS
+
+ONE self-contained HTML file (inline CSS + vanilla JS), no external libraries. Inline SVG outline icons (Lucide style, 1.5px stroke) — never emoji/cartoon icons.
+Every screen = a section; JS click-navigation; browser back works (history.pushState); back arrows work; sheets close on X / backdrop / swipe-down / back.
+Dev-toolbar (top-right, collapsible, minimal gray): jump to any screen/sheet/state, toggle Light/Dark, toggle Mobile/Tablet/Desktop, toggle role (Owner / Broker / Builder), toggle slot status (has plan / no plan), toggle states (draft-restored / validation-errors / upload-failure).
+Responsive: mobile-first 390px. At ≥768px the SAME design renders centered in a 470px column, #FAFAFA outside, hairline #DBDBDB column borders — no separate desktop layout.
+English only. Realistic Rajkot data (areas: Mavdi, Kalawad Road, University Road, 150 Feet Ring Road, Raiya Road; societies: Shree Residency, Green Valley Heights).
+Production polish, Instagram-level. Not a wireframe.
+
+DESIGN SYSTEM (mandatory — follow exactly)
+Colors light: page #FFFFFF · surface1 #FFFFFF · surface2 #F5F5F5 · surface3 #EFEFEF · border #DBDBDB · divider #EFEFEF · ink1 #111111 · ink2 #555555 · ink3 #8E8E8E · inkDisabled #C7C7C7 · accent #0F9D58 · accentPressed #0C7C46 · accentSoft #E6F4EC · accentDisabled #A8D5BD · error #ED4956 · errorSoft #FDECEE · warning #F5A623 · warningSoft #FEF5E7 · info #0095F6 · infoSoft #E7F3FD.
+Colors dark: page #000000 · surface1 #121212 · surface2 #1E1E1E · surface3 #262626 · border #363636 · divider #262626 · ink1 #F5F5F5 · ink2 #B0B0B0 · ink3 #8E8E8E · inkDisabled #4D4D4D · accent #1DB868 · accentPressed #17A05A · accentSoft #0E2B1C · error #FF5C6A · warning #FFB74D · info #3BA7F8. Dark: no shadows → 1px border outlines.
+Font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif. 24/700 hero · 20/700 page title · 17/600 emphasis · 15/400 body (15/600 buttons/tabs) · 13/400 meta (13/600 labels) · 11/400 caption (11/600 badges uppercase +0.3px). Line-height headings 1.25, body 1.45.
+Spacing: only 4/8/12/16/24/32. Gutters 16px.
+Radius: 4 badges · 8 buttons/inputs/cards · 12 sheets-top/large cards · 16 dialogs · 999 chips/avatars/pills.
+Shadows (light only): L1 0 1px 2px rgba(0,0,0,.06) · L2 0 4px 12px rgba(0,0,0,.10) · L3 0 8px 24px rgba(0,0,0,.16).
+Icons: 24px outline 1.5px round-cap.
+Buttons: Primary accent bg/white 15/600 h44 r8 (pressed accentPressed + scale .98; disabled accentDisabled; loading = spinner replaces label, width locked) · Secondary surface2/ink1 · Outline 1px border transparent · Text-link accent · Icon-button 44×44.
+Inputs: h44, surface2 bg, r8, 1px border; focus accent 1.5px; error = error border + 11px error text with 14px alert icon below; top-label pattern (13/600 ink2 above field) — never placeholder-only; helper text 11 ink3 below field.
+Selects/rows: input-styled row with chevron → opens bottom sheet (never native dropdown).
+Touch targets: min 44×44 everywhere.
+Motion: ease-out cubic-bezier(0.2,0,0,1). Sheets in 300ms spring / out 250ms, drag-follow, dismiss >50%, scrim rgba(0,0,0,.40). Sheet stacking: a sheet can open over a sheet (back closes only the top one). Field reveal/hide: 200ms height+fade. Press scale .98 (100ms). Toast up 200ms/hold 3s/down 200ms. Progress ring on upload tiles animates. Respect prefers-reduced-motion.
+Brand: wordmark "Homz" ink1-700 + "List" accent-700.
+SCREENS TO BUILD
+S1. PLAN WALL (appears when user taps + and has NO available slot)
+Header: X close (44px, → back to origin) + title "Choose a plan" 17/600 center.
+Body:
+
+Intro line: "Buy a plan to post your listing" 15 ink2 center + "One-time payment · Lifetime listing" 13 ink3.
+Plan cards (role-filtered — dev-toolbar switches role):
+
+₹999 card (default recommended — accent 1.5px border + "RECOMMENDED" micro-badge accentSoft top-right): "₹999" 24/700 + "one-time · lifetime listing" 13 ink3 → checklist rows (accent check icons, 15/400): "1 property listing — stays live forever" · "1 requirement post (30 days)" · "10 proposals on others' requirements" → primary "Continue" button.
+₹2,999 card: "₹2,999" 24/700 + "/month" ink3 → checklist: "Unlock all requirements" · "30 proposals included" · "Instant match alerts" → outline "Continue" button.
+₹9,999 card (visible ONLY when role = Builder — dev-toolbar): "₹9,999" 24/700 + "per project · 6 months" ink3 → checklist: "1 project listing with unlimited units" · "Unlimited matching requirements" · "Priority match notifications" → outline "Continue".
+When role = Owner/Broker: ₹9,999 card is hidden entirely (verify visually).
+
+
+Coupon row (surface2 r8, 48px): tag icon + "Have a coupon code?" 15 ink2 + chevron → expands inline to input + "Apply" outline button → applied state: accentSoft row "SAVE20 applied — ₹200 off" + × remove.
+Text-link centered: "Compare plans" → comparison sheet.
+Footer note 11 ink3 centered: "No refunds after purchase. See Refund Policy." (accent link).
+Comparison sheet (90% height): title "Compare plans" + X · scrollable table: sticky first column of feature labels (13/400 ink2) + columns per plan (13/600) with accent checks / "—" dashes: rows = "Property listing" · "Listing validity" · "Requirement post" · "Requirement viewing" · "Proposals included" · "Project posting" · "Match alerts" · "Boost eligible" · "Price" (last row bold) → each column footer: primary "Choose" button.
+Tapping "Continue" → placeholder "Checkout — Batch P6" (clean placeholder view with back).
+
+S2. POST TYPE SELECTION
+Header: X (44px) + title "Create" 17/600.
+Body: intro "What would you like to post?" 15 ink2 + option cards (stacked, 12px gap, each: 48px accentSoft rounded-square with accent outline icon + title 17/600 + subtitle 13 ink2 + chevron; press scale .98) — role-filtered (dev-toolbar):
+
+Owner/Broker: "Sell a Property" (house-tag icon — "List a property for sale") · "Rent a Property" (key icon — "List a property for rent") · "Post a Requirement" (search-list icon — "Tell us what you're looking for").
+Builder: adds at top → "Post a New Project" (building icon — "Multi-unit project with RERA details") · then Sell / Rent / Requirement.
+Below cards: plan-status strip (surface2 r8): "1 listing slot available" 13 accent + info ⓘ → tooltip popup "Your ₹999 plan includes 1 lifetime listing." · no-slot variant (dev-toolbar): warningSoft strip "No listing slots left — buy a plan to continue" + accent "View Plans" link → S1.
+Tap Sell/Rent → S3. Tap Requirement → placeholder "Requirement Form — Batch P6". Tap Project → placeholder "Project Form — Batch P6".
+
+S3. PROPERTY TYPE SELECTION
+Header: back arrow + title "Property type" 17/600 + progress dots (step 1 of 4).
+Body: category accordions (expanded by default; each: 13/600 ink3 uppercase header + grid of type tiles 3-col: 32px outline icon + label 11/600 center, tile = surface2 r8 h72, selected = accent 1.5px border + accentSoft):
+
+RESIDENTIAL: Flat (selected by default) · Bungalow · Tenement · Farmhouse
+COMMERCIAL: Office · Shop · Showroom · Godown
+PLOT / LAND: Residential Plot · Commercial Plot · Agriculture Land · Farm
+OTHER: PG / Hostel
+Role filter (critical — implement): when role = Builder (dev-toolbar), hide PG/Hostel completely and show only project-relevant types (Residential/Commercial/Plot categories) — verify no PG tile renders.
+Bottom sticky: primary "Continue" (disabled until a type selected) → S4.
+
+S4. LISTING FORM (dynamic — the biggest screen; build fully)
+Header: X (→ unsaved-changes dialog: "Save this as a draft?" + "You can finish it later from Drafts." + row: text-link "Discard" (error) / outline "Cancel" / primary "Save Draft" → toast "Draft saved") + title "Add details" 17/600 + progress dots (step 2 of 4) + "Save draft" text-link right.
+Draft-restored banner (dev-toolbar state): accentSoft strip at top: "Draft restored from 2 hours ago" 13 + "Start fresh" accent link.
+Body — scrollable, grouped sections (each section: 13/600 ink3 uppercase header + fields):
+A. BASICS
+
+Title input + helper 11 ink3 that auto-updates with selected type: for Flat → "e.g. 3 BHK Flat for sale in Mavdi, Rajkot"; for Plot → "e.g. Residential plot for sale in Kuvadva Road"; for Shop → "e.g. Commercial shop for rent on Kalawad Road" (implement 3+ variants; JS swaps text).
+"Auto-generate title" accent text-link (right of label) → fills the input from selected fields with a brief fill animation.
+Looking to: chips "Sell" (selected) / "Rent" — switching to Rent reveals the Rent-only fields (deposit, available-from, tenant preference, maintenance-included toggle) and hides possession-related ones. Implement live.
+
+B. PROPERTY DETAILS (dynamic per type — implement show/hide for all listed cases)
+
+Flat/Tenement/Bungalow: BHK chips (1/2/3 selected/4/5+) · Bathrooms chips (1/2/3+) · Balconies chips (0/1/2/3+) · Built-up area (number input + unit select row → unit sheet: sq ft / sq yard / sq m) · Carpet area (optional, same pattern) · Area type note 11 ink3: "Carpet area is recommended for accuracy" · Floor (number) + Total floors (number) in a 2-col row · Furnishing select row → sheet (Unfurnished / Semi-furnished (selected) / Fully furnished) — choosing Semi/Fully reveals "Furnishing included" checkbox chips: AC · Wardrobes · Fridge · Geyser · Modular kitchen · Beds · Sofa · Curtains · Facing select row → sheet (East/West/North/South/NE/NW/SE/SW) · Age select row → sheet (Under construction / New construction / 0–1 year / 1–5 years (selected) / 5–10 / 10+) — choosing "New construction" hides Age-related helper and reveals "Possession date" month-picker row; choosing a resale age hides possession · Parking: 2 stepper rows ("Car parking" − 1 + / "Two-wheeler parking" − 2 +) + chips "Covered" (selected) / "Open" · Water supply chips: Municipal (selected) · Bore · Both · Lift toggle · Society/Project name input (helper "Helps buyers find your listing" 11 ink3) · Ownership select row → sheet (Freehold (selected) / Leasehold / Power of Attorney).
+Farmhouse variant (dev-toolbar type switch): NO BHK field (verify hidden) · Land area (+unit incl. Vigha/Guntha) · Construction area · Bore/Well toggle · Garden toggle · Boundary wall toggle.
+Commercial (Office/Shop/Showroom/Godown): Carpet area (+unit) · Washrooms chips (0/1/2+) · Floor + Total floors · Shell state chips: "Bare shell" / "Warm shell" / "Furnished" · Frontage (ft) · Corner unit toggle. (Hide BHK/balconies/furnishing-checklist — verify.)
+Plot / Agriculture / Farm: Area input + unit select incl. Vigha / Guntha / Sq yard / Sq ft / Sq m → below it a live auto-conversion line 11 ink3: "5 Vigha ≈ 60,500 sq ft" (implement JS conversion for at least Vigha→sqft and Guntha→sqft) · Land use chips: "NA (non-agricultural)" / "Agricultural" · Road width input (ft) · "Road touch" toggle · "Corner plot" toggle · Fencing toggle. (Hide BHK/bath/floor/furnishing — verify.)
+PG/Hostel: Sharing chips (Single/Double/Triple) · Tenant type chips: Family / Bachelors (selected) / Company lease · "Veg only" toggle · Meals included toggle · Beds available stepper. (Owner/Broker only — hidden for Builder.)
+
+C. PRICE
+
+Price input with "₹" prefix, numeric, live comma formatting (85,00,000 as you type) + below it a word-confirm line 13 accent: "₹85 Lakh" (implement JS: lakh/crore logic).
+Sanity warning state (implement): if value is absurd (e.g. < ₹10,000 or > ₹500 Cr) show warningSoft inline note "Please check the price — this looks unusual" (warning only, never blocks).
+Chips row: "Price negotiable" toggle-chip · "Price on request" toggle → when ON, the price input dims/disables and helper shows "Price will be hidden — buyers must inquire".
+Rent-only fields (visible when Looking-to = Rent): Deposit input (₹ + comma format + word line) · "Maintenance included in rent" toggle · Maintenance ₹/month input (hidden when toggle ON) · Available from date row → month/date picker sheet · Tenant preference chips: Family (selected) / Bachelors / Company · "Veg only" toggle.
+Sell-only: Maintenance ₹/month input.
+
+D. LOCATION
+Cascading select rows (each opens a search-list sheet; each row disabled until the previous is chosen — implement):
+
+State → sheet (search + list: Gujarat (selected) / Maharashtra / Rajasthan…)
+District → (Rajkot selected)
+Taluka → (Rajkot / Gondal / Jetpur…)
+City / Village → (Rajkot selected) — helper 11 ink3: "Choose Village for agricultural or farm properties"
+Area / Landmark → sheet with search + rows (Mavdi ✓ / University Road / Kalawad Road / Raiya Road / 150 Feet Ring Road / Kuvadva Road) + bottom row inside sheet: "Can't find your area? Request it" accent link → request-area sheet (input "Area name" + "City" prefilled + primary "Send Request" → toast "Request sent — we'll add it soon")
+Pincode input (numeric, 6 digits)
+After selection, show a breadcrumb chip strip: "Gujarat › Rajkot › Rajkot › Mavdi · 360004" 11 ink3 with an "Edit" accent link.
+
+E. AMENITIES
+Checkbox chips (multi-select, wrapping): Lift · Covered parking · Security · CCTV · Garden · Gym · Clubhouse · Swimming pool · Kids play area · 24hr water · Power backup · Gas line · Intercom · Fire safety · Visitor parking · Rain water harvesting.
+F. DESCRIPTION
+Textarea (surface2, r8, 5 rows) + type-specific placeholder (implement swap): Flat → "Describe floor, furnishing, society amenities, nearby schools and markets…"; Plot → "Describe road access, land use, nearby developments, boundary status…"; Shop → "Describe frontage, footfall, floor, parking availability…" · char counter 11 ink3 bottom-right "0 / 2000" · number-detection warning (implement): typing a 10-digit number in the textarea triggers a warningSoft inline note: "Phone numbers aren't allowed in descriptions. Use the contact toggle below — buyers can request your number." (warning only; does not block typing).
+G. CONTACT
+
+Toggle row: "Show my number publicly" 15/600 + accent toggle (OFF by default) + helper 11 ink3 below: "When off, buyers must request your number and you decide." · when ON → helper changes to: "Your number will be visible on the listing with Call and WhatsApp buttons."
+Display number input (prefilled "+91 98250 12345", editable) + note 11 ink3: "This number will be shown publicly on your listing."
+"WhatsApp is on this number" toggle (ON) → when OFF, reveals WhatsApp number input.
+Alternate contact number input (optional) + helper "Optional — for a family member or assistant".
+
+H. OWNERSHIP PROOF (optional)
+Collapsible card (surface2 r8): shield icon + "Add ownership proof (optional)" 15/600 + "Verified listings get more genuine inquiries" 11 ink3 + chevron → expands: document-type select row → sheet (Property tax receipt / Index copy / Allotment letter / Power of Attorney / Electricity bill / Other) + upload tile (dashed border, upload icon, "Upload document" 13 ink3, PDF/JPG) + privacy note 11 ink3: "Only visible to HomzList admins — never shown publicly."
+Sticky bottom: primary "Continue to Photos" → S5. (Validation on tap: scroll to first error field, show inline errors — implement at least required Title/Price/Location errors as the "validation-errors" dev-toolbar state.)
+S5. PHOTO UPLOAD
+Header: back + title "Add photos" 17/600 + counter "6 / 10" 13 ink3 right (Builder role → "6 / ∞") + progress dots (step 3 of 4).
+One-time sample guide overlay (shows on first entry; dismissible): dark scrim + card (surface1 r12, 16px): "Photos that get more inquiries" 17/600 + 2×2 grid of 4 tiny example thumbs with labels ("Exterior / building", "Living room", "Kitchen", "Bedroom") + bullet lines 13 ink2: "Shoot in daylight" · "Keep the room tidy" · "Add at least 5 photos" + primary "Got it".
+Body:
+
+Photo grid: 3-column, 8px gaps, 1:1 tiles with realistic photos; first tile has a "COVER" badge (accentSoft/accent 11/600 uppercase, top-left); each tile has: drag handle affordance (implement drag-reorder with JS — reordering updates which tile shows COVER) + ⋯ mini-button (top-right, 32px, black-60% circle) → tile sheet: "Set as cover" · "Edit photo" (→ editor sheet) · "Add label" (→ inline input: e.g. "Master bedroom") · "Delete" (error text).
+Add tile: dashed border r8, plus icon + "Add photos" 11 ink3 → simulates picker (JS adds new tiles with progress state).
+Upload states (implement all): uploading tile = photo dimmed + accent progress ring with % · done = ring fades out · failed tile = error 1.5px border + errorSoft overlay + "Retry" micro-chip (accent) + toast "2 photos failed to upload".
+Below grid: hint strip (surface2 r8): image icon + "Recommended: 1200×1500 px or larger · JPG, PNG, HEIC · Any size accepted — we compress automatically" 11 ink3.
+Builder-only (dev-toolbar role): extra Brochure section: 13/600 ink3 "PROJECT BROCHURE" + upload tile (PDF icon, "Upload brochure (PDF, max 10 MB)") + uploaded state: file row (PDF icon + "GreenValley-Brochure.pdf" 15/600 + "2.4 MB" 11 ink3 + × remove) + scanning state: "Scanning file…" 11 ink3 with mini spinner → "Ready ✓" accent.
+Editor sheet: title "Edit photo" + X · large preview · tool tabs (Crop / Rotate / Brightness): Crop shows 4:5 frame guides + aspect chips ("4:5 recommended" selected / "1:1" / "Original"); Rotate = two icon-buttons (↺ ↻); Brightness = accent slider · footer: text-link "Reset" + primary "Save".
+Sticky bottom: primary "Continue to Preview" (disabled until ≥1 photo) → placeholder "Preview — Batch P6" (clean placeholder + back).
+
+GLOBAL / SHEETS TO BUILD
+
+All select rows open bottom sheets with: drag handle, title + X, optional search bar, 48px rows, selected row = accentSoft + accent check, dividers.
+Sheet stacking demonstrated (Location → area sheet → request-area sheet on top).
+Unsaved-changes dialog, request-area sheet, tile sheet, editor sheet, comparison sheet, tooltip popup, toasts (Draft saved / Request sent / Upload failed / Photo deleted).
+Offline banner (warningSoft strip: "No internet connection — your draft is saved locally" + Retry) — toggleable.
+Any link to another module → clean placeholder view + back.
+
+BUILD CHECKLIST (build EVERY item — nothing skipped)
+Plan Wall (3 plan cards + role-filtering + recommended badge + coupon expand/applied + compare sheet + refund note) · Post Type (role-filtered options incl. Builder project + slot strip + no-slot warning + tooltip) · Property Type (4 category accordions + 13 tiles + selected state + Builder hides PG) · Listing Form (title hint per type + auto-generate + Sell/Rent switch revealing rent fields + full dynamic field sets for Flat/Farmhouse/Commercial/Plot-Agri/PG + area unit sheets + Vigha→sqft live conversion + price comma-format + word-confirm + sanity warning + negotiable + price-on-request + rent deposit/available-from/tenant/veg + location cascade 6 levels + request-area + breadcrumb strip + amenities chips + description with type placeholder + char counter + number-detection warning + contact toggles/numbers/alternate/WhatsApp + optional ownership proof collapsible + unsaved dialog + draft-restored banner + validation errors) · Photos (sample guide overlay + grid + COVER badge + drag reorder + tile sheet + editor sheet with crop/rotate/brightness + add tile + progress ring + failed+retry + labels + size hint + Builder brochure with scan state + counter 10 vs ∞ + disabled Continue until 1 photo) · Toasts · Offline banner · Dev toolbar (screens/states/role/slot) · Full click-navigation + browser back · Responsive centered-470 at ≥768px.

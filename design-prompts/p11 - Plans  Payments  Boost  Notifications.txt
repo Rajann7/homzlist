@@ -1,0 +1,131 @@
+PACKET P11 — PLANS, PAYMENTS, BOOST & NOTIFICATIONS (7 screens)
+Copy everything below → new Claude Design session → paste → generate → save.
+
+Build a fully interactive, clickable HTML prototype for HomzList — a premium Instagram-style real estate listing PWA (website, mobile-first). This module: Plans & Pricing, My Plan Dashboard, Payment History, Boost Purchase, Boost Status, Top-up Sheet, Notifications Screen — plus all sheets, dialogs and states — in ONE single HTML file with working click-navigation.
+OUTPUT REQUIREMENTS
+
+ONE self-contained HTML file (inline CSS + vanilla JS), no external libraries. Inline SVG outline icons (Lucide style, 1.5px stroke) — never emoji/cartoon icons.
+Every screen = a section; JS click-navigation; browser back works (history.pushState); back arrows work; sheets close on X / backdrop tap / swipe-down / browser back.
+Dev-toolbar (top-right, collapsible, minimal gray): jump to any screen/sheet/state, toggle Light/Dark, toggle Mobile/Tablet/Desktop, toggle role (Owner / Broker / Builder), toggle plan state (no plan / ₹999 active / ₹2,999 active / ₹9,999 active / multiple plans / expired / grace period / trial granted), toggle payment state (success / pending / failed / refunded), toggle boost state (none / pending approval / active / expired / rejected), toggle states (skeleton / empty / offline).
+Responsive: mobile-first 390px. At ≥768px the SAME design renders centered in a 470px column with #FAFAFA outside and hairline #DBDBDB column borders — no separate desktop layout.
+English only. Realistic Rajkot data. Indian currency formatting (₹999, ₹2,999, ₹85 Lakh, ₹1.2 Cr).
+Production polish, Instagram-level. Not a wireframe.
+
+DESIGN SYSTEM (mandatory — follow exactly)
+Colors light: page #FFFFFF · surface1 #FFFFFF · surface2 #F5F5F5 · surface3 #EFEFEF · border #DBDBDB · divider #EFEFEF · ink1 #111111 · ink2 #555555 · ink3 #8E8E8E · inkDisabled #C7C7C7 · accent #0F9D58 · accentPressed #0C7C46 · accentSoft #E6F4EC · accentDisabled #A8D5BD · error #ED4956 · errorSoft #FDECEE · warning #F5A623 · warningSoft #FEF5E7 · info #0095F6 · infoSoft #E7F3FD.
+Colors dark: page #000000 · surface1 #121212 · surface2 #1E1E1E · surface3 #262626 · border #363636 · divider #262626 · ink1 #F5F5F5 · ink2 #B0B0B0 · ink3 #8E8E8E · inkDisabled #4D4D4D · accent #1DB868 · accentPressed #17A05A · accentSoft #0E2B1C · error #FF5C6A · warning #FFB74D · info #3BA7F8. Dark: no shadows → 1px border outlines.
+Font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif. 32/700 plan hero price · 24/700 hero · 20/700 page title · 17/600 emphasis · 15/400 body (15/600 buttons/tabs) · 13/400 meta (13/600 labels) · 11/400 caption (11/600 badges uppercase +0.3px). Line-height headings 1.25, body 1.45.
+Spacing: only 4/8/12/16/24/32. Gutters 16px.
+Radius: 4 badges · 8 buttons/inputs · 12 cards/sheets-top · 16 dialogs · 999 chips/avatars/pills.
+Shadows (light only): L1 0 1px 2px rgba(0,0,0,.06) · L2 0 4px 12px rgba(0,0,0,.10) · L3 0 8px 24px rgba(0,0,0,.16).
+Icons: 24px outline 1.5px round-cap; nav 26px.
+Buttons: Primary accent/white 15/600 h44 r8 (pressed accentPressed + scale .98; disabled accentDisabled; loading spinner replaces label, width locked) · Secondary surface2/ink1 · Outline 1px border · Text-link accent · Icon-button 44×44.
+UsageBar: track surface3 h6 r999 + accent fill (animated width on load); label row above (13/600 left + 13 ink3 right "7 / 10").
+Status badges (11/600 uppercase r4): Active (accentSoft/accent) · Expired (surface3/ink3) · Pending (infoSoft/info) · Failed (errorSoft/error) · Refunded (surface2/ink2) · Promoted (black-60%/white) · Trial (infoSoft/info) · Grace (warningSoft/warning).
+Touch targets: min 44×44 everywhere.
+Motion: ease-out cubic-bezier(0.2,0,0,1). Sheets in 300ms spring / out 250ms drag-dismiss, scrim rgba(0,0,0,.40). UsageBar fill animates 600ms on mount. Success check-draw 600ms. Spinner rotate 800ms. Toast up 200ms/hold 3s/down 200ms. Tab crossfade 150ms + underline slide 200ms. Notification rows: swipe-to-dismiss follows finger. Reduced-motion respected.
+Brand: wordmark "Homz" ink1-700 + "List" accent-700.
+SCREENS TO BUILD
+S1. PLANS & PRICING
+Header: back + title "Plans" 17/600 + ⋯ (44px → sheet: "Payment history" · "Refund policy" · "Contact support").
+Active-plan strip (if any plan active — accentSoft r8, 12px pad): check icon + "You have an active ₹999 plan" 13 accent + "View details" text-link → S2.
+Plan cards (stacked, 12px gap, role-filtered via dev-toolbar):
+
+₹999 — Listing Plan (accent 1.5px border + "MOST POPULAR" micro-badge accentSoft top-right): "₹999" 32/700 + "one-time" 13 ink3 inline · sub-line "Lifetime listing — never expires" 13 accent · checklist rows (accent 16px checks, 15/400): "1 property listing (stays live forever)" · "1 requirement post (30 days)" · "10 proposals on others' requirements" · "Boost eligible" · footer: primary "Buy Plan" → placeholder "Checkout — Batch P6".
+₹2,999 — Requirement Access: "₹2,999" 32/700 + "/month" 13 ink3 · sub "Unlock every requirement" 13 ink2 · checklist: "View all requirements with full details" · "30 proposals included" · "Instant match alerts for your areas" · "Direct chat after acceptance" · outline "Buy Plan".
+₹9,999 — Builder Project (visible ONLY when role = Builder; verify hidden for Owner/Broker): "₹9,999" 32/700 + "per project · 6 months" 13 ink3 · checklist: "1 project with unlimited unit types" · "Unlimited photos + brochure" · "Unlimited matching requirements" · "Priority match notifications" · outline "Buy Plan".
+Add-ons section: 13/600 ink3 uppercase "ADD-ONS" + row card (surface2 r12): "+10 proposals" 15/600 + "₹499" 17/600 right + "Valid with your active plan" 11 ink3 + outline small "Add" → top-up sheet (S6).
+Coupon row (surface2 r8, 48px): tag icon + "Have a coupon code?" 15 ink2 + chevron → expands: input + outline "Apply" → applied state: accentSoft row "SAVE20 applied — ₹200 off" + × remove → invalid state: errorSoft "Invalid or expired code".
+Compare link: text-link centred "Compare all plans" → comparison sheet (90% height): title + X + scrollable table: sticky left column of feature labels (13/400 ink2) + 3 plan columns (13/600 headers) with accent checks / "—" dashes: rows = "Property listing" · "Listing validity" (Lifetime / — / 6 months) · "Requirement post" (1 × 30 days / — / 1) · "View others' requirements" (— / ✓ / ✓ matched only) · "Proposals included" (10 / 30 / Unlimited matches) · "Project posting" (— / — / ✓) · "Match alerts" (— / ✓ / ✓ priority) · "Boost eligible" (✓ / ✓ / ✓) · "Price" (₹999 / ₹2,999 / ₹9,999) → each column footer: primary small "Choose".
+Footer notes (11 ink3): "No refunds after purchase, except technical failures. See Refund Policy." (accent link) · "Prices include applicable taxes shown at checkout." · "Plans don't auto-renew — you'll be reminded before expiry."
+Trial-granted variant (dev-toolbar): infoSoft banner at top: gift icon + "You have a trial from HomzList" 13/600 + "1 listing + 1 requirement · 14 days left" 11 ink2 + "View" text-link → S2.
+
+S2. MY PLAN DASHBOARD
+Header: back + title "My plan" 17/600 + ⋯ (→ sheet: "Payment history" · "Download invoices" · "Contact support").
+Active plans cards (build multi-plan stacking — dev-toolbar):
+
+Card 1 — ₹999 Listing Plan: header row: "₹999 Listing Plan" 17/600 + "Active" badge (accentSoft) · "Purchased 12 Jan 2025 · Lifetime" 11 ink3 · usage bars: "Property listings" 13/600 + "1 / 1" 13 ink3 → bar (100% accent, full) + helper 11 ink3 "Slot used by: 3 BHK Flat, Mavdi" (accent link → placeholder P9) · "Requirement posts" + "1 / 1" → full bar + helper "22 days left on your active requirement" · "Proposals" + "7 / 10" → 70% bar + accent text-link "Top up" → S6.
+Card 2 — ₹2,999 Requirement Access: "Active" badge + "Renews on 12 Feb 2025 · 18 days left" 11 ink3 + usage bar "Proposals 12 / 30" + note 11 ink3 "Proposals from this plan expire with the plan" + row: outline "Renew now".
+Pooled summary strip (surface2 r12, 3 columns): "2" 17/700 + "Active plans" 11 ink3 · "23" + "Proposals left" · "1" + "Listing slots left" — plus note 11 ink3 below: "Proposals from all plans are pooled. The oldest plan is used first."
+States (dev-toolbar — build all):
+No plan: empty card (line-art card-icon 96px + "No active plan" 17/600 + "Buy a plan to post listings and requirements" 13 ink2 + primary "View Plans").
+Grace period: warningSoft banner: clock icon + "Your ₹2,999 plan expired 4 hours ago" 13/600 + "Requirements you already unlocked stay visible for 20 more hours. New ones are locked." 11 ink2 + primary "Renew now".
+Expired: card dimmed + "Expired" badge (surface3) + "Expired on 12 Jan" 11 ink3 + note 11 ink3: "Your requirement is off. Renew to turn it back on — it will use a requirement slot." + primary "Renew plan".
+Trial: infoSoft card + gift icon + "Trial from HomzList" + "1 listing + 1 requirement · 14 days left" + note 11 ink3 "Granted by HomzList team on 10 Jan. Buying a plan ends the trial." + primary "View Plans".
+Consumed-trace section: 13/600 ink3 uppercase "WHAT YOU'VE USED" + timeline rows (each: dot + line, 12px pad): "₹999 plan · 12 Jan" 13/600 → sub-rows 11 ink3: "→ Listing #4521 — 3 BHK Flat, Mavdi (Live)" (accent link) · "→ Requirement #89 — 3 BHK, ₹40–60 L (Active)" · "→ 7 of 10 proposals used" — then "₹2,999 plan · 20 Jan" → "→ 12 of 30 proposals used".
+Expiry reminders card (surface2 r8): bell icon + "Reminders on" 13/600 + "We'll notify you 7 days and 1 day before expiry" 11 ink3 + toggle (on).
+Footer note 11 ink3: "Plans can't be paused or transferred. Deleting or turning off a requirement still uses its slot."
+
+S3. PAYMENT HISTORY & INVOICES
+Header: back + title "Payments" 17/600 + filter icon (44px → sheet: "All" / "Successful" / "Pending" / "Failed" / "Refunded" + date range rows: "Last 30 days" / "Last 6 months" / "This financial year" / "All time") + ⋯ (→ sheet: "Download all invoices (ZIP)" · "Email invoices to me").
+Summary strip (surface2 r12, 2 columns): "₹3,998" 17/700 + "Total spent" 11 ink3 · "4" + "Transactions" 11 ink3.
+Transaction rows (surface1 r12 1px border, 12px pad, 8px gap — build ALL states):
+
+Successful: top row: "₹999 Listing Plan" 15/600 + "₹999" 15/600 right · "12 Jan 2025 · 2:34 PM · UPI" 11 ink3 · "Success" badge (accentSoft) · footer row: text-link "View invoice" (→ invoice sheet) + text-link "Details" (→ details sheet).
+Pending: "₹2,999 Requirement Access" + "Pending" badge (infoSoft) + line 11 ink3 "Started 4 min ago · UPI · waiting for confirmation" + mini spinner + row: outline small "Check status" (→ toast "Still processing — we'll notify you") + note 11 ink3 "Don't pay again — this can take up to 10 minutes."
+Failed: "₹499 Proposal Top-up" + "Failed" badge (errorSoft) + line 11 ink3 "Payment declined by bank · 10 Jan" + note 11 ink3 "No money was deducted. If it was, it's refunded automatically in 5–7 days." + row: primary small "Retry payment" + text-link "Contact support".
+Refunded: "₹999 Listing Plan" + "Refunded" badge (surface2) + line 11 ink3 "Refunded on 8 Jan · reason: plan not activated (technical)" + "₹999 credited to your account in 5–7 days" 11 accent + text-link "View invoice".
+Invoice sheet: title "Invoice" + X + invoice card (surface1, r12, 16px pad, print-clean styling): wordmark top + "TAX INVOICE" 11/600 ink3 uppercase right + "Invoice #HL-2025-0142" 13/600 + "Date: 12 Jan 2025" 11 ink3 + divider + "Billed to" 11 ink3 + "RK Properties · +91 98250 12345" 13 + "GSTIN: 24ABCDE1234F1Z5" 11 ink3 (when added) + divider + line items table: "₹999 Listing Plan" 13 + "₹999" right → sub-lines 11 ink3: "1 property listing (lifetime) · 1 requirement post (30 days) · 10 proposals" → rows: "Subtotal ₹999" · "Coupon SAVE20 −₹200" (accent) · "Taxable ₹799" · "CGST 9% ₹72" · "SGST 9% ₹72" · divider · "Total paid ₹943" 17/600 · "Payment ID: pay_NxK2p9Qw8R" 11 ink3 + copy icon (→ toast "Payment ID copied") + "Method: UPI · GPay" 11 ink3 + footer 11 ink3: "HomzList · Rajkot, Gujarat · This is a computer-generated invoice." + row: outline "Download PDF" + outline "Email to me" (→ toast "Invoice emailed").
+Details sheet: rows: "Order ID" · "Payment ID" (copy icons) · "Method" · "Status" · "Plan contents" · "Coupon" · "Refund status" + text-link "Report a problem with this payment" (→ placeholder Support).
+Empty state: line-art receipt 96px + "No payments yet" 17/600 + "Your plan purchases and invoices appear here" 13 ink2 + primary "View Plans".
+Skeleton + offline.
+
+S4. BOOST PURCHASE
+Header: back + title "Boost listing" 17/600 + ⓘ (44px → info sheet: "How boost works" + bullets: "Your listing appears at the top of the feed, first in stories and top of search in the areas you choose." · "Boosted listings show a 'Promoted' tag." · "Detailed analytics aren't provided — you'll see the boost status only." · "Boosts need admin approval before going live (usually within a few hours).").
+Step 1 — Select listing: 13/600 ink3 uppercase "SELECT A LISTING" + horizontal selectable mini-cards (only live listings; each 1:1 photo + "₹85 L" 13/600 + "3 BHK Mavdi" 11 ink3; selected = accent 1.5px border + check badge) + note 11 ink3: "Only approved, live listings can be boosted." + ineligible examples shown dimmed with lock icon + tiny label ("Under review" / "Sold").
+Step 2 — Duration: 13/600 "CHOOSE DURATION" + 2 plan cards (side by side): "7 Days" 17/600 + "₹499" 24/700 + "≈ ₹71/day" 11 ink3 + radio; "1 Month" + "₹1,499" + "≈ ₹50/day" 11 ink3 + "BEST VALUE" micro-badge (accentSoft) + radio (selected).
+Step 3 — Targeting: 13/600 "WHERE TO SHOW" + radio rows (56px): "This area only — Mavdi, Rajkot" (selected) + "Reach: local buyers" 11 ink3 · "Whole city — Rajkot" · "Whole state — Gujarat" · "All India" + each row shows an estimated-reach chip (surface2 pill 11: "~2,400 users" / "~18k" / "~90k" / "~2.1L") + note 11 ink3: "Wider targeting doesn't cost more — but local buyers convert better."
+Summary card (surface2 r12): rows: "Listing: 3 BHK Flat, Mavdi" 13 · "Duration: 1 Month" · "Targeting: Mavdi, Rajkot" · divider · "Total" 15/600 + "₹1,499" 20/700 accent right.
+Sticky bottom: primary "Continue to Payment — ₹1,499" → placeholder "Checkout — Batch P6" → returns to pending state (see S5).
+Note strip 11 ink3: "Boosts start after admin approval. If a boost is rejected, you're refunded automatically."
+S5. BOOST STATUS
+Header: back + title "Boosts" 17/600.
+Tabs: "Active 1" · "Pending 1" · "Past 3".
+Active tab — boost card (accent 1.5px border, r12, 16px pad): "Promoted" badge (black-60%) + listing row (56px thumb + "3 BHK Flat, Mavdi" 15/600 + "₹85 Lakh" 11 ink3) + status block: accent rocket icon + "Boost active" 17/600 + "Ends on 25 Jan 2025 · 6 days left" 13 ink2 + countdown bar (accent fill, ~80%) + rows 13 ink3: "Duration: 1 Month" · "Targeting: Mavdi, Rajkot" · "Started: 25 Dec 2024" + no-analytics note (surface2 r8) 11 ink3: "Detailed views and clicks aren't shown for boosts." + row: outline "Extend boost" (→ S4 with listing preselected) + text-link "View listing".
+Pending tab — card: "Pending approval" badge (infoSoft) + clock icon + "Waiting for admin approval" 15/600 + "Usually approved within a few hours. Your boost starts after approval." 11 ink2 + "Paid ₹1,499 · 2h ago" 11 ink3 + text-link "Cancel and refund" (error → dialog: "Cancel this boost?" + "You'll be refunded within 5–7 days." + Cancel / error-primary "Cancel boost").
+Past tab — cards: (a) Expired: surface3 "Expired" badge + "Ran 12–19 Jan · 7 days · Mavdi" 11 ink3 + primary small "Boost again"; (b) Rejected: errorSoft badge "Rejected" + "Reason: Listing was hidden during review" 13 ink2 + "₹499 refunded on 10 Jan" 11 accent; (c) Stopped: surface3 "Stopped" + "Listing marked as sold on 15 Jan · boost stopped automatically" 11 ink3 + note 11 ink3: "No refund for unused days — see Refund Policy." (accent link).
+Renew notification landing state (dev-toolbar): accentSoft banner at top: "Your boost ends tomorrow" 13/600 + primary small "Renew in 1 tap — ₹1,499" → confirm dialog: "Renew this boost?" + "1 Month · Mavdi, Rajkot · ₹1,499" + Cancel / primary "Pay & Renew".
+Empty state: line-art rocket 96px + "No boosts yet" 17/600 + "Boost a listing to appear at the top of the feed, stories and search" 13 ink2 + primary "Boost a Listing".
+S6. TOP-UP SHEET (standalone screen demo + sheet form)
+Sheet: drag handle + title "Add proposals" + X.
+Body: card (accentSoft r12, 16px pad, centred): send icon 32px accent + "+10 proposals" 20/700 + "₹499" 32/700 + "Valid with your active plan" 11 ink3 + checklist 13: "Use on any requirement" · "Never expire while your account is active" (for ₹999 pool) / "Expire with your monthly plan" (for ₹2,999 pool — show as variant note).
+Current balance strip (surface2 r8): "Current balance: 3 proposals" 13 ink2 + UsageBar (30%).
+Coupon row (collapsible) + Primary "Pay ₹499" → loading → success state inside the sheet (check-draw animation + "10 proposals added" 17/600 + new balance "13 proposals" + primary "Done") → toast "10 proposals added".
+Inline variant note: when opened from a proposal flow with 0 balance, after success the sheet auto-closes and the pending proposal sends automatically → toast "Proposal sent — 9 remaining".
+S7. NOTIFICATIONS SCREEN
+Header: back + title "Notifications" 17/600 + ⋯ (44px → sheet: "Mark all as read" · "Notification settings" (→ placeholder P10) · "Clear all" (error → dialog)).
+Filter chips (horizontal): "All 24" (selected) · "Unread 6" · "Inquiries" · "Listings" · "Requirements" · "Payments".
+Time-grouped sections (13/600 ink3 uppercase sticky headers): "TODAY" · "THIS WEEK" · "EARLIER".
+Notification rows (72px, unread = accentSoft tint + accent 8px dot left; read = plain; dividers; press = surface2 flash; swipe-left = dismiss with fade) — build ALL these types:
+
+Inquiry: 40px avatar + text 13/400 ink1 (2 lines, bold name): "Nirav Shah sent an inquiry on your 3 BHK Flat, Mavdi" + "2m ago" 11 ink3 + 40px listing thumb right → tap → placeholder Chat.
+Number request (INLINE ACTIONS — important): avatar + "Meet Patel requested your phone number" + "10m ago" + inline button row inside the notification: outline small "Deny" + primary small "Allow" → tapping Allow → row updates in place to "You shared your number with Meet Patel ✓" (accent check) + toast "Number shared".
+Listing approved: accent check-circle icon (in accentSoft circle) + "Your listing 3 BHK Flat, Mavdi is now live" + "1h ago" + thumb → tap → placeholder Listing.
+Changes requested: warning icon (warningSoft circle) + "Changes requested on 2 BHK Flat, University Road — photos are too dark" + "3h ago" + primary small inline "Edit listing".
+Rejected: error icon + "Your listing was rejected — Duplicate listing" + text-link "Appeal".
+Proposal received: avatar + "RK Properties sent a proposal on your requirement (3 BHK, ₹40–60 L)" + "5h ago".
+Price drop (saved): down-arrow accent icon + "Price dropped ₹5 Lakh on a property you saved — 3 BHK, Raiya Road" + thumb.
+Saved-search match: search icon + "12 new properties match your saved search 3 BHK · ₹40–60 L · Mavdi" + "Yesterday".
+Matching requirement (Builder): building icon + "New requirement matches Green Valley Heights — 3 BHK, ₹60–80 L, 150 Feet Ring Road" + "Yesterday".
+Still-available prompt (INLINE ACTIONS): clock icon + "Is 3 BHK Flat, Mavdi still available? Listings are checked every 2 months." + inline row: outline "No, it's sold" + primary "Yes" → row collapses + toast "Thanks — your listing stays live".
+Requirement expiry: hourglass icon + "Your requirement expires in 5 days" + text-link "View".
+Plan expiry: card icon + "Your ₹2,999 plan expires in 7 days" + primary small "Renew".
+Boost: rocket icon + "Your boost is live on 3 BHK Flat, Mavdi" / variant "Your boost ends tomorrow" + inline "Renew — ₹1,499".
+Payment: receipt icon + "Payment successful — ₹999 Listing Plan" + text-link "View invoice" / variant errorSoft "Payment failed — ₹499 top-up" + primary small "Retry".
+Refund: "₹999 refunded — it will reach your account in 5–7 days".
+Grouped batch: stacked-avatars icon + "10 listings approved — tap to review" (dedup example).
+Chat group: avatar + "Nirav Shah: 5 new messages" (per-thread grouping).
+Report outcome: shield icon + "Action taken on the listing you reported" + text-link "View status".
+Suspension lifted: accent check + "Your account is active again".
+New device login: device icon + "New login from Chrome on Windows · Rajkot" + text-link "Not you?".
+Performance nudge: lightbulb icon + "No inquiries in 30 days on 2 BHK, Kalawad Road — add daylight photos to get up to 3× more" + outline small "Edit".
+Area added: pin icon + "Kuvadva Road is now available — post your listing there".
+Weekly digest: chart icon + "Your week: 340 views, 6 leads" + text-link "See details".
+Empty state: line-art bell 96px + "No notifications" 17/600 + "Inquiries, approvals and match alerts will appear here" 13 ink2.
+Blocked-permission banner (dev-toolbar): warningSoft strip at top: "Browser notifications are blocked — you'll miss instant alerts" 11 + accent link "How to enable".
+Skeleton (avatar circles + 2 lines rows) + offline banner. Bottom nav visible (bell has no nav slot; keep Home/Search/Requirements/Messages/Profile).
+
+GLOBAL / SHEETS TO BUILD
+Comparison sheet · coupon states (applied/invalid) · top-up sheet (+ inline success + auto-send variant) · invoice sheet (print-clean) · payment details sheet · filter sheets (payments/notifications) · boost info sheet · cancel-boost dialog · renew-boost dialog · clear-all dialog · mark-all-read · ⋯ sheets · toasts ("10 proposals added" / "Invoice emailed" / "Payment ID copied" / "Number shared" / "Thanks — your listing stays live" / "Still processing") · offline banners · skeletons · placeholders for other batches + back.
+BUILD CHECKLIST (build EVERY item — nothing skipped)
+Plans (active strip + 3 role-filtered cards + most-popular badge + full checklists + add-ons + coupon expand/applied/invalid + comparison sheet with 9 feature rows + footer notes + trial banner variant) · My Plan (multi-plan cards + usage bars for listings/requirements/proposals + slot-used links + pooled summary + FIFO note + no-plan empty + grace banner + expired card + trial card + consumed-trace timeline + reminders card + footer rules note) · Payments (summary strip + 4 transaction states (success/pending+check-status/failed+retry/refunded) + invoice sheet with GST line items + payment ID copy + download/email + details sheet + filter sheet + empty + skeleton) · Boost Purchase (listing picker with ineligible dimmed + 2 duration cards + 4 targeting rows with reach chips + summary + sticky CTA + info sheet + approval note) · Boost Status (3 tabs + active card with countdown + no-analytics note + pending + cancel-refund dialog + expired/rejected/stopped variants + renew banner + dialog + empty) · Top-up (sheet + balance bar + success-in-sheet + inline auto-send variant) · Notifications (filter chips + 3 time groups + all 23 notification types + inline actions on number-request & still-available + grouped/dedup examples + swipe-dismiss + unread states + empty + blocked-permission banner + skeleton) · Dev toolbar (screens/states/role/plan/payment/boost/light-dark/viewport) · Full click-navigation + browser back · Responsive centered-470 at ≥768px.

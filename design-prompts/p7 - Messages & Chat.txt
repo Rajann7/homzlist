@@ -1,0 +1,125 @@
+ PACKET P7 — MESSAGES & CHAT (4 screens, interactive)
+Copy everything below → new Claude Design session → paste → generate → save.
+
+Build a fully interactive, clickable HTML prototype for HomzList — a premium Instagram-style real estate listing PWA (website, mobile-first). This is the MESSAGES & CHAT module: Messages Home (4 tabs), Message Requests, Chat Thread (full behaviour), Chat Details — plus all sheets, dialogs and states — in ONE single HTML file with working click-navigation.
+OUTPUT REQUIREMENTS
+
+ONE self-contained HTML file (inline CSS + vanilla JS), no external libraries. Inline SVG outline icons (Lucide style, 1.5px stroke) — never emoji/cartoon icons.
+Every screen = a section; JS click-navigation; browser back works (history.pushState); back arrows work; sheets close on X / backdrop tap / swipe-down / browser back.
+Dev-toolbar (top-right, collapsible, minimal gray): jump to any screen/sheet/state, toggle Light/Dark, toggle Mobile/Tablet/Desktop, toggle role (Buyer-sender / Poster-owner / Broker), toggle chat state (request-pending / accepted / number-requested / number-allowed / blocked / listing-archived / requirement-expired / offline-queue / declined-cooldown), toggle states (skeleton / empty / offline).
+Responsive: mobile-first 390px. At ≥768px the SAME design renders centered in a 470px column with #FAFAFA outside and hairline #DBDBDB column borders — no separate desktop layout (Instagram-web pattern).
+English only. Realistic Rajkot data (RK Properties, Nirav Shah, Meet Patel, Shreeji Builders; areas: Mavdi, University Road, Kalawad Road, 150 Feet Ring Road; society: Shree Residency).
+Production polish, Instagram-level. Not a wireframe.
+
+DESIGN SYSTEM (mandatory — follow exactly)
+Colors light: page #FFFFFF · surface1 #FFFFFF · surface2 #F5F5F5 · surface3 #EFEFEF · border #DBDBDB · divider #EFEFEF · ink1 #111111 · ink2 #555555 · ink3 #8E8E8E · inkDisabled #C7C7C7 · accent #0F9D58 · accentPressed #0C7C46 · accentSoft #E6F4EC · accentDisabled #A8D5BD · error #ED4956 · errorSoft #FDECEE · warning #F5A623 · warningSoft #FEF5E7 · info #0095F6 · infoSoft #E7F3FD.
+Colors dark: page #000000 · surface1 #121212 · surface2 #1E1E1E · surface3 #262626 · border #363636 · divider #262626 · ink1 #F5F5F5 · ink2 #B0B0B0 · ink3 #8E8E8E · inkDisabled #4D4D4D · accent #1DB868 · accentPressed #17A05A · accentSoft #0E2B1C · error #FF5C6A · warning #FFB74D · info #3BA7F8. Dark: no shadows → 1px border outlines; photos 6% dim.
+Font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif. 24/700 hero · 20/700 page title · 17/600 emphasis · 15/400 body & chat messages (15/600 buttons/tabs) · 13/400 meta (13/600 labels/usernames) · 11/400 caption (11/600 badges uppercase +0.3px). Line-height headings 1.25, body 1.45.
+Spacing: only 4/8/12/16/24/32. Gutters 16px.
+Radius: 4 badges · 8 buttons/inputs · 12 cards/sheets-top · 16 dialogs · 16 chat bubbles (4px on the tail corner) · 999 chips/avatars/pills.
+Shadows (light only): L1 0 1px 2px rgba(0,0,0,.06) · L2 0 4px 12px rgba(0,0,0,.10) · L3 0 8px 24px rgba(0,0,0,.16).
+Icons: 24px outline 1.5px round-cap; nav 26px.
+Buttons: Primary accent/white 15/600 h44 r8 (pressed accentPressed + scale .98; disabled accentDisabled; loading spinner replaces label) · Secondary surface2/ink1 · Outline 1px border · Text-link accent · Icon-button 44×44.
+Chat bubbles: sent = accentSoft bg, ink1 text, right-aligned, max-width 78%; received = surface2 bg, ink1 text, left-aligned; 15/400 text; 11px time + ticks inside bottom-right of bubble (ink3); reactions chip attached below-outside bubble edge.
+Badges (one system, 11/600 uppercase, r4): Verified (accentSoft/accent) · Promoted (black-60%/white) · Sold (ink1/white) · Rented (warningSoft/warning) · Expired (surface3/ink3) · Under Review (infoSoft/info).
+Touch targets: min 44×44 everywhere.
+Motion: ease-out cubic-bezier(0.2,0,0,1). Sheets in 300ms spring / out 250ms, drag-follow, dismiss >50%, scrim rgba(0,0,0,.40). Tab switch: content crossfade 150ms + underline slide 200ms. Message send: optimistic append + slide-up 150ms. NumberCard reveal: fade + rise 8px 300ms + subtle accent flash. Toast up 200ms/hold 3s/down 200ms. Swipe actions follow finger. Typing indicator: 3 dots bouncing 1.2s loop. Reduced-motion respected.
+Brand: wordmark "Homz" ink1-700 + "List" accent-700.
+SCREENS TO BUILD
+S1. MESSAGES HOME (4 tabs — build all four fully)
+Header (56px): title "Messages" 20/700 left · right: search icon (44px → search state: header becomes a searchbar "Search chats or properties…" with X to exit; live-filters rows) · ⋯ icon (44px → sheet: "Mark all as read" · "Archived chats" · "Blocked users").
+Tabs row (swipeable, horizontally scrollable if needed; 15/600; active = ink1 + 1.5px accent underline; inactive = ink3; each tab has a count badge when unread — small accent dot or number):
+
+My Listings 2. My Inquiries 3. Requirement Leads 4. My Responses
+Under tabs — controls row: left: "Unread only" filter chip (toggle, selected = accentSoft) · right: grouping toggle icon-button (list icon ↔ folder icon) → switches between flat list and per-listing grouping.
+Requests row (top of tab content, surface2 r8, 56px, tappable → S2): envelope icon + "Message requests" 15/600 + accent count badge "4" + chevron; sub-line 11 ink3: "3 verified · 1 other".
+
+Tab 1 — My Listings (inquiries received on my properties):
+
+Grouped view (when grouping ON): collapsible group headers (surface2 r8, 48px): 40px listing thumb + "3 BHK Flat, Mavdi — ₹85 L" 13/600 + "45 chats · 6 unread" 11 ink3 + chevron (rotates) → inside, chat rows.
+Chat rows (72px, dividers between, press = surface2 flash): 48px avatar (photo or initials on accentSoft) + name 15/600 ink1 + verified check inline + role tag ("Owner"/"Broker" surface2 pill 11) · second line: 32px listing thumb (rounded 4) + last message preview 13 ink3 (1 line, truncated; prefix "You: " for own last message) · right column: time 11 ink3 ("2h", "Yesterday", "12 Jan") + unread dot (accent 8px) or count badge (error bg "3") + pin icon (ink3 12px) if pinned + mute icon (ink3) if muted.
+Show 6 rows with variety: unread+pinned, read, muted, one with "Typing…" accent 13 italic preview, one with photo-message preview ("📷 Photo" → use image icon + "Photo"), one archived-looking.
+Swipe actions (implement): swipe-left reveals action buttons (Archive [surface3, box icon] / Mute [warning, bell-off] / Delete [error, trash]) — swipe follows finger, snaps open/closed.
+Long-press → bulk mode: rows get checkboxes, header switches to "3 selected" + action icons (pin/mute/archive/delete) + X to exit.
+Long-press single (alternative) → sheet: "Pin chat" · "Mute notifications" · "Mark as read" · "Archive" · "Block user" (error) · "Delete chat" (error) → delete dialog ("Delete this chat? This can't be undone." + Cancel / error-primary "Delete").
+
+Tab 2 — My Inquiries (sent by me): same row anatomy; include one row in "Request pending" state: name + sub-line "Waiting for owner to accept" 11 warning + small clock icon, row slightly dimmed, no unread dot.
+Tab 3 — Requirement Leads (proposals received on my requirements): rows show: avatar + sender name + "Proposal" micro-chip (infoSoft) + sub-line: requirement ref "For: 3 BHK, ₹40–60 L, Mavdi" 11 ink3 + right: time + unread. Group headers (when grouping ON) = requirement instead of listing: "3 BHK · ₹40–60 L · Mavdi — 12 proposals · 4 unread".
+Tab 4 — My Responses (proposals I sent): status strip at top (surface2 r8, horizontally scrollable chips with counts, tappable filters): "All 8" · "Pending 3" · "Accepted 2" · "Declined 1" · "Expired 2" — then rows: avatar + poster name + sub-line "Proposal · 3 BHK Flat, Mavdi attached" 11 ink3 + right: status chip (Pending = surface2/ink2 · Accepted = accentSoft/accent · Declined = errorSoft/error · Expired = surface3/ink3) + time.
+Archived section (reachable from ⋯ → "Archived chats"): sub-screen with back + title "Archived" + rows + note strip 11 ink3: "Chats are archived automatically after 30 days of inactivity. A new message un-archives them."
+Empty states (build all four — each unique):
+
+Tab 1: line-art inbox 96px + "No inquiries yet" 17/600 + "Boost your listing to reach more buyers" 13 ink2 + primary "Boost Listing".
+Tab 2: line-art paper-plane + "You haven't inquired on anything" + "Explore properties and send your first inquiry" + primary "Explore Properties".
+Tab 3: line-art megaphone + "No proposals yet" + "Boost your requirement so more brokers see it" + primary "Boost Requirement".
+Tab 4: line-art handshake + "No proposals sent" + "Browse requirements and offer your properties" + primary "Browse Requirements".
+Other states: skeleton (avatar circles + 2 gray lines per row, shimmer) · offline banner (warningSoft strip under header + Retry).
+Bottom nav (5 icons; Messages active/filled + badge). Other nav items → clean placeholder views + back.
+
+S2. MESSAGE REQUESTS
+Header: back + title "Message requests" 17/600 + sub-count 11 ink3 ("4 requests").
+Sub-tabs: "Verified" (selected) · "Others" — 15/600 with accent underline; Verified tab shows requests from phone/ID/RERA-verified users, Others = unverified.
+Request cards (surface1 r12 1px border, 16px pad, 12px gap — build 3 variants):
+
+Property inquiry request: sender row: 48px avatar + "Nirav Shah" 15/600 + accent verified check + "Owner" tag + "· 2h ago" 11 ink3 · trust strip (surface2 r8, 8px pad, 11 ink3, icons inline): "Phone verified ✓ · Member since Mar 2025 · Profile 80% complete" · full message preview (not truncated) 15/400 ink1: "Hi, I'm interested in your 3 BHK Flat at Mavdi, Rajkot (₹85 Lakh). Is it still available?" · intent chips (as sent): "Site visit?" · "Negotiable?" (surface2 pills) · attached listing rich card (surface2 r8, 56px: thumb + "3 BHK Flat, Mavdi" 13/600 + "₹85 Lakh" 11 ink3 + chevron) · note strip 11 ink3 with eye icon: "They won't know you've seen this until you accept." · action row: outline "Decline" + primary "Accept" (+ text-link "View profile" centered below).
+Proposal request (on my requirement): sender row + trust strip + sender's number shown directly (accentSoft r8 row: phone icon + "+91 98250 12345" 15/600 + Copy icon-button + Call icon-button) + note 11 ink3: "Numbers of people responding to your requirement are shown to you automatically." + message + attached property card (their listing: thumb + "3 BHK, Shree Residency, Mavdi" + "₹82 Lakh") + actions: outline "Decline" + primary "Accept" + text-link "Not relevant" (error-tinted, right).
+"Can we chat" proposal (no listing attached): same minus attached card + message "Hi, I have a few options in Mavdi that match. Can we discuss?".
+Interactions: Accept → card collapses with fade → toast "Chat started" → navigates to S3 (accepted state). Decline → decline dialog: "Decline this request?" + "They can send a new inquiry after 30 days." + Cancel / error-primary "Decline" → toast "Request declined".
+Empty state: line-art envelope-open + "No message requests" + "New inquiries will appear here first" 13 ink2.
+
+S3. CHAT THREAD (build the full behaviour set — most important screen)
+Header (56px): back arrow · 32px avatar · name column: "Nirav Shah" 15/600 + accent verified check + "Owner" tag; sub-line 11 ink3: "Online" (accent dot) / "Last seen 2h ago" (toggleable) / "Typing…" (accent) · right: ⋯ (44px) → chat menu sheet: "View profile" · "Mute notifications" · "Search in chat" · "Block user" (error) · "Report" (error) · "Not interested — close chat".
+Pinned property bar (sticky under header, surface2, 56px, top+bottom hairline): 40px thumb + "3 BHK Flat, Mavdi" 13/600 (1 line) + "₹85 Lakh" 11 ink3 + chevron → placeholder "Property Detail — Batch P4". Variant (dev-toolbar): price-updated flash — bar briefly highlights accentSoft + inline system line appears in thread: "Price updated: ₹85 L → ₹78 L" (see system messages).
+Message area (scrollable; build these in order):
+
+System safety card (first message, centered, surface2 r8, 12px pad, max 90%): shield icon accent + "Never pay token or advance before a site visit. HomzList is not responsible for payments made outside the platform." 11 ink2 + accent text-link "Learn more".
+Sticky date separator: centered pill (surface2, 11/600 ink3): "Today" — implement sticky behaviour on scroll (also "Yesterday", "12 Jan" separators between older groups).
+Received bubble: "Yes, it's available. When would you like to visit?" + time "10:24 AM" 11 ink3.
+Sent bubble (accentSoft): "This weekend works. Is the price negotiable?" + time + double-tick "Seen" (accent ticks) + below-bubble label "Seen 10:26 AM" 11 ink3 (only under the last seen sent message).
+Quoted reply bubble: sent bubble containing an inset quote block (left accent 2px border, surface2 tint, 11 ink3 truncated original: "Yes, it's available. When would…") + reply text "Great — Saturday 11 AM then?" — tapping the quote scrolls up and flash-highlights the original message (implement).
+Received bubble with reaction: "Sure, Saturday works 👍" + reaction chip attached below-left (surface1 border, "👍 1").
+Photo message: bubble containing 1:1 photo (r12, 200px) + time overlay bottom-right on photo (white + shadow) → tap opens fullscreen viewer (black, X, swipe-down dismiss, pinch-zoom).
+Link preview message: bubble with rich card (thumb + title "Green Valley Heights — Shreeji Builders" 13/600 + domain "homzlist.com" 11 ink3) + caution label below (warningSoft micro-strip, 11): "External link — open with care" (for non-HomzList links).
+Number-request system card (centered, surface2 r8): "Nirav requested your phone number" 13 ink2 + row: outline "Deny" + primary "Allow" → allow confirm dialog: "Share your number?" 17/600 + "Your number +91 98250 12345 will be visible to Nirav Shah in this chat." 13 ink2 + Cancel / primary "Allow" → card replaces with NumberCard.
+NumberCard (accentSoft r12, 12px pad, reveal animation): phone icon + "+91 98250 12345" 17/600 ink1 + row of two icon-buttons: Copy (→ toast "Number copied") + Call (accent) · sub 11 ink3: "Shared 2 min ago".
+Post-number continuity prompt (system card): "Did you connect on call?" 13/600 + 3 chips: "Interested" · "Not interested" · "Visit fixed" → tapping adds a system line "Marked as: Visit fixed" and shows toast "Lead status updated".
+Visit scheduler card (surface1 r12 1px border): calendar icon + "Propose a site visit" 15/600 → date chips row (Sat 25 Jan · Sun 26 Jan · Mon 27 Jan) + time chips (10:00 AM · 11:00 AM (selected) · 4:00 PM) + primary "Propose visit" → confirmed state: accent 1.5px border card: check icon + "Site visit confirmed" 15/600 + "Saturday, 25 Jan · 11:00 AM" 13 + "3 BHK Flat, Mavdi" 11 ink3 + row: text-link "Reschedule" + text-link "Cancel" (error) → outcome prompt (after the date passes — dev-toolbar): "How did the visit go?" + chips: "Done" · "Cancelled" · "Reschedule".
+System lines (centered, 11 ink3, no bubble): "Price updated: ₹85 L → ₹78 L" · "This listing has been marked as sold" · "Nirav shared their number".
+Unread divider: full-width hairline with centered pill "New messages" (accent text 11/600, accentSoft bg) — chat opens scrolled to this position (implement).
+Received bubble (new, below divider) + typing indicator bubble (surface2, 3 bouncing dots).
+Jump-to-bottom pill: floating above input (surface1, L2 shadow, r999): down-arrow + "New message" 13/600 — appears when scrolled up.
+Message interactions (implement): long-press any bubble → message menu sheet: "React" (emoji row: 👍 ❤️ 😊 🙏 ✅) · "Reply" · "Copy text" · "Report message" (error) · "Delete" → delete sheet: "Delete for me" / "Delete for everyone" (error) → deleted bubble becomes: italic ink3 "This message was deleted" 13. Swipe-right on any bubble = quick reply (bubble slides, reply-arrow icon appears, composer shows the quote block with × to cancel).
+Composer (bottom, sticky, surface1, top hairline): attach icon-button (44px → attach sheet: "Photo from gallery" · "Take photo") + textarea (auto-grows 1→4 lines, surface2 r999→r16 as it grows, placeholder "Message…") + quick-replies icon (lightning, 44px → quick replies sheet: title "Quick replies" + rows of saved templates: "Site visits happen on weekends 11 AM–5 PM." · "The price is slightly negotiable for a serious buyer." · "All documents are ready — index copy and tax receipts." + "+ New template" accent row + manage: each row has edit/delete icons → template editor sheet: textarea + Save) + send button (icon-button; disabled state = ink3, enabled = accent, 150ms fade transition; on tap = optimistic bubble append + slide-up) + char counter appears at 1800+: "1,847 / 2,000" 11 ink3.
+Keyboard-aware behaviour: when composer focused, show a state where the composer sits directly above an implied keyboard area and messages shift up (implement a class toggled by dev-toolbar "keyboard" or on focus).
+Number-pattern warning (implement): typing a 10-digit number in the composer triggers a warningSoft inline strip above the composer: "Sharing numbers directly isn't recommended. Use 'Request number' — HomzList isn't responsible for off-platform deals." + × dismiss (does not block sending).
+Chat states (dev-toolbar — build all):
+
+
+Request pending (sender side): message area shows only the sent inquiry bubble + centered card: clock icon + "Waiting for Nirav to accept your inquiry" 13 ink2 + "You'll be notified when they respond" 11 ink3; composer disabled (surface2, placeholder "You can message after they accept").
+Declined cooldown: centered card errorSoft: "Your inquiry was declined. You can send a new one after 12 Feb." + composer disabled.
+Listing archived/sold: warningSoft banner under pinned bar: "This property is no longer available" 11 — composer stays enabled (deals close after sold-mark).
+Requirement expired: warningSoft banner: "This requirement has expired — new proposals are closed" — composer enabled.
+Blocked: centered card surface2: "You blocked Nirav Shah" + text-link "Unblock" + composer replaced with a strip: "You can't message a blocked user."
+Deleted user: header avatar = gray placeholder + name "Deleted user" ink3 + composer disabled strip "This account no longer exists."
+Offline queue: sent bubbles show a clock icon instead of ticks + composer strip warningSoft: "No connection — messages will send automatically" — then on "reconnect" (dev-toolbar) ticks appear + toast "Messages sent".
+Empty thread (just accepted): centered art (chat bubbles line-art 72px) + "Say hello" 15/600 + "Ask about availability, price or a site visit" 13 ink2 + suggested chips (tappable → fills composer): "Is it still available?" · "Can we schedule a visit?" · "Is the price negotiable?".
+Search in chat: header becomes searchbar; matching messages highlight (warningSoft) + up/down arrows + "3 of 8" counter.
+
+S4. CHAT DETAILS
+Header: back + title "Chat details" 17/600.
+Body:
+
+Participant card (surface1 r12 1px border): 64px avatar + "Nirav Shah" 17/600 + accent verified + "Owner" tag + "Rajkot · Member since Mar 2025" 11 ink3 + "Usually responds in 2 hours" 11 accent + row: outline "View profile" + outline "Call" (only if number allowed — dev-toolbar).
+Property card (the pinned listing, larger): thumb 64px + "3 BHK Flat, Mavdi" 15/600 + "₹85 Lakh · For Sale" 13 ink3 + chevron.
+Shared photos section: 13/600 ink3 uppercase "SHARED PHOTOS (6)" + 3-column 1:1 grid (6 thumbs, 2px gaps) + "See all" accent link → tapping opens fullscreen viewer.
+Shared cards section: "SHARED LISTINGS (2)" + 2 mini rows (thumb + title + price + chevron).
+Settings rows (ListRow style, 56px, dividers): "Mute notifications" + toggle · "Pin chat" + toggle · "Archive chat" + chevron · "Search in chat" + chevron · "Block user" (error text + shield-off icon) → block dialog: "Block Nirav Shah?" + "They won't be able to message you. Existing messages stay visible." + Cancel / error-primary "Block" · "Report" (error) → report sheet (radio rows: "Spam" · "Abusive language" · "Fraud attempt" · "Asking for payment off-platform" · "Fake identity" · optional note + error-primary "Submit Report") · "Delete chat" (error) → dialog.
+
+GLOBAL / SHEETS TO BUILD
+Chat menu sheet · message menu sheet + reaction row · delete-message sheet · attach sheet · quick-replies sheet + template editor sheet · allow-number dialog · decline dialog · block dialog · report sheet · delete-chat dialog · bulk-select mode · swipe actions · photo viewer (fullscreen, X, pinch-zoom, swipe-down) · toasts ("Number copied" / "Chat started" / "Request declined" / "Lead status updated" / "Messages sent" / "Template saved") · offline banner · placeholders for other batches + back.
+BUILD CHECKLIST (build EVERY item — nothing skipped)
+Messages Home: header (search state + ⋯ sheet) · 4 tabs with badges · unread-only filter · grouping toggle + group headers (listing & requirement variants) · requests row with verified/others count · chat rows (unread/pinned/muted/typing/photo-preview variants) · swipe actions · long-press bulk mode · long-press sheet + delete dialog · Tab-2 request-pending row · Tab-3 proposal rows · Tab-4 status strip + status chips · archived sub-screen + note · 4 unique empty states · skeleton · offline.
+Requests: verified/others sub-tabs · 3 card variants (inquiry / proposal-with-number / can-we-chat) · trust strips · attached rich cards · intent chips · seen-privacy note · accept/decline + decline dialog + toasts · empty state.
+Chat Thread: header (avatar/name/badges/online/last-seen/typing + ⋯ sheet) · pinned bar + price-update flash · safety system card · sticky date separators · received/sent bubbles + ticks + "Seen 10:26 AM" · quoted reply + tap-to-jump highlight · reactions · photo message + viewer · link preview + caution label · number-request card → allow dialog → NumberCard (copy/call) · continuity prompt chips · visit scheduler (propose → confirmed → reschedule/cancel → outcome) · system lines · unread divider + open-at-position · typing indicator · jump-to-bottom pill · long-press menu (react/reply/copy/report/delete-for-me/everyone + deleted state) · swipe-to-reply · composer (attach/textarea grow/quick-replies/send disabled→enabled/char counter/keyboard-aware) · number-pattern warning · all 9 chat states (request-pending / declined-cooldown / archived-sold / requirement-expired / blocked / deleted-user / offline-queue / empty-thread + suggestion chips / search-in-chat).
+Chat Details: participant card · property card · shared photos grid · shared listings · settings rows + toggles · block dialog · report sheet · delete dialog.
+Dev toolbar (screens/states/role/light-dark/viewport/keyboard) · Full click-navigation + browser back · Responsive centered-470 at ≥768px.

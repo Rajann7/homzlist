@@ -1,0 +1,177 @@
+📦 PACKET P14 — ADMIN: USERS, LISTINGS MASTER, PLANS, COUPONS, GRANTS, FINANCE, PAYMENTS (8 screens)
+
+Copy everything below → new Claude Design session → paste → generate → save.
+
+Build a fully interactive, clickable HTML prototype for the HomzList Admin Panel (admin.homzlist.com) — the internal back-office of a premium real estate listing platform. This module: Users List, User Detail (deep-drill, all tabs), Listings Master, Plans Manager, Coupons, Grants & Trials, Finance, Payments (list + detail) — plus every side-panel, sheet, dialog and state — in ONE single HTML file with working click-navigation.
+
+OUTPUT REQUIREMENTS
+ONE self-contained HTML file (inline CSS + vanilla JS), no external libraries. Inline SVG outline icons (Lucide style, 1.5px stroke) — never emoji/cartoon icons.
+Every screen = a section; JS click-navigation; browser back works (history.pushState); breadcrumbs navigate back; side-panels/sheets close on X / backdrop / Esc / browser back.
+Deep-drill is the core principle of this packet: every entity name/ID anywhere must be clickable into its own side-panel, and panels stack (panel over panel) with a breadcrumb trail at the top of the stack (e.g. User → their Listing → its Leads → a Chat → the other participant's User panel). Back closes only the top panel.
+Dev-toolbar (bottom-right, collapsible, minimal gray): jump to any screen/panel/state, toggle Light/Dark, toggle viewport (Desktop 1440 / Tablet 768 / Mobile 390), toggle admin role (Super Admin / Admin / Staff — must actually hide/disable restricted actions), toggle user state (active / suspended / deleted / trial / no-plan / multi-plan), toggle payment state (success / pending / failed / refunded / chargeback), toggle states (skeleton / empty / offline).
+Responsive (admin = desktop-first): sidebar 240px (collapsible → 64px icon rail) + content max 1200px. At ≤767px: sidebar → bottom drawer (hamburger), tables → stacked cards, side-panels → full-screen sheets. Must be fully usable on a phone.
+English only. Realistic Rajkot data (RK Properties, Nirav Shah, Meet Patel, Shreeji Builders, Priya Shah (admin); areas: Mavdi, University Road, Kalawad Road, 150 Feet Ring Road; society: Shree Residency, Green Valley Heights).
+Production polish — dense, serious, professional back-office. Not a wireframe.
+DESIGN SYSTEM (mandatory — follow exactly)
+
+Colors light: page 
+#FFFFFF · surface1 
+#FFFFFF · surface2 
+#F5F5F5 · surface3 
+#EFEFEF · border 
+#DBDBDB · divider 
+#EFEFEF · ink1 
+#111111 · ink2 
+#555555 · ink3 
+#8E8E8E · inkDisabled 
+#C7C7C7 · accent 
+#0F9D58 · accentPressed 
+#0C7C46 · accentSoft 
+#E6F4EC · accentDisabled 
+#A8D5BD · error 
+#ED4956 · errorSoft 
+#FDECEE · warning 
+#F5A623 · warningSoft 
+#FEF5E7 · info 
+#0095F6 · infoSoft 
+#E7F3FD.
+Colors dark: page 
+#000000 · surface1 
+#121212 · surface2 
+#1E1E1E · surface3 
+#262626 · border 
+#363636 · divider 
+#262626 · ink1 
+#F5F5F5 · ink2 
+#B0B0B0 · ink3 
+#8E8E8E · inkDisabled 
+#4D4D4D · accent 
+#1DB868 · accentPressed 
+#17A05A · accentSoft 
+#0E2B1C · error 
+#FF5C6A · warning 
+#FFB74D · info 
+#3BA7F8. Dark: no shadows → 1px border outlines.
+Font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif. 24/700 page hero · 20/700 page title · 17/600 panel titles · 15/400 body (15/600 buttons/tabs) · 13/400 table cells & meta (13/600 labels/column headers) · 11/400 caption (11/600 badges uppercase +0.3px). Tables line-height 1.4.
+Spacing: only 4/8/12/16/24/32. Content padding 24px desktop / 16px mobile. Table cells 12px vertical / 16px horizontal. Panel padding 24px.
+Radius: 4 badges · 8 buttons/inputs/cards · 12 panels/sheets · 16 dialogs · 999 chips/avatars/pills.
+Shadows (light only): L1 0 1px 2px rgba(0,0,0,.06) · L2 0 4px 12px rgba(0,0,0,.10) · L3 0 8px 24px rgba(0,0,0,.16) (panels/dialogs).
+Icons: 24px outline 1.5px; 20px in tables/sidebar.
+Buttons: Primary accent/white 15/600 h40 r8 · Secondary surface2/ink1 · Outline 1px · Text-link accent · Destructive error bg/white · Icon-button 40×40 (≥44px hit area on mobile). Press scale .98; loading = spinner replaces label; disabled = accentDisabled or 40% opacity with cursor: not-allowed + tooltip ("Super Admin only").
+Inputs: h40 surface2 r8 1px border; focus accent 1.5px; error border + 11px message; top-label 13/600 ink2; helper 11 ink3. Money inputs show ₹ prefix + live comma formatting.
+Tables: sticky header row (surface2, 13/600 ink2, sortable chevrons), rows 56px + hairline dividers, hover surface2, selected accentSoft, checkbox column 40px, sticky first column on horizontal scroll.
+Status badges (single system, 11/600 uppercase r4): Active (accentSoft/accent) · Suspended (errorSoft/error) · Deleted (surface3/ink3) · Trial (infoSoft/info) · Live (accentSoft/accent) · Pending (infoSoft/info) · Changes Requested (warningSoft/warning) · Rejected (errorSoft/error) · Hidden (surface3/ink3) · Sold (ink1/white) · Rented (warningSoft/warning) · Archived (surface3/ink3) · Expired (surface3/ink3) · Promoted (black-60%/white) · Verified (accentSoft/accent) · Success (accentSoft/accent) · Failed (errorSoft/error) · Refunded (surface2/ink2) · Chargeback (errorSoft/error) · Grace (warningSoft/warning).
+Role chips: Owner (surface2/ink2) · Broker (infoSoft/info) · Builder (accentSoft/accent) · Super Admin (accentSoft/accent) · Admin (infoSoft/info) · Staff (surface2/ink2).
+Motion: ease-out cubic-bezier(0.2,0,0,1). Side-panel slide-in-right 250ms (mobile: bottom-up 300ms). Stacked panels offset 24px with a subtle scrim between. Dialogs scale-in .96→1 200ms. Toasts up 200ms/hold 3s/down 200ms. Skeleton shimmer 1.2s. Chart bars grow 400ms on mount. Reduced-motion respected.
+Brand: wordmark "Homz" ink1-700 + "List" accent-700 + "ADMIN" 11/600 ink3 chip.
+
+GLOBAL SHELL (rebuild — same as P13)
+
+Sidebar (240px / 64px rail / mobile drawer): wordmark + ADMIN chip + collapse chevron. Items (20px icon + 15/400 + count badges; active = accentSoft bg + 3px accent left bar): Dashboard · Queues (Listings 12 · Requirements 3 · Boosts 2 · Verifications 4 · Appeals 1 · Reports 5) · Users (active) · Listings · Payments · Finance · Plans (Plans · Coupons · Grants) · Master Data · CMS · Templates · Support (Tickets 3 · Disputes 1) · Staff (Super only) · Analytics · Audit Log (Super only) · System (Cron & Status · Settings & Flags · Trash · Exports). Footer: 32px avatar + "Priya Shah" 13/600 + role chip + logout icon.
+Top header (56px): hamburger (mobile) + breadcrumb trail (13 ink3, accent links) · global search (h40, max 420px, "Search phone, name, listing ID, payment ID…") → grouped dropdown (USERS / LISTINGS / PAYMENTS / REQUIREMENTS / TICKETS) · bell (badge 7 → drawer) · staff-online strip (Super only) · env badge (STAGING) · light/dark toggle · avatar menu.
+
+SCREENS TO BUILD
+
+A10. USERS LIST
+Page title "Users" 20/700 + total chip ("4,281 users") + right: saved-views dropdown ("All users" / "Brokers in Rajkot" / "Suspended" / "New this week" / "+ Save current view") + column-settings icon (→ sheet: checkbox list of columns + drag-reorder) + export icon (→ export sheet: format radios (CSV/XLSX) + field checkboxes (Name, Phone, Role, City, Plans, Listings, Leads, Joined, Status) + row-scope radios ("Current filter — 128 rows" / "All users") + warning 11 ink3: "Exports contain personal data and are logged." + primary "Export 128 rows" → toast "Export queued — check Exports Center").
+Filter bar: search input (name/phone) + chips: "Role ▾" (Owner/Broker/Builder) · "Status ▾" (Active/Suspended/Deleted/Trial) · "Plan ▾" (No plan/₹999/₹2,999/₹9,999/Multiple) · "City ▾" · "Verification ▾" (Phone/ID/RERA) · "Joined ▾" (date range) + "Clear all" text-link + result count "128 users".
+Table (desktop) / cards (mobile) — columns: [checkbox] · User (32px avatar + name 13/600 + "@rkproperties" 11 ink3; hover/long-press → quick-stat mini-card popup (L3, 240px): avatar + name + role + "Listings 12 · Leads 36 · Plans 2 active · Reports 0 · Joined 12 Jan" + row of mini buttons "Open" / "Suspend") · Phone ("+91 98250 12345" + copy icon) · Role (role chip) · Verification (badge cluster: Phone ✓ gray / ID ✓ accent / RERA ✓ accent-filled; "—" if none) · City ("Rajkot") · Plans ("₹999 · ₹2,999" chips or "No plan" ink3) · Listings ("12" + tiny live/pending split "10/2" ink3) · Leads ("36") · Joined ("12 Jan 2025") · Status (badge) · Actions (⋯ → sheet: "Open user" · "Send message" · "Suspend" · "Grant trial" · "Impersonate" (Super/Admin only)).
+Build 8 rows with variety: a Broker with all badges + 2 plans; an Owner with no plan; a Builder with ₹9,999 + RERA; a new account (warningSoft "New" micro-chip beside name, joined "2h ago"); a suspended user (row tinted errorSoft-light + Suspended badge); a deleted user (name "Deleted user" ink3 + gray avatar); a trial user (Trial badge + "14 days left" 11 ink3); a user with a reports flag (small error flag icon + "3 reports" tooltip).
+Bulk bar (on selection): "3 selected" + outline "Send message" + outline "Grant trial" + error-outline "Suspend" + "Clear" + note 11 ink3 "Bulk actions are logged".
+Empty/skeleton/offline states.
+
+A11. USER DETAIL (deep-drill side-panel — the most important admin screen after Review; build fully)
+Opens as a right side-panel (480px desktop / full-screen mobile) with a breadcrumb stack bar at top ("Users › RK Properties") + X.
+Panel header: 56px avatar + "RK Properties" 17/600 + verification badges + role chip + status badge + "@rkproperties · +91 98250 12345" 13 ink3 + copy icon + rows 11 ink3: "Joined 12 Jan 2025 · Last active 2h ago · Rajkot" + action bar (wrapping button row): outline "Edit" · outline "Send message" · outline "Grant trial" · outline "Adjust balance" · outline "Role change" · outline "Impersonate" · error-outline "Suspend" · ⋯ (→ sheet: "Merge accounts" · "Ban device/IP" (Super) · "Delete user" (error, Super) · "Add internal note" · "Open in user view ↗").
+Role-gating (implement): Staff sees only read + "Send message" (others disabled with tooltip "Admin only"); Admin sees all except "Delete user"/"Ban device" (tooltip "Super Admin only"); Super sees everything.
+Tabs (scrollable): Overview · Plans · Payments · Listings · Requirements · Leads · Chats · Communication · Notes · Timeline.
+
+Overview: editable field rows (label 13/600 ink2 + value 15 + pencil icon → inline edit + Save/Cancel): Name · Bio (with flagged-terms highlight if any) · City · Phone · Email · Role · Alternate number · read-only meta: "Profile completion 80%" (usage bar) · "Response time: ~2 hours" · "Consent: T&C v1.2 accepted 12 Jan · Privacy v1.1 accepted 12 Jan · Marketing: opted out" 11 ink3 · counters strip (4 mini cards): "12 Listings" · "36 Leads" · "4,280 Views" · "0 Reports" · flags card (warningSoft, conditional): "New account · 1 prior rejection · 1 auto-flag (number in bio) — resolved".
+Plans: active plan cards (₹999 lifetime — usage bars: "Listings 1/1", "Requirements 1/1", "Proposals 7/10"; ₹2,999 monthly — "Expires 12 Feb · 18 days" + "Proposals 12/30") + pooled note 11 ink3 ("Balances pooled · FIFO — oldest plan consumed first") + plan history timeline (purchased → consumed items with links: "→ Listing #4521 (Live)" / "→ Requirement #89 (Active)") + buttons: outline "Grant trial" (→ grant sheet, see A15) + outline "Adjust balance" (→ adjust sheet: type radios ("Proposals" / "Listing slot" / "Requirement slot") + stepper (+5) + reason textarea (required) + note 11 ink3: "This is logged in the audit trail with your name." + primary "Apply adjustment" → toast "Balance adjusted · logged").
+Payments: mini table (Date · Item · Amount · Method · Status badge · ⋯) rows → click → stacks the Payment Detail panel (A18) on top + summary strip ("Total paid ₹3,998 · 1 refund · 0 chargebacks").
+Listings: grid/list toggle + status filter chips + rows (thumb + title + price + status badge + "1,240 views · 6 leads" 11 ink3 + ⋯) → click → stacks Listing Detail/Edit panel (A12).
+Requirements: rows (budget + type + areas + status chip (Active 22d / Expired / Off / Fulfilled) + "12 proposals" + ⋯ ("Open" / "Force expire" (error, → dialog))).
+Leads: grouped by source (collapsible groups: "Property: 3 BHK Flat, Mavdi — 6 leads" / "Requirement: 3 BHK ₹40–60L — 12 proposals" / "Project: Green Valley Heights — 18 leads") → lead rows (avatar + name + stage chip + last activity 11 ink3 + chevron) → click → stacks Chat viewer (read-only).
+Chats: list rows (participant + listing thumb + last message preview + time + message count) → click → read-only chat viewer panel: exact user chat render (pinned property bar, bubbles, ticks, system cards, NumberCard if shared, visit card) + persistent banner (surface3, top): eye icon + "Read-only — admins cannot send messages" + no composer at all (verify: there is no input field anywhere) + note 11 ink3 at bottom: "Deleted messages are shown to admins as 'Deleted by user' for evidence." + one such greyed bubble example + participant chips at top (both users → clicking the other user stacks their User panel).
+Communication: log rows of admin-sent items (icon + type chip ("Warning" / "Message" / "Email" / "WhatsApp") + subject/preview + admin name + timestamp + "Delivered ✓" 11 ink3) + primary "Send message" (→ send sheet: channel checkboxes (In-app / Email / WhatsApp) + template dropdown + subject + body + preview + primary "Send" → toast "Message sent · logged").
+Notes: internal sticky notes (surface2 warning-tinted cards: author avatar + name + timestamp + text + delete icon) + "Add note" textarea + primary "Add" + note 11 ink3: "Internal only — never visible to the user."
+Timeline: chronological rows (dot + connector line): "12 Jan 14:02 — Registered (Owner)" · "12 Jan 14:30 — Purchased ₹999 plan (pay_NxK2p9)" · "12 Jan 15:10 — Submitted listing #4521" · "12 Jan 18:22 — Listing approved by Priya Shah" · "5 Jan — Listing #4102 rejected (Duplicate) by Amit" · "14 Jan — ID verified by Priya Shah" · "20 Jan — Trial granted by Priya Shah (14 days)" + filter chips ("All" / "Account" / "Listings" / "Payments" / "Admin actions").
+Dialogs/flows from this panel (build all):
+Suspend: "Suspend RK Properties?" + duration radios ("7 days" / "30 days" / "Until review") + reason select (templates: "Fake listings" / "Abusive behaviour" / "Payment fraud" / "Repeated policy violations" / "Other" + textarea) + consequence list (13 ink2 bullets): "Their 10 live listings will be hidden" · "3 active chats will be frozen" · "1 active boost will be paused" · "They'll see a suspension screen on login" + Cancel / error-primary "Suspend" → toast "User suspended · logged" → panel header shows Suspended badge + a "Lift suspension" button appears (→ dialog: "Lift suspension? Listings and chats will be restored and the user notified.").
+Role change: "Change role for RK Properties?" + current ("Broker") → new (radio: Owner / Broker / Builder) + reason + note 11 ink3: "Their listings stay as they are. Plan availability may change." + primary "Change role".
+Impersonate: "Open user view as RK Properties?" + warning 11 (warningSoft): "You'll see the app exactly as they do. All sends, payments and messages are disabled. This session is logged with your name." + Cancel / primary "Start session" → A31-style impersonation frame: a full user-app shell mock inside the panel with a persistent top strip (warning bg): "Viewing as RK Properties (read-only) · Started 2 min ago" + "Exit session" button → on exit → toast "Impersonation session ended · logged 4 min".
+Merge accounts: "Merge accounts" sheet: search input to find the second account + preview of both (avatars + phones + plans + listings counts) + radio "Keep this account as primary" + consequence list ("Listings and plan balances move to the primary account" · "The other account is suspended, not deleted" · "Chats stay with their original threads") + type-to-confirm input ("Type MERGE") + error-primary "Merge accounts" → toast.
+Ban device/IP (Super only): dialog showing "Device fingerprint: fp_9x2k…" + "Last IP: 103.21.xx.xx (Rajkot)" + reason + error-primary "Ban".
+Delete user (Super only): double-confirm dialog: consequence list ("Listings and requirements removed" · "Chats anonymised" · "Payment records kept 7 years (anonymised) — legal requirement" · "Cannot be undone") + type "DELETE" + error-primary.
+
+A12. LISTINGS MASTER
+Page title "Listings" 20/700 + total chip ("2,140") + saved views + column settings + export.
+Status filter chips (with counts): "All 2,140" · "Live 1,806" · "Pending 12" · "Changes requested 3" · "Rejected 24" · "Hidden 41" · "Sold 168" · "Rented 74" · "Archived 12" · "Trash 8" (last one navigates to a Trash placeholder → "Trash — Batch P15").
+Filter bar: search (title/ID) + chips: "Type ▾" · "City/Area ▾" · "Price range ▾" · "Role ▾" · "Boosted ▾" · "Reported ▾" · "Date ▾".
+Table: [checkbox] · Listing (48px thumb + title 13/600 + "#4521" 11 ink3 + Promoted micro-badge if boosted) · Type (chip "Flat / Sale") · Price ("₹85 Lakh") · Location ("Mavdi, Rajkot") · Poster (avatar + name + role chip) · Status (badge) · Stats ("1,240 views · 6 leads" 11 ink3) · Posted ("12 Jan") · Flags (icons: report flag (error, tooltip "3 reports") / clock (warning, tooltip "Expiry prompt sent — 12 days left") / lock) · Actions (⋯ → sheet: "Open listing" · "Edit" · "Open in user view ↗" · "Remove story" · "Pause boost" · "Hide" · "Mark sold" · "Restore" · "Delete" (error)).
+Row click → Listing Detail panel (stacks):
+
+Header: thumb + title + "#4521" + status badge + poster row (clickable → stacks User panel) + action bar: outline "Edit all fields" · outline "Open in user view ↗" · outline "Remove story" · outline "Pause boost" · error-outline "Hide" · ⋯ ("Mark sold" · "Restore" · "Force expire" · "Delete" (Super)).
+SOP banner (infoSoft, always visible): info icon + "Compliance edits only. Every change is logged with your name and the old value. Do not 'improve' user content." 11 ink2.
+Tabs: Preview · Fields · Photos · Leads · Boost · Reports · Timeline.
+Preview: exact user render (feed card + full listing tabs).
+Fields: full editable form (every field from the user's listing form — title, type, BHK, areas, price with comma-format + word-check, location cascade, contact toggles, description with number-highlight, amenities, ownership proof link) — each field row shows a pencil + on change a diff chip appears ("₹85 Lakh → ₹78 Lakh" warningSoft) + sticky footer: "3 unsaved changes" + reason textarea (required) + Cancel / primary "Save changes" → confirm dialog: "Save 3 changes to this listing?" + diff list + "Re-review required? " toggle (default ON for photos/location changes) + primary "Save & log" → toast "Changes saved · logged".
+Photos: grid with COVER badge + reorder + per-photo ⋯ ("Remove photo" (error) · "Set as cover" · "View original") + note 11 ink3: "Removing photos is logged."
+Leads: rows → stack Chat viewer (read-only).
+Boost: current boost card ("Active till 25 Jan · Mavdi targeting · ₹1,499 paid") + outline "Pause boost" (→ dialog: "Pause this boost? The remaining days are preserved while paused." ) + history rows.
+Reports: report cards (reason + reporters + time) + text-link "Open in reports queue →".
+Timeline: "12 Jan 15:10 — Submitted" · "12 Jan 18:22 — Approved by Priya" · "14 Jan — Story generated (expired 15 Jan)" · "20 Jan — Price edited by user (₹85L → ₹78L)" · "22 Jan — Boost approved by Amit" · "25 Jan — Expiry prompt sent".
+Bulk bar: "5 selected" + outline "Hide" + outline "Approve" + error-outline "Delete" + note "Max 20 · logged".
+
+A13. PLANS MANAGER
+Page title "Plans" 20/700 + primary "+ New plan" + note strip (infoSoft, 11 ink2): "Changes apply to new purchases only. Existing users keep the plan they bought (grandfathering)."
+Plan cards (3 + custom, grid 2-col desktop): each: name 17/600 + price 24/700 + validity 11 ink3 + status toggle ("Active" accent / "Hidden") + role availability chips (Owner ✓ · Broker ✓ · Builder ✓/—) + contents list (13: "1 listing (lifetime)" · "1 requirement (30 days)" · "10 proposals") + stats strip 11 ink3 ("1,204 purchases · ₹12.0L revenue") + row: outline "Edit" + ⋯ ("Duplicate" · "Hide from users" · "View purchases" · "Delete" (Super, disabled if purchases exist + tooltip "Plans with purchases can't be deleted — hide instead")).
+Edit plan panel (stacks): fields: Name · Price (₹ input + comma) · Billing type (radios: "One-time" / "Monthly" / "Per project · 6 months") · Contents section: "Property listings" stepper (1) + validity select ("Lifetime" / "30 days" / "6 months") · "Requirement posts" stepper (1) + validity ("30 days") · "Proposals" stepper (10) + validity radios ("Lifetime with account" / "Expires with plan") · toggles: "Unlock all requirements" (off for ₹999, on for ₹2,999) · "Unlimited matched requirements" (Builder) · "Boost eligible" (on) · "Priority match alerts" · Role availability checkboxes (Owner/Broker/Builder) · Display: "Most popular" badge toggle · description input · order-in-list stepper · Preview card (live-updating user-facing plan card render beside the form) · sticky footer: reason textarea + Cancel / primary "Save plan" → confirm dialog: "Save changes to ₹999 Listing Plan?" + diff list ("Price ₹999 → ₹1,299" · "Proposals 10 → 12") + grandfathering note (accentSoft 11): "1,204 existing users keep their original terms." + primary "Save & log".
+Purchases sub-view (from ⋯ "View purchases"): table (User · Date · Amount · Payment ID · Status) + export.
+
+A14. COUPONS
+Page title "Coupons" 20/700 + primary "+ New coupon" + filter chips ("Active 4" / "Scheduled 1" / "Expired 6" / "Exhausted 2").
+Table: Code ("SAVE20" 13/600 mono-ish + copy icon) · Discount ("20% · max ₹200" or "₹200 flat") · Applies to (chips: "Plans" / "Boosts" / "Both") · Scope ("₹999 plan only" / "All plans") · Usage ("142 / 500" + mini usage bar) · Per user ("1") · Min value ("₹999") · Validity ("1–31 Jan 2025") · Status (badge: Active/Scheduled/Expired/Exhausted) · Actions (⋯ → "Edit" · "Duplicate" · "View usage" · "Deactivate" (error)).
+New/Edit coupon panel: Code input (+ "Generate" text-link → random code) · Discount type radios ("Percentage" / "Flat amount") + value input + "Max discount" input (when %) · Applies to checkboxes (Plans / Boosts) + plan multi-select ("₹999" ✓ / "₹2,999" / "₹9,999") · Usage cap input (500) + "Unlimited" toggle · Per-user limit stepper (1) · Min order value input · Validity date range (start/end pickers) · "Active" toggle · Internal note input · Preview strip ("User sees: SAVE20 — 20% off, max ₹200, on ₹999 plan") · primary "Create coupon" → toast "Coupon created · logged".
+View usage sub-view: table (User · Date · Order · Discount given · Payment ID) + total row ("₹28,400 discounted") + export.
+
+A15. GRANTS & TRIALS
+Page title "Grants & trials" 20/700 + primary "+ New grant" + note strip (warningSoft 11 ink2): "Trials are never shown to users as an option. They only appear after you grant them. Every grant is logged."
+Filter chips: "Active 12" · "Expired 34" · "All".
+Table: User (avatar + name + role chip → stacks User panel) · Granted (contents chips: "1 listing · 1 requirement · 10 proposals") · Duration ("14 days") · Expires ("2 Feb 2025 · 8 days left" — warning when ≤3 days) · Reason (truncated text + tooltip full) · Granted by (admin avatar + "Priya Shah") · Date ("20 Jan") · Actions (⋯ → "Extend" (→ dialog: duration + reason) · "Revoke" (error → dialog: "Revoke this trial? Their trial listing stays live but new actions stop." + reason)).
+New grant sheet: user search (type phone/name → result rows with avatar/role → select) · Grant contents section (steppers): "Property listings" (1) · "Requirement posts" (1) · "Proposals" (10) · toggles: "Unlock all requirements" · "Boost eligible" · Duration (radios: 7 / 14 / 30 days / custom input) · Reason (required) textarea (templates dropdown: "Founding broker onboarding" / "Support goodwill — technical issue" / "Partnership trial" / "Testing") · Notify user toggle (on) + preview of the notification ("You've received a trial from HomzList: 1 listing + 1 requirement for 14 days") · note 11 ink3: "Buying a paid plan ends the trial automatically." · primary "Grant trial" → toast "Trial granted to Nirav Shah · logged".
+
+A16. FINANCE
+Page title "Finance" 20/700 + date-range picker chip ("1–31 Jan 2025 ▾" → sheet: presets (Today / 7d / 30d / This month / Last month / This FY / Custom range)) + export icon.
+Tabs: Revenue · Churn · Reconciliation · Exports.
+
+Revenue: KPI cards (4): "₹4,82,140" 24/700 + "Total revenue" + delta chip ("▲ 18% vs last month") · "1,204" + "Transactions" · "₹401" + "Avg order value" · "₹12,940" + "Refunds" (error tint). Stacked bar chart (by day/month; legend: Plans (accent) / Boosts (info) / Top-ups (warning); hover tooltip with ₹ split) + tab chips (Daily / Weekly / Monthly). Breakdown table: rows by plan ("₹999 Listing Plan — 380 sales — ₹3,79,620 — 78%" + share bar) · ("₹2,999 Requirement — 24 — ₹71,976") · ("₹9,999 Builder — 3 — ₹29,997") · ("Boosts — 42 — ₹58,940") · ("Top-ups — 18 — ₹8,982"). City breakdown: rows (Rajkot ₹3.2L · Ahmedabad ₹0.9L · Surat ₹0.4L + share bars).
+Churn: KPI strip ("18 expiring in 7 days" · "62% renewal rate" · "8 churned last month"). Expiring table: User · Plan · Expires ("2 Feb · 3 days" warning) · Renewed? (chip: "Not yet" ink3 / "Renewed ✓" accent) · Last activity · Actions (⋯ → "Send reminder" (→ sheet: template + channels + Send) · "Grant extension" · "Open user"). Churned table: User · Plan · Expired on · Days since · Actions.
+Reconciliation: strip: "Razorpay settlements vs HomzList records · last synced 2h ago" + outline "Sync now" (→ spinner → toast "Synced · 2 mismatches found"). Match summary: 3 cards: "1,198 matched ✓" (accent) · "2 mismatched ⚠" (error) · "4 pending" (info). Mismatch table (error-tinted rows): Payment ID · Our record ("₹999 · Success") · Razorpay ("₹999 · Refunded") · Difference chip · Actions (outline "Re-check" · outline "Open payment" · "Mark resolved" (→ dialog + reason)). Settlement table: Date · Settlement ID · Gross · Fees · Net · Status.
+Exports: rows: "GST invoice list (Jan 2025)" + "Generated 1 Feb · 1,204 rows" + Download · "Revenue summary" · "Refunds report" + primary "+ New export" (→ sheet: type radios + date range + format + primary "Generate" → toast "Export queued — you'll be notified").
+
+A17. PAYMENTS LIST
+Page title "Payments" 20/700 + total chip + filter chips: "All" · "Success 1,198" · "Pending 4" · "Failed 26" · "Refunded 12" · "Chargebacks 1" (error dot) · "Abandoned 38" (info) + date range + search ("payment ID / order ID / phone").
+Table: Payment ID ("pay_NxK2p9Qw8R" 13 + copy icon) · User (avatar + name → stacks user) · Item ("₹999 Listing Plan" / "Boost · 1 Month" / "+10 Proposals") · Amount ("₹943" + strike "₹999" when coupon: tooltip "SAVE20 −₹200 · GST ₹144") · Method (chip: "UPI · GPay" / "Card · HDFC" / "Netbanking") · Status (badge) · Date ("12 Jan · 2:34 PM") · Actions (⋯ → "Open details" · "Re-check status" · "Refund" · "Resend invoice" · "Send retry link").
+Abandoned tab: rows (User · Item started · Amount · Started "4 min ago" · Actions: outline "Send retry link" (→ toast "Retry link sent via WhatsApp + email") · "Open user") + note 11 ink3: "Checkouts started but not completed in the last 24 hours."
+Chargeback rows: errorSoft tint + banner in row: "Chargeback raised 2 Feb · plan auto-suspended · respond by 9 Feb" + outline "Open dispute".
+
+A18. PAYMENT DETAIL (panel — stacks)
+Header: "pay_NxK2p9Qw8R" 17/600 + copy + status badge + "₹943" 24/700 + "12 Jan 2025 · 2:34 PM IST".
+Sections:
+
+Summary rows: Order ID (order_9Kx… + copy) · User (avatar row → stacks) · Item ("₹999 Listing Plan") · Method ("UPI · GPay · 98250xxxxx@okhdfc") · Bank RRN · Attempt count ("1") · IP/device ("103.21.xx.xx · Chrome Android").
+Money breakdown card (surface2): Subtotal ₹999 · Coupon SAVE20 −₹200 (accent) · Taxable ₹799 · CGST 9% ₹72 · SGST 9% ₹72 · Total ₹943 17/600 · Gateway fee ₹22 (ink3) · Net settled ₹921.
+Plan consumption card: "This payment granted:" rows with links: "→ Listing slot — used by #4521 (Live)" · "→ Requirement slot — used by #89 (Active)" · "→ 10 proposals — 7 used, 3 left" + warning strip (warningSoft, shown when refunding a consumed plan): "This plan is partly consumed. Refunding will revoke the plan and unpublish listing #4521."
+Webhook & reconciliation card: rows: "Webhook received 2:34:06 PM ✓" · "Signature verified ✓" · "Idempotency key: idem_84f2…" · "Razorpay status: captured" · "Our status: success" · "Reconciled ✓ (2 Feb)" + outline "Re-check with Razorpay" (→ spinner → toast "Status confirmed: captured").
+Timeline: "2:34:02 — Order created" · "2:34:05 — Payment captured (UPI)" · "2:34:06 — Webhook received & verified" · "2:34:07 — Plan activated" · "2:34:07 — Invoice HL-2025-0142 generated" · "2:35 — Confirmation email + WhatsApp sent ✓".
+Invoice card: preview thumb + "HL-2025-0142" + row: outline "Download PDF" · outline "Resend to user" · outline "Regenerate" (→ dialog: "Regenerate invoice? The old one stays in records." + reason).
+Action bar: primary "Refund" (→ refund dialog: amount input (prefilled full ₹943, full-only — note 11 ink3: "Partial refunds are not supported — see policy") + reason radios ("Technical failure — plan not activated" / "Duplicate payment" / "Boost rejected by admin" / "Other") + textarea + consequence list: "Plan will be revoked · Listing #4521 will be unpublished · User will be notified" + type-to-confirm ("REFUND") + error-primary "Process refund" → toast "Refund initiated · logged · user notified") · outline "Send retry link" (failed only) · outline "Open dispute" (chargeback only) · ⋯ ("Add internal note" · "Open in Razorpay ↗").
+States (dev-toolbar): pending (info banner: "Payment pending since 4 min · UPI confirmation awaited" + "Re-check") · failed (errorSoft banner: "Declined by bank (reason: insufficient funds)" + "No money deducted") · refunded (banner: "Refunded ₹943 on 8 Jan by Priya Shah · reason: technical failure · ARN 74567…") · chargeback (errorSoft banner + "Respond by 9 Feb" + outline "Open dispute").
+GLOBAL / PANELS / SHEETS TO BUILD
+
+Stacked side-panels + breadcrumb stack bar · quick-stat hover popup · saved-views dropdown + save-view dialog · column-settings sheet · export sheets (users/listings/coupons/finance) · bulk bars + bulk dialogs · suspend/lift dialogs · role-change dialog · impersonation frame + exit · merge-accounts sheet (type-to-confirm) · ban device dialog · delete-user double-confirm · adjust-balance sheet · grant-trial sheet · send-message sheet · internal-notes · read-only chat viewer (no composer) · listing edit with diffs + reason + re-review toggle · photo remove · pause boost dialog · plan edit panel + preview + grandfathering note · coupon panel + usage view · finance date-range sheet · reminder sheet · reconciliation re-check · refund dialog (full-only + type-to-confirm) · invoice regenerate dialog · retry-link action · toasts ("Balance adjusted · logged" / "Trial granted · logged" / "User suspended · logged" / "Changes saved · logged" / "Refund initiated · logged" / "Export queued" / "Synced · 2 mismatches") · offline banner · skeletons · placeholders for other batches + back.
+
+BUILD CHECKLIST (build EVERY item — nothing skipped)
+
+Shell (sidebar + rail + mobile drawer + breadcrumbs + global search with grouped results + bell + staff-online + env badge + role-gating) · A10 Users List (saved views + column settings + export sheet with data-warning + filters incl. verification/plan + table with quick-stat popup + all 8 row variants (new/suspended/deleted/trial/flagged/multi-plan) + bulk bar + empty/skeleton) · A11 User Detail (header + full action bar + role-gating with tooltips + 10 tabs: Overview (inline edits, consent versions, counters, flags) · Plans (usage bars, pooled/FIFO note, history, grant, adjust-balance with required reason) · Payments (mini table → stacks A18) · Listings (→ stacks A12) · Requirements (force-expire) · Leads (grouped by source → stacks chat) · Chats (read-only viewer, no composer anywhere, deleted-message evidence note, participant → stacks user) · Communication (log + send sheet) · Notes · Timeline with filters) + suspend/lift/role-change/impersonate/merge/ban/delete flows) · A12 Listings Master (status chips + filters + table with flags + ⋯ actions + Listing panel: SOP banner + 7 tabs (Preview exact render · Fields with diffs + required reason + re-review toggle · Photos with remove-logged · Leads · Boost pause · Reports · Timeline) + bulk bar) · A13 Plans (cards + stats + edit panel with contents steppers/validity/role availability/preview + grandfathering confirm + purchases view + delete-guard) · A14 Coupons (table + all statuses + create/edit panel + generate code + usage view + totals) · A15 Grants & Trials (never-shown-to-users note + table + new-grant sheet with user search, contents, duration, required reason, notify preview + extend/revoke) · A16 Finance (4 tabs: Revenue KPIs + stacked chart + plan/city breakdowns · Churn expiring/churned + reminder sheet · Reconciliation match summary + mismatch rows + sync + resolve · Exports) · A17 Payments List (all status tabs incl. abandoned + chargebacks + retry links + search by IDs) · A18 Payment Detail (summary + money breakdown + plan consumption with revoke warning + webhook/reconciliation card + timeline + invoice actions + refund dialog full-only with type-to-confirm + all 4 states) · Dev toolbar (screens/panels/states/admin-role/user-state/payment-state/viewport/light-dark) · Full click-navigation + browser back + panel stacking · Desktop-first responsive (sidebar → drawer, tables → cards, panels → full-screen at ≤767px).

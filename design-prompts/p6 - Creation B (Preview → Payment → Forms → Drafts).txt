@@ -1,0 +1,97 @@
+PACKET P6 — CREATION B: PREVIEW → CHECKOUT → SUCCESS → REQUIREMENT/PROJECT FORMS → DRAFTS → EDIT (7 screens)
+Copy everything below → new Claude Design session → paste → generate → save.
+
+Build a fully interactive, clickable HTML prototype for HomzList — a premium Instagram-style real estate listing PWA. This is CREATION MODULE B: Preview, Payment Checkout, Success, Requirement Form, Project Form (builder), Drafts, Edit/Status flows — in ONE single HTML file with working click-navigation.
+OUTPUT REQUIREMENTS
+
+ONE self-contained HTML file (inline CSS + vanilla JS), no external libraries. Inline SVG outline icons (Lucide, 1.5px) — no emoji/cartoon.
+Screens = sections; JS navigation; browser back works; sheets close on X / backdrop / swipe-down / back.
+Dev-toolbar (collapsible, top-right, minimal gray): jump to any screen/sheet/state, toggle Light/Dark, Mobile/Tablet/Desktop, toggle payment state (success / pending-UPI / failed), toggle listing state (Live / Pending / Changes requested / Rejected / Sold / Rented / Archived), toggle role (Owner/Broker/Builder).
+Responsive: mobile-first 390px; ≥768px same design centered in 470px column, #FAFAFA outside, hairline borders.
+English only. Realistic Rajkot data.
+Production polish.
+
+DESIGN SYSTEM (mandatory — follow exactly)
+Colors light: page #FFFFFF · surface1 #FFFFFF · surface2 #F5F5F5 · surface3 #EFEFEF · border #DBDBDB · divider #EFEFEF · ink1 #111111 · ink2 #555555 · ink3 #8E8E8E · inkDisabled #C7C7C7 · accent #0F9D58 · accentPressed #0C7C46 · accentSoft #E6F4EC · accentDisabled #A8D5BD · error #ED4956 · errorSoft #FDECEE · warning #F5A623 · warningSoft #FEF5E7 · info #0095F6 · infoSoft #E7F3FD.
+Colors dark: page #000000 · surface1 #121212 · surface2 #1E1E1E · surface3 #262626 · border #363636 · divider #262626 · ink1 #F5F5F5 · ink2 #B0B0B0 · ink3 #8E8E8E · accent #1DB868 · accentSoft #0E2B1C · error #FF5C6A · warning #FFB74D · info #3BA7F8. Dark: no shadows → 1px borders.
+Font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif. 24/700 · 20/700 · 17/600 · 15/400 (15/600 buttons) · 13/400 (13/600 labels) · 11/400 (11/600 badges uppercase +0.3px).
+Spacing: 4/8/12/16/24/32 only. Gutters 16px. Radius: 4 badges · 8 buttons/inputs · 12 cards/sheets · 16 dialogs · 999 chips/pills.
+Shadows (light): L1 0 1px 2px rgba(0,0,0,.06) · L2 0 4px 12px rgba(0,0,0,.10) · L3 0 8px 24px rgba(0,0,0,.16).
+Icons: 24px outline 1.5px.
+Buttons: Primary accent/white 15/600 h44 r8 (disabled accentDisabled; loading spinner) · Secondary surface2/ink1 · Outline 1px · Text-link accent · Icon-button 44×44. Press scale .98.
+Inputs: h44 surface2 r8 1px border; focus accent 1.5px; error border + 11px message + alert icon; top-label 13/600 ink2; helper 11 ink3.
+Badges (single system, 11/600 uppercase, r4): Promoted (black-60%/white) · Verified (accentSoft/accent) · Sold (ink1/white) · Rented (warningSoft/warning) · Under Review (infoSoft/info) · Changes Requested (warningSoft/warning) · Rejected (errorSoft/error) · Expired (surface3/ink3) · For Sale (accentSoft/accent) · For Rent (warningSoft/warning) · New Project (infoSoft/info) · Fulfilled (accentSoft/accent ✓).
+Touch targets: min 44×44.
+Motion: ease-out cubic-bezier(0.2,0,0,1); sheets 300/250ms; tab crossfade 150ms + underline slide 200ms; success check-draw animation 600ms; spinner rotate; toast 200/3s/200; reduced-motion respected.
+Brand: wordmark "Homz" ink1-700 + "List" accent-700.
+SCREENS TO BUILD
+S1. PREVIEW
+Header: back + title "Preview" 17/600 + "Submit for review" text-link right (accent).
+Tabs (15/600, active = ink1 + accent underline): "Feed card" · "Full listing".
+
+Feed card tab: shows the EXACT feed card render on page background (surface2 page tint to imply feed context): 4:5 photo carousel (dots + "1/6" counter), price "₹85 Lakh" 17/700 + "For Sale" badge, meta "3 BHK · 1,450 sqft · ₹5,862/sqft", location pin + "Mavdi, Rajkot", poster row (avatar + "RK Properties" + verified + "Broker" tag), action bar (Save icon + "View Property" outline + "Inquiry" primary + ⋯). Note strip below 11 ink3 center: "This is how your listing appears in the feed."
+Full listing tab: condensed but faithful detail render — photo carousel, price block, title + location, key-specs strip (3 BHK · 3 Bath · 1,450 sqft · Floor 4/7), details list (all filled values), amenities grid, description, contact preview strip: "Number hidden — buyers can request it" 13 ink2 (or "Number public — Call & WhatsApp shown" variant), safety note strip.
+Sticky bottom: outline "Edit" (→ placeholder "Form — Batch P5") + primary "Submit for Review" → submit dialog: "Submit this listing for review?" + "Our team reviews listings within 24 hours. You'll be notified once it's live." + Cancel / primary "Submit" → S2 if payment pending, else S3.
+
+S2. PAYMENT CHECKOUT
+Header: back + title "Checkout" 17/600 + lock icon (secure).
+Body:
+
+Order summary card (surface1 r12 1px border): "₹999 Listing Plan" 17/600 + "one-time · lifetime" 11 ink3 → itemized rows 13/400 with accent checks: "1 property listing (lifetime)" · "1 requirement post (30 days)" · "10 proposals" → divider → row "Subtotal" 13 ink2 / "₹999" 13/600 → row "Coupon (SAVE20)" 13 accent / "− ₹200" accent → row "GST (18%)" 13 ink2 / "₹144" → divider → "Total payable" 17/600 / "₹943" 20/700 accent.
+Coupon row: input + "Apply" outline (applied state shows accentSoft row + × remove).
+GSTIN (optional) collapsible: "Add GSTIN for business invoice" 13 accent link → input + helper "For claiming input tax credit".
+Payment method preview (surface2 r8 rows, radio): "UPI · GPay, PhonePe, Paytm" (selected, UPI glyphs) · "Credit / Debit Card" · "Net Banking" · footer 11 ink3 "Payments are processed securely by Razorpay."
+Terms line 11 ink3: "By paying you agree to our Terms and No-Refund Policy." (accent links)
+Sticky bottom: primary "Pay ₹943" → loading spinner → routes per dev-toolbar payment state:
+Success → S3.
+Pending-UPI state screen: centered clock/UPI line-art + "Payment processing…" 20/700 + "This can take up to 10 minutes. You can safely close this page — we'll notify you when it's done." 15 ink2 + accent mini-spinner + outline "Check status" (→ pretends re-check, shows "Still processing" toast) + text-link "Go to My Listings".
+Failed state screen: errorSoft circle-x art + "Payment failed" 20/700 + "Your money wasn't deducted. If it was, it will be refunded automatically within 5–7 days." 15 ink2 + primary "Retry Payment" + text-link "Contact Support" + note 11 ink3: "Your listing is saved as a draft."
+Double-payment guard (dev-toolbar): warningSoft banner on checkout: "You already paid for this plan 4 minutes ago. Please wait before paying again." + accent "Check status".
+
+S3. SUBMISSION SUCCESS
+Centered: animated accent check-in-circle (draw animation 600ms, 72px) + "Listing submitted" 24/700 + "Your listing is under review. We usually approve within 24 hours." 15 ink2 center + timeline block (vertical stepper, 3 nodes): "Submitted ✓" (accent, done) → "Under review" (accent ring, current, pulsing) → "Live on HomzList" (surface3, upcoming) — each with 13/600 label + 11 ink3 sublabel ("Just now" / "Usually within 24 hours" / "You'll be notified") + info strip (surface2 r8) 11 ink3: "You'll get a notification and email when it's approved." + primary "Go to My Listings" (→ placeholder "My Listings — Batch P9") + text-link "Preview listing" (→ S1).
+Variants: Requirement success ("Requirement submitted" + "Requirements are reviewed within 24 hours" + timeline) · Project success ("Project submitted" + "6-month project listing activated after approval").
+S4. REQUIREMENT FORM
+Header: X (unsaved dialog) + title "Post a requirement" 17/600 + "Save draft" link.
+Body sections:
+
+A. LOOKING FOR: chips "Buy" (selected) / "Rent" · Property type select row → sheet (Flat / Bungalow / Tenement / Plot / Office / Shop / PG…) · BHK chips (1/2/3 selected/4/5+) — hidden automatically if type = Plot/Office/Shop (implement).
+B. BUDGET: two inputs side-by-side "Min budget" / "Max budget" (₹ prefix, comma-format) + live word line 13 accent: "₹40 Lakh – ₹60 Lakh" + validation: max < min → inline error "Max budget must be higher than min".
+C. PREFERRED AREAS: multi-select row → areas sheet (search + checkbox rows: Mavdi ✓ / University Road ✓ / Raiya Road / Kalawad Road / 150 Feet Ring Road; "Select up to 5" 11 ink3 note) → selected shown as removable chips + helper 11 ink3: "We'll also show you matches from nearby areas."
+D. URGENCY: chips "Immediate (within 1 month)" (selected) / "1–3 months" / "Just exploring".
+E. NOTES: textarea (placeholder "Any specific needs — facing, floor, furnishing, school nearby…") + counter "0 / 500" + number-detection warning (same as listing form).
+Plan strip (surface2 r8): "1 requirement post available · 30 days validity" 13 accent + ⓘ tooltip ("Your ₹999 plan includes 1 requirement post for 30 days.") · no-quota variant: warningSoft "No requirement posts left — buy a plan" + accent "View Plans".
+Sticky bottom: primary "Submit for Review" → submit dialog → S3 (requirement variant).
+
+S5. PROJECT FORM (Builder — multi-step)
+Header: X + title "Post a project" + step indicator ("Step 2 of 5" + progress bar accent).
+Step 1 — Basics: Project name input · Project type select row (Residential / Commercial / Plot scheme) · Status chips: "Booking open" / "Under construction" (selected) / "Ready to move" · Possession month row → month-picker sheet (Dec 2026) · Towers input + Floors input (2-col) · Total units input + Available units input (2-col) · RERA section (accentSoft r8 card): "RERA number" input (helper 11: "Required for projects — buyers look for this") + "RERA exempt" toggle → when ON, reveals "Exemption reason" select row (Plot scheme below threshold / Completed before RERA / Other) + input.
+Step 2 — Unit types (repeater): section header "Unit types" + existing unit cards (surface1 r12 1px border, 12px pad): "2 BHK · 1,100 sqft · ₹45 L onwards" 15/600 + sub "Carpet 920 sqft · 12 available" 11 ink3 + edit/delete icons → add-unit sheet: fields — Unit name select (1 BHK/2 BHK/3 BHK/3 BHK Premium/4 BHK/Shop/Office) · Built-up area (+unit) · Carpet area · Price from (₹ + comma + word line) · Units available (stepper) · Floor plan upload (dashed tile, "Upload floor plan") → primary "Add unit" → adds card + toast "Unit added". Include a dashed "+ Add unit type" tile.
+Step 3 — Media: photo grid (unlimited, COVER badge, reorder, ⋯ tile sheet) + Brochure upload (PDF, 10MB, scanning → Ready ✓) + hint strip.
+Step 4 — Amenities & Banks: amenities checkbox chips (Clubhouse · Pool · Gym · Kids play area · Garden · Security · CCTV · Power backup · Parking · Jogging track · Community hall · Rain water harvesting) + Bank approvals multi-select chips (SBI ✓ · HDFC ✓ · ICICI · Axis · Kotak · LIC HFL · Bajaj) + helper "Approved banks help buyers get loans faster".
+Step 5 — Location & Review: location cascade (same 6-level pattern as listing form + request-area) + Pincode + review summary card (all entered values in label/value rows with "Edit" links jumping back to steps) + plan strip: "₹9,999 · 6 months · 1 project" + sticky primary "Continue to Payment" → S2 (₹9,999 summary variant) → S3 (project success).
+Include per-step validation states + step back/next navigation.
+S6. DRAFTS
+Header: back + title "Drafts" 17/600 + counter "2 / 3" 13 ink3.
+Body: draft rows (surface1 r12 1px border, 12px pad): 64px thumb (or dashed placeholder if no photo yet) + title 15/600 ("3 BHK Flat, Mavdi" or "Untitled listing" ink3 if empty) + progress line 11 ink3 ("Details added · Photos pending") + expiry countdown chip (warningSoft if <7 days: "Expires in 5 days" / surface2: "Expires in 82 days") + right: ⋯ (44px) → sheet: "Resume editing" · "Delete draft" (error) → delete dialog ("Delete this draft?" + Cancel / error-primary "Delete") → toast "Draft deleted".
+Info strip (surface2 r8) 11 ink3: "You can keep up to 3 drafts. Drafts are deleted after 90 days of inactivity."
+Empty state: line-art clipboard 96px + "No drafts" 17/600 + "Start a listing and it'll be saved here automatically." 13 ink2 + primary "Create Listing".
+Tap row → placeholder "Form (resumed) — Batch P5".
+S7. EDIT LISTING & STATUS FLOWS
+Header: back + title "Edit listing" 17/600 + "Save" text-link right.
+Re-review banner (infoSoft strip at top): info icon + "Changes to photos, price or location need admin re-approval. Your current listing stays live meanwhile." 11 ink2.
+Body: condensed form (same styling as P5 form; a few sections shown: Basics / Price / Location / Photos link row) + each field marked with a "minor/major" hint where relevant: price field helper 11 ink3 "Price changes are auto-approved"; photos row helper "Photo changes need re-review".
+Changes-requested variant (dev-toolbar): warningSoft banner "Admin requested changes" + per-field inline notes attached to specific fields: e.g. under Photos: warningSoft note card (16px, r8): "Photos are too dark — please re-upload daylight photos. — HomzList Team" 11 ink2; under Price: "Price seems unusually low for this area — please confirm." → sticky bottom primary "Resubmit for Review".
+Rejected variant: errorSoft banner "Listing rejected: Duplicate listing" + note "You can edit and resubmit. After 3 rejections, the listing is locked and you'll need to contact support." + sticky primary "Edit & Resubmit".
+Status action bar (bottom sticky, for live listings): outline "Mark as Sold" · outline "Mark as Rented" · outline "Boost" (→ placeholder "Boost — Batch P11"):
+
+Mark as Sold dialog: "Mark this property as sold?" + "It will be archived and removed from search and feed. You can restore it later." + Cancel / primary "Mark as Sold" → toast "Listing marked as sold".
+Mark as Rented dialog: same + note "You can re-activate this listing for free when it's vacant again."
+Rented state screen variant: warningSoft banner "This listing is marked as rented" + primary "Re-activate listing" → dialog: "Re-activate this listing?" + "It will go for a quick re-review and use the same listing slot — no extra payment." + Cancel / primary "Re-activate" → toast.
+Archived state: surface3 "Archived" badge + primary "Restore listing" → dialog ("Restore this listing?" + "It will be re-reviewed before going live.").
+Still-available prompt (inline card — important): infoSoft card at top of a live listing edit screen: clock icon + "Is this property still available?" 15/600 + "We ask every 2 months to keep listings fresh. If you don't respond within 15 days, it will be hidden automatically." 11 ink2 + row: outline "No, it's sold" + primary "Yes, still available" → toast "Thanks — your listing stays live".
+
+GLOBAL / SHEETS TO BUILD
+Unsaved-changes dialog · submit dialog · delete dialogs · status dialogs (sold/rented/re-activate/restore) · month-picker sheet · areas multi-select sheet · add-unit sheet · tile sheet + editor sheet (photos) · request-area sheet · coupon states · tooltips (ⓘ) · toasts (Draft saved / Submitted / Unit added / Marked sold / Re-activated / Payment failed / Link copied) · offline banner ("No internet — draft saved locally") · placeholders for other batches + back.
+BUILD CHECKLIST (build EVERY item — nothing skipped)
+Preview (2 tabs: exact feed-card + full listing render + contact preview variants + submit dialog) · Checkout (itemized summary + coupon + GST + GSTIN optional + payment methods + terms + Pay button loading + success/pending-UPI/failed states + double-payment guard) · Success (check animation + 3-node timeline + variants for listing/requirement/project) · Requirement Form (buy/rent + type + BHK auto-hide for plot/commercial + min/max budget with word-line + validation + areas multi-sheet with 5-limit + urgency + notes + counter + number warning + quota strip + no-quota variant) · Project Form (5 steps + step bar + RERA + exempt toggle/reason + unit repeater + add-unit sheet with floor plan + media + brochure scan + amenities + bank chips + location cascade + review summary with edit-jumps + ₹9,999 strip) · Drafts (rows + thumb/untitled + progress line + expiry chips + ⋯ sheet + delete dialog + 3-limit strip + empty state) · Edit (re-review banner + minor/major hints + changes-requested with per-field notes + rejected variant + 3-reject lock note + status bar + sold/rented dialogs + rented re-activate + archived restore + still-available inline prompt) · All dialogs/sheets/toasts · Offline banner · Dev toolbar (screens/payment states/listing states/role/light-dark/viewport) · Full click-navigation + browser back · Responsive centered-470 at ≥768px.

@@ -1,0 +1,112 @@
+PACKET P10 — SAVED, ACTIVITY & SETTINGS SUITE (10 screens)
+Copy everything below → new Claude Design session → paste → generate → save.
+
+Build a fully interactive, clickable HTML prototype for HomzList — a premium Instagram-style real estate listing PWA. This module: Saved/Collections, Your Activity, QR Share, Trash, Archived, Settings Home, Notification Preferences, Language, Login Activity, Blocked Users — plus all sheets, dialogs and states — in ONE single HTML file with working click-navigation.
+OUTPUT REQUIREMENTS
+
+ONE self-contained HTML file (inline CSS + vanilla JS), no external libraries. Inline SVG outline icons (Lucide, 1.5px stroke) — no emoji/cartoon icons.
+Screens = sections; JS click-navigation; browser back works; sheets close on X / backdrop / swipe-down / back.
+Dev-toolbar (top-right, collapsible, minimal gray): jump to any screen/sheet/state, toggle Light/Dark, Mobile/Tablet/Desktop, toggle role (Owner/Broker/Builder), toggle states (skeleton / empty / offline).
+Responsive: mobile-first 390px; at ≥768px same design centered in 470px column, #FAFAFA outside, hairline #DBDBDB borders. No separate desktop layout.
+English only. Realistic Rajkot data.
+Production polish, Instagram-level.
+
+DESIGN SYSTEM (mandatory — follow exactly)
+Colors light: page #FFFFFF · surface1 #FFFFFF · surface2 #F5F5F5 · surface3 #EFEFEF · border #DBDBDB · divider #EFEFEF · ink1 #111111 · ink2 #555555 · ink3 #8E8E8E · inkDisabled #C7C7C7 · accent #0F9D58 · accentPressed #0C7C46 · accentSoft #E6F4EC · accentDisabled #A8D5BD · error #ED4956 · errorSoft #FDECEE · warning #F5A623 · warningSoft #FEF5E7 · info #0095F6 · infoSoft #E7F3FD.
+Colors dark: page #000000 · surface1 #121212 · surface2 #1E1E1E · surface3 #262626 · border #363636 · divider #262626 · ink1 #F5F5F5 · ink2 #B0B0B0 · ink3 #8E8E8E · inkDisabled #4D4D4D · accent #1DB868 · accentSoft #0E2B1C · error #FF5C6A · warning #FFB74D · info #3BA7F8. Dark: no shadows → 1px borders.
+Font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif. 24/700 · 20/700 · 17/600 · 15/400 (15/600 buttons/tabs) · 13/400 (13/600 labels) · 11/400 (11/600 badges uppercase +0.3px).
+Spacing: 4/8/12/16/24/32 only. Gutters 16px. Radius: 4 badges · 8 buttons/inputs · 12 cards/sheets · 16 dialogs · 999 chips/avatars/pills.
+Shadows (light): L1 0 1px 2px rgba(0,0,0,.06) · L2 0 4px 12px rgba(0,0,0,.10) · L3 0 8px 24px rgba(0,0,0,.16).
+Icons: 24px outline 1.5px.
+Buttons: Primary accent/white 15/600 h44 r8 (disabled accentDisabled; loading spinner) · Secondary surface2/ink1 · Outline 1px · Text-link accent · Icon-button 44×44. Press scale .98.
+ListRow: 56px, leading icon (24px ink2) + label 15/400 ink1 + optional value 13 ink3 or toggle or chevron (ink3); divider under text only (not under icon); pressed = surface2 flash; destructive rows = error text + error icon.
+Toggle: 44×26 track — off = surface3 with white thumb; on = accent with white thumb; disabled = 40% opacity.
+Touch targets: min 44×44.
+Motion: ease-out cubic-bezier(0.2,0,0,1); sheets 300/250ms drag-dismiss; toggles 150ms; toast 200/3s/200; grid lazy shimmer; language switch = instant content swap with 150ms crossfade. Reduced-motion respected.
+Brand: wordmark "Homz" ink1-700 + "List" accent-700.
+SCREENS TO BUILD
+S1. SAVED / COLLECTIONS
+Header: back + title "Saved" 17/600 + "+" icon (44px → new-collection sheet: name input + "Create" primary) + ⋯ (→ sheet: "Manage collections" · "Sort by: Recently saved / Price").
+Collection chips row (horizontal scroll): "All 24" (selected) · "For parents 6" · "Investment 9" · "Office 4" · "+ New" (dashed chip) — long-press a chip → sheet: "Rename" · "Delete collection" (error → dialog: "Delete this collection? Saved properties won't be deleted.").
+Grid (3-col, 2px gaps, 1:1 tiles): saved property photos + price overlay chip at bottom-left of each tile (black-60% pill, white 11/600: "₹85 L") + status overlays: one tile with "SOLD" diagonal ribbon + dimmed 60% + one with "PRICE DROP" chip (accentSoft, top-left: "↓ ₹5 L").
+Long-press tile → sheet: "Move to collection" (→ move sheet: radio rows of collections + "+ New collection" + primary "Move") · "Remove from saved" (error) · "Share".
+Status alert strip (accentSoft r8, above grid — dev-toolbar): bell icon + "3 saved properties changed" 13 + "View" accent link → filters grid to changed ones (price drop / sold).
+Empty states: All-tab empty: line-art bookmark 96px + "Nothing saved yet" 17/600 + "Tap the bookmark on any property to save it here" 13 ink2 + primary "Explore Properties". Collection empty: "This collection is empty" + "Move saved properties here to organise them" + outline "Browse saved".
+Skeleton + offline.
+S2. YOUR ACTIVITY
+Header: back + title "Your activity" 17/600.
+Sections (each: 13/600 ink3 uppercase header + content + "See all" accent link right):
+
+RECENTLY VIEWED: horizontal mini-cards (1:1 photo + "₹85 L" 13/600 + "3 BHK Mavdi" 11 ink3 + "2h ago" 11 ink3) ×5.
+SAVED: count row (bookmark icon + "24 properties saved" 15/400 + chevron → S1).
+INQUIRIES SENT: rows (48px thumb + "3 BHK Flat, Mavdi" 13/600 + status chip ("Accepted" accentSoft / "Pending" surface2 / "Declined" errorSoft) + time 11 ink3 + chevron → placeholder Chat) ×3 + "See all" → placeholder "Messages — Batch P7".
+PROPOSALS SENT: row (send icon + "8 proposals · 6 remaining" 15/400 + chevron → placeholder "My Proposals — Batch P8").
+SITE VISITS: row (calendar icon + "2 upcoming visits" 15/400 + accent dot + chevron → placeholder "My Visits — Batch P8").
+SEARCHES: "Saved searches" row (bell icon + "3 saved searches · alerts on" + chevron → sub-screen: Saved searches — build it: rows with query chips ("3 BHK · ₹40–60 L · Mavdi") + "12 new matches" accent badge + toggle "Alerts" + ⋯ (Rename / Delete) + empty state "No saved searches — save any search to get alerts").
+Clear activity row (error text): → dialog "Clear recently viewed?" + "This won't affect your saved properties." + Cancel / error-primary "Clear".
+Empty state: line-art clock + "No activity yet" + "Properties you view and inquire about appear here".
+
+S3. QR & SHARE PROFILE
+Header: back + title "Your QR code" 17/600 + share icon (44px).
+Body (centered): QR card (surface1 r16, 24px pad, L2 shadow, max 320px): QR graphic (accent-tinted modules, white bg, small "H" logo centred) + avatar 48px overlapping top of card + "RK Properties" 17/600 + "Broker · Rajkot" 13 ink3 + verification badges row + link "homzlist.com/rkproperties" 11 ink3 · colour chips row below card (change QR card background: white / accent / ink1 — like Instagram's QR colour switch) · row: outline "Download image" (→ toast "QR saved") + primary "Share profile" (→ share sheet: preview + "Copy link" (→ toast "Link copied") + WhatsApp / More) · note 11 ink3 centred: "Print this on your visiting card — buyers can scan to see all your listings."
+Scan variant (tab at top: "My code" | "Scan code"): camera viewfinder frame (dark, rounded corners, accent scan-line animation) + "Point at a HomzList QR code" 13 white/70 + gallery icon-button ("Scan from photo").
+S4. TRASH (Recently deleted)
+Header: back + title "Recently deleted" 17/600 + ⋯ (→ sheet: "Empty trash" (error → dialog)).
+Info strip (surface2 r8) 11 ink3: "Items are permanently deleted after 30 days. Restoring a listing doesn't use a new slot."
+Rows (surface1 r12 1px border, 12px pad): 56px thumb (dimmed 60%) + title 15/600 ink2 + "₹85 Lakh · 3 BHK · Mavdi" 13 ink3 + type chip ("Listing" / "Requirement" surface2 pills) + countdown chip (warningSoft if <7 days: "Deleted 26 days ago · 4 days left" / surface2: "Deleted 3 days ago · 27 days left") + row: outline "Restore" (→ dialog: "Restore this listing?" + "It will be re-reviewed before going live." + Cancel / primary "Restore" → toast "Listing restored — under review") + text-link "Delete now" (error → dialog: "Delete permanently?" + "This can't be undone." + Cancel / error-primary "Delete").
+Empty state: line-art trash 96px + "Trash is empty" + "Deleted listings appear here for 30 days".
+S5. ARCHIVED
+Header: back + title "Archived" 17/600 + filter icon (→ sheet: "All" / "Sold" / "Rented" / "Hidden").
+Info strip 11 ink3: "Archived listings are hidden from feed and search. Restore anytime — it uses the same slot."
+Grid or rows (toggle icon in header): rows: 56px thumb (dimmed) + title + price + status badge ("Sold" ink1 / "Rented" warning / "Hidden" surface3) + archived date 11 ink3 ("Archived 12 Jan") + outline "Restore" → dialog ("Restore this listing?" + "It will be re-reviewed before going live." + Cancel / primary "Restore") → toast.
+Empty state: line-art box + "Nothing archived" + "Sold and rented listings move here automatically".
+S6. SETTINGS HOME
+Header: back + title "Settings" 17/600.
+Account card (top, surface2 r12, 12px pad, tappable → placeholder Edit Profile): 48px avatar + "RK Properties" 15/600 + "+91 98250 12345 · Broker" 11 ink3 + chevron.
+Sections (13/600 ink3 uppercase headers + ListRows):
+
+ACCOUNT: "Edit profile" (user icon → placeholder P9) · "Phone number" (+91 98250 12345 value → placeholder) · "Email" ("Not added" ink3) · "City" ("Rajkot") · "Verification" (shield icon + "ID ✓ RERA ✓" 11 accent → placeholder P9) · "Account status" (→ placeholder P9).
+PREFERENCES: "Notifications" (bell → S7) · "Language" (globe + "English" value → S8) · "Appearance" (moon icon + value "System" → appearance sheet: radio rows Light / Dark / System (selected) + note "Follows your device setting") · "Privacy" (lock → privacy sub-screen: build it — toggles: "Show my number by default on new listings" (off + helper 11 ink3 "You can change this per listing") · "Show last seen in chats" (on) · "Show activity status" (on) · "Allow others to find me by phone number" (on)).
+YOUR CONTENT: "Saved" (bookmark + "24" → S1) · "Your activity" (clock → S2) · "Drafts" (file + badge "2" → placeholder P6) · "Archived" (box → S5) · "Recently deleted" (trash → S4) · "My listings" (list → placeholder P9).
+PLANS & BILLING: "My plan" (card icon + "₹999 · 1 slot used" → placeholder P11) · "Payment history" (receipt → placeholder P11) · "Boosts" (rocket → placeholder P11).
+SECURITY: "Login activity" (device icon + "3 devices" → S9) · "Blocked users" (shield-off + "2" → S10).
+SUPPORT: "Help centre" (question icon → placeholder P12) · "Contact support" (headset → placeholder P12) · "Report a problem" (flag → report-problem sheet: category select + textarea + "Attach screenshot" tile + primary "Send").
+ABOUT: "Terms of Service" · "Privacy Policy" · "Refund Policy" · "Grievance Officer" · "About HomzList" (all → placeholder P12 legal) · "Download your data" (download icon → placeholder P12) · "Rate us on Google" (star icon, external-link icon trailing).
+DANGER ZONE: "Log out" (error text → dialog: "Log out of HomzList?" + Cancel / error-primary "Log out") · "Deactivate account" (error → placeholder P12) · "Delete account" (error → placeholder P12).
+Footer: wordmark small + "Version 1.0.2 (build 148)" 11 ink3 centred + "Made in Rajkot" 11 ink3.
+
+S7. NOTIFICATION PREFERENCES
+Header: back + title "Notifications" 17/600.
+Info strip (surface2 r8) 11 ink3: "You'll always get critical alerts about your payments and listings by email."
+Channel row card: "Browser notifications" 15/600 + status chip ("Enabled" accentSoft / "Blocked" errorSoft variant + helper 11 ink3: "Notifications are blocked in your browser settings. Enable them to get instant alerts." + accent link "How to enable").
+Category groups (13/600 ink3 headers + toggle rows, each with 11 ink3 sub-label):
+
+INQUIRIES & CHATS: "New inquiries" (on) + "Someone inquires about your listing" · "New messages" (on) · "Number requests" (on) · "Message requests" (on).
+YOUR LISTINGS: "Approval updates" (on) + "When your listing is approved, rejected or needs changes" · "Listing reminders" (on) + "Still-available checks every 2 months" · "Performance tips" (on).
+REQUIREMENTS & PROPOSALS: "New proposals" (on) · "Proposal responses" (on) · "Matching requirements" (on) + "New requirements matching your area or projects" · "Requirement expiry" (on).
+SAVED & ALERTS: "Price drops on saved" (on) · "Saved search matches" (on) · "Status changes on saved" (off).
+PLANS & PAYMENTS: "Payment updates" (on, disabled toggle + lock icon + helper "Can't be turned off") · "Plan expiry reminders" (on) · "Boost updates" (on).
+MARKETING (separate — DPDP): "Offers and updates from HomzList" (off) + helper 11 ink3: "Promotional messages only. You can opt in or out anytime."
+QUIET HOURS row: toggle (on) + value "11:00 PM – 8:00 AM" + helper "Non-urgent notifications are held during these hours" → tap → time sheet (two time pickers + Save).
+Weekly digest row: toggle + "Every Monday · saved-search matches and your listing performance".
+
+S8. LANGUAGE
+Header: back + title "Language" 17/600.
+Radio rows (56px): "English" (selected, accent check) + sub "Default" 11 ink3 · "ગુજરાતી (Gujarati)" · "हिन्दी (Hindi)" — tapping shows brief loading (150ms) then instant swap demo: show a mini preview card at the top that changes its labels ("Home · Search · Messages" → "હોમ · શોધ · સંદેશા") + toast "Language updated".
+Note strip (surface2 r8) 11 ink3: "Only the app's interface changes. Listing descriptions stay in the language they were written in."
+Second note 11 ink3: "You can search and type in any Indian language."
+S9. LOGIN ACTIVITY
+Header: back + title "Login activity" 17/600 + ⋯ (→ sheet: "Log out of all devices" (error)).
+Current session card (accentSoft r12, 12px pad): phone icon + "This device" 15/600 + "Chrome on Android · Rajkot, Gujarat" 13 ink3 + "Active now" 11 accent + "Signed in 12 Jan 2025" 11 ink3.
+Other sessions rows (surface1 r12 1px border): device icon + "Chrome on Windows" 15/600 + "Rajkot, Gujarat · Last active 2h ago" 13 ink3 + "Signed in 5 Jan" 11 ink3 + outline "Log out" (small, → dialog: "Log out this device?" + Cancel / primary "Log out" → row fades + toast) · second row: "Safari on iPhone · Ahmedabad · Last active 3 days ago".
+Alerts section: 13/600 ink3 "RECENT SECURITY ALERTS" + rows (48px): shield icon + "New login from Chrome on Windows" 13 + "5 Jan, 6:40 PM" 11 ink3 + "Not you?" accent link → dialog: "Secure your account" + "Log out all devices and contact support if you didn't sign in." + row: outline "Contact support" / error-primary "Log out all".
+Log-out-all dialog: "Log out of all devices?" + "You'll need to sign in again with your phone number on each device." + Cancel / error-primary "Log out all".
+S10. BLOCKED USERS
+Header: back + title "Blocked users" 17/600.
+Info strip 11 ink3: "Blocked users can't message you. They can still see your public listings."
+Rows (56px): 40px avatar + name 15/600 + role tag + "Blocked on 12 Jan" 11 ink3 + outline "Unblock" (small) → dialog: "Unblock Nirav Shah?" + "They'll be able to message you again." + Cancel / primary "Unblock" → row fades + toast "User unblocked".
+Empty state: line-art shield 96px + "No blocked users" + "People you block will appear here" 13 ink2.
+GLOBAL / SHEETS TO BUILD
+New-collection sheet · move-to-collection sheet · collection rename/delete sheets + dialog · saved-tile long-press sheet · sort sheets · appearance sheet · privacy sub-screen · saved-searches sub-screen · report-problem sheet · time-picker sheet (quiet hours) · share sheet · logout dialogs · restore dialogs · permanent-delete dialogs · unblock dialog · clear-activity dialog · empty-trash dialog · toasts ("Link copied" / "QR saved" / "Listing restored — under review" / "Language updated" / "User unblocked" / "Collection created" / "Moved to Investment") · offline banners · skeletons · placeholders for other batches + back.
+BUILD CHECKLIST (build EVERY item — nothing skipped)
+Saved (collection chips + long-press rename/delete + grid with price chips + SOLD ribbon + PRICE DROP chip + status alert strip + move sheet + new-collection sheet + 2 empty states + skeleton) · Your Activity (recently viewed strip + saved row + inquiries rows with status chips + proposals row + visits row + saved-searches sub-screen with alerts toggles + clear-activity dialog + empty) · QR (QR card + avatar + badges + colour chips + download + share sheet + print note + Scan tab with viewfinder) · Trash (info strip + rows with countdown chips + restore dialog + delete-now dialog + empty-trash + empty state) · Archived (info strip + filter sheet + rows with status badges + restore dialog + empty) · Settings Home (account card + all 8 sections with every row listed + values + badges + report-problem sheet + logout dialog + version footer) · Notification Prefs (channel card + blocked variant + all 6 category groups with every toggle + disabled payment toggle + marketing separate + quiet hours + time sheet + weekly digest) · Language (3 rows + instant-swap preview + 2 notes) · Login Activity (current session + other sessions + log-out dialogs + security alerts + not-you dialog + log-out-all) · Blocked Users (rows + unblock dialog + empty) · Dev toolbar (screens/states/role/light-dark/viewport) · Full click-navigation + browser back · Responsive centered-470 at ≥768px.
