@@ -51,6 +51,7 @@ export function ProfileMenuSheet({
   onViewAsVisitor,
   onQr,
   onPlaceholder,
+  onNavigate,
 }: {
   open: boolean;
   onClose: () => void;
@@ -58,6 +59,8 @@ export function ProfileMenuSheet({
   onViewAsVisitor: () => void;
   onQr: () => void;
   onPlaceholder: (what: string) => void;
+  /** Route push for the seller destinations below. */
+  onNavigate: (href: string) => void;
 }) {
   const Row = ({ icon, label, badge, onClick }: { icon: IconName; label: string; badge?: string; onClick: () => void }) => (
     <button onClick={onClick} className="flex h-12 w-full items-center gap-3 text-left text-15 text-ink-primary active:bg-surface-2">
@@ -69,10 +72,17 @@ export function ProfileMenuSheet({
   return (
     <BottomSheet open={open} onClose={onClose} hideHeader>
       <div className="flex flex-col pt-1">
+        {/* Seller destinations — this is where an under-review listing, the
+            plan and payment history live (Doc4 §56/§62). */}
+        <Row icon="home" label="My Listings" onClick={() => onNavigate("/listings")} />
+        <Row icon="card" label="My plan" onClick={() => onNavigate("/plans/my")} />
+        <Row icon="receipt" label="Payments" onClick={() => onNavigate("/payments")} />
+        <Row icon="rocket" label="Boosts" onClick={() => onNavigate("/boost")} />
+        <span className="my-1 h-px bg-divider" />
         <Row icon="user" label="Settings" onClick={() => onPlaceholder("Settings")} />
         <Row icon="bookmark" label="Saved" onClick={() => onPlaceholder("Saved")} />
         <Row icon="home" label="Your activity" onClick={() => onPlaceholder("Your activity")} />
-        <Row icon="image" label="Drafts" badge="2" onClick={() => onPlaceholder("Drafts")} />
+        <Row icon="image" label="Drafts" onClick={() => onNavigate("/create/drafts")} />
         <Row icon="bookmark" label="Archived" onClick={() => onPlaceholder("Archived")} />
         <Row icon="alert" label="Account status" onClick={onAccountStatus} />
         <Row icon="user" label="View as visitor" onClick={onViewAsVisitor} />

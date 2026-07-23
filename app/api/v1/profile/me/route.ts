@@ -2,12 +2,14 @@ import type { NextRequest } from "next/server";
 import { ok, fail } from "@/lib/api";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { getProfileById, getVerifications, getCityName, updateOwnProfile } from "@/lib/profile/service";
+import { getProfileCounts } from "@/lib/listings/service";
 import { ownProfileDTO } from "@/lib/profile/dto";
 
 /**
  * GET  /api/v1/profile/me (Doc7 §16) — full own profile (stats server-derived).
  * PATCH /api/v1/profile/me (Doc7 §17) — edit; whitelisted fields, bio auto-flag.
- * Stats (Listings/Views/Leads) are 0 until the listings module lands (Module 4).
+ * Listings/Projects/Views counts are real queries; Leads lands with the chat
+ * module and stays 0 until then.
  */
 export const dynamic = "force-dynamic";
 
@@ -15,8 +17,15 @@ async function loadOwn(id: string) {
   const [profile, verifications] = await Promise.all([getProfileById(id), getVerifications(id)]);
   if (!profile) return null;
   const cityName = await getCityName(profile.city_id);
-  // TODO(Module 4): compute real Listings/Views/Leads from listings.
-  const stats = { listings: 0, views: 0, leads: 0, ...(profile.role === "builder" ? { projects: 0 } : {}) };
+  // Listings/Projects/Views are real queries (migration 0018 added the views
+  // table). Leads still needs the chat module — see PENDING-INTEGRATIONS.
+  const counts = await getProfileCounts(id, profile.role);
+  const stats = {
+    listings: counts.listings,
+    views: counts.views,
+    leads: 0,
+    ...(profile.role === "builder" ? { projects: counts.projects } : {}),
+  };
   return ownProfileDTO(profile, verifications, cityName, stats);
 }
 

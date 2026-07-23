@@ -8,8 +8,9 @@ import { Otp } from "./screens/Otp";
 import { Role } from "./screens/Role";
 import { Details } from "./screens/Details";
 import { Coach } from "./screens/Coach";
-import { BrowserUnsupported, Placeholder, OfflineBanner } from "./screens/Misc";
+import { BrowserUnsupported, Placeholder, OfflineBanner, SavedAccounts } from "./screens/Misc";
 import { authApi } from "@/lib/auth/client";
+import { getSavedAccounts, rememberAccount, type SavedAccountHint } from "@/lib/auth/saved-accounts";
 
 /**
  * P1 Auth & Entry orchestrator. Single-file flow (matches the design) with a
@@ -17,7 +18,14 @@ import { authApi } from "@/lib/auth/client";
  * session? home : (onboarding first-run) → Login. New user OTP → Role → Details
  * → Coach → home.
  */
-type Screen = "splash" | "onboarding" | "login" | "otp" | "role" | "details" | "coach" | "browserUnsupported" | "guest" | "legal";
+type Screen = "splash" | "onboarding" | "savedAccounts" | "login" | "otp" | "role" | "details" | "coach" | "browserUnsupported" | "guest" | "legal";
+
+/** Best-effort hint from a verified user DTO (server stays the source of truth). */
+function hintFromUser(phone: string, user: unknown): SavedAccountHint | null {
+  const u = user as { name?: string | null; phoneMasked?: string | null; photoUrl?: string | null } | null;
+  if (!u || !phone) return null;
+  return { name: u.name ?? "", phone, phoneMasked: u.phoneMasked ?? "", photoUrl: u.photoUrl ?? null };
+}
 
 const ONBOARDED_KEY = "hz-onboarded";
 
@@ -30,6 +38,7 @@ export function AuthFlow() {
   const [stack, setStack] = useState<Screen[]>(["splash"]);
   const [offline, setOffline] = useState(false);
   const [flow, setFlow] = useState<{ phone: string; otpSession: string; devCode?: string; role?: string }>({ phone: "", otpSession: "" });
+  const [saved, setSaved] = useState<SavedAccountHint[]>([]);
   const legalRef = useRef<"terms" | "privacy">("terms");
 
   const screen = stack[stack.length - 1];
@@ -73,7 +82,10 @@ export function AuthFlow() {
         return;
       }
       const onboarded = localStorage.getItem(ONBOARDED_KEY);
-      setTimeout(() => !cancelled && replace(onboarded ? "login" : "onboarding"), 900);
+      const hints = getSavedAccounts();
+      setSaved(hints);
+      // Returning user with remembered accounts → S5 picker; else login / first-run onboarding.
+      setTimeout(() => !cancelled && replace(hints.length ? "savedAccounts" : onboarded ? "login" : "onboarding"), 900);
     })();
     return () => {
       cancelled = true;
@@ -84,6 +96,19 @@ export function AuthFlow() {
   const finishOnboarding = () => {
     localStorage.setItem(ONBOARDED_KEY, "1");
     replace("login");
+  };
+
+  // S5 pick — re-trigger a full OTP for the remembered number (server re-validates;
+  // the stored hint is convenience only). On any error, fall back to Login prefilled.
+  const pickSaved = async (a: SavedAccountHint) => {
+    const res = await authApi.requestOtp(a.phone).catch(() => ({ ok: false }) as const);
+    if (res.ok) {
+      setFlow((f) => ({ ...f, phone: a.phone, otpSession: res.data.otpSession, devCode: res.data.devCode }));
+      go("otp");
+    } else {
+      setFlow((f) => ({ ...f, phone: a.phone }));
+      go("login");
+    }
   };
   // Relative so it works on any host (localhost, a LAN IP via nip.io, the real
   // domain). The seller dashboard lives on the same host as /login already.
@@ -97,6 +122,7 @@ export function AuthFlow() {
 
       {screen === "splash" && <Splash />}
       {screen === "onboarding" && <Onboarding onDone={finishOnboarding} />}
+      {screen === "savedAccounts" && <SavedAccounts accounts={saved} onPick={pickSaved} onUseAnother={() => go("login")} />}
       {screen === "login" && (
         <Login
           initialPhone={flow.phone}
@@ -119,7 +145,11 @@ export function AuthFlow() {
           onEdit={back}
           onVerified={(res) => {
             if (res.isNew) go("role");
-            else window.location.href = "/";
+            else {
+              const hint = hintFromUser(flow.phone, res.user);
+              if (hint) rememberAccount(hint);
+              window.location.href = "/";
+            }
           }}
         />
       )}
@@ -131,7 +161,17 @@ export function AuthFlow() {
           }}
         />
       )}
-      {screen === "details" && <Details role={flow.role ?? "owner"} onBack={back} onDone={() => replace("coach")} />}
+      {screen === "details" && (
+        <Details
+          role={flow.role ?? "owner"}
+          onBack={back}
+          onDone={(user) => {
+            const hint = hintFromUser(flow.phone, user);
+            if (hint) rememberAccount(hint);
+            replace("coach");
+          }}
+        />
+      )}
       {screen === "coach" && <Coach onDone={goHome} />}
       {screen === "browserUnsupported" && <BrowserUnsupported />}
       {screen === "guest" && <Placeholder title="Feed — coming in Batch P2" onBack={back} />}

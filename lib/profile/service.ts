@@ -73,7 +73,8 @@ export async function getVerifications(profileId: string): Promise<VerificationR
 export async function getCityName(cityId: string | null): Promise<string | null> {
   if (!cityId) return null;
   const db = createServiceClient();
-  const { data } = await db.from("cities").select("name,state").eq("id", cityId).maybeSingle();
+  // Single city master since migration 0014 — see lib/auth/service.ts.
+  const { data } = await db.from("locations").select("name").eq("id", cityId).eq("level", "city").maybeSingle();
   return data ? `${data.name}` : null;
 }
 
@@ -106,7 +107,12 @@ export async function updateOwnProfile(profileId: string, patch: ProfilePatch): 
   if (patch.bio !== undefined) update.bio = patch.bio;
   if (patch.email !== undefined) update.email = patch.email.trim() || null;
   if (patch.cityId !== undefined) {
-    const { data: city } = await db.from("cities").select("id").eq("id", patch.cityId).maybeSingle();
+    const { data: city } = await db
+      .from("locations")
+      .select("id")
+      .eq("id", patch.cityId)
+      .eq("level", "city")
+      .maybeSingle();
     if (!city) throw new Error("INVALID_CITY");
     update.city_id = patch.cityId;
   }

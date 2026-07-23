@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/Input";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { useToast } from "@/components/ui/Toast";
-import { profileApi } from "@/lib/profile/client";
+import { uploadProfileMedia, profileApi } from "@/lib/profile/client";
 import { cn } from "@/lib/utils";
 
 /**
@@ -43,6 +43,25 @@ export function Verification() {
   const [docSheet, setDocSheet] = useState(false);
   const [rera, setRera] = useState("");
   const [busy, setBusy] = useState(false);
+  // Uploaded doc keys. These are PRIVATE bucket keys, never public URLs — the
+  // file is only ever retrievable through a short-lived signed URL (Doc2 §5.1).
+  const [idDocKey, setIdDocKey] = useState<string | null>(null);
+  const [reraDocKey, setReraDocKey] = useState<string | null>(null);
+  const [uploading, setUploading] = useState<"id" | "rera" | null>(null);
+  const idFileRef = useRef<HTMLInputElement>(null);
+  const reraFileRef = useRef<HTMLInputElement>(null);
+
+  /** Shared picker handler: upload to the private bucket, keep the key. */
+  async function pickDoc(which: "id" | "rera", file: File | undefined) {
+    if (!file) return;
+    setUploading(which);
+    const res = await uploadProfileMedia("doc", file);
+    setUploading(null);
+    if (!res.ok) return show(res.error);
+    if (which === "id") setIdDocKey(res.key ?? null);
+    else setReraDocKey(res.key ?? null);
+    show("Document attached");
+  }
 
   async function load() {
     const [meR, vR] = await Promise.all([profileApi.me(), profileApi.verificationStatus()]);
@@ -59,7 +78,7 @@ export function Verification() {
   async function submitId() {
     if (!docType || busy) return;
     setBusy(true);
-    const r = await profileApi.submitId(docType);
+    const r = await profileApi.submitId(docType, idDocKey);
     setBusy(false);
     if (r.ok) {
       show("Submitted for verification");
@@ -69,7 +88,7 @@ export function Verification() {
   async function submitRera() {
     if (rera.trim().length < 6 || busy) return;
     setBusy(true);
-    const r = await profileApi.submitRera(rera.trim());
+    const r = await profileApi.submitRera(rera.trim(), reraDocKey);
     setBusy(false);
     if (r.ok) {
       show("Submitted for verification");
@@ -121,8 +140,20 @@ export function Verification() {
                     <span className={docType ? "text-ink-primary" : "text-ink-tertiary"}>{docType ? DOC_TYPES.find((d) => d.v === docType)?.l : "Select document type"}</span>
                     <Icon name="chevron-down" size={18} className="text-ink-tertiary" strokeWidth={1.7} />
                   </button>
-                  <UploadTile onClick={() => show("Document upload comes with the storage module")} />
-                  <Button className="mt-3" fullWidth loading={busy} disabled={!docType} onClick={submitId}>
+                  <UploadTile
+                    onClick={() => idFileRef.current?.click()}
+                    label={idDocKey ? "Document attached ✓" : "Upload document"}
+                    busy={uploading === "id"}
+                    done={!!idDocKey}
+                  />
+                  <input
+                    ref={idFileRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,application/pdf"
+                    hidden
+                    onChange={(e) => { void pickDoc("id", e.target.files?.[0]); e.target.value = ""; }}
+                  />
+                  <Button className="mt-3" fullWidth loading={busy} disabled={!docType || !idDocKey} onClick={submitId}>
                     {v.id.status === "rejected" ? "Try again" : "Submit for verification"}
                   </Button>
                 </>
@@ -143,7 +174,19 @@ export function Verification() {
                   <>
                     {v.rera.status === "revoked" && <Strip tone="error" icon="alert" text={`Your RERA verification was revoked${v.rera.reason ? ` — reason: ${v.rera.reason}` : ""}.`} />}
                     <Input value={rera} onChange={(e) => setRera(e.target.value)} placeholder="RERA number" hint="e.g. PR/GJ/RAJKOT/RAJKOT/Others/MAA12345/240424" />
-                    <UploadTile onClick={() => show("Certificate upload comes with the storage module")} label="Upload RERA certificate" />
+                    <UploadTile
+                      onClick={() => reraFileRef.current?.click()}
+                      label={reraDocKey ? "Certificate attached ✓" : "Upload RERA certificate"}
+                      busy={uploading === "rera"}
+                      done={!!reraDocKey}
+                    />
+                    <input
+                      ref={reraFileRef}
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,application/pdf"
+                      hidden
+                      onChange={(e) => { void pickDoc("rera", e.target.files?.[0]); e.target.value = ""; }}
+                    />
                     <Button className="mt-3" fullWidth loading={busy} disabled={rera.trim().length < 6} onClick={submitRera}>
                       {v.rera.status === "revoked" ? "Re-submit" : "Submit"}
                     </Button>
@@ -218,7 +261,7 @@ function Strip({ tone, icon, text, action }: { tone: "info" | "error"; icon: "al
   );
 }
 
-function UploadTile({ onClick, label = "Upload document" }: { onClick: () => void; label?: string }) {
+function UploadTile({ onClick, label = "Upload document", busy, done }: { onClick: () => void; label?: string; busy?: boolean; done?: boolean }) {
   return (
     <button onClick={onClick} className="mt-2 flex w-full flex-col items-center gap-1 rounded-8 border border-dashed border-border py-5 text-center">
       <Icon name="image" size={24} className="text-ink-tertiary" strokeWidth={1.7} />

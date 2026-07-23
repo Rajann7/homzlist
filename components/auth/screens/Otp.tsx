@@ -25,7 +25,7 @@ export function Otp({
   otpSession: string;
   devCode?: string;
   onEdit: () => void;
-  onVerified: (result: { isNew: boolean; next: string }) => void;
+  onVerified: (result: { isNew: boolean; next: string; user?: unknown }) => void;
 }) {
   const [digits, setDigits] = useState<string[]>(Array(6).fill(""));
   const [loading, setLoading] = useState(false);
@@ -101,7 +101,7 @@ export function Otp({
     submitting.current = false;
 
     if (res.ok) {
-      onVerified({ isNew: (res.data as any).isNew, next: (res.data as any).next });
+      onVerified({ isNew: (res.data as any).isNew, next: (res.data as any).next, user: (res.data as any).user });
       return;
     }
     setShake(true);

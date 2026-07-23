@@ -21,6 +21,17 @@ export function toE164(raw: string): string | null {
   return TEN_DIGIT.test(ten) ? `+91${ten}` : null;
 }
 
+/**
+ * Full number, human-formatted: +91 98250 12345. Only for surfaces the owner is
+ * entitled to see in full (their own GST invoice) — everywhere else use
+ * `maskPhone`, and never put this in a log (Doc9 §19).
+ */
+export function formatPhone(e164: string): string {
+  const ten = e164.replace(/^\+91/, "");
+  if (ten.length !== 10) return e164;
+  return `+91 ${ten.slice(0, 5)} ${ten.slice(5)}`;
+}
+
 /** Mask for display / logs: +91 98••• ••345 (never log the full number — Doc9 §19). */
 export function maskPhone(e164: string): string {
   const ten = e164.replace(/^\+91/, "");

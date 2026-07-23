@@ -25,7 +25,13 @@ export async function counterValue(key: string): Promise<number> {
 /** Hash an IP for privacy-preserving per-IP limits / logs (Doc9 §19). */
 export async function hashIp(ip: string): Promise<string> {
   const { createHash } = await import("node:crypto");
-  return createHash("sha256").update(ip).digest("hex").slice(0, 16);
+  // Pepper the hash with a server-only secret so a leaked `listing_views`
+  // export (or any table holding these) can't be reversed against the small
+  // IPv4 + common-UA space by rainbow table (Doc9 — no de-anonymisable PII in
+  // analytics). Falls back to unpeppered only if the secret isn't set, so dev
+  // without the env var still works.
+  const pepper = process.env.HASH_PEPPER ?? process.env.JWT_ACCESS_SECRET ?? "";
+  return createHash("sha256").update(`${pepper}|${ip}`).digest("hex").slice(0, 16);
 }
 
 export function clientIp(headers: Headers): string {

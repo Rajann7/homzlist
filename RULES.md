@@ -67,8 +67,19 @@ decided in the frontend or localStorage.
    stripped server-side before the payload — never hidden with CSS.
 
 5. Real migrations, run. Every schema change is a file in supabase/migrations,
-   applied to Supabase (dev now; staged + human-run for prod). No table ships
-   without RLS.
+   and Claude applies it to the DEV Supabase project itself — don't leave a
+   module blocked waiting on me. Production stays staged + human-run. No table
+   ships without RLS.
+
+6. A-to-Z DATABASE-DRIVEN. Every value the site shows — counts, labels, badges,
+   prices, stats, lists, statuses, dropdown options — is a real Supabase query.
+   BANNED: hardcoded counts, mock/sample arrays, `TODO: real data later` in a
+   shipped screen, option lists hardcoded in a component. If the data source
+   doesn't exist, BUILD it (table + endpoint). Never fake it in the frontend.
+
+7. VERIFY FROM THE DATABASE, EVERY TIME. A feature is not done until the actual
+   row(s) have been queried and shown. A green UI, a 200, or a passing typecheck
+   is not proof. `npm run db:proof` + a targeted query, in every module report.
 
 6. Never trust the browser. Every input validated + authorized server-side;
    generic responses (no enumeration leaks); secrets in env only. Prices/GST/
@@ -139,3 +150,11 @@ Design change = ZERO. If anything is unclear, confirm with me BEFORE building.
 - Full security per Doc 9 (RLS mandatory, IDOR-safe, bypass-sealed, no CAPTCHA).
 - Instagram-level smoothness (60fps, no jank/lag/block); loading states hold on slow network.
 - Nothing skipped: every screen, sheet, popup, state, and flow from the design + specs is built and working.
+- **Hunt for hidden issues on every module.** The module prompt is the starting point for
+  finding what is silently broken, not a checklist to tick. For each item ask: is the control
+  actually DB-backed, does every on-screen promise have a job behind it that something
+  triggers, which state does nothing transition out of, what happens if step 2 of 2 fails
+  after money moved, has each state ever had a real row, and does the UI copy match what the
+  server actually did. Report what you FOUND, not only what you built — out-of-scope gaps go
+  to docs/PENDING-INTEGRATIONS.md rather than being left for a real user to hit.
+  (Full checklist: CLAUDE.md "HUNT FOR HIDDEN ISSUES".)

@@ -122,6 +122,12 @@ export async function resendOtp(otpSession: string, ipHash: string): Promise<Res
 
   s.codeHash = hashCode(code, otpSession);
   s.resends += 1;
+  // A freshly sent code is a fresh verification opportunity — reset the
+  // per-session attempt counter so the new (correct) code can succeed. Without
+  // this, a user who exhausted 3 attempts stays dead-ended even after Resend
+  // re-enables the inputs (the abuse ceilings remain: MAX_RESENDS + the 10/day
+  // number lock, which are NOT reset here).
+  s.attempts = 0;
   s.lastSentAt = Date.now();
   await kv.set(sessKey(otpSession), JSON.stringify(s), OTP.TTL_SEC);
 

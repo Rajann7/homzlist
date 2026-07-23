@@ -16,7 +16,7 @@ import { cn } from "@/lib/utils";
  * selector row · 18+ + DPDP checks (13 #555) · "Start Exploring" (disabled until
  * name + city + both checks).
  */
-export function Details({ role, onBack, onDone }: { role: string; onBack: () => void; onDone: () => void }) {
+export function Details({ role, onBack, onDone }: { role: string; onBack: () => void; onDone: (user?: unknown) => void }) {
   const { show } = useToast();
   const [name, setName] = useState("");
   const [city, setCity] = useState<City | null>(null);
@@ -36,7 +36,7 @@ export function Details({ role, onBack, onDone }: { role: string; onBack: () => 
     setNameError(null);
     const res = await authApi.register({ role, name: name.trim(), cityId: city!.id, photoUrl, consent18: age18, consentDpdp: dpdp });
     setLoading(false);
-    if (res.ok) onDone();
+    if (res.ok) onDone((res.data as any).user);
     else if (res.error.code === "VALIDATION_ERROR" && res.error.field === "name") setNameError("Please enter your full name.");
     else show(friendlyError(res.error));
   }

@@ -101,7 +101,15 @@ function makeUsername(name: string, id: string): string {
 export async function completeRegistration(profileId: string, input: RegistrationInput): Promise<Profile> {
   const db = createServiceClient();
 
-  const { data: city } = await db.from("cities").select("id").eq("id", input.cityId).maybeSingle();
+  // `locations` is the single city master (migration 0014) — the same rows
+  // listings and requirements reference, so a profile's city is comparable to a
+  // listing's city instead of living in its own namespace.
+  const { data: city } = await db
+    .from("locations")
+    .select("id")
+    .eq("id", input.cityId)
+    .eq("level", "city")
+    .maybeSingle();
   if (!city) throw new Error("INVALID_CITY");
 
   const { data, error } = await db

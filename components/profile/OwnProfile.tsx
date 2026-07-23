@@ -14,6 +14,7 @@ import { AccountSwitchSheet, ProfileMenuSheet, QRSheet } from "./ProfileSheets";
 import { AccountStatus } from "./AccountStatus";
 import { profileApi, type OwnProfile as OwnProfileT } from "@/lib/profile/client";
 import { authApi } from "@/lib/auth/client";
+import { listingsApi, type MyListing, type RequirementCard } from "@/lib/listings/client";
 import { cn } from "@/lib/utils";
 
 /**
@@ -43,6 +44,18 @@ export function OwnProfile() {
   const [viewsInfo, setViewsInfo] = useState(false);
   const [viewAs, setViewAs] = useState(false);
   const [subScreen, setSubScreen] = useState<null | "account-status">(null);
+  // The grid is real data now (Module 4): the owner's listings and requirements,
+  // filtered per tab. Nothing here is a placeholder count.
+  const [listings, setListings] = useState<MyListing[] | null>(null);
+  const [requirements, setRequirements] = useState<RequirementCard[] | null>(null);
+
+  useEffect(() => {
+    void (async () => {
+      const [l, r] = await Promise.all([listingsApi.mine(), listingsApi.myRequirements()]);
+      setListings(l.ok ? l.data.items : []);
+      setRequirements(r.ok ? r.data.items : []);
+    })();
+  }, []);
 
   useEffect(() => {
     profileApi.me().then((r) => {
@@ -103,8 +116,10 @@ export function OwnProfile() {
           <Avatar name={p.name ?? undefined} src={p.photoUrl ?? undefined} size={84} />
           {/* Stats ×3 */}
           <div className="flex flex-1 justify-around">
-            <Stat n={p.stats.listings} label="Listings" onClick={() => show("My listings — coming in the listings module")} />
-            {p.role === "builder" && <Stat n={p.stats.projects ?? 0} label="Projects" onClick={() => {}} />}
+            {/* Tapping Listings opens the manager — that's where an under-review
+                listing is visible (Doc4 §56). */}
+            <Stat n={p.stats.listings} label="Listings" onClick={() => router.push("/listings")} />
+            {p.role === "builder" && <Stat n={p.stats.projects ?? 0} label="Projects" onClick={() => router.push("/listings")} />}
             {!viewAs && <Stat n={p.stats.views} label="Views" onClick={() => setViewsInfo(true)} />}
             {!viewAs && <Stat n={p.stats.leads} label="Leads" onClick={() => show("Leads — coming in the chat module")} />}
           </div>
@@ -187,21 +202,18 @@ export function OwnProfile() {
         </div>
       </div>
 
-      {/* Grid content — empty until listings (Module 4) */}
-      <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 py-16 text-center">
-        <HousePlusArt />
-        <h3 className="text-17 font-semibold text-ink-primary">No listings yet</h3>
-        <p className="max-w-xs text-13 text-ink-secondary">
-          {tabs[tab] === "Requirements"
-            ? "Post what you're looking for and matching properties will find you."
-            : "Post your first property — it stays live forever with the ₹999 plan."}
-        </p>
-        {!viewAs && (
-          <Button className="mt-2" onClick={() => show("Create — coming in the listings module")}>
-            {tabs[tab] === "Requirements" ? "Post Requirement" : "Create Listing"}
-          </Button>
-        )}
-      </div>
+      {/* Grid content — the user's REAL listings/requirements for this tab */}
+      <TabContent
+        tab={tabs[tab]}
+        view={view}
+        viewAs={viewAs}
+        listings={listings}
+        requirements={requirements}
+        onOpenListing={(id) => router.push(`/listings/${id}`)}
+        onCreate={() =>
+          router.push(tabs[tab] === "Requirements" ? "/requirements/new" : "/create")
+        }
+      />
       </div>
       {/* end scroll area */}
 
@@ -218,6 +230,10 @@ export function OwnProfile() {
       <ProfileMenuSheet
         open={menuSheet}
         onClose={() => setMenuSheet(false)}
+        onNavigate={(href) => {
+          setMenuSheet(false);
+          router.push(href);
+        }}
         onAccountStatus={() => {
           setMenuSheet(false);
           setSubScreen("account-status");
@@ -280,6 +296,139 @@ function ProfileSkeleton() {
           <Skeleton key={i} className="aspect-square w-full rounded-none" />
         ))}
       </div>
+    </div>
+  );
+}
+
+/**
+ * The profile grid. Which items a tab shows is derived from the same rows the
+ * My Listings screen uses — there is no separate count or cached number here,
+ * so the tab can never disagree with the listing itself.
+ */
+function TabContent({
+  tab, view, viewAs, listings, requirements, onOpenListing, onCreate,
+}: {
+  tab: string;
+  view: "grid" | "list";
+  viewAs: boolean;
+  listings: MyListing[] | null;
+  requirements: RequirementCard[] | null;
+  onOpenListing: (id: string) => void;
+  onCreate: () => void;
+}) {
+  const isRequirements = tab === "Requirements";
+
+  // Still loading — show skeletons rather than an "empty" state that would be a
+  // lie for a user who does have listings.
+  if ((isRequirements ? requirements : listings) === null) {
+    return (
+      <div className={cn("p-1", view === "grid" ? "grid grid-cols-3 gap-1" : "flex flex-col gap-2 p-4")}>
+        {[0, 1, 2].map((i) => (
+          <Skeleton key={i} className={view === "grid" ? "aspect-square w-full rounded-4" : "h-16 w-full rounded-8"} />
+        ))}
+      </div>
+    );
+  }
+
+  if (isRequirements) {
+    const items = requirements ?? [];
+    if (!items.length) {
+      return (
+        <Empty
+          title="No requirements yet"
+          body="Post what you're looking for and matching properties will find you."
+          cta="Post Requirement"
+          viewAs={viewAs}
+          onCreate={onCreate}
+        />
+      );
+    }
+    return (
+      <div className="flex flex-col gap-2 p-4">
+        {items.map((r) => (
+          <div key={r.id} className="rounded-12 border border-border bg-surface-1 p-3">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-15 font-semibold text-ink-primary">
+                {r.bhk ? `${r.bhk} BHK · ` : ""}{r.kindLabel}
+              </span>
+              <span className="text-11 font-semibold uppercase text-ink-tertiary">{r.badge.label}</span>
+            </div>
+            <div className="mt-1 text-13 text-ink-secondary">{r.budgetLabel}</div>
+            {r.areaLabel && <div className="mt-0.5 text-11 text-ink-tertiary">{r.areaLabel}</div>}
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  // Sell / Rent / Projects tabs read the listing rows, filtered by kind.
+  const all = listings ?? [];
+  const items =
+    tab === "Sell" ? all.filter((l) => l.kind === "sell")
+    : tab === "Rent" ? all.filter((l) => l.kind === "rent")
+    : all; // "Projects" and "Sell / Rent" (builder) show everything they own
+
+  if (!items.length) {
+    return (
+      <Empty
+        title="No listings yet"
+        body="Post your first property — it stays live forever with the ₹999 plan."
+        cta="Create Listing"
+        viewAs={viewAs}
+        onCreate={onCreate}
+      />
+    );
+  }
+
+  if (view === "list") {
+    return (
+      <div className="flex flex-col gap-2 p-4">
+        {items.map((l) => (
+          <button key={l.id} onClick={() => onOpenListing(l.id)} className="flex gap-3 rounded-12 border border-border bg-surface-1 p-3 text-left">
+            <Thumb url={l.coverUrl} className="h-16 w-16 shrink-0 rounded-8" />
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-15 font-semibold text-ink-primary">{l.title ?? "Untitled listing"}</div>
+              <div className="mt-0.5 text-13 text-ink-secondary">{l.price}</div>
+              <div className="mt-0.5 truncate text-11 text-ink-tertiary">{l.areaLabel}</div>
+            </div>
+            <span className="shrink-0 self-start text-11 font-semibold uppercase text-ink-tertiary">{l.badge.label}</span>
+          </button>
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-3 gap-1 p-1">
+      {items.map((l) => (
+        <button key={l.id} onClick={() => onOpenListing(l.id)} className="relative aspect-square">
+          <Thumb url={l.coverUrl} className="h-full w-full rounded-4" />
+          {l.badge.label !== "Live" && (
+            <span className="absolute left-1 top-1 rounded-4 bg-black/60 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-white">
+              {l.badge.label}
+            </span>
+          )}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function Thumb({ url, className }: { url: string | null; className?: string }) {
+  if (!url) return <div className={cn("bg-surface-3", className)} />;
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src={url} alt="" className={cn("object-cover", className)} />;
+}
+
+function Empty({
+  title, body, cta, viewAs, onCreate,
+}: { title: string; body: string; cta: string; viewAs: boolean; onCreate: () => void }) {
+  return (
+    <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 py-16 text-center">
+      <HousePlusArt />
+      <h3 className="text-17 font-semibold text-ink-primary">{title}</h3>
+      <p className="max-w-xs text-13 text-ink-secondary">{body}</p>
+      {!viewAs && <Button className="mt-2" onClick={onCreate}>{cta}</Button>}
     </div>
   );
 }

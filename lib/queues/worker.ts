@@ -26,10 +26,58 @@ function log(queue: string, job: Job) {
   });
 }
 
+/**
+ * Image optimisation (Doc6 §6, Doc8 §3.1).
+ *
+ * SECURITY NOTE: this is NOT the validation gate. `commitPhotos` already
+ * downloads every committed object and magic-byte validates it before the photo
+ * is usable, precisely because a presigned upload bypasses our API and this
+ * worker may not be running. What happens here is quality and bandwidth:
+ * EXIF-correct rotation, WebP variants, and a smaller stored footprint.
+ *
+ * Idempotent: a photo already carrying variants is skipped, so a retried job
+ * never re-encodes or double-charges storage.
+ */
 async function imageProcessor(job: Job) {
   log(QUEUE_NAMES.image, job);
-  // TODO(storage module): validateImage → processToVariants → upload R2 →
-  // watermark → CDN URLs → mark photo ready / per-tile retry on failure.
+
+  const { photoId } = (job.data ?? {}) as { photoId?: string };
+  if (!photoId) return;
+
+  const { createServiceClient } = await import("@/lib/supabase/server");
+  const { readObject, putObject, publicUrlFor, BUCKET } = await import("@/lib/storage");
+  const { processToVariants, IMAGE_VARIANTS } = await import("@/lib/image-pipeline");
+
+  const db = createServiceClient();
+  const { data } = await db
+    .from("listing_photos")
+    .select("id, storage_key, bucket, variants, status")
+    .eq("id", photoId)
+    .maybeSingle();
+
+  const photo = data as
+    | { id: string; storage_key: string; bucket: string | null; variants: unknown; status: string }
+    | null;
+  if (!photo || !photo.storage_key) return;
+  if (photo.variants) return; // already processed — nothing to redo
+
+  const bucket = photo.bucket ?? BUCKET.public;
+  const source = await readObject(photo.storage_key, bucket);
+  if (!source) return;
+
+  const variants = await processToVariants(source);
+  const urls: Record<string, string> = {};
+
+  for (const name of Object.keys(IMAGE_VARIANTS) as (keyof typeof IMAGE_VARIANTS)[]) {
+    const key = `${photo.storage_key}.${name}.webp`;
+    await putObject(key, variants[name], "image/webp", bucket);
+    urls[name] = publicUrlFor(key, bucket);
+  }
+
+  await db
+    .from("listing_photos")
+    .update({ variants: urls, status: "ready" })
+    .eq("id", photo.id);
 }
 
 async function notificationProcessor(job: Job) {

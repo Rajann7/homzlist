@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -12,7 +12,7 @@ import { Skeleton } from "@/components/ui/Skeleton";
 import { CitySheet, type City } from "@/components/auth/CitySheet";
 import { PhotoSheet } from "@/components/auth/PhotoSheet";
 import { NumberChange } from "./NumberChange";
-import { profileApi, type OwnProfile } from "@/lib/profile/client";
+import { profileApi, uploadProfileMedia, type OwnProfile } from "@/lib/profile/client";
 import { useToast } from "@/components/ui/Toast";
 import { cn } from "@/lib/utils";
 
@@ -39,6 +39,9 @@ export function EditProfile() {
 
   const [citySheet, setCitySheet] = useState(false);
   const [photoSheet, setPhotoSheet] = useState(false);
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
   const [numberChange, setNumberChange] = useState(false);
   const [unsaved, setUnsaved] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -48,6 +51,7 @@ export function EditProfile() {
       if (!r.ok) return;
       const p = r.data.profile;
       setInit(p);
+      setPhotoUrl(p.photoUrl);
       setName(p.name ?? "");
       setBio(p.bio ?? "");
       setEmail(p.email ?? "");
@@ -116,10 +120,28 @@ export function EditProfile() {
       <div className="flex flex-col gap-5 p-4">
         {/* Avatar */}
         <div className="flex flex-col items-center gap-2">
-          <Avatar name={init.name ?? undefined} src={init.photoUrl ?? undefined} size={84} />
-          <button onClick={() => setPhotoSheet(true)} className="text-13 font-semibold text-accent">
-            Change photo
+          <Avatar name={init.name ?? undefined} src={photoUrl ?? undefined} size={84} />
+          <button onClick={() => setPhotoSheet(true)} disabled={uploading} className="text-13 font-semibold text-accent disabled:opacity-50">
+            {uploading ? "Uploading…" : "Change photo"}
           </button>
+          {/* One hidden picker drives both Camera and Gallery; capture is set
+              per-action so "Take photo" opens the camera on mobile. */}
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/heic"
+            hidden
+            onChange={async (e) => {
+              const file = e.target.files?.[0];
+              e.target.value = "";
+              if (!file) return;
+              setUploading(true);
+              const res = await uploadProfileMedia("avatar", file);
+              setUploading(false);
+              if (res.ok) { setPhotoUrl(res.url ?? null); show("Photo updated"); }
+              else show(res.error);
+            }}
+          />
         </div>
 
         <Input label="Name" value={name} onChange={(e) => setName(e.target.value)} maxLength={60} />
@@ -195,7 +217,18 @@ export function EditProfile() {
       </div>
 
       <CitySheet open={citySheet} onClose={() => setCitySheet(false)} selectedId={city?.id} onSelect={(c: City) => setCity({ id: c.id, name: `${c.name}, ${c.state}` })} />
-      <PhotoSheet open={photoSheet} onClose={() => setPhotoSheet(false)} hasPhoto={!!init.photoUrl} onTake={() => show("Camera comes with the photo module")} onChoose={() => show("Gallery comes with the photo module")} onRemove={() => show("Photo removed")} />
+      <PhotoSheet
+        open={photoSheet}
+        onClose={() => setPhotoSheet(false)}
+        hasPhoto={!!photoUrl}
+        onTake={() => { setPhotoSheet(false); fileRef.current?.setAttribute("capture", "environment"); fileRef.current?.click(); }}
+        onChoose={() => { setPhotoSheet(false); fileRef.current?.removeAttribute("capture"); fileRef.current?.click(); }}
+        onRemove={async () => {
+          setPhotoSheet(false);
+          const r = await profileApi.update({ photoUrl: null });
+          if (r.ok) { setPhotoUrl(null); show("Photo removed"); } else show("Could not remove the photo");
+        }}
+      />
       <ConfirmDialog open={unsaved} onClose={() => setUnsaved(false)} onConfirm={() => router.back()} title="Discard changes?" body="Your edits will be lost." confirmLabel="Discard" destructive />
     </div>
   );

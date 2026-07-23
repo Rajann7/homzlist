@@ -17,7 +17,18 @@ export type BadgeKind =
   | "for-sale"
   | "for-rent"
   | "new-project"
-  | "fulfilled";
+  | "fulfilled"
+  // Billing/boost states (P11) — same badge language, not a second one.
+  | "active"
+  | "pending"
+  | "pending-approval"
+  | "failed"
+  | "refunded"
+  | "trial"
+  | "grace"
+  | "rejected"
+  | "stopped"
+  | "success";
 
 const LABEL: Record<BadgeKind, string> = {
   promoted: "Promoted",
@@ -31,6 +42,16 @@ const LABEL: Record<BadgeKind, string> = {
   "for-rent": "For Rent",
   "new-project": "New Project",
   fulfilled: "Fulfilled ✓",
+  active: "Active",
+  pending: "Pending",
+  "pending-approval": "Pending approval",
+  failed: "Failed",
+  refunded: "Refunded",
+  trial: "Trial",
+  grace: "Grace",
+  rejected: "Rejected",
+  stopped: "Stopped",
+  success: "Success",
 };
 
 // Token-based colour pairs (Doc1 §2 #18). Dark mode auto-swaps via tokens.
@@ -46,14 +67,27 @@ const STYLE: Record<BadgeKind, string> = {
   "for-rent": "bg-warning-soft text-warning",
   "new-project": "bg-info-soft text-info",
   fulfilled: "bg-accent-soft text-accent",
+  active: "bg-accent-soft text-accent",
+  pending: "bg-info-soft text-info",
+  "pending-approval": "bg-info-soft text-info",
+  failed: "bg-error-soft text-error",
+  refunded: "bg-surface-2 text-ink-secondary",
+  trial: "bg-info-soft text-info",
+  grace: "bg-warning-soft text-warning",
+  rejected: "bg-error-soft text-error",
+  stopped: "bg-surface-3 text-ink-tertiary",
+  success: "bg-accent-soft text-accent",
 };
 
 export function StatusBadge({
   kind,
+  label,
   onPhoto = false,
   className,
 }: {
   kind: BadgeKind;
+  /** Override the canonical label (server-supplied status text). */
+  label?: string;
   onPhoto?: boolean;
   className?: string;
 }) {
@@ -65,7 +99,7 @@ export function StatusBadge({
         className,
       )}
     >
-      {LABEL[kind]}
+      {label ?? LABEL[kind]}
     </span>
   );
 }

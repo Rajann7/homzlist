@@ -162,6 +162,24 @@
     user-select: none;
   }
 
+  /* Inline text-links read as text but must still be tappable (Doc1 §3 —
+     min 44×44). This expands the HIT AREA only, via an invisible overlay, so
+     the link's size, position and the surrounding layout are pixel-identical.
+     Use on inline accent links that are shorter than 44px. */
+  .tap44 {
+    position: relative;
+  }
+  .tap44::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    height: 44px;
+    min-width: 44px;
+  }
+
   /* Safe-area insets for every fixed element (Doc1 §3) */
   .safe-top {
     padding-top: env(safe-area-inset-top);
@@ -207,6 +225,27 @@
     display: none;
   }
 
+  /*
+   * Horizontal strip (key-specs chips, amenity chips, similar-listing rail).
+   * Copied VERBATIM from the design's own stylesheet — see the <helmet> block
+   * in `designs/P4 - Detail Screens.html`, which ships exactly these two rules.
+   *
+   * The detail components use `hz-x` in five places but the rule was never
+   * ported across, so those rows computed `overflow-x: visible`: the chips
+   * escaped their container, stretched the padding wrapper past the column
+   * width and handed <main> a horizontal scrollbar on the property AND project
+   * detail pages. Restoring the design's rule is a fix, not a design change —
+   * the strip looks identical, it just scrolls again.
+   */
+  .hz-x {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .hz-x::-webkit-scrollbar {
+    display: none;
+  }
+
   /* GPU hint for animated elements — use sparingly (Doc8 §8) */
   .gpu {
     will-change: transform;
@@ -224,6 +263,25 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
     scroll-behavior: auto !important;
+  }
+}
+
+/* Success check-draw (P11 top-up / P6 success): 600ms stroke draw.
+   Reduced-motion is already neutralised by the block above. */
+@keyframes hz-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* Pending-approval node pulse on the P6 success timeline */
+@keyframes hz-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(15, 157, 88, 0.35);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(15, 157, 88, 0);
   }
 }
 

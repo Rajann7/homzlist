@@ -5,6 +5,9 @@
 
 # next.js
 /.next/
+# Secondary dev-server build dir (NEXT_DIST_DIR) — keeps two servers on one
+# checkout from corrupting each other's webpack cache.
+/.next-claude/
 /out/
 next-env.d.ts
 
@@ -41,3 +44,11 @@ yarn-error.log*
 
 # logs
 *.log
+
+# Dev-only local upload sink (R2 stand-in)
+/public/uploads/
+
+# QA harness session cache (dev cookies for seeded test numbers)
+.qa-sessions.json
+_shots/
+public/_dx/

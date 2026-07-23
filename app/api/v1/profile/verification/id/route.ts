@@ -1,6 +1,7 @@
 import type { NextRequest } from "next/server";
 import { ok, fail } from "@/lib/api";
 import { getCurrentUser } from "@/lib/auth/current-user";
+import { rateLimit } from "@/lib/auth/rate-limit";
 import { submitIdVerification } from "@/lib/profile/service";
 
 /**
@@ -16,6 +17,10 @@ export async function POST(req: NextRequest) {
   const claims = await getCurrentUser();
   if (!claims) return fail("UNAUTHORIZED");
 
+  // Throttle resubmissions so a user can't flood the admin verification queue.
+  const limited = await rateLimit(`verify-id:${claims.sub}`, 10, 3600);
+  if (!limited.allowed) return fail("RATE_LIMITED", { retryAfterSec: limited.retryAfterSec });
+
   let body: { docType?: string; docKey?: string };
   try {
     body = await req.json();
@@ -24,7 +29,11 @@ export async function POST(req: NextRequest) {
   }
   if (!body.docType || !DOC_TYPES.includes(body.docType)) return fail("VALIDATION_ERROR", { field: "docType" });
 
-  // docKey = server-generated private-R2 key (placeholder until storage module).
-  await submitIdVerification(claims.sub, body.docType, body.docKey ?? "pending-upload");
+  // The doc must live under THIS user's private prefix. A crafted key
+  // pointing at someone else's upload is refused (Doc9 §API1).
+  const docKey = typeof body.docKey === "string" ? body.docKey : "";
+  if (!docKey.startsWith(`docs/${claims.sub}/`)) return fail("VALIDATION_ERROR", { field: "docKey" });
+
+  await submitIdVerification(claims.sub, body.docType, docKey);
   return ok({ status: "pending" });
 }
