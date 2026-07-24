@@ -52,3 +52,10 @@ yarn-error.log*
 .qa-sessions.json
 _shots/
 public/_dx/
+
+# Demo-seed photo cache — scripts/seed-demo-content.mjs re-downloads any missing
+# file from Pexels, so these ~5MB of JPGs are a build artifact, not source.
+scripts/.demo-photos/
+
+# curl cookie jars from local API testing
+cA.txt

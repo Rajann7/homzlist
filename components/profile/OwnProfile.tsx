@@ -121,7 +121,7 @@ export function OwnProfile() {
             <Stat n={p.stats.listings} label="Listings" onClick={() => router.push("/listings")} />
             {p.role === "builder" && <Stat n={p.stats.projects ?? 0} label="Projects" onClick={() => router.push("/listings")} />}
             {!viewAs && <Stat n={p.stats.views} label="Views" onClick={() => setViewsInfo(true)} />}
-            {!viewAs && <Stat n={p.stats.leads} label="Leads" onClick={() => show("Leads — coming in the chat module")} />}
+            {!viewAs && <Stat n={p.stats.leads} label="Leads" onClick={() => router.push("/leads")} />}
           </div>
         </div>
 

@@ -22,6 +22,10 @@
     "design:build": "node scripts/build-designcheck.mjs",
     "design:diff": "node scripts/pixdiff.mjs",
     "seed:states": "node scripts/seed-module4-states.mjs",
+    "seed:module5": "node scripts/seed-module5.mjs",
+    "seed:module6": "node scripts/seed-module6.mjs",
+    "seed:demo": "node scripts/seed-demo-content.mjs",
+    "check:roles": "node scripts/check-roles-live.mjs",
     "verify:trash": "node scripts/verify-trash.mjs",
     "check:fields": "node scripts/check-field-config.mjs"
   },

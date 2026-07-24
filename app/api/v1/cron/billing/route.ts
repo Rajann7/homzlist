@@ -2,6 +2,7 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { timingSafeEqual } from "node:crypto";
 import { runBillingReconciliation } from "@/lib/billing/reconcile";
+import { expireStaleProposals } from "@/lib/listings/proposals";
 
 /**
  * POST /api/v1/cron/billing — hourly reconciliation (Doc7 §21 item 12).
@@ -21,7 +22,14 @@ function authorized(req: NextRequest): boolean {
 
 export async function POST(req: NextRequest) {
   if (!authorized(req)) return NextResponse.json({ ok: false }, { status: 401 });
-  return NextResponse.json({ ok: true, data: await runBillingReconciliation() });
+  // Proposal expiry (Doc2 §8.1: 30-day no-response → expired, count NOT
+  // refunded) rides the hourly billing cron — it's the same idempotent sweep
+  // shape and needs no separate schedule.
+  const [billing, proposals] = await Promise.all([
+    runBillingReconciliation(),
+    expireStaleProposals(),
+  ]);
+  return NextResponse.json({ ok: true, data: { ...billing, proposals } });
 }
 
 /**

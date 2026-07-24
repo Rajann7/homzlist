@@ -178,6 +178,8 @@ export function listingDetailDTO(
     promoted?: boolean;
     /** Owner-only view/save/lead counts — see service.ownerListingStats. */
     stats?: { views: number; saves: number | null; leads: number | null } | null;
+    /** Amenity code → label (service.getAmenityLabels); raw codes otherwise. */
+    amenityLabels?: Map<string, string>;
   },
 ) {
   const attrs = (l.attributes ?? {}) as Record<string, unknown>;
@@ -228,7 +230,8 @@ export function listingDetailDTO(
     // screen should actually render.
     attributes: l.attributes,
     attributeRows: attributeRows(l.attributes ?? {}, type, opts.fieldDefs),
-    amenities: l.amenities,
+    // Labels, not codes — "power_backup" is a storage detail, not UI copy.
+    amenities: (l.amenities ?? []).map((a) => opts.amenityLabels?.get(a) ?? a),
     postedOn: ist(l.live_at ?? l.created_at),
     // Whether a number EXISTS is public (it drives the Request-Number button);
     // the number itself is not.

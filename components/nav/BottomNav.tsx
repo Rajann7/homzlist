@@ -22,6 +22,10 @@ export interface NavItem {
   label: string;
   /** Match rule: exact for tabs; prefix for sections. */
   match?: (pathname: string) => boolean;
+  /** Small accent dot (e.g. Requirements has new matches). */
+  dot?: boolean;
+  /** Red count badge (e.g. Messages unread). 0 = hidden. */
+  badge?: number;
 }
 
 // Canonical 5 (P3): home · search · plus (create) · heart (saved) · user (profile).
@@ -58,11 +62,17 @@ export function BottomNav({ items = DEFAULT_NAV }: { items?: NavItem[] }) {
           >
             <span
               className={cn(
-                "grid place-items-center transition-transform duration-150 ease-out-quart active:scale-90",
+                "relative grid place-items-center transition-transform duration-150 ease-out-quart active:scale-90",
                 active ? "text-ink-primary" : "text-ink-tertiary",
               )}
             >
               <Icon name={item.name} size={26} filled={active} strokeWidth={active ? 2 : 1.7} />
+              {item.dot && <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-accent" />}
+              {item.badge && item.badge > 0 && (
+                <span className="absolute -right-1.5 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-error px-1 text-[10px] font-semibold text-white">
+                  {item.badge > 9 ? "9+" : item.badge}
+                </span>
+              )}
             </span>
           </Link>
         );

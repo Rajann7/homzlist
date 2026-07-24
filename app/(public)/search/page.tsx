@@ -1,7 +1,7 @@
 import { AppShell, Header, Wordmark, EmptyState } from "@/components";
 
 /**
- * Search is P3 (Module 6) and isn't built yet — but Search is one of the five
+ * Search is P3 — **Module 8** (Search & SEO) — and isn't built yet — but Search is one of the five
  * canonical bottom-nav items, so the tap has to land somewhere. It used to hit
  * the 404 page on every screen with a nav (CLAUDE.md rule 10: no dead-ends).
  *

@@ -2,6 +2,7 @@ import "server-only";
 import { createServiceClient } from "@/lib/supabase/server";
 import { consumeQuota, reserveSlot, transitionSlot } from "@/lib/billing/service";
 import { formatShortRupees } from "@/lib/billing/money";
+import { getAmenityLabels } from "./service";
 
 /**
  * Builder projects (Doc2 §6, Doc7 §59-61).
@@ -201,7 +202,8 @@ export async function listMyProjects(profileId: string) {
     .eq("profile_id", profileId)
     .is("deleted_at", null)
     .order("created_at", { ascending: false });
-  return ((data ?? []) as any[]).map((p) => projectDTO(p, p.project_units ?? []));
+  const amenityLabels = await getAmenityLabels();
+  return ((data ?? []) as any[]).map((p) => projectDTO(p, p.project_units ?? [], amenityLabels));
 }
 
 /**
@@ -217,8 +219,9 @@ export async function getProject(id: string, viewerId: string | null) {
   // Same state-access matrix as listings: non-live is owner-only.
   if (p.status !== "live" && !isOwner) return null;
 
+  const amenityLabels = await getAmenityLabels();
   return {
-    ...projectDTO(p, p.project_units ?? []),
+    ...projectDTO(p, p.project_units ?? [], amenityLabels),
     isOwner,
     pincode: p.pincode ?? null,
     brochureScanned: p.brochure_scanned,
@@ -255,7 +258,7 @@ const BUILD_STATUS_LABEL: Record<string, string> = {
   ready: "Ready to move",
 };
 
-function projectDTO(p: any, units: any[]) {
+function projectDTO(p: any, units: any[], amenityLabels?: Map<string, string>) {
   return {
     buildStatusLabel: p.build_status ? BUILD_STATUS_LABEL[p.build_status] ?? p.build_status : null,
     possessionLabel: p.possession_date
@@ -272,7 +275,8 @@ function projectDTO(p: any, units: any[]) {
     totalUnits: p.total_units,
     availableUnits: p.available_units,
     bankApprovals: p.bank_approvals ?? [],
-    amenities: p.amenities ?? [],
+    // Labels, not stored codes — same rule as the listing detail DTO.
+    amenities: (p.amenities ?? []).map((a: string) => amenityLabels?.get(a) ?? a),
     description: p.description,
     areaLabel: p.area_label,
     coverUrl: p.cover_url,

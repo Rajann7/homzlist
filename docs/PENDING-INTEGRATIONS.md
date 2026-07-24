@@ -1,6 +1,6 @@
 # PENDING — everything not finished, and exactly what to do when it unblocks
 
-Status as of **22 Jul 2026**.
+Status as of **24 Jul 2026**.
 
 Three kinds of pending work, in priority order:
 
@@ -18,8 +18,384 @@ Three kinds of pending work, in priority order:
 | ~~C1~~ | ~~`EXPIRED10` has no expiry~~ | ✅ FIXED 22 Jul 2026 | — |
 | ~~C3~~ | ~~Quota charged for a requirement/listing that was never created~~ | ✅ FIXED 23 Jul 2026, migration 0024 | — |
 | **C2** | Checkout shows CGST+SGST, design shows one GST row | Rajan's decision | No |
+| **M6.3** | Story media never expires (public bucket, so signing is a no-op) | **B4 (R2 / private bucket)** | No — anti-scrape only; story viewer works |
+| **M6.4** | Same gap as A1, seen from Module 6 | **Module 11 — Admin Panel** | 🟡 Boost ranks correctly once active — it just can't get there |
+
+**Module 6 is NOT 100% closed** — M6.3 + M6.4 above are the only two left, and
+neither can be closed from inside Module 6. See the closure table in §A0-M6.
 
 Everything below **fails closed** — nothing runs insecurely, the feature is just off.
+
+---
+
+# A0. Module 5 (P8 — Requirements/Proposals/Matching/Visits/Leads) — built 23 Jul 2026
+
+Shipped fully, DB-verified, all screens live per role. What Module 5 deliberately
+leaves for later modules (design-faithful — P8's own mock marks every chat action
+"→ placeholder Chat"):
+
+## A0.1 Accept → chat does not open a real thread (Module 6 — P7)
+
+`acceptProposal` sets `status='accepted'`, `responded_at`, and the poster already
+sees the sender's number (the number rule) — but no `chat_threads` row is created
+because chat is Module 6. "Accept & Chat" / "Open chat" / "Message" all navigate
+to a placeholder toast, exactly as the P8 design specifies.
+**When Module 6 lands:** on accept, create the thread and set `proposals.thread_id`
+(the column already exists), then point these buttons at it. Same for
+`visits.thread_id` and the lead "Message" action.
+
+## A0.2 Visit + lead ORIGINATION is chat-driven (Module 6)
+
+Module 5 owns the **viewing + management** of visits (reschedule/cancel/outcome)
+and leads (stage-move/note/CSV) and seeds every state. What it does NOT own:
+- **Visit creation** — the visit scheduler lives inside a chat (Doc2 §10.2). Here
+  visits are seeded; there is no non-chat "schedule a visit" entry (not in P8).
+- **Lead auto-population** — a lead should be born from a chat inquiry / accepted
+  proposal / visit. The **visit-outcome → stage nudge is already wired**
+  (`setVisitOutcome` moves a matching lead to `visit`), but inquiry→lead and
+  proposal-accept→lead need chat. Leads are seeded until then.
+**When Module 6 lands:** create a lead on first inquiry/accepted-proposal; create
+visits from the scheduler writing to the tables that already exist.
+
+## A0.3 Builder match auto-notify — engine built, trigger + delivery pending
+
+Doc2 §8.3 wants builders auto-notified of matching requirements (3/day live +
+digest). The **matching cascade engine is built** (`lib/listings/matching.ts`,
+reused by the reverse-match strip and `/match/for-requirement/:id`). Not built:
+the **trigger** (requirement approve/edit → run match → notify) needs the admin
+approve flow (**Module 11**), and **delivery** (push/email) needs the provider
+layer (**Module 10** — same blocker as B3 reminders). Deliberately NOT writing
+"notification intent" rows nothing consumes — that would be the dead placeholder
+CLAUDE.md §7 warns against. Build the trigger + delivery together when both land.
+
+## A0.4 Requirements "browse" is not yet a bottom-nav tab (Module 6 — P2)
+
+P8 S3 shows Requirements as a bottom-nav CENTRE tab — but that is the P2
+requirement-mode feed shell (Module 6), which owns the global `BottomNav`. Module
+5 did not restructure the nav; `/requirements` (browse) is reachable via the
+seller profile ⋯ menu ("Browse requirements") and links between the Module-5
+screens. **UPDATE 23 Jul 2026 (Module 6 landed):** Rajan's call is ONE nav
+everywhere — the P3 canonical Home/Search/Create/Saved/Profile. So Requirements
+does **not** get a nav tab; `/requirements` stays route-reachable (⋯ menu +
+inter-screen links). This item is closed by decision, not by build. See A0-M6.6.
+
+## A0.5 Two deliberate reconciliations (design/Doc tension — resolved, noted)
+
+- **Duplicate guard vs "a sender may send multiple" (Doc7 §71).** The P8 design
+  draws a duplicate guard ("You've already sent a proposal for this requirement")
+  and Doc2 §8.1 lists it. Doc7 §71's note that "a single sender may send multiple
+  proposals" is read as *across different requirements* — re-proposing the **same**
+  requirement is blocked while a pending/accepted proposal exists, allowed again
+  only after a decline/expiry. Enforced by a partial unique index (0025) + the API
+  `DUPLICATE_PROPOSAL` path. If Rajan intended multiple proposals to the *same*
+  requirement, relax the index.
+- **Visit PATCH path.** Doc7 §101 namespaces it `/chat/visits/:id`; chat isn't
+  built, so it ships as `/api/v1/visits/:id`. Re-home under chat in Module 6 if
+  desired (the client method is the only caller).
+
+## A0.7 P8 Proposals screens overlap the P7 Messages tabs — REUSE, don't rebuild
+
+Doc2 §10.3 gives the chat Messages screen four tabs; tabs **3. Requirement Leads
+(proposals received)** and **4. My Responses (proposals sent)** are the SAME data
+as Module 5's standalone **S5 ProposalsReceived** and **S6 MyProposalsSent**.
+Nothing is thrown away: when Module 6 builds Messages, tabs 3+4 must call the
+existing `proposalsApi.received` / `proposalsApi.mine` and render the same DTOs —
+they are a second entry surface, not a second implementation. The standalone P8
+screens stay (reached from My Requirements → proposals row, and the profile menu).
+Do NOT re-model proposals in Module 6. (Note: P8 S2 "Leads Pipeline" — the
+broker/builder CRM, Doc2 §10.4 — is a DIFFERENT thing from the "Requirement
+Leads" Messages tab despite the shared word; the pipeline is not a Messages tab.)
+
+## A0.6 Proposal-vs-requirement-OFF refund (Doc2 §15) — sealed by pre-check
+
+`sendProposal` re-reads the requirement and refuses (no quota drawn) unless it is
+`live` AND `is_active`, so a proposal is never charged against an OFF/deleted
+requirement. The `refund_proposal` RPC (0003) remains wired for the create-failure
+release path (`releaseQuota`, the 0024 pattern) and is available for any future
+admin refund. 30-day no-response expiry is **non-refund** by design (Doc2 §8.1),
+swept hourly by `expireStaleProposals()` on the billing cron.
+
+---
+
+# A0-M6. Module 6 (P2 — Feed & Stories) — built 23 Jul 2026
+
+Shipped, DB-verified, live-verified guest + logged-in. Three new real tables
+(`saves`, `inquiries`, `reports`) plus `feed_not_interested` and `story_seen`,
+all RLS deny-all; `feed_banners` added 24 Jul (migration 0027).
+
+## ⚠️ CLOSURE STATUS — Module 6 is NOT 100% closed (as of 24 Jul 2026)
+
+Everything in Module 6's own scope is built and both live suites pass
+(`test-module6-live.mjs` ALL PASS, `check:roles` ALL PASS). **Two items remain,
+and neither can be closed from inside Module 6** — do not report Module 6 as
+fully complete until both land:
+
+| # | Remaining | Blocked on | Why it can't be done now |
+|---|---|---|---|
+| **M6.3** | Story media not signed / 24h-expiring | **B4 (R2 keys)** or a private bucket | Photos sit in a **public** Supabase bucket. Signing a publicly-readable object is theatre — the plain URL keeps working, so nothing expires. A real fix means moving media to a private bucket, which then forces signed reads across feed, detail AND profile. That is storage architecture, not a Module 6 bug. |
+| **M6.4** | A paid boost can never become `active` | **Module 11 (Admin)** | Needs `POST /admin/boosts/:id/approve`, which needs the admin auth zone + panel. Money side is already safe (auto-refund after 48h in `pending_approval`) — see A1. |
+
+Deliberately NOT faked for either: no signed-URL wrapper over a public object,
+no self-approving boost. Both would look done and be false.
+
+**Closed during the 24 Jul sweep** (were on this list): admin banner slot
+(A0-M6.6), pull-to-refresh indicator + the "new listings" pill's `created_at`
+bug (A0-M6.10), and the message badge (A0-M6.2).
+
+What Module 6 leaves for later modules:
+
+## A0-M6.1 Save / Inquiry / Report tables are seeds their owning modules extend
+Per Rajan's decision, these persist for real now (no frontend-only toast). Owning
+module for each, checked against Doc6's module list on 23 Jul 2026:
+- **`saves`** → **Module 6B (P10 Saved)** builds the wishlist/collections UI on it.
+  *P10 had NO module at all until 23 Jul 2026 — see A0-M6.7.*
+- **`inquiries`** → **Module 7 (P7 Chat)** grows a thread from each inquiry (the
+  `thread_id` column is already there); until then an inquiry is stored, not a chat.
+- **`reports`** → the **Module 11 (Admin, P13-14-15)** Reports queue consumes them
+  (status stays `open`; no admin action path exists yet).
+
+Module map for the rest of this section (corrected 24 Jul 2026): **M6.2** message
+badge → ✅ **closed inside Module 6** (it never needed Chat — the `inquiries`
+table is enough; the earlier "→ Module 7" note was wrong), notification badge →
+**Module 10**, "new matches" dot → Module 5 signal delivered by Module 10.
+**M6.3** signed story media → no feature module; it rides **B4 (R2 keys)** /
+a private bucket, single seam `storySegment`. **M6.4** boost→`active` →
+**Module 11** (A1); search top-slots → **Module 9** placement on top of
+**Module 8** search.
+
+## A0-M6.2 Header badges — message ✅ CLOSED 24 Jul 2026, bell still Module 10
+**Message badge — now REAL.** It does not need Chat to exist: Module 6 already
+built `inquiries`, so "inquiries sent to me I haven't acted on" (`poster_id = me
+AND status = 'sent'`) is a genuine, queryable count today — the same set P7's
+"Requests" tab will own. Wired `headerBadges()` → `GET /api/v1/feed/badges` →
+`FeedHome` → `FeedShell` → `FeedHeader`.
+**DB-verified:** pending-inquiry counts are Sneha 7 / Amit 6 / RK 4 / Manish 4;
+signed in as Amit the header renders **6**, guest renders none.
+
+**Bell badge — still open (Module 10).** There is no notifications table, so the
+endpoint returns `notifications: null` — deliberately NULL, not `0`. NULL means
+"no source yet" and the header draws no badge; a `0` would imply "you have none",
+and a hardcoded "3" would be a DB-lock violation (rule 12). When Module 10 lands,
+fill that one field — the plumbing is already in place.
+
+Also still open: the Requirements "new matches" dot (Module 5 signal, delivered
+by Module 10). The bell/message taps route to `/notifications` and `/messages`,
+which are placeholder screens until M10/M7.
+
+## A0-M6.3 Story media is not yet signed-24h (public bucket)
+Doc2 §9.3 wants story media as signed URLs that die after 24h (anti-scrape).
+Listing photos live in the **public** Supabase bucket (same URLs the feed cards
+use), so `storySegment` returns public URLs. The story VIEWER works with real
+media; the anti-scrape signing needs a **private story-media bucket** (or R2, B4)
+and a signed-read per segment. `storySegment` is the single seam to change.
+
+**Re-examined 24 Jul 2026 — still open, and here is why it is not a quick fix.**
+Wrapping the existing URLs in `createSignedUrl()` would be *theatre*: the object
+stays publicly readable, so the plain URL keeps working after the signature
+expires and nothing is actually protected. Making it real requires the object to
+be private, and the moment the bucket goes private **every other surface that
+renders the same photos breaks** — feed cards, listing detail, profile grid,
+suggested strip — each would need signed reads too. That is a storage-layer
+migration (B4 / R2), not a Module 6 change.
+
+**When B4 lands, the order is:** private bucket → signed-read helper → point
+`storySegment` at it → then the feed/detail/profile readers → then verify a
+segment URL 404s after 24h. Do not sign against the public bucket and call it
+done.
+
+## A0-M6.4 Boost placement now READS active boosts (A3 partially closed)
+The feed ranks active boosts first (FIFO by `starts_at`) and the story row puts
+boosted posters first — so A3's "boost appears nowhere" is now closed **for the
+feed + stories**. Still open: **boosts can't become `active`** without the admin
+approve endpoint (A1), so today an active boost only exists if seeded directly;
+and **search** top-slots (A3) are still unbuilt. Requirement-boost locked-but-top
+is honoured (boosted-locked cards render first in requirement mode).
+
+**Re-examined 24 Jul 2026 — still open.** Deliberately NOT worked around: an
+auto-approve or a "activate on payment" shortcut would put a paid boost live with
+no human review, which is exactly the control the admin queue exists to provide.
+The money half is already safe — `timeoutStalePendingBoosts()` refunds anything
+stuck in `pending_approval` past 48h — so the open risk is a *delayed* boost, not
+a lost payment. Closes with **Module 11**'s approve/reject endpoints (see A1).
+
+## A0-M6.5 New-listings pill is poll-based, not WebSocket
+Per Doc7 §83 (server gives the count, client gates the ≥30s display), the pill
+polls `GET /feed/new-count` every 20s. Full Supabase Realtime (WebSocket) is for
+chat/notifications later; the feed does not need a socket.
+
+## A0-M6.6 Nav split — RESOLVED (unified, 23 Jul 2026) + admin banner source
+The feed shell briefly used a separate P2 nav (`FEED_NAV`:
+Home/Search/Requirements/Messages/Profile). **Rajan's call: ONE nav everywhere** —
+the profile/P3 canonical `DEFAULT_NAV` (Home/Search/Create/Saved/Profile). The
+feed shell now renders plain `<BottomNav />` and `FEED_NAV` is deleted, so no
+screen can diverge again (CLAUDE.md rule 6). Requirements browse therefore still
+reaches its screens by route, not by a nav tab — see A0.4.
+
+**Admin banner — ✅ CLOSED 24 Jul 2026** (was: "component exists but has no
+server-driven source"). That was a design element with no data source, so the
+slot was silently absent from the running app. Now DB-driven end to end:
+`feed_banners` (migration 0027, RLS deny-all) → `activeFeedBanner()` →
+`GET /api/v1/feed/banner` → `<AdminBanner>` between the story row and the mode
+toggle, exactly where P2 puts it. Text/gradient or image, schedule window,
+priority and dismiss all come from the row — nothing hardcoded. The P15 admin
+CMS will edit these rows instead of inserting them.
+
+## A0-M6.12 DESIGN-LOCK OVERRIDE — card title left / price right (24 Jul 2026)
+Second authorised departure from `designs/P2`, same day, same reason (Rajan's
+call). P2 stacks the property card body as: price + sale badge, then meta, then
+location. Rajan asked for **title on the left, price on the right, one row**,
+title ellipsising when long.
+
+Property feed cards **never carried a title** — only project cards did — so this
+needed a server change too: `title` added to the listings SELECT and to the
+property branch of `toCard()`. All 10 property cards now return one
+(DB-verified).
+
+Layout: `flex items-baseline`, title `min-w-0 flex-1 truncate`, price
+`shrink-0`. The `min-w-0` matters — without it a flex item won't shrink below its
+content and a long title would shove the price off the card instead of clipping.
+**Verified live** with a 110-char title: title shows `…`, `text-overflow:
+ellipsis`, title box stays 263px, price stays 72px and fully visible.
+The sale badge + meta moved to the row below; the project card branch is
+untouched (verified on feed page 2 — "Shivalik Heights" renders as before).
+
+## A0-M6.11 DESIGN-LOCK OVERRIDE — feed card image 4:5 → 16:9 (24 Jul 2026)
+The one place the app deliberately departs from `designs/P2`. Recorded here so
+nobody "fixes" it back to the design later.
+
+`designs/P2` specifies `aspect-ratio: 4/5` for all three feed card types, and the
+app matched it exactly — this was NOT a deviation bug. Rajan judged the portrait
+crop to read badly for real property photos and asked for housing.com's ratio.
+
+Measured on housing.com at a 375px viewport (Rajkot flats listing, "Gallery Cover
+Pic" card images): they use **two** — `262×194` (4:3, 1.35) and `262×142`
+(16:9, 1.85). Rajan chose **16:9**.
+
+Changed: one class in `components/feed/FeedCard.tsx`
+(`aspect-[4/5]` → `aspect-[16/9]`). Card image is now 375×211 at 375px wide,
+so roughly 2 cards fit a screen instead of ~1.
+
+**Functionality untouched** — the carousel, scroll-snap, photo counter, dots and
+Promoted/New-Project badges all size off that same container. Verified live:
+counter steps 1/6 → 3/6 on scroll, `scroll-snap-type: x mandatory` and
+`overflow-x: auto` unchanged, all 6 photos still in the carousel.
+
+The 4:5 in `designs/P2` is now stale for this element. Everything else in P2
+remains locked and unchanged.
+
+## A0-M6.10 Design-vs-app sweep of P2 — 3 gaps found (24 Jul 2026)
+Rajan asked why the design's "3 new listings" pill and banner weren't visible.
+Walked every element in `designs/P2` against the running DOM. Present and
+correct: header + scroll-morph, story row, mode toggle, filter chips + sort,
+3 card types, Suggested strip, caught-up, guest strip, offline state, skeleton,
+empty, bottom nav, and all 8 sheets (login/city/sort/more/inquiry/share/report/
+paywall). Three were NOT:
+
+1. **Admin banner — never rendered.** Component existed, was imported nowhere,
+   and had no data source. Fixed: see A0-M6.6 (table + endpoint + slot).
+2. **Pull-to-refresh indicator — never wired.** `PullSpinner` was defined in
+   `primitives.tsx` and used by no one, so the design's pull indicator did not
+   exist in the app. Now wired in `FeedShell`: arms only at `scrollTop 0`,
+   damped 0.5× rubber-band, 64px threshold, spins until the refresh promise
+   resolves. Verified with synthetic touch events — a 40px pull springs back
+   without refreshing; an 88px pull pins at 64px and fires 4 refresh requests.
+3. **🔴 "New listings" pill could never fire — wrong timestamp.** This is the
+   real defect behind Rajan's question. `newCount()` counted
+   `created_at > since`, but `created_at` is when the DRAFT row was made. A
+   listing is drafted → moderated → published, so a listing that went live
+   *right now* can have a `created_at` from days ago and was never counted.
+   **Proof:** 3 listings set to `live_at = now()` → `new-count` returned **0**.
+   After switching to `live_at` → returns **3**, and the pill renders live.
+
+   Same wrong column was used for feed ORDER, the pagination CURSOR and
+   `postedAgo`, so the feed also mis-ranked and lied about age ("2d ago" on
+   something published today; 8 of 38 live rows have `live_at > created_at`).
+   All four now key off `live_at` (with a `?? created_at` guard). Boosted-first
+   ordering is unchanged. Cursor stays consistent because `nextCursor` is the
+   same sort key.
+
+Regression after the change: Module 6 suite **ALL PASS** (incl. boosted-first
+and cursor pagination page 2), `check:roles` **ALL PASS**, `tsc --noEmit` clean.
+
+## A0-M6.8 The PUBLIC host had no /login, /profile, /create, /messages, /notifications
+Found 23 Jul 2026 by walking every destination the public feed links to. The
+whole auth + nav surface existed only in the (seller) route group, so on
+homzlist.com these all hit the 404 page:
+
+| Tapped from | Went to | Was |
+|---|---|---|
+| Guest strip "Sign In", guest-gate sheet, profile sign-out | `/login` | **404** |
+| Bottom nav — Profile | `/profile` | **404** (only `/profile/[username]` existed) |
+| Bottom nav — Create (+) | `/create` | **404** |
+| Feed header — bell | `/notifications` | **404** |
+| Feed header — message | `/messages` | **404** |
+
+Fixed, each in the honest way rather than one blanket placeholder:
+- **`/login`** — real `AuthFlow`, same component the seller host uses. Session
+  cookies are HOST-ONLY, so a guest on the public host must be able to get a
+  session THERE; that is exactly what makes save/inquire/report work from the
+  public feed. Login-bypass now sealed for the public zone too (middleware).
+- **`/profile`** — real `OwnProfile`, server-gated (`getCurrentUser()`), guests
+  redirected to `/login`.
+- **`/create`** — a routing bridge, not a screen: creation is a seller surface
+  (plan wall, slots, moderation), so it 307s to the same deployment's seller
+  host, origin derived from the REQUEST host (not a fixed env URL).
+- **`/notifications` (Module 10)** and **`/messages` (Module 7)** — shell +
+  EmptyState, the accepted `/search` pattern. No fabricated lists.
+
+## A0-M6.9 Demo content pass — what it exposed (23 Jul 2026)
+`npm run seed:demo` (`scripts/seed-demo-content.mjs`) fills every screen with
+design-density content. Building it surfaced five REAL defects, all fixed:
+
+1. **No listing photo in the app resolved.** 61 `listing_photos` rows held
+   `/uploads/...` local-disk paths from the dev `local` storage driver, and 6
+   live listings had no photo row at all — every feed card was a grey box. Now
+   every visible listing has 6 real images uploaded to the Supabase
+   `listing-photos` bucket (repair + backfill are steps in the seed).
+2. **Project cards in the feed 404'd.** `PropertyFeed` taps project cards to
+   `/project/:id`; that route existed only on the seller host and under a
+   different name (`/projects/:id`). Added `app/(public)/project/[id]`.
+3. **Amenities rendered as raw codes.** The create form stores codes
+   (`power_backup`), the detail payload echoed them straight to the screen.
+   `getAmenityLabels()` now resolves code → label server-side for both the
+   listing and the project DTO; unknown values pass through.
+4. **City-scoped feed had content in ONE city.** The feed scopes to the viewer's
+   city (correct), but every live listing was in Rajkot — so a Vadodara owner or
+   a Surat builder opened the app to an empty home. Seeded Vadodara, Surat and
+   Ahmedabad with their own areas, listings, buyers and requirements.
+5. **QA artifacts were showing as content**: 4 "Flat QA owner" copies, 4
+   duplicates of one seeded listing (₹8.5 Cr with `bhk: 1`), and 143 QA drafts
+   filling the profile grid. Archived / trashed, survivors' attributes fixed.
+
+**Photo licensing:** images are Pexels (Pexels License — free use, no
+attribution). Google Images was deliberately NOT used — arbitrary copyright,
+cannot be re-hosted in our bucket.
+
+Verify with `npm run check:roles` (`ROLES_BASE=<url>`): guest + owner + broker +
+builder walked through feed, detail, requirement mode, profile stats, listings,
+leads, proposals, visits and the builder dashboard, asserting on what the SERVER
+returned.
+
+Still thin (needs the owning module, not data): proposals/visits/leads exist
+only for the Rajkot Module-5 actors, and the newer city buyers have no plan, so
+their requirement cards stay locked — which is the correct paywall behaviour.
+
+## A0-M6.7 P10 had no module in the build plan — now Module 6B
+Found 23 Jul 2026 while mapping M6.1-M6.4 to their owning modules: `build/Doc6`
+lists Modules 0-17 and **P10 (Saved / Activity / Settings, 12 screens) appeared
+in none of them** — it showed up only in Doc6's file list. So the `saves` table
+Module 6 ships had no consumer with an owner, and the now-unified bottom nav
+carries a **Saved** tab that nobody was scheduled to build a destination for.
+
+**Fixed:** added `### MODULE 6B — SAVED, ACTIVITY & SETTINGS (P10)` to Doc6,
+between Modules 6 and 7. Numbered **6B deliberately** — Modules 7/8/9/10/11 are
+referenced by number throughout these docs, so renumbering would rot every one
+of those references.
+
+Until 6B is built, `/saved` is **not a 404** — it is the shell + EmptyState
+placeholder (the accepted `/search` pattern), so the nav tab lands somewhere and
+no fake saved-list is shown. The table underneath is real; nothing saved is lost.
+(The screens table below still said "`/saved` 404s" — corrected.)
 
 ---
 
@@ -412,15 +788,15 @@ than rediscovered.
 | Design | Screens | Built? |
 |---|---|---|
 | P1 Auth & Entry | s1–s9, legal | ✅ |
-| P2 Feed + Stories + Global Shells | feed, story | ⚠️ shell + bottom nav only — the feed itself is an EmptyState, stories nowhere |
+| P2 Feed + Stories + Global Shells | feed, story | ✅ built 23 Jul 2026 (Module 6) — property/requirement/builder feed + story row/viewer + all sheets; see A0-M6 |
 | P3 Search / Explore | home, results, area, comingsoon | ❌ not built — `/search` 404s |
 | P4 Detail Screens | property, project, requirement, viewer, sold, error | ⚠️ all four render; see D2 for what's missing inside them |
 | P5 Creation A | plan, posttype, proptype, form, photos | ✅ |
 | P6 Creation B | preview, checkout, success, reqform, projform, drafts, edit | ✅ (`edit` is the create form in edit mode — see C5) |
 | P7 Messages & Chat | home, chat, requests, details, archived, blocked | ❌ not built |
-| P8 Visits/Leads/Requirements/Proposals | leads, reqBrowse, myReq, myProp, proposalsRx | ❌ not built (own-requirement detail exists via P4) |
+| P8 Visits/Leads/Requirements/Proposals | visits, leads, reqBrowse, myReq, proposalsRx, myProp | ✅ built 23 Jul 2026 (Module 5) — chat-origination deferred, see A0 |
 | P9 Profile suite | ownProfile, editProfile, verification, listings, listingStats, accountStatus, otp* | ✅ |
-| P10 Saved/Activity/Settings | S1–S10 (12 screens) | ❌ none built — `/saved` 404s |
+| P10 Saved/Activity/Settings | S1–S10 (12 screens) | ❌ none built — **Module 6B** owns it (added 23 Jul 2026, A0-M6.7); `/saved` = placeholder shell, not a 404 |
 | P11 Plans/Payments/Boost/Notifications | plans, myplan, payments, boost, boostbuy, **notif** | ⚠️ five built; the **Notifications screen is missing** |
 | P12 Help/Legal/Blog/System | help, legal, blog, system pages | ❌ not built |
 
@@ -748,19 +1124,26 @@ Dead-ends that will resolve with later modules but are live buttons **today**:
 "Request phone number", "Send inquiry" (both toast), and "Update Units" on a
 project.
 
-## D3. Leads stat has no source
+## D3. Leads stat has no source — ✅ CLOSED 23 Jul 2026
 
-Views became a real query in migration 0018. **Leads is still a literal `0`** in
-`/profile/me` — there is no leads table because leads come from chat (P7).
+Was: `/profile/me` returned a literal `leads: 0`, and `ownerListingStats`
+returned `saves: null` / `leads: null` (the P4 strip rendered `—`), because no
+`leads`/`saves` table existed yet.
 
-Same gap on the property detail's owner stats strip (designs/P4 S1, added
-23 Jul 2026): `service.ownerListingStats` returns a real `views` count and
-`saves: null` / `leads: null`, and the strip renders `—` for the nulls rather
-than a fabricated `0`. Fill them when the Saved suite (P10) and Leads (P8)
-land.
+Both tables now exist — `leads` (Module 5, migration 0025) and `saves`
+(Module 6, migration 0026) — so the hardcoded zero was a live DB-lock violation
+(rule 12) and is gone:
+- `/api/v1/profile/me` → `countProfileLeads()` (`lib/listings/leads.ts`), same
+  `is_relevant` filter the Leads pipeline uses, so tile and screen can't disagree.
+- `ownerListingStats()` → real `views` + `saves` + `leads` counts per listing.
 
-Until then the profile shows a stat nobody can move. Either build it with P7 or
-hide the tile; do not leave a permanent zero.
+**DB-verified.** `leads` per owner: RK Properties 6, Suresh Reddy 3, Rahul Mehta
+2. Rahul's profile now renders **Leads 2** (was 0), and listing
+`5ac29249-…` returns `{"views":1,"saves":0,"leads":2}` to its owner — matching a
+direct SQL count of the same three tables.
+
+Still deliberately zero-ish elsewhere: nothing AUTO-creates a lead yet (chat is
+Module 7) — see A0.2. Seeded + manually staged leads are real rows and now count.
 
 ## D4. Listing and requirement badges use two different vocabularies
 

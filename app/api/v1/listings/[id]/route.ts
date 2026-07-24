@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 import { ok, fail } from "@/lib/api";
 import { getCurrentUser } from "@/lib/auth/current-user";
-import { getListingForViewer, getPropertyType, getFieldDefinitions, updateListing, softDeleteListing, recordListingView, resolveLocationChain, isPromoted, ownerListingStats } from "@/lib/listings/service";
+import { getListingForViewer, getPropertyType, getFieldDefinitions, updateListing, softDeleteListing, recordListingView, resolveLocationChain, isPromoted, ownerListingStats, getAmenityLabels } from "@/lib/listings/service";
 import { rateLimit, clientIp, hashIp } from "@/lib/auth/rate-limit";
 import { listingDetailDTO } from "@/lib/listings/dto";
 
@@ -35,7 +35,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   }
 
   const isOwner = claims?.sub === listing.profile_id;
-  const [type, fieldDefs, promoted, stats] = await Promise.all([
+  const [type, fieldDefs, promoted, stats, amenityLabels] = await Promise.all([
     getPropertyType(listing.type_code),
     // Needed to turn stored codes ("semi", "1-5") into the labels the design
     // shows ("Semi-furnished", "1–5 years") — resolved server-side.
@@ -44,8 +44,10 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     // client is never told to assume either (designs/P4 S1).
     isPromoted(listing.id),
     isOwner ? ownerListingStats(listing.id) : Promise.resolve(null),
+    // Amenity codes -> the labels the design shows.
+    getAmenityLabels(),
   ]);
-  const dto = listingDetailDTO(listing, type, { isOwner, fieldDefs, promoted, stats });
+  const dto = listingDetailDTO(listing, type, { isOwner, fieldDefs, promoted, stats, amenityLabels });
 
   // For the owner's edit form, hand back a COMPLETE location chain even if the
   // row stored a broken one — the cascade needs every ancestor to unlock.

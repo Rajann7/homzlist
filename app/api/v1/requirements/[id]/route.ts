@@ -5,7 +5,7 @@ import { rateLimit } from "@/lib/auth/rate-limit";
 import {
   getRequirementForViewer, requirementProposalCount,
   setRequirementActive, fulfillRequirement, deleteRequirement,
-  updateRequirementContent,
+  updateRequirementContent, reopenRequirement,
 } from "@/lib/listings/requirements";
 import { requirementDetailDTO } from "@/lib/listings/dto";
 
@@ -71,6 +71,10 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (body.fulfilled === true) {
     const done = await fulfillRequirement(params.id, claims.sub);
     if (!done) return fail("NOT_FOUND");
+  } else if (body.reopen === true) {
+    // Reopen a fulfilled requirement — consumes a fresh slot (design S4 dialog).
+    const res = await reopenRequirement(params.id, claims.sub);
+    if (!res.ok) return fail(res.reason === "no_quota" ? "PLAN_REQUIRED" : "NOT_FOUND");
   } else if (typeof body.isActive === "boolean") {
     const done = await setRequirementActive(params.id, claims.sub, body.isActive);
     if (!done) return fail("NOT_FOUND");

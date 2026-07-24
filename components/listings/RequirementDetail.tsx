@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { AppShell, Button, Header, Icon, Skeleton, StatusBadge, Toggle, useToast } from "@/components/billing/ui";
 import { BackButton, Checklist, OfflineBanner } from "@/components/billing/primitives";
 import { ConfirmDialog } from "@/components/ui/Dialog";
+import { ProposalSheet } from "./ProposalSheet";
 import { requirementsApi, type RequirementDetail as Detail } from "@/lib/listings/client";
 import { cn } from "@/lib/utils";
 
@@ -25,6 +26,7 @@ export function RequirementDetail({ id }: { id: string }) {
   const [offDlg, setOffDlg] = useState(false);
   const [fulfilDlg, setFulfilDlg] = useState(false);
   const [delDlg, setDelDlg] = useState(false);
+  const [proposalSheet, setProposalSheet] = useState(false);
 
   const load = useCallback(async () => {
     const res = await requirementsApi.get(id);
@@ -216,7 +218,7 @@ export function RequirementDetail({ id }: { id: string }) {
             </div>
 
             <button
-              onClick={() => toast.show("Proposals arrive with the proposals module")}
+              onClick={() => router.push(`/requirements/${r.id}/proposals`)}
               className="flex h-14 items-center gap-3 rounded-8 border border-border bg-surface-1 px-4 text-left"
             >
               <span className="flex-1 text-15 font-semibold text-ink-primary">
@@ -243,11 +245,20 @@ export function RequirementDetail({ id }: { id: string }) {
         </div>
       ) : !locked ? (
         <div className="sticky bottom-0 border-t border-border bg-surface-1 p-4">
-          <Button fullWidth onClick={() => toast.show("Sending proposals arrives with the proposals module")}>
+          <Button fullWidth onClick={() => setProposalSheet(true)}>
             Send Proposal
           </Button>
         </div>
       ) : null}
+
+      {!isOwn && !locked && (
+        <ProposalSheet
+          open={proposalSheet}
+          requirementId={r.id}
+          onClose={() => setProposalSheet(false)}
+          onSent={() => setProposalSheet(false)}
+        />
+      )}
 
       <ConfirmDialog
         open={offDlg}

@@ -31,14 +31,18 @@ export async function middleware(request: NextRequest) {
 
   const user = await verifyAccessEdge(request.cookies.get(ACCESS_COOKIE)?.value);
 
+  const isLogin = pathname === "/login" || pathname.startsWith("/login/");
+
   if (zone === "public") {
     if (pathname.startsWith("/seller") || pathname.startsWith("/account")) {
       return NextResponse.rewrite(new URL("/404", request.url));
     }
+    // Public is guest-browsable, so nothing is gated here — but the login-bypass
+    // seal applies to every zone (Doc9 §28): a signed-in user must not be able to
+    // re-enter the auth flow and re-issue a session.
+    if (isLogin && user) return NextResponse.redirect(new URL("/", request.url));
     return NextResponse.next();
   }
-
-  const isLogin = pathname === "/login" || pathname.startsWith("/login/");
 
   if (zone === "seller") {
     if (isLogin && user) return NextResponse.redirect(new URL("/", request.url));

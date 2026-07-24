@@ -3,13 +3,13 @@ import { ok, fail } from "@/lib/api";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { getProfileById, getVerifications, getCityName, updateOwnProfile } from "@/lib/profile/service";
 import { getProfileCounts } from "@/lib/listings/service";
+import { countProfileLeads } from "@/lib/listings/leads";
 import { ownProfileDTO } from "@/lib/profile/dto";
 
 /**
  * GET  /api/v1/profile/me (Doc7 §16) — full own profile (stats server-derived).
  * PATCH /api/v1/profile/me (Doc7 §17) — edit; whitelisted fields, bio auto-flag.
- * Listings/Projects/Views counts are real queries; Leads lands with the chat
- * module and stays 0 until then.
+ * Listings/Projects/Views/Leads counts are all real queries.
  */
 export const dynamic = "force-dynamic";
 
@@ -17,13 +17,14 @@ async function loadOwn(id: string) {
   const [profile, verifications] = await Promise.all([getProfileById(id), getVerifications(id)]);
   if (!profile) return null;
   const cityName = await getCityName(profile.city_id);
-  // Listings/Projects/Views are real queries (migration 0018 added the views
-  // table). Leads still needs the chat module — see PENDING-INTEGRATIONS.
-  const counts = await getProfileCounts(id, profile.role);
+  // Every tile is a real query: listings/projects (Module 4), views (migration
+  // 0018), leads (Module 5's `leads` table — this was a hardcoded 0 until the
+  // table existed; D3 in PENDING-INTEGRATIONS).
+  const [counts, leads] = await Promise.all([getProfileCounts(id, profile.role), countProfileLeads(id)]);
   const stats = {
     listings: counts.listings,
     views: counts.views,
-    leads: 0,
+    leads,
     ...(profile.role === "builder" ? { projects: counts.projects } : {}),
   };
   return ownProfileDTO(profile, verifications, cityName, stats);

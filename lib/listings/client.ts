@@ -74,6 +74,9 @@ export interface RequirementCard {
   rejectReason: string | null;
   daysLeft: number | null;
   createdOn: string | null;
+  /** S4 list extras — present for live requirements (Doc7 §65). */
+  proposals?: { total: number; newCount: number };
+  matches?: { id: string; title: string | null; priceLabel: string; areaLabel: string | null; bhk: number | null; coverUrl: string | null; tier: string; tierLabel: string | null }[];
 }
 
 export interface MyListing {
@@ -413,5 +416,142 @@ export const requirementsApi = {
     req<{ requirement: RequirementDetail }>(`/requirements/${id}`, "PATCH", { isActive }),
   fulfill: (id: string) =>
     req<{ requirement: RequirementDetail }>(`/requirements/${id}`, "PATCH", { fulfilled: true }),
+  reopen: (id: string) =>
+    req<{ requirement: RequirementDetail }>(`/requirements/${id}`, "PATCH", { reopen: true }),
   remove: (id: string) => req<{ deleted: boolean }>(`/requirements/${id}`, "DELETE"),
+};
+
+// ---- Module 5: browse, proposals, matching, visits, leads ------------------
+
+export interface BrowseCard {
+  id: string;
+  access: "unlocked" | "locked";
+  kind: "sell" | "rent";
+  kindLabel: string;
+  typeCode: string;
+  bhk: number | null;
+  summary: string;
+  isUrgent: boolean;
+  isBoosted: boolean;
+  postedAgo: string;
+  budgetLabel?: string;
+  areaLabel?: string;
+  posterName?: string;
+  posterRole?: string;
+  posterVerified?: boolean;
+  proposalCount?: number;
+  alreadySent?: boolean;
+  tier: "exact" | "adjacent" | "city";
+}
+export interface BrowseSection { tier: "exact" | "adjacent" | "city"; label: string | null; cards: BrowseCard[]; }
+
+export interface MatchedListing {
+  id: string; title: string | null; priceLabel: string; areaLabel: string | null;
+  coverUrl: string | null; bhk: number | null; tier: "exact" | "adjacent" | "city"; tierLabel: string | null;
+}
+
+export interface ReceivedProposal {
+  id: string;
+  status: "pending" | "accepted" | "declined" | "not_relevant" | "expired" | "fulfilled";
+  message: string;
+  sentAgo: string;
+  isNew: boolean;
+  sender: {
+    id: string; name: string; role: string | null;
+    verified: { phone: boolean; id: boolean; rera: boolean };
+    memberSince: string; profilePct: number; phone: string;
+  };
+  listing: { id: string; title: string | null; priceLabel: string; areaLabel: string | null; coverUrl: string | null } | null;
+}
+
+export interface SentProposal {
+  id: string; requirementId: string;
+  status: "pending" | "accepted" | "declined" | "not_relevant" | "expired" | "fulfilled";
+  requirementRef: string; poster: { name: string; role: string | null };
+  listing: { title: string | null; priceLabel: string; coverUrl: string | null } | null;
+  sentAt: string; footnote: string; nonRefund: boolean;
+}
+
+export const browseApi = {
+  list: (kind?: "sell" | "rent" | null, typeCode?: string | null) =>
+    req<{ sections: BrowseSection[]; unlocked: boolean; cityName: string | null; balance: { left: number; total: number; unlimited: boolean } }>(
+      `/requirements/browse?${new URLSearchParams({ ...(kind ? { kind } : {}), ...(typeCode ? { type: typeCode } : {}) }).toString()}`,
+      "GET",
+    ),
+};
+
+export const proposalsApi = {
+  /** The sender's own live listings for the picker + current balance. */
+  sheet: (requirementId: string) =>
+    req<{
+      balance: { left: number; total: number; unlimited: boolean };
+      alreadySent: boolean;
+      listings: { id: string; title: string | null; priceLabel: string; areaLabel: string | null; coverUrl: string | null }[];
+      prefill: { listing: string; chat: string };
+    }>(`/requirements/${requirementId}/proposals`, "GET"),
+  send: (requirementId: string, body: { mode: "listing" | "chat"; listingId?: string | null; message?: string | null }) =>
+    req<{ proposal: { id: string }; balanceLeft: number }>(`/requirements/${requirementId}/proposals`, "POST", body),
+  /** Poster view: proposals received on a requirement they own (numbers auto). */
+  received: (requirementId: string) =>
+    req<{ items: ReceivedProposal[]; requirementRef: string; filters: { key: string; label: string; count: number }[] }>(
+      `/requirements/${requirementId}/proposals?view=received`, "GET"),
+  mine: () =>
+    req<{ items: SentProposal[]; balance: { left: number; total: number; unlimited: boolean }; filters: { key: string; label: string; count: number }[] }>(
+      "/proposals/mine", "GET"),
+  accept: (id: string) => req<{ status: string }>(`/proposals/${id}`, "PATCH", { action: "accept" }),
+  decline: (id: string) => req<{ status: string }>(`/proposals/${id}`, "PATCH", { action: "decline" }),
+  notRelevant: (id: string) => req<{ status: string; flagged: boolean }>(`/proposals/${id}`, "PATCH", { action: "not_relevant" }),
+};
+
+export const matchApi = {
+  forRequirement: (id: string) => req<{ items: MatchedListing[] }>(`/match/for-requirement/${id}`, "GET"),
+};
+
+export interface VisitView {
+  id: string;
+  scheduledAt: string;
+  note: string | null;
+  status: "proposed" | "confirmed" | "completed" | "cancelled";
+  outcome: "done" | "cancelled" | null;
+  section: "tomorrow" | "this_week" | "upcoming" | "completed" | "cancelled";
+  timeLabel: string;
+  dateLabel: string;
+  listing: { title: string | null; priceLabel: string; areaLabel: string | null; coverUrl: string | null } | null;
+  counterparty: { name: string; role: string | null };
+  isPast: boolean;
+}
+
+export const visitsApi = {
+  mine: (filter?: string) => req<{ items: VisitView[] }>(`/visits/mine${filter ? `?filter=${filter}` : ""}`, "GET"),
+  reschedule: (id: string, scheduledAt: string, note: string | null) =>
+    req<{ updated: boolean }>(`/visits/${id}`, "PATCH", { action: "reschedule", scheduledAt, note }),
+  cancel: (id: string, reason: string | null) => req<{ updated: boolean }>(`/visits/${id}`, "PATCH", { action: "cancel", reason }),
+  outcome: (id: string, outcome: "done" | "cancelled") => req<{ updated: boolean }>(`/visits/${id}`, "PATCH", { action: "outcome", outcome }),
+  confirm: (id: string) => req<{ updated: boolean }>(`/visits/${id}`, "PATCH", { action: "confirm" }),
+};
+
+export interface LeadView {
+  id: string;
+  stage: "new" | "contacted" | "visit" | "negotiation" | "closed_won" | "closed_lost";
+  source: "inquiry" | "proposal" | "visit";
+  lastActivity: string | null;
+  lastActivityAt: string;
+  notes: { text: string; at: string }[];
+  lead: { name: string; role: string | null; verified: { phone: boolean; id: boolean; rera: boolean }; memberSince: string; profilePct: number };
+  property: { title: string | null; priceLabel: string; areaLabel: string | null; coverUrl: string | null } | null;
+}
+
+export const leadsApi = {
+  list: () =>
+    req<{
+      ownerVariant: boolean;
+      leads: LeadView[];
+      stageCounts: { key: string; label: string; count: number }[];
+      summary: { total: number; newThisWeek: number; conversionPct: number | null };
+    }>("/leads", "GET"),
+  moveStage: (id: string, stage: string, note: string | null) => req<{ updated: boolean }>(`/leads/${id}`, "PATCH", { action: "stage", stage, note }),
+  addNote: (id: string, text: string) => req<{ updated: boolean }>(`/leads/${id}`, "PATCH", { action: "note", text }),
+  notRelevant: (id: string) => req<{ updated: boolean }>(`/leads/${id}`, "PATCH", { action: "not_relevant" }),
+  /** CSV comes back as text; the caller triggers a download from the blob. */
+  exportUrl: (fields: string[]) => `/api/v1/leads/export?fields=${fields.join(",")}`,
 };

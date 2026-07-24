@@ -75,6 +75,11 @@ export function ProfileMenuSheet({
         {/* Seller destinations — this is where an under-review listing, the
             plan and payment history live (Doc4 §56/§62). */}
         <Row icon="home" label="My Listings" onClick={() => onNavigate("/listings")} />
+        <Row icon="search" label="Browse requirements" onClick={() => onNavigate("/requirements")} />
+        <Row icon="file" label="My requirements" onClick={() => onNavigate("/requirements/mine")} />
+        <Row icon="send" label="My proposals" onClick={() => onNavigate("/proposals")} />
+        <Row icon="pin" label="My visits" onClick={() => onNavigate("/visits")} />
+        <Row icon="filter" label="Leads" onClick={() => onNavigate("/leads")} />
         <Row icon="card" label="My plan" onClick={() => onNavigate("/plans/my")} />
         <Row icon="receipt" label="Payments" onClick={() => onNavigate("/payments")} />
         <Row icon="rocket" label="Boosts" onClick={() => onNavigate("/boost")} />

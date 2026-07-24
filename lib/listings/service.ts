@@ -128,6 +128,24 @@ export async function getAmenities(category?: string) {
   return category ? rows.filter((a) => !a.categories.length || a.categories.includes(category)) : rows;
 }
 
+/**
+ * code → label for the amenity master ("power_backup" → "Power backup").
+ *
+ * The creation form submits CODES (that's what `getAmenities` hands it), but
+ * every detail payload used to echo the stored value straight back, so a real
+ * listing rendered "power_backup" / "swimming_pool" on screen. Resolved here so
+ * the labels stay data (Doc2 §5.1: a new amenity is a row, not a code change).
+ * Unknown values pass through untouched — older rows stored the label itself.
+ */
+export async function getAmenityLabels(): Promise<Map<string, string>> {
+  const rows = await getAmenities();
+  return new Map(rows.map((a) => [a.code, a.label]));
+}
+
+export function labelAmenities(values: string[] | null | undefined, labels: Map<string, string>): string[] {
+  return (values ?? []).map((v) => labels.get(v) ?? v);
+}
+
 export async function getPropertyType(code: string): Promise<PropertyTypeRow | null> {
   const { data } = await db().from("property_types").select("*").eq("code", code).eq("is_active", true).maybeSingle();
   return (data as PropertyTypeRow) ?? null;
@@ -509,12 +527,19 @@ export async function isPromoted(listingId: string): Promise<boolean> {
  * come back as null and the strip renders "—" rather than a fabricated 0
  * (CLAUDE.md §7: no hardcoded counts). Tracked in docs/PENDING-INTEGRATIONS.md.
  */
+/**
+ * Per-listing owner stats strip (P4 S1). All three are real counts now: views
+ * (migration 0018), saves (Module 6's `saves`), leads (Module 5's `leads`).
+ * They used to return `saves: null` / `leads: null` — the strip rendered "—"
+ * rather than a fabricated 0 while those tables didn't exist (D3).
+ */
 export async function ownerListingStats(listingId: string) {
-  const { count } = await db()
-    .from("listing_views")
-    .select("id", { count: "exact", head: true })
-    .eq("listing_id", listingId);
-  return { views: count ?? 0, saves: null as number | null, leads: null as number | null };
+  const [{ count: views }, { count: saves }, { count: leads }] = await Promise.all([
+    db().from("listing_views").select("id", { count: "exact", head: true }).eq("listing_id", listingId),
+    db().from("saves").select("id", { count: "exact", head: true }).eq("listing_id", listingId),
+    db().from("leads").select("id", { count: "exact", head: true }).eq("listing_id", listingId).eq("is_relevant", true),
+  ]);
+  return { views: views ?? 0, saves: saves ?? 0, leads: leads ?? 0 };
 }
 
 export async function listMine(profileId: string) {

@@ -408,6 +408,55 @@ export async function fulfillRequirement(id: string, profileId: string) {
 }
 
 /**
+ * Reopen a fulfilled requirement (P8 S4 fulfilled card → "Reopen").
+ *
+ * The design's dialog is explicit: "It will use a requirement slot from your
+ * current plan." So reopening consumes a fresh `requirement` unit, exactly like
+ * posting — the same atomic draw, and the same strand-safety (release on
+ * failure) as createRequirement. A fulfilled requirement whose 30-day window has
+ * passed also gets a fresh window.
+ */
+export async function reopenRequirement(
+  id: string,
+  profileId: string,
+): Promise<{ ok: true } | { ok: false; reason: "not_found" | "no_quota" }> {
+  const { data: cur } = await db()
+    .from("requirements")
+    .select("id, status, expires_at")
+    .eq("id", id)
+    .eq("profile_id", profileId)
+    .eq("status", "fulfilled")
+    .maybeSingle();
+  if (!cur) return { ok: false, reason: "not_found" };
+
+  const userPlanId = await consumeQuota(profileId, "requirement", 1, { type: "requirement", id, note: "Requirement reopened" });
+  if (!userPlanId) return { ok: false, reason: "no_quota" };
+
+  try {
+    const now = new Date();
+    const stillValid = (cur as { expires_at: string | null }).expires_at
+      && new Date((cur as { expires_at: string }).expires_at).getTime() > now.getTime();
+    const expires = stillValid
+      ? (cur as { expires_at: string }).expires_at
+      : new Date(now.getTime() + REQUIREMENT_DAYS * 86_400_000).toISOString();
+    const { data, error } = await db()
+      .from("requirements")
+      .update({ status: "live", is_active: true, fulfilled_at: null, expires_at: expires, slot_consumed_at: now.toISOString() })
+      .eq("id", id)
+      .eq("profile_id", profileId)
+      .eq("status", "fulfilled")
+      .select("id")
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) { await releaseQuota(profileId, userPlanId, "requirement", 1, "Reopen lost the row"); return { ok: false, reason: "not_found" }; }
+    return { ok: true };
+  } catch (e) {
+    await releaseQuota(profileId, userPlanId, "requirement", 1, "Requirement reopen failed");
+    throw e;
+  }
+}
+
+/**
  * Soft-delete. Doc2 §4.2 is explicit that deleting does NOT return the quota —
  * the slot stays consumed, which is why nothing is refunded here.
  */
