@@ -30,7 +30,7 @@ export function BuilderDashboard() {
   if (!data) return <div className="flex flex-col gap-3 p-4"><Skeleton className="h-40 w-full rounded-12" /><Skeleton className="h-32 w-full rounded-12" /></div>;
 
   if (data.projects.length === 0 && data.matched.length === 0) {
-    return <EmptyState title="No projects yet" subtitle="Post a project to see stats and matching requirements here." cta={{ label: "Post a Project", onClick: () => router.push("/projects/new") }} />;
+    return <EmptyState title="No projects yet" subtitle="Post a project to see stats and matching requirements here." cta={{ label: "Post a Project", onClick: () => router.push("/create") }} />;
   }
 
   return (
@@ -41,7 +41,7 @@ export function BuilderDashboard() {
           <div className="text-13 font-semibold uppercase tracking-[0.3px] text-ink-tertiary">My Projects</div>
           <div className="flex gap-3 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {data.projects.map((p) => (
-              <button key={p.id} onClick={() => router.push(`/projects/${p.id}`)} className="flex w-[220px] shrink-0 flex-col overflow-hidden rounded-12 border border-border bg-surface-1 text-left">
+              <button key={p.id} onClick={() => router.push(`/project/${p.id}`)} className="flex w-[220px] shrink-0 flex-col overflow-hidden rounded-12 border border-border bg-surface-1 text-left">
                 <div className="h-24 w-full bg-surface-3">{p.coverUrl && <img src={p.coverUrl} alt="" className="h-full w-full object-cover" />}</div>
                 <div className="flex flex-col gap-1 p-3">
                   <div className="truncate text-15 font-semibold text-ink-primary">{p.name}</div>

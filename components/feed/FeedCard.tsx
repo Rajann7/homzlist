@@ -14,10 +14,12 @@ import { cn } from "@/lib/utils";
  * save. Every number/label is server-computed (this renders, never derives).
  */
 export function FeedCard({
-  card, onOpen, onSave, onInquiry, onMore,
+  card, onOpen, onOpenPoster, onSave, onInquiry, onMore,
 }: {
   card: Card;
   onOpen: () => void;
+  /** Poster name/avatar tap → their public profile. */
+  onOpenPoster: () => void;
   onSave: () => void;
   onInquiry: () => void;
   onMore: () => void;
@@ -27,14 +29,30 @@ export function FeedCard({
   const [idx, setIdx] = useState(0);
   const [heart, setHeart] = useState(false);
   const lastTap = useRef(0);
+  const openTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scrolledAt = useRef(0);
 
+  /**
+   * Photo tap does double duty, so single vs double has to be disambiguated:
+   *   double-tap → heart pop + save (unchanged behaviour)
+   *   single tap → open the detail (new — the card used to open ONLY from the
+   *                "View Property" button)
+   * A single tap therefore waits 300ms to see whether a second tap follows;
+   * if it does, the pending open is cancelled and it becomes a save.
+   *
+   * `scrolledAt` guards the carousel: swiping between photos can fire a click
+   * on touch, and without this a swipe would navigate away mid-browse.
+   */
   const onPhotoTap = () => {
     const now = Date.now();
+    if (now - scrolledAt.current < 400) return; // that was a swipe, not a tap
     if (now - lastTap.current < 300) {
-      // double-tap → heart pop + save
+      if (openTimer.current) { clearTimeout(openTimer.current); openTimer.current = null; }
       setHeart(true);
       setTimeout(() => setHeart(false), 600);
       if (!card.saved) onSave();
+    } else {
+      openTimer.current = setTimeout(() => { openTimer.current = null; onOpen(); }, 300);
     }
     lastTap.current = now;
   };
@@ -46,6 +64,7 @@ export function FeedCard({
         <div
           onScroll={(e) => {
             const el = e.target as HTMLDivElement;
+            scrolledAt.current = Date.now();
             setIdx(Math.round(el.scrollLeft / el.clientWidth));
           }}
           onClick={onPhotoTap}
@@ -99,11 +118,15 @@ export function FeedCard({
 
       {/* ---- Body ---- */}
       <div className="flex flex-col gap-1.5 px-4 pt-3">
+        {/* The whole info block opens the detail — not just the "View Property"
+            button it used to be. One <button> wrapping the text keeps it
+            keyboard-reachable instead of an onClick on a bare <div>. */}
+        <button type="button" onClick={onOpen} className="flex w-full flex-col gap-1.5 text-left">
         {isProject ? (
           <>
-            <button onClick={onOpen} className="text-left text-17 font-semibold text-ink-primary">{card.title}</button>
-            <div className="text-15 font-bold text-ink-primary">{card.priceFrom}</div>
-            <div className="text-13 text-ink-secondary">{[card.buildStatus, card.rera ? "RERA approved" : null].filter(Boolean).join(" · ")}</div>
+            <span className="text-17 font-semibold text-ink-primary">{card.title}</span>
+            <span className="text-15 font-bold text-ink-primary">{card.priceFrom}</span>
+            <span className="text-13 text-ink-secondary">{[card.buildStatus, card.rera ? "RERA approved" : null].filter(Boolean).join(" · ")}</span>
           </>
         ) : (
           <>
@@ -112,31 +135,40 @@ export function FeedCard({
                 min-w-0 a flex item refuses to shrink below its content and would
                 push the price off the card instead of clipping. `shrink-0` keeps
                 the price fully readable; the title gives up the space. */}
-            <div className="flex items-baseline gap-2">
+            <span className="flex w-full items-baseline gap-2">
               {card.title && (
                 <span className="min-w-0 flex-1 truncate text-15 font-semibold text-ink-primary">{card.title}</span>
               )}
               <span className={cn("shrink-0 text-17 font-bold text-ink-primary", !card.title && "flex-1")}>{card.price}</span>
-            </div>
-            <div className="flex items-center gap-2">
+            </span>
+            <span className="flex w-full items-center gap-2">
               <span className={cn("rounded-full px-2 py-0.5 text-11 font-semibold", card.saleLabel === "For Rent" ? "bg-warning-soft text-warning" : "bg-accent-soft text-accent")}>
                 {card.saleLabel}
               </span>
               {card.meta && <span className="truncate text-13 text-ink-secondary">{card.meta}</span>}
-            </div>
+            </span>
           </>
         )}
-        <div className="flex items-center gap-1 text-13 text-ink-tertiary">
+        <span className="flex items-center gap-1 text-13 text-ink-tertiary">
           <Icon name="pin" size={14} /> {card.areaLabel ?? "Rajkot"}
-        </div>
+        </span>
+        </button>
 
-        {/* poster row */}
+        {/* Poster row — opens the poster's public profile, NOT the listing.
+            Its own button so the tap can't fall through to the info block. */}
         <div className="mt-1 flex items-center gap-2">
-          <Avatar src={card.poster.avatarUrl} name={card.poster.name} size={24} />
-          <span className="text-13 font-semibold text-ink-primary">{card.poster.name}</span>
-          {card.poster.verified && <Icon name="verified" size={14} className="text-accent" />}
-          {card.poster.role && <span className="rounded-4 bg-surface-2 px-1.5 py-0.5 text-11 capitalize text-ink-secondary">{card.poster.role}</span>}
-          <span className="ml-auto text-11 text-ink-tertiary">{card.postedAgo}</span>
+          <button
+            type="button"
+            onClick={onOpenPoster}
+            className="flex min-w-0 items-center gap-2 text-left"
+            aria-label={`View ${card.poster.name}'s profile`}
+          >
+            <Avatar src={card.poster.avatarUrl} name={card.poster.name} size={24} />
+            <span className="truncate text-13 font-semibold text-ink-primary">{card.poster.name}</span>
+            {card.poster.verified && <Icon name="verified" size={14} className="shrink-0 text-accent" />}
+            {card.poster.role && <span className="shrink-0 rounded-4 bg-surface-2 px-1.5 py-0.5 text-11 capitalize text-ink-secondary">{card.poster.role}</span>}
+          </button>
+          <span className="ml-auto shrink-0 text-11 text-ink-tertiary">{card.postedAgo}</span>
         </div>
 
         {/* action bar */}

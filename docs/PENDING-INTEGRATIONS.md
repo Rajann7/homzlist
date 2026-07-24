@@ -240,6 +240,57 @@ toggle, exactly where P2 puts it. Text/gradient or image, schedule window,
 priority and dismiss all come from the row — nothing hardcoded. The P15 admin
 CMS will edit these rows instead of inserting them.
 
+## A0-M6.13 Clickable-flow sweep — 6 dead ends found (24 Jul 2026)
+Rajan: the feed card only opened from the "View Property" button, and tapping a
+poster did nothing. Walked every tappable target in the feed and followed each
+destination to a real screen.
+
+**Feed card was barely clickable.** Only the "View Property" button and the
+project title opened anything; the photo's single tap was dead (it only recorded
+a timestamp for double-tap detection) and title/price/meta/location were inert.
+Now the whole info block and the photo open the detail:
+- photo **single tap → open**, **double tap → heart + save** (unchanged). The
+  single tap waits 300ms so a second tap can cancel the pending open.
+- a `scrolledAt` guard drops taps within 400ms of a carousel scroll, so
+  **swiping between photos no longer navigates away**.
+- Save / Inquiry / More stay siblings of the info button, so they never
+  trigger the card open. Verified: More opens its sheet, Save toggles, neither
+  navigates.
+
+**Poster was not clickable at all**, and the public profile behind it was
+broken in two ways:
+1. `PosterInfo` carried no `username`, and `/profile/:username` is how the
+   public profile routes — so there was nothing to link to. Added server-side.
+2. The profile then showed **"0 Listings"** — a hardcoded `listings: 0` with a
+   `TODO(Module 4)` left in a shipped screen (rule 12 violation; Module 4 shipped
+   long ago). Now `getPublicProfileCounts()`, **live + available only** so a
+   visitor is never told how much unpublished stock a poster is sitting on.
+   DB-verified: RK 12 / Amit 8 / Sneha 6 / Suresh 4 (+3 projects) / Rahul 3 —
+   API matches SQL exactly.
+3. The grid under it was a hardcoded **"No listings to show yet."** with no fetch
+   — so a profile could claim 12 listings and show none. Added
+   `GET /profile/:username/listings` + a real tab-filtered grid (Sell 8 / Rent 4
+   = 12). Uses `listingCardDTO`, **not** `myListingDTO`, which would have leaked
+   status badges, review notes and reject reasons to a stranger.
+
+**Three routes 404'd** — same class as `/project/:id` (A0-M6.9):
+| Tapped | Route | Was |
+|---|---|---|
+| Requirement card (unlocked) | `/requirements/:id` | **404 on public** — seller-only |
+| Builder dashboard project tile | `/projects/:id` | **404 on public** — seller-only |
+| Feed project card | `/project/:id` | **404 on seller** — public-only |
+
+Fixed by making singular `/project/:id` canonical on **both** hosts (added the
+seller alias) and pointing the builder dashboard at it; added public
+`/requirements/:id`; "Post a Project" now goes to `/create`, which already
+bridges to the seller host.
+
+Paywall re-checked after opening the requirement route to guests: a guest gets
+`access: "locked"` and **no budget field at all** in the payload.
+
+Verified: 11/11 routes 200, Module 6 suite ALL PASS, `check:roles` ALL PASS,
+`tsc` clean, zero console/server errors.
+
 ## A0-M6.12 DESIGN-LOCK OVERRIDE — card title left / price right (24 Jul 2026)
 Second authorised departure from `designs/P2`, same day, same reason (Rajan's
 call). P2 stacks the property card body as: price + sale badge, then meta, then

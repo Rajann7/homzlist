@@ -92,6 +92,13 @@ export const PropertyFeed = forwardRef<PropertyFeedHandle, { filter: string; sor
             <FeedCard
               card={card}
               onOpen={() => router.push(`/${card.kind === "project" ? "project" : "property"}/${card.id}`)}
+              // Public profile routes by username (/profile/:username). A poster
+              // with no username can't be linked, so tell the user rather than
+              // pushing a URL that would 404.
+              onOpenPoster={() => {
+                if (card.poster.username) router.push(`/profile/${card.poster.username}`);
+                else toast.show("This poster has no public profile yet");
+              }}
               onSave={guard(() => void save(card))}
               onInquiry={guard(() => setInquiryFor(card))}
               onMore={() => setMoreFor(card)}

@@ -21,7 +21,7 @@ const db = () => createServiceClient();
 export type FeedFilter = "buy" | "rent" | "all";
 export type FeedSort = "latest" | "nearby" | "price_asc" | "price_desc";
 
-export interface PosterInfo { id: string; name: string; role: string | null; verified: boolean; avatarUrl: string | null; }
+export interface PosterInfo { id: string; name: string; username: string | null; role: string | null; verified: boolean; avatarUrl: string | null; }
 
 export interface FeedCard {
   kind: "property" | "project";
@@ -165,7 +165,7 @@ export async function getFeed(
   const listingIds = page.filter((c) => c.kind === "property").map((c) => c.row.id);
 
   const [{ data: profs }, { data: vers }, photosByListing, savedSet, priceFromByProject] = await Promise.all([
-    db().from("profiles").select("id,name,role,photo_url").in("id", posterIds.length ? posterIds : ["00000000-0000-0000-0000-000000000000"]),
+    db().from("profiles").select("id,name,username,role,photo_url").in("id", posterIds.length ? posterIds : ["00000000-0000-0000-0000-000000000000"]),
     db().from("verifications").select("profile_id").eq("level", "phone").eq("status", "approved").in("profile_id", posterIds.length ? posterIds : ["00000000-0000-0000-0000-000000000000"]),
     photosFor(listingIds),
     savedFor(viewerId, listingIds),
@@ -227,7 +227,7 @@ function toCard(
   boostRank: Map<string, number>,
 ): FeedCard {
   const p = profMap.get(c.row.profile_id) ?? {};
-  const poster: PosterInfo = { id: c.row.profile_id, name: p.name ?? "HomzList user", role: p.role ?? null, verified: verifiedSet.has(c.row.profile_id), avatarUrl: p.photo_url ?? null };
+  const poster: PosterInfo = { id: c.row.profile_id, name: p.name ?? "HomzList user", username: p.username ?? null, role: p.role ?? null, verified: verifiedSet.has(c.row.profile_id), avatarUrl: p.photo_url ?? null };
 
   if (c.kind === "project") {
     const pf = priceFromByProject.get(c.row.id);

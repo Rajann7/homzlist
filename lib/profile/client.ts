@@ -39,6 +39,11 @@ export const profileApi = {
   me: () => req<{ profile: OwnProfile }>("/profile/me", "GET"),
   update: (patch: Record<string, unknown>) => req<{ profile: OwnProfile }>("/profile/me", "PATCH", patch),
   publicProfile: (username: string) => req<{ profile: any }>(`/profile/${encodeURIComponent(username)}`, "GET"),
+  /** Live listings for someone else's profile grid (P9 S2). */
+  publicListings: (username: string) =>
+    req<{ items: { id: string; title: string | null; price: string; coverUrl: string | null; areaLabel: string | null; kind: "sell" | "rent" }[] }>(
+      `/profile/${encodeURIComponent(username)}/listings`, "GET",
+    ),
   verificationStatus: () => req<{ verification: any }>("/profile/verification/status", "GET"),
   submitId: (docType: string, docKey?: string | null) => req<{ status: string }>("/profile/verification/id", "POST", { docType, docKey }),
   submitRera: (reraNumber: string, docKey?: string | null) => req<{ status: string }>("/profile/verification/rera", "POST", { reraNumber, docKey }),

@@ -37,6 +37,9 @@ export function OtherProfile({ username }: { username: string }) {
   const [reportReason, setReportReason] = useState<string | null>(null);
   const [blockDlg, setBlockDlg] = useState(false);
   const [notFound, setNotFound] = useState(false);
+  const [listings, setListings] = useState<
+    { id: string; title: string | null; price: string; coverUrl: string | null; areaLabel: string | null; kind: "sell" | "rent" }[] | null
+  >(null);
 
   useEffect(() => {
     profileApi.publicProfile(username).then((r) => {
@@ -44,6 +47,11 @@ export function OtherProfile({ username }: { username: string }) {
       else setNotFound(true);
       setLoading(false);
     });
+  }, [username]);
+
+  // The grid: real live listings. Was a hardcoded "No listings to show yet."
+  useEffect(() => {
+    profileApi.publicListings(username).then((r) => setListings(r.ok ? r.data.items : []));
   }, [username]);
 
   const header = (right?: React.ReactNode) => (
@@ -153,9 +161,45 @@ export function OtherProfile({ username }: { username: string }) {
           </button>
         ))}
       </div>
-      <div className="flex flex-1 items-center justify-center px-6 py-16 text-center">
-        <p className="text-13 text-ink-tertiary">No listings to show yet.</p>
-      </div>
+      {/* Grid — tab-filtered. "Sell"/"Rent" filter by kind; the builder's
+          "Sell / Rent" tab shows everything. Each tile opens the listing. */}
+      {listings === null ? (
+        <div className="grid grid-cols-3 gap-0.5 p-0.5">
+          {[0, 1, 2, 3, 4, 5].map((i) => <div key={i} className="aspect-square animate-pulse bg-surface-2" />)}
+        </div>
+      ) : (() => {
+        const label = tabs[tab];
+        const shown = label === "Sell" ? listings.filter((l) => l.kind === "sell")
+          : label === "Rent" ? listings.filter((l) => l.kind === "rent")
+          : listings;
+        if (!shown.length) {
+          return (
+            <div className="flex flex-1 items-center justify-center px-6 py-16 text-center">
+              <p className="text-13 text-ink-tertiary">No listings to show yet.</p>
+            </div>
+          );
+        }
+        return (
+          <div className="grid grid-cols-3 gap-0.5 p-0.5">
+            {shown.map((l) => (
+              <button
+                key={l.id}
+                onClick={() => router.push(`/property/${l.id}`)}
+                className="relative aspect-square overflow-hidden bg-surface-2 text-left"
+                aria-label={l.title ?? l.price}
+              >
+                {l.coverUrl && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={l.coverUrl} alt="" className="h-full w-full object-cover" />
+                )}
+                <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-1.5 pb-1 pt-4 text-11 font-semibold text-white">
+                  {l.price}
+                </span>
+              </button>
+            ))}
+          </div>
+        );
+      })()}
 
       {/* ⋯ menu */}
       <BottomSheet open={menu} onClose={() => setMenu(false)} hideHeader>

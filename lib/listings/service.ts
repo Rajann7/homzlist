@@ -129,6 +129,53 @@ export async function getAmenities(category?: string) {
 }
 
 /**
+ * The listings shown on someone ELSE's public profile grid (P9 S2).
+ *
+ * Same visibility rule as `getPublicProfileCounts` — live + available only, so
+ * the grid can never disagree with the "N Listings" stat above it. Ordered
+ * newest-live-first, matching the feed.
+ */
+export async function listPublicByProfile(profileId: string): Promise<ListingRow[]> {
+  const { data } = await db()
+    .from("listings")
+    .select("*")
+    .eq("profile_id", profileId)
+    .eq("status", "live")
+    .eq("availability", "available")
+    .order("live_at", { ascending: false })
+    .limit(60);
+  return (data ?? []) as ListingRow[];
+}
+
+/**
+ * Counts for someone ELSE's public profile (P9 S2).
+ *
+ * Deliberately narrower than `getProfileCounts`: a visitor may only be told
+ * about what they can actually see, so this counts `live` + `available` only.
+ * The owner's own count includes pending_review/hidden/archived; leaking those
+ * totals to a stranger would tell them how much is sitting unpublished.
+ */
+export async function getPublicProfileCounts(profileId: string, role: string | null) {
+  const { count: listings } = await db()
+    .from("listings")
+    .select("id", { count: "exact", head: true })
+    .eq("profile_id", profileId)
+    .eq("status", "live")
+    .eq("availability", "available");
+
+  let projects = 0;
+  if (role === "builder") {
+    const { count } = await db()
+      .from("projects")
+      .select("id", { count: "exact", head: true })
+      .eq("profile_id", profileId)
+      .eq("status", "live");
+    projects = count ?? 0;
+  }
+  return { listings: listings ?? 0, projects };
+}
+
+/**
  * code → label for the amenity master ("power_backup" → "Power backup").
  *
  * The creation form submits CODES (that's what `getAmenities` hands it), but

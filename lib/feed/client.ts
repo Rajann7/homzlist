@@ -23,7 +23,7 @@ async function req<T>(path: string, method = "GET", body?: unknown): Promise<Api
   }
 }
 
-export interface PosterInfo { id: string; name: string; role: string | null; verified: boolean; avatarUrl: string | null; }
+export interface PosterInfo { id: string; name: string; username: string | null; role: string | null; verified: boolean; avatarUrl: string | null; }
 export interface FeedCard {
   kind: "property" | "project";
   id: string; promoted: boolean; saved: boolean; coverUrl: string | null; photos: string[];

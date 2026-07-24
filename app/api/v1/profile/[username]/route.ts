@@ -1,6 +1,7 @@
 import type { NextRequest } from "next/server";
 import { ok, fail } from "@/lib/api";
 import { getProfileByUsername, getVerifications, getCityName } from "@/lib/profile/service";
+import { getPublicProfileCounts } from "@/lib/listings/service";
 import { publicProfileDTO } from "@/lib/profile/dto";
 
 /**
@@ -14,8 +15,14 @@ export async function GET(_req: NextRequest, { params }: { params: { username: s
   const profile = await getProfileByUsername(params.username);
   if (!profile || !profile.is_registered) return fail("NOT_FOUND");
 
-  const [verifications, cityName] = await Promise.all([getVerifications(profile.id), getCityName(profile.city_id)]);
-  // TODO(Module 4): real public listings/projects counts.
-  const stats = { listings: 0, ...(profile.role === "builder" ? { projects: 0 } : {}) };
+  const [verifications, cityName, counts] = await Promise.all([
+    getVerifications(profile.id),
+    getCityName(profile.city_id),
+    // Real query — this was a hardcoded `listings: 0` with a TODO left in a
+    // shipped screen, so every public profile claimed the poster had none.
+    // Live+available only: a visitor is never told about unpublished stock.
+    getPublicProfileCounts(profile.id, profile.role),
+  ]);
+  const stats = { listings: counts.listings, ...(profile.role === "builder" ? { projects: counts.projects } : {}) };
   return ok({ profile: publicProfileDTO(profile, verifications, cityName, stats) });
 }
