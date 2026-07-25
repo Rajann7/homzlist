@@ -26,6 +26,7 @@ export interface VisitRow {
   status: "proposed" | "confirmed" | "completed" | "cancelled";
   outcome: "done" | "cancelled" | null;
   cancel_reason: string | null;
+  thread_id: string | null;
   created_at: string;
 }
 

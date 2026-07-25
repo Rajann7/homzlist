@@ -19,6 +19,8 @@ export const dynamic = "force-dynamic";
 const KINDS = {
   avatar: { prefix: "avatars", private: false, mimes: ALLOWED_IMAGE_MIME as readonly string[] },
   logo: { prefix: "logos", private: false, mimes: ALLOWED_IMAGE_MIME as readonly string[] },
+  // Chat photos are PUBLIC (rendered inline in a bubble), keyed per-sender.
+  chat: { prefix: "chat", private: false, mimes: ALLOWED_IMAGE_MIME as readonly string[] },
   // Verification docs are PRIVATE: owner + admin only, via signed URL.
   doc: { prefix: "docs", private: true, mimes: [...ALLOWED_IMAGE_MIME, "application/pdf"] },
 } as const;

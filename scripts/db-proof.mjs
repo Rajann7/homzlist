@@ -47,6 +47,18 @@ const TABLES = [
   ["listing_views", "Module 4 · unique detail opens per day"],
   ["staff", "Module 4 · who may moderate"],
   ["moderation_log", "Module 4 · every approve/changes/reject, attributed"],
+  ["inquiries", "Module 6 · inquiry → chat request"],
+  ["proposals", "Module 5 · requirement proposals"],
+  ["visits", "Module 5-7 · scheduled site visits"],
+  ["leads", "Module 5-7 · broker/builder pipeline"],
+  ["chat_threads", "Module 7 · conversations (inquiry/proposal)"],
+  ["thread_participants", "Module 7 · per-side pin/mute/archive/read"],
+  ["chat_messages", "Module 7 · every bubble/system card"],
+  ["number_requests", "Module 7 · sealed number request/allow"],
+  ["chat_blocks", "Module 7 · directional blocks"],
+  ["chat_templates", "Module 7 · quick-reply templates"],
+  ["notifications", "Module 7 · in-app notification records"],
+  ["push_tokens", "Module 7 · FCM device tokens (push)"],
 ];
 
 console.log("TABLE                 ROWS   RLS  POLICIES   PURPOSE");

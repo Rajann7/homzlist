@@ -46,7 +46,9 @@ export interface LeadView {
     memberSince: string;
     profilePct: number;
   };
-  property: { title: string | null; priceLabel: string; areaLabel: string | null; coverUrl: string | null } | null;
+  property: { id: string; title: string | null; priceLabel: string; areaLabel: string | null; coverUrl: string | null } | null;
+  /** The chat grown from this lead's origin inquiry/proposal, if any — opens the thread. */
+  threadId: string | null;
 }
 
 export interface LeadsPayload {
@@ -92,6 +94,14 @@ export async function listLeads(ownerId: string, role: string | null): Promise<L
     leadIds.length ? db().from("verifications").select("profile_id,level,status").in("profile_id", leadIds) : Promise.resolve({ data: [] as unknown[] }),
     listingIds.length ? db().from("listings").select("id,title,price_paise,price_on_request,area_label,cover_url").in("id", listingIds) : Promise.resolve({ data: [] as unknown[] }),
   ]);
+  // One thread per (listing, buyer) — resolve each lead's chat so "Message" opens
+  // the real thread instead of a toast. Owner-scoped, so no foreign thread leaks.
+  const { data: threads } = listingIds.length
+    ? await db().from("chat_threads").select("id,listing_id,buyer_id").eq("poster_id", ownerId).in("listing_id", listingIds)
+    : { data: [] as unknown[] };
+  const threadMap = new Map(
+    ((threads ?? []) as { id: string; listing_id: string | null; buyer_id: string }[]).map((t) => [`${t.listing_id}:${t.buyer_id}`, t.id]),
+  );
   const profMap = new Map((profs ?? []).map((p: any) => [p.id, p]));
   const verMap = new Map<string, { phone: boolean; id: boolean; rera: boolean }>();
   for (const v of (vers ?? []) as { profile_id: string; level: string; status: string }[]) {
@@ -119,8 +129,9 @@ export async function listLeads(ownerId: string, role: string | null): Promise<L
         profilePct: profileCompleteness(p),
       },
       property: l
-        ? { title: l.title, priceLabel: l.price_on_request ? "Price on request" : priceLabel(l.price_paise), areaLabel: l.area_label, coverUrl: l.cover_url }
+        ? { id: l.id, title: l.title, priceLabel: l.price_on_request ? "Price on request" : priceLabel(l.price_paise), areaLabel: l.area_label, coverUrl: l.cover_url }
         : null,
+      threadId: r.listing_id ? threadMap.get(`${r.listing_id}:${r.lead_profile_id}`) ?? null : null,
     };
   });
 

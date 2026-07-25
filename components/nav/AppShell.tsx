@@ -18,13 +18,27 @@ export interface AppShellProps {
   showNav?: boolean;
   navItems?: NavItem[];
   className?: string;
+  /**
+   * Default (true): `main` is the scroll region — the normal screen.
+   * false: `main` is a non-scrolling flex column and the CHILD owns scrolling —
+   * used by the chat thread so its messages scroll while the composer stays
+   * pinned at the bottom (Doc2 §10.2), instead of the composer riding the page.
+   */
+  scroll?: boolean;
 }
 
-export function AppShell({ children, header, showNav = true, navItems, className }: AppShellProps) {
+export function AppShell({ children, header, showNav = true, navItems, className, scroll = true }: AppShellProps) {
   return (
     <div className="mx-auto flex h-[100dvh] w-full max-w-column flex-col overflow-hidden bg-page">
       {header}
-      <main className={cn("flex-1 overflow-y-auto overscroll-contain", className)}>{children}</main>
+      <main
+        className={cn(
+          scroll ? "flex-1 overflow-y-auto overscroll-contain" : "flex min-h-0 flex-1 flex-col overflow-hidden",
+          className,
+        )}
+      >
+        {children}
+      </main>
       {showNav && <BottomNav items={navItems} />}
     </div>
   );

@@ -33,5 +33,5 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
   if (res === null) return fail("VALIDATION_ERROR", { field: "action" });
   if (!res.ok) return fail("NOT_FOUND");
-  return ok({ status: res.status, flagged: res.flagged ?? false });
+  return ok({ status: res.status, flagged: res.flagged ?? false, threadId: "threadId" in res ? res.threadId ?? null : null });
 }

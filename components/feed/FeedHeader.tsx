@@ -6,24 +6,22 @@ import { cn } from "@/lib/utils";
 
 /**
  * P2 feed header — wordmark (fades on scroll) + city chip (→ City sheet) +
- * bell + message icons. Scroll-morph 56→48 driven by `compact` from the feed's
- * scroll container.
+ * bell + saved icons. Scroll-morph 56→48 driven by `compact` from the feed's
+ * scroll container. (Messages moved to the bottom nav; Saved lives here now.)
  *
- * Badge counts: the bell (Notifications, P11) and message (Chat, P7) modules
- * aren't built, so no fabricated "3"/"5" badge is shown (DB-lock: never a
- * hardcoded count). A badge appears only when a real count is passed (tracked in
- * PENDING-INTEGRATIONS.md — wire when those modules land).
+ * Badge counts: the bell (Notifications) shows a badge only when a real count is
+ * passed (DB-lock: never a fabricated count). The unread chat count rides the
+ * Messages icon in the bottom nav.
  */
 export function FeedHeader({
-  compact, cityName, onCityTap, bellCount = 0, messageCount = 0, onBell, onMessage,
+  compact, cityName, onCityTap, bellCount = 0, onBell, onSaved,
 }: {
   compact: boolean;
   cityName: string | null;
   onCityTap: () => void;
   bellCount?: number;
-  messageCount?: number;
   onBell?: () => void;
-  onMessage?: () => void;
+  onSaved?: () => void;
 }) {
   return (
     <header className="chrome z-header sticky top-0 mx-auto w-full max-w-column border-b border-border bg-surface-1 pt-[env(safe-area-inset-top)]">
@@ -52,14 +50,15 @@ export function FeedHeader({
 
         <div className="ml-auto flex items-center">
           <IconBtn name="bell" count={bellCount} onClick={onBell} label="Notifications" />
-          <IconBtn name="message" count={messageCount} onClick={onMessage} label="Messages" />
+          {/* Saved lives here now (top-right); Messages moved to the bottom nav. */}
+          <IconBtn name="heart" count={0} onClick={onSaved} label="Saved" />
         </div>
       </div>
     </header>
   );
 }
 
-function IconBtn({ name, count, onClick, label }: { name: "bell" | "message"; count: number; onClick?: () => void; label: string }) {
+function IconBtn({ name, count, onClick, label }: { name: "bell" | "message" | "heart"; count: number; onClick?: () => void; label: string }) {
   return (
     <button aria-label={label} onClick={onClick} className="relative grid h-11 w-11 place-items-center">
       <Icon name={name} size={24} className="text-ink-primary" />

@@ -139,7 +139,7 @@ export function Leads() {
           </div>
 
           {shown.map((l) => (
-            <LeadCard key={l.id} l={l} onMessage={() => toast.show("Chat opens with the messages module")} onMove={() => setMoveFor(l)} onMore={() => setMoreFor(l)} onOpenProperty={() => toast.show("Opens the property")} />
+            <LeadCard key={l.id} l={l} onMessage={() => (l.threadId ? router.push(`/messages/${l.threadId}`) : toast.show("No chat with this lead yet"))} onMove={() => setMoveFor(l)} onMore={() => setMoreFor(l)} onOpenProperty={() => (l.property ? router.push(`/property/${l.property.id}`) : toast.show("No property linked"))} />
           ))}
         </div>
       )}

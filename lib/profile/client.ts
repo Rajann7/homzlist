@@ -47,7 +47,12 @@ export const profileApi = {
   verificationStatus: () => req<{ verification: any }>("/profile/verification/status", "GET"),
   submitId: (docType: string, docKey?: string | null) => req<{ status: string }>("/profile/verification/id", "POST", { docType, docKey }),
   submitRera: (reraNumber: string, docKey?: string | null) => req<{ status: string }>("/profile/verification/rera", "POST", { reraNumber, docKey }),
+  cancelVerification: (level: "id" | "rera") => req<{ cancelled: boolean }>("/profile/verification/cancel", "POST", { level }),
   accountStatus: () => req<{ inGoodStanding: boolean; events: any[] }>("/profile/account-status", "GET"),
+  /** P9 ⋯ — block / report a user from their public profile (persists for real). */
+  blockUser: (userId: string) => req<{ blocked: boolean }>("/profile/moderation", "POST", { userId, action: "block" }),
+  reportUser: (userId: string, reason: string, note?: string | null) =>
+    req<{ reported: boolean }>("/profile/moderation", "POST", { userId, action: "report", reason, note }),
   requestRoleChange: (toRole: string) => req<{ requested: boolean }>("/profile/role-change-request", "POST", { toRole }),
   // number-change dual-OTP
   ncStart: () => req<{ otpSession: string; resendIn: number; maskedCurrent: string; devCode?: string }>("/auth/number-change/start", "POST"),

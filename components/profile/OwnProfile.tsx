@@ -100,7 +100,7 @@ export function OwnProfile() {
         </button>
         {!viewAs && (
           <div className="flex items-center">
-            <button aria-label="Create" onClick={() => show("Create — coming in the listings module")} className="grid h-11 w-11 place-items-center text-ink-primary">
+            <button aria-label="Create" onClick={() => router.push("/create")} className="grid h-11 w-11 place-items-center text-ink-primary">
               <Icon name="plus" size={24} strokeWidth={1.9} />
             </button>
             <button aria-label="Menu" onClick={() => setMenuSheet(true)} className="grid h-11 w-11 place-items-center text-ink-primary">

@@ -36,8 +36,14 @@ export function ProposalsReceived({ requirementId }: { requirementId: string }) 
 
   const accept = async (p: ReceivedProposal) => {
     const res = await proposalsApi.accept(p.id);
-    toast.show(res.ok ? `Chat started with ${p.sender.name}` : "Couldn't accept that");
-    void load();
+    if (res.ok) {
+      // "Accept & Chat" — open the thread the acceptance grew (Doc2 §8.1).
+      if (res.data.threadId) { router.push(`/messages/${res.data.threadId}`); return; }
+      toast.show(`Chat started with ${p.sender.name}`);
+      void load();
+    } else {
+      toast.show("Couldn't accept that");
+    }
   };
   const runDialog = async () => {
     if (!dialog) return;
@@ -99,7 +105,7 @@ export function ProposalsReceived({ requirementId }: { requirementId: string }) 
       ) : (
         <div className="flex flex-col gap-3 p-4 pb-8">
           {shown.map((p) => (
-            <ProposalCard key={p.id} p={p} toast={toast} onAccept={() => void accept(p)} onDecline={() => setDialog({ kind: "decline", id: p.id, name: p.sender.name })} onNotRelevant={() => setDialog({ kind: "not_relevant", id: p.id, name: p.sender.name })} onOpenListing={(id) => router.push(`/property/${id}`)} />
+            <ProposalCard key={p.id} p={p} toast={toast} onAccept={() => void accept(p)} onDecline={() => setDialog({ kind: "decline", id: p.id, name: p.sender.name })} onNotRelevant={() => setDialog({ kind: "not_relevant", id: p.id, name: p.sender.name })} onOpenListing={(id) => router.push(`/property/${id}`)} onOpenChat={(tid) => router.push(`/messages/${tid}`)} />
           ))}
         </div>
       )}
@@ -126,11 +132,11 @@ export function ProposalsReceived({ requirementId }: { requirementId: string }) 
 }
 
 function ProposalCard({
-  p, toast, onAccept, onDecline, onNotRelevant, onOpenListing,
+  p, toast, onAccept, onDecline, onNotRelevant, onOpenListing, onOpenChat,
 }: {
   p: ReceivedProposal;
   toast: { show: (m: string) => void };
-  onAccept: () => void; onDecline: () => void; onNotRelevant: () => void; onOpenListing: (id: string) => void;
+  onAccept: () => void; onDecline: () => void; onNotRelevant: () => void; onOpenListing: (id: string) => void; onOpenChat: (threadId: string) => void;
 }) {
   const accepted = p.status === "accepted";
   const closed = p.status === "declined" || p.status === "not_relevant";
@@ -193,7 +199,7 @@ function ProposalCard({
 
       {/* Action row */}
       {accepted ? (
-        <Button variant="outline" fullWidth onClick={() => toast.show("Chat opens with the messages module")}>Open chat</Button>
+        <Button variant="outline" fullWidth onClick={() => (p.threadId ? onOpenChat(p.threadId) : toast.show("Opening chat…"))}>Open chat</Button>
       ) : closed ? null : (
         <div className="flex items-center gap-3">
           <Button variant="outline" className="flex-1" onClick={onDecline}>Decline</Button>

@@ -13,6 +13,7 @@ import { verifyAccessEdge } from "@/lib/auth/edge";
  * refreshes and returns them. Internal prefixes unreachable from the public host.
  */
 const ACCESS_COOKIE = "hz_at";
+const REFRESH_COOKIE = "hz_rt";
 
 type Zone = "public" | "seller" | "admin";
 function getZone(host: string): Zone {
@@ -25,7 +26,8 @@ function getZone(host: string): Zone {
 export async function middleware(request: NextRequest) {
   const url = request.nextUrl.clone();
   const { pathname } = url;
-  const zone = getZone(request.headers.get("host") ?? "");
+  const host = request.headers.get("host") ?? "";
+  const zone = getZone(host);
 
   if (pathname.startsWith("/api")) return NextResponse.next();
 
@@ -37,10 +39,37 @@ export async function middleware(request: NextRequest) {
     if (pathname.startsWith("/seller") || pathname.startsWith("/account")) {
       return NextResponse.rewrite(new URL("/404", request.url));
     }
-    // Public is guest-browsable, so nothing is gated here — but the login-bypass
-    // seal applies to every zone (Doc9 §28): a signed-in user must not be able to
-    // re-enter the auth flow and re-issue a session.
-    if (isLogin && user) return NextResponse.redirect(new URL("/", request.url));
+    // STRICT: the public host is the GUEST surface only (SEO/browse). ALL
+    // authenticated experience lives on the seller subdomain. So:
+    //   • login always happens on seller — public /login → seller /login;
+    //   • a public session (legacy) is STRIPPED so public renders logged-out
+    //     content on this very request, and the cookies are cleared so it stays
+    //     that way. A signed-in user visiting the public host therefore sees the
+    //     guest view; their content is only on seller.<host>.
+    if (isLogin) {
+      const to = new URL(request.url);
+      to.host = `seller.${host}`;
+      to.pathname = "/login";
+      to.search = "";
+      return NextResponse.redirect(to);
+    }
+    if (user) {
+      // Strip ONLY the auth cookies from the forwarded request so downstream
+      // (pages + APIs via getCurrentUser) sees a guest on THIS request; keep any
+      // UI-only cookies (theme, onboarding). Clear them on the browser too.
+      const requestHeaders = new Headers(request.headers);
+      const cookie = requestHeaders.get("cookie") ?? "";
+      const kept = cookie
+        .split(/;\s*/)
+        .filter((c) => c && !c.startsWith(`${ACCESS_COOKIE}=`) && !c.startsWith(`${REFRESH_COOKIE}=`))
+        .join("; ");
+      if (kept) requestHeaders.set("cookie", kept);
+      else requestHeaders.delete("cookie");
+      const res = NextResponse.next({ request: { headers: requestHeaders } });
+      res.cookies.delete(ACCESS_COOKIE);
+      res.cookies.delete(REFRESH_COOKIE);
+      return res;
+    }
     return NextResponse.next();
   }
 

@@ -1,22 +1,11 @@
-import { AppShell, Header, Wordmark, EmptyState } from "@/components";
+import { Messages } from "@/components";
+import { getCurrentUser } from "@/lib/auth/current-user";
 
-/**
- * Messages & Chat is P7 — **Module 7**, not built yet. The feed header's message
- * icon taps here, so without this route it 404'd. Shell + EmptyState (the
- * accepted `/search` pattern) — inquiries already persist in the `inquiries`
- * table (Module 6), Module 7 grows a thread from each one, so nothing sent
- * today is lost.
- */
+/** P7 S1 — Messages Home (4 tabs). Module 7. */
 export const metadata = { title: "Messages" };
+export const dynamic = "force-dynamic";
 
-export default function MessagesPlaceholderPage() {
-  return (
-    <AppShell header={<Header left={<Wordmark />} title="Messages" centerTitle />}>
-      <EmptyState
-        title="Chat is coming"
-        subtitle="Your inquiries are saved. When chat opens, each one becomes a thread with the poster."
-        cta={{ label: "Go to Home", href: "/" }}
-      />
-    </AppShell>
-  );
+export default async function MessagesPage() {
+  const me = await getCurrentUser();
+  return <Messages base="/messages" meId={me?.sub} />;
 }

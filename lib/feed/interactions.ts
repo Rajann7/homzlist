@@ -1,5 +1,6 @@
 import "server-only";
 import { createServiceClient } from "@/lib/supabase/server";
+import { ensureInquiryThread } from "@/lib/chat/service";
 
 /**
  * Feed interactions (Doc2 §9-11) — Save, Inquiry, Report, Not-interested. Each
@@ -49,13 +50,18 @@ export async function sendInquiry(
 
   const { data: existing } = await db().from("inquiries").select("id").eq("profile_id", buyerId).eq("listing_id", listingId).maybeSingle();
   if (existing) {
-    await db().from("inquiries").update({ message, intents, share_number: input.shareNumber ?? true }).eq("id", (existing as { id: string }).id);
+    const id = (existing as { id: string }).id;
+    await db().from("inquiries").update({ message, intents, share_number: input.shareNumber ?? true }).eq("id", id);
+    // Revive/refresh the chat thread grown from this inquiry (Doc2 §10.1).
+    await ensureInquiryThread({ id, profile_id: buyerId, listing_id: listingId, poster_id: listing.profile_id, message, intents });
     return { ok: true, alreadySent: true };
   }
-  await db().from("inquiries").insert({
+  const { data: created } = await db().from("inquiries").insert({
     profile_id: buyerId, listing_id: listingId, poster_id: listing.profile_id,
     message, intents, share_number: input.shareNumber ?? true,
-  });
+  }).select("id").single();
+  // Module 7: the inquiry IS a chat request — grow the pending thread now.
+  await ensureInquiryThread({ id: (created as { id: string }).id, profile_id: buyerId, listing_id: listingId, poster_id: listing.profile_id, message, intents });
   return { ok: true, alreadySent: false };
 }
 
@@ -99,12 +105,11 @@ export async function report(
  * "3" would both be DB-lock violations (CLAUDE.md rule 12).
  */
 export async function headerBadges(profileId: string): Promise<{ messages: number; notifications: number | null }> {
-  const { count } = await db()
-    .from("inquiries")
-    .select("id", { count: "exact", head: true })
-    .eq("poster_id", profileId)
-    .eq("status", "sent");
-  return { messages: count ?? 0, notifications: null };
+  // Messages badge (Module 7) = pending requests awaiting me + accepted threads
+  // with unread. Real counts, server-computed — never a fabricated number.
+  const { unreadTotal, requestsSummary } = await import("@/lib/chat/service");
+  const [unread, requests] = await Promise.all([unreadTotal(profileId), requestsSummary(profileId)]);
+  return { messages: unread + requests.total, notifications: null };
 }
 
 /** Down-rank a type or an area for this user (Doc7 §82). */

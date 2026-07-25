@@ -165,6 +165,24 @@ export async function submitReraVerification(profileId: string, reraNumber: stri
     );
 }
 
+/**
+ * Withdraw a PENDING verification request (P9 verification screen "Cancel
+ * request"). Only a pending row is removed — an approved/rejected level is never
+ * touched — so the user can re-submit. Owner-scoped by profileId.
+ */
+export async function cancelVerification(profileId: string, level: "id" | "rera"): Promise<boolean> {
+  if (level !== "id" && level !== "rera") return false;
+  const db = createServiceClient();
+  const { data } = await db
+    .from("verifications")
+    .delete()
+    .eq("profile_id", profileId)
+    .eq("level", level)
+    .eq("status", "pending")
+    .select("profile_id");
+  return Boolean(data && data.length);
+}
+
 // ---- Account status + role change ------------------------------------------
 
 export async function getAccountStatus(profileId: string) {

@@ -1,0 +1,38 @@
+import type { NextRequest } from "next/server";
+import { ok, fail } from "@/lib/api";
+import { rateLimit } from "@/lib/auth/rate-limit";
+import { requireActive, UUID_RE } from "@/lib/chat/guard";
+import { sendMessage } from "@/lib/chat/thread";
+
+/**
+ * POST /api/v1/chat/threads/:id/message (Doc7 §93) — send text/photo (2000-char
+ * cap enforced server-side), optional quoted-reply. Number-pattern + profanity
+ * flagged for admin (never blocks the send). Blocked/declined/pre-accept-poster
+ * are refused server-side.
+ */
+export const dynamic = "force-dynamic";
+
+export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+  const auth = await requireActive();
+  if ("error" in auth) return fail(auth.error);
+  if (!UUID_RE.test(params.id)) return fail("NOT_FOUND");
+  const limited = await rateLimit(`chat-send:${auth.id}`, 120, 60);
+  if (!limited.allowed) return fail("RATE_LIMITED");
+
+  let body: Record<string, unknown>;
+  try { body = await req.json(); } catch { return fail("VALIDATION_ERROR"); }
+  const res = await sendMessage(params.id, auth.id, {
+    text: typeof body.text === "string" ? body.text : "",
+    photoUrl: typeof body.photoUrl === "string" ? body.photoUrl : undefined,
+    photoW: typeof body.photoW === "number" ? body.photoW : undefined,
+    photoH: typeof body.photoH === "number" ? body.photoH : undefined,
+    replyTo: typeof body.replyTo === "string" ? body.replyTo : null,
+  });
+  if (!res.ok) {
+    if (res.reason === "not_found") return fail("NOT_FOUND");
+    if (res.reason === "blocked") return fail("FORBIDDEN");
+    if (res.reason === "empty") return fail("VALIDATION_ERROR");
+    return fail("LISTING_STATE_LOCKED"); // closed / not_accepted
+  }
+  return ok({ message: res.message });
+}

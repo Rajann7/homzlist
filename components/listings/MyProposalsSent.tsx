@@ -72,7 +72,7 @@ export function MyProposalsSent() {
             ))}
           </div>
 
-          {shown.map((p) => <SentRow key={p.id} p={p} onOpenReq={() => router.push(`/requirements/${p.requirementId}`)} onOpenChat={() => toast.show("Chat opens with the messages module")} />)}
+          {shown.map((p) => <SentRow key={p.id} p={p} onOpenReq={() => router.push(`/requirements/${p.requirementId}`)} onOpenChat={() => (p.threadId ? router.push(`/messages/${p.threadId}`) : toast.show("Chat opens once your proposal is accepted"))} />)}
         </div>
       )}
 

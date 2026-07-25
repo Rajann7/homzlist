@@ -90,7 +90,7 @@ export function Visits() {
             <div key={s.key} className="flex flex-col gap-3">
               <div className="sticky top-0 z-[1] bg-surface-1/95 py-1 text-13 font-semibold uppercase tracking-[0.3px] text-ink-tertiary">{s.label}</div>
               {(grouped.get(s.key) ?? []).map((v) => (
-                <VisitCard key={v.id} v={v} onReschedule={() => setReschedule(v)} onCancel={() => setCancelFor(v)} onOutcome={(o) => void setOutcome(v, o)} onMessage={() => toast.show("Chat opens with the messages module")} />
+                <VisitCard key={v.id} v={v} onReschedule={() => setReschedule(v)} onCancel={() => setCancelFor(v)} onOutcome={(o) => void setOutcome(v, o)} onMessage={() => (v.threadId ? router.push(`/messages/${v.threadId}`) : toast.show("This visit isn't linked to a chat"))} />
               ))}
             </div>
           ))}

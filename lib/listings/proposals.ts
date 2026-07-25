@@ -212,6 +212,8 @@ export interface ReceivedProposal {
     phone: string;
   };
   listing: { id: string; title: string | null; priceLabel: string; areaLabel: string | null; coverUrl: string | null } | null;
+  /** Chat grown from this proposal (set once accepted) — powers "Open chat". */
+  threadId: string | null;
 }
 
 /**
@@ -286,6 +288,7 @@ export async function proposalsForRequirement(requirementId: string, posterId: s
             coverUrl: l.cover_url,
           }
         : null,
+      threadId: r.thread_id,
     };
   });
 }
@@ -303,6 +306,8 @@ export interface SentProposal {
   /** status-specific footer copy incl. the non-refund note where it applies */
   footnote: string;
   nonRefund: boolean;
+  /** Chat grown once the poster accepted — powers "Open chat". */
+  threadId: string | null;
 }
 
 export async function myProposals(senderId: string): Promise<SentProposal[]> {
@@ -345,13 +350,14 @@ export async function myProposals(senderId: string): Promise<SentProposal[]> {
       sentAt: new Date(r.created_at).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit", timeZone: "Asia/Kolkata" }),
       footnote: sentFootnote(r),
       nonRefund: r.status === "declined" || r.status === "expired",
+      threadId: r.thread_id,
     };
   });
 }
 
 // ---- Poster actions: accept / decline / not-relevant (Doc7 §73-75) ---------
 
-export type ActResult = { ok: true; status: ProposalRow["status"]; flagged?: boolean } | { ok: false; reason: "not_found" | "not_pending" };
+export type ActResult = { ok: true; status: ProposalRow["status"]; flagged?: boolean; threadId?: string | null } | { ok: false; reason: "not_found" | "not_pending" };
 
 /** Shared owner-scoped status flip; only a PENDING proposal can be acted on. */
 async function actOnProposal(proposalId: string, posterId: string, status: "accepted" | "declined" | "not_relevant") {
@@ -370,7 +376,19 @@ async function actOnProposal(proposalId: string, posterId: string, status: "acce
 export async function acceptProposal(proposalId: string, posterId: string): Promise<ActResult> {
   const row = await actOnProposal(proposalId, posterId, "accepted");
   if (!row) return { ok: false, reason: "not_found" };
-  return { ok: true, status: "accepted" };
+  // Module 7: accept opens the chat. Grow (or revive) the thread from the proposal.
+  const { data: p } = await db()
+    .from("proposals")
+    .select("id,sender_id,poster_id,requirement_id,mode,listing_id,message,status")
+    .eq("id", proposalId)
+    .maybeSingle();
+  let threadId: string | null = null;
+  if (p) {
+    const { ensureProposalThread } = await import("@/lib/chat/service");
+    threadId = await ensureProposalThread(p as any);
+    await db().from("chat_threads").update({ status: "accepted" }).eq("id", threadId);
+  }
+  return { ok: true, status: "accepted", threadId };
 }
 
 export async function declineProposal(proposalId: string, posterId: string): Promise<ActResult> {

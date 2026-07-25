@@ -462,6 +462,7 @@ export interface ReceivedProposal {
     memberSince: string; profilePct: number; phone: string;
   };
   listing: { id: string; title: string | null; priceLabel: string; areaLabel: string | null; coverUrl: string | null } | null;
+  threadId: string | null;
 }
 
 export interface SentProposal {
@@ -469,7 +470,7 @@ export interface SentProposal {
   status: "pending" | "accepted" | "declined" | "not_relevant" | "expired" | "fulfilled";
   requirementRef: string; poster: { name: string; role: string | null };
   listing: { title: string | null; priceLabel: string; coverUrl: string | null } | null;
-  sentAt: string; footnote: string; nonRefund: boolean;
+  sentAt: string; footnote: string; nonRefund: boolean; threadId: string | null;
 }
 
 export const browseApi = {
@@ -498,7 +499,7 @@ export const proposalsApi = {
   mine: () =>
     req<{ items: SentProposal[]; balance: { left: number; total: number; unlimited: boolean }; filters: { key: string; label: string; count: number }[] }>(
       "/proposals/mine", "GET"),
-  accept: (id: string) => req<{ status: string }>(`/proposals/${id}`, "PATCH", { action: "accept" }),
+  accept: (id: string) => req<{ status: string; threadId: string | null }>(`/proposals/${id}`, "PATCH", { action: "accept" }),
   decline: (id: string) => req<{ status: string }>(`/proposals/${id}`, "PATCH", { action: "decline" }),
   notRelevant: (id: string) => req<{ status: string; flagged: boolean }>(`/proposals/${id}`, "PATCH", { action: "not_relevant" }),
 };
@@ -518,6 +519,7 @@ export interface VisitView {
   dateLabel: string;
   listing: { title: string | null; priceLabel: string; areaLabel: string | null; coverUrl: string | null } | null;
   counterparty: { name: string; role: string | null };
+  threadId: string | null;
   isPast: boolean;
 }
 
@@ -538,7 +540,8 @@ export interface LeadView {
   lastActivityAt: string;
   notes: { text: string; at: string }[];
   lead: { name: string; role: string | null; verified: { phone: boolean; id: boolean; rera: boolean }; memberSince: string; profilePct: number };
-  property: { title: string | null; priceLabel: string; areaLabel: string | null; coverUrl: string | null } | null;
+  property: { id: string; title: string | null; priceLabel: string; areaLabel: string | null; coverUrl: string | null } | null;
+  threadId: string | null;
 }
 
 export const leadsApi = {

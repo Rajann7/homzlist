@@ -219,10 +219,22 @@ export async function getProject(id: string, viewerId: string | null) {
   // Same state-access matrix as listings: non-live is owner-only.
   if (p.status !== "live" && !isOwner) return null;
 
+  // Doc2 §6: a builder's number is ALWAYS public for a project. Projects carry
+  // no contact column of their own, so the public number is the builder's
+  // profile phone — surfaced here so the detail bar's Call/WhatsApp are real.
+  const { data: poster } = await db()
+    .from("profiles")
+    .select("phone,name")
+    .eq("id", p.profile_id)
+    .maybeSingle();
+
   const amenityLabels = await getAmenityLabels();
   return {
     ...projectDTO(p, p.project_units ?? [], amenityLabels),
     isOwner,
+    contact: (poster as { phone?: string | null } | null)?.phone
+      ? { number: (poster as { phone: string }).phone, name: (poster as { name?: string | null }).name ?? null }
+      : null,
     pincode: p.pincode ?? null,
     brochureScanned: p.brochure_scanned,
     // Owner-only: the raw values the edit form re-opens on. The public payload

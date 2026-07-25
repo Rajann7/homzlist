@@ -266,6 +266,12 @@
   }
 }
 
+/* Chat typing indicator — 3 bouncing dots (P7 §S3). */
+@keyframes dotb {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.5; }
+  30% { transform: translateY(-4px); opacity: 1; }
+}
+
 /* Success check-draw (P11 top-up / P6 success): 600ms stroke draw.
    Reduced-motion is already neutralised by the block above. */
 @keyframes hz-draw {

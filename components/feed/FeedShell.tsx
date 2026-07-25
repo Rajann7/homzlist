@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { BottomNav } from "@/components/nav/BottomNav";
+import { BottomNav, DEFAULT_NAV } from "@/components/nav/BottomNav";
 import { FeedHeader } from "./FeedHeader";
 import { PullSpinner } from "./primitives";
 import { CitySheet, type CityRow } from "./CitySheet";
@@ -70,9 +70,8 @@ export function FeedShell({
         cityName={cityName}
         onCityTap={() => setCitySheet(true)}
         bellCount={badges?.notifications ?? 0}
-        messageCount={badges?.messages ?? 0}
         onBell={() => router.push("/notifications")}
-        onMessage={() => router.push("/messages")}
+        onSaved={() => router.push("/saved")}
       />
       <div
         ref={ref}
@@ -86,7 +85,8 @@ export function FeedShell({
         <PullSpinner active={refreshing} distance={pull} />
         {children}
       </div>
-      <BottomNav />
+      {/* Unread count rides the Messages icon (now in the bottom nav). */}
+      <BottomNav items={DEFAULT_NAV.map((it) => (it.name === "message" ? { ...it, badge: badges?.messages ?? 0 } : it))} />
 
       <CitySheet open={citySheet} onClose={() => setCitySheet(false)} selectedId={selectedCityId} onSelect={onCity} />
     </div>

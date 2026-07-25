@@ -28,6 +28,175 @@ Everything below **fails closed** — nothing runs insecurely, the feature is ju
 
 ---
 
+# A-SWEEP. Detail/flow rewiring after Modules 6/6B/7 — 25 Jul 2026
+
+A screen-by-screen live walk found several screens still carrying **placeholder
+toasts** from before their owning module landed ("Chat opens with the messages
+module", "Saved lists arrive…"). The controls looked done but wrote nothing.
+Fixed and verified:
+
+- **Seller `/property/:id` route** — was a hard **404 on the seller subdomain**
+  (only the public group had it), so a logged-in user tapping any property card
+  dead-ended. Added `app/(seller)/seller/property/[id]/page.tsx`. Verified live.
+- **ListingDetail (P4)** — Save, More/Report/Share, Send Inquiry (×2) and Request
+  Number were all toasts. Now wired to the real feed/chat sheets: Save →
+  `saves`; Send Inquiry → `inquiries` + grows a pending `chat_threads` row;
+  Request Number → same inquiry pipeline (number exchange continues in the
+  thread); More → Share/Report/Not-interested. Guest gate: the public host strips
+  the session, so `isGuest` is passed from the public page and every write action
+  opens the login sheet. **DB-verified** (inquiry + thread rows written).
+- **ProjectDetail (P4)** — Call/WhatsApp/Enquire were toasts AND the project DTO
+  exposed **no contact number at all** despite Doc2 §6 ("builder number always
+  public"). `getProject` now surfaces the builder's profile phone; Call → `tel:`,
+  WhatsApp/Enquire → prefilled `wa.me`. Verified (number present in payload).
+- **ProposalsReceived (P8)** — "Accept & Chat" / "Open chat" were toasts.
+  `acceptProposal` now returns the grown `thread_id`, the received DTO exposes
+  `threadId`, and both buttons navigate to `/messages/:threadId`. API-verified.
+- **Visits (P8)** — "Message" was a toast; `visits.thread_id` now flows through
+  `/visits/mine` → the button opens the linked thread.
+
+**Batch 2 — profile + Module 5 CRM + boost (25 Jul 2026, all API/DB-verified):**
+- **OtherProfile Block + Report** (PENDING **A4 — now RESOLVED**). Both were pure
+  toasts — the safety-critical Block "protected" nobody and Report saved nothing.
+  New `blockUserById` / `reportUserById` + `POST /api/v1/profile/moderation`;
+  the sheet/dialog call them. **DB-verified**: `chat_blocks` + `reports`
+  (`subject_type='user'`) rows written.
+- **OwnProfile Create (+)** — dead toast → navigates to `/create` (Module 4).
+- **BoostStatus "View listing"** — dead toast → `/property/:id` (boost DTO already
+  had `listingId`).
+- **Leads (P8) "Message" + "View property"** — toasts → the leads DTO now resolves
+  the origin chat thread (one-thread-per-listing-buyer) + the listing id;
+  buttons open `/messages/:threadId` and `/property/:id`. API-verified.
+- **MyProposalsSent (P8) "Open chat"** — toast → `SentProposal.threadId` surfaced;
+  opens the accepted thread. API-verified.
+
+**Still open (found in these sweeps):**
+- **OtherProfile "Message"** — there is no generic user-to-user DM; every chat is
+  anchored to a listing/requirement (Doc2 §10). The profile Message button has no
+  valid target, so it still toasts. Needs a product decision (route to their
+  listings to inquire, or a contextless DM feature). Not a simple wire.
+- **Auth Details photo picker** (M1 registration) + **Verification "Cancel
+  request"** (M2) + **OwnProfile "Featured collections"** (M2) — each needs its own
+  backend (photo upload during signup / a cancel-verification endpoint / a
+  featured-collections table). Left honest; not faked.
+- **"Contact support"** across Plans/MyPlan/Payments/Checkout — no support surface
+  (Module 12 CMS). Low priority.
+- **Project Save** — `saves` is listing-scoped (`saves.listing_id`); a project
+  can't be saved without a schema change (nullable listing_id + project_id, or a
+  `project_saves` table) AND the P10 Saved UI rendering project tiles. The P4
+  project header Save still toasts. Not faked. Owner: Module 6B follow-up.
+- **Plans / Payments "Contact support"** — still a toast; a support surface isn't
+  built (Module 12 CMS / settings). Low priority.
+
+---
+
+# A-M7. Module 7 (P7 — Chat, Inquiry & Number System) — built 24 Jul 2026
+
+Shipped: full chat schema (0028 + 0029) + service + 17 API routes + the 4-tab
+Messages home, Requests, Chat Thread (full bubble set + in-thread search), Chat
+Details, realtime, notifications, photo upload, retention cron — all wired, seeded
+(162 threads / 301 messages), and live-verified across broker/owner/builder roles.
+DB-verified; number-sealing proven DevTools-proof; 401 + IDOR (404) sweeps pass.
+
+**Now RESOLVED (were pending from earlier modules):**
+- **A0.1** accept → real thread: `acceptProposal` + inquiry send now grow a
+  `chat_threads` row (`ensureInquiry/ProposalThread`); "Accept" opens the thread.
+- **A0.2** visit + lead origination: the in-chat visit scheduler creates real
+  `visits` rows; the post-number continuity prompt writes/updates `leads`.
+- **A4** Profile block + report: the chat block/report paths persist to
+  `chat_blocks` / `reports` (report_subject extended with `message` + `user`).
+  Profile-screen buttons can now call the same endpoints.
+
+**Gap-closing pass — 24 Jul 2026 (all live-verified, 3 roles, no console errors):**
+Re-seeded so EACH role hero (owner Rahul, broker Amit, builder Arjun) has ≥10
+real threads in every one of the 4 tabs with a full status/state mix
+(`scripts/seed-module7-roles.mjs`). DB now: 162 threads / 301 messages.
+
+- **RESOLVED #1 · Realtime.** Now Supabase Realtime **broadcast** (RLS-independent,
+  works with custom-JWT auth): server pings `chat:thread:<id>` / `chat:inbox:<uid>`
+  via the Realtime HTTP API on every mutation (`lib/chat/realtime.ts`); client
+  subscribes (`lib/chat/realtime-client.ts`) and refetches through the sealed API —
+  no business data on the socket. Poll stays as fallback (thread 15s / list 20s).
+  Broadcast endpoint verified 202. `Doc7 §16`.
+- **RESOLVED #2 · Chat photo upload.** Attach sheet gallery/camera now runs the
+  real `uploads/presign(kind:chat) → PUT → commit → send({photoUrl})` pipeline
+  (`uploadChatPhoto` in `lib/chat/client.ts`). Uses the Supabase Storage driver
+  (R2 swaps in via config, no call-site change). Verified end-to-end in browser.
+- **RESOLVED #3 · Retention cron.** `/api/v1/cron/chat` (CRON_SECRET-guarded, in
+  `vercel.json` @ 03:00) runs `runChatRetention()`: 12-month dormant-thread purge
+  + 30-day tombstone purge (`lib/chat/retention.ts`). Auto-unarchive on new
+  message already works in the send path.
+- **RESOLVED #4 · Chat notifications.** `notifications` + `push_tokens` tables
+  (0029, RLS deny-all). `notify()` (`lib/notifications/service.ts`) records an
+  in-app row + best-effort FCM push (`lib/notifications/push.ts`, firebase-admin,
+  service account in env) on inquiry-received / proposal-received / chat-accepted /
+  number-requested / number-shared / new-message (mute-aware). Live send verified
+  → real `new_message` notification row written.
+- **RESOLVED #5 · In-thread search.** Menu → "Search in chat" → header input +
+  warning-soft match highlight + "N of M" stepper (prev/next) + scroll-to-match,
+  design-exact. Verified in browser.
+
+**Design-completeness pass — 25 Jul 2026 (every screen walked vs design; all live-verified on the seller subdomain):**
+- **Archived chats** (`/messages/archived`) + **Blocked users** (`/messages/blocked`)
+  screens BUILT — the ⋯ menu items were dead 404 links before. New
+  `getArchivedThreads`/`getBlockedUsers`/`unblockUserById` + `GET /chat/archived`,
+  `GET|POST /chat/blocked`. Unarchive + unblock work; verified (archived thread →
+  unarchive → returns to list).
+- **Full-screen photo viewer** (`components/chat/PhotoViewer.tsx`) — tapping a photo
+  bubble (Thread) or a shared photo (Details) opens the design's dim full-screen
+  viewer; before, tapping did nothing. Verified.
+- **Bulk multi-select** on the home — ⋯ → "Select chats" → checkboxes + "{n}
+  selected" header + Mark-read / Mute / Archive / Delete bulk actions. Verified
+  (2 selected → archive → both removed, count 8→7).
+- **Composer pinned to the bottom** — was riding the page scroll; AppShell got a
+  `scroll={false}` flex-column mode so the messages area scrolls and the composer
+  stays fixed (design §10.2). Verified.
+- **Seller routing bug fixed** — chat pages used `/seller/messages` which
+  double-prefixed to 404 on the seller host; now bare paths + explicit `seller`
+  flag. Nav + thread-open verified on `seller.localhost`.
+- **Public host is now guest-only** — login redirects to the seller subdomain and
+  any public session is stripped (middleware); authenticated chat lives on seller.
+- **Nav icon swap** — Messages icon moved to the bottom nav (Saved slot); Saved
+  moved to the feed header top-right. Composer attach icon changed `+ → image`.
+- Fixed a `BottomNav` bug rendering a literal `0` under the message icon.
+
+**Spec-completeness pass — 25 Jul 2026 (walked designs/P7 + design-prompts/p7 element-by-element; auditors run):**
+- **Quoted-reply** now renders the quote block inside the bubble + tap-to-jump-and-flash the original (was: replyTo stored but never displayed).
+- **"Seen HH:MM"** label under the last seen sent message (was: tick only).
+- **Requests intent chips** ("Site visit?"/"Negotiable?") from the sender's ticked `inquiries.intents` (backend + UI).
+- **Chat Details**: added the pinned Property card, the **Report** row + report sheet, the **Archive chat** row; "Search in chat" now opens the thread with search active (`?search=1`).
+- **Archived screen** note ("auto-archived after 30 days…") + the **30-day auto-archive job** now runs in `runChatRetention()` (was a promise with no job).
+- **Security-auditor: PASS** (no High/Crit; number-sealing + IDOR + RLS + secrets verified solid). Fixed its one Medium: **rate-limits added to 11 chat routes** (visit/block/state/continuity/details/read-all/archived/blocked/templates×2/push-register) + **template count capped at 30/user**.
+- **qa-tester: BLOCKED** — the Browser pane isn't available to sub-agents (screenshots time out, synthetic input drops); it confirmed dev-server boot + seller-subdomain routing + auth redirect. Screens were live-verified by the primary session instead.
+
+**Remaining P7 items — BUILT 25 Jul 2026 (user asked for all; typecheck clean, dev server serves with no errors):**
+- **Typing indicator** — peer "typing" pings over the Supabase broadcast channel: a 3-dot bubble in the open thread + "Typing…" preview on the Messages row (the sender also pings the peer's inbox topic). `lib/chat/realtime-client.ts` (`subscribeChat` handlers + `broadcastTyping`), `dotb` keyframe in globals.css.
+- **Swipe-to-reply** — swipe-right on a bubble → quick reply (reply arrow appears); long-press → Reply still works.
+- **Sticky date separators** — the date pill now sticks to the top of the scroll area.
+- **Offline queue** — a failed send keeps its pending-clock bubble + shows "No connection — messages will send automatically"; queued messages auto-resend on the `online` event → toast "Messages sent".
+- **Price-update flash** — the pinned bar flashes accent-soft when the listing price changes between loads.
+- **Shared listings** in Chat Details — real section from the thread's attached listing (deduped; hidden when none).
+
+**Still open (needs a Module-4 hook or is a screen elsewhere):**
+- Price-update **system line** ("Price updated ₹85 L → ₹78 L") in the thread — the client flash is done; the persisted system message needs a trigger in the listings price-update path (Module 4). Tracked here.
+- In-chat visit **reschedule/cancel/outcome** — lives in the Visits screen (Module 5) today; not duplicated inside the chat card.
+
+**Still genuinely pending (credential- or later-module-blocked):**
+1. **FCM device push delivery** — the SERVER sender + token table + `/api/v1/push/
+   register` are all built and firebase-admin initialises with the service-account
+   key. Actual browser delivery still needs the **public** Firebase web config
+   (`NEXT_PUBLIC_FIREBASE_*`) + a **VAPID** key so the client can obtain a device
+   token to register. Until those are set, `sendPushToProfile` finds no tokens and
+   no-ops; the in-app notification records still work. ⚠️ The service-account key
+   was shared in chat — **rotate it** in the Firebase console.
+2. **Link-preview server fetch** with SSRF guards (Doc9 §66) — link cards render
+   from stored meta; a live URL-preview fetcher isn't built. Number-pattern +
+   profanity flags ARE implemented server-side.
+3. **A0.6 visit PATCH path** stays `/api/v1/visits/:id` (not re-homed under
+   `/chat/visits/:id`); the chat visit *creation* is now `/chat/threads/:id/visit`.
+
+---
+
 # A0. Module 5 (P8 — Requirements/Proposals/Matching/Visits/Leads) — built 23 Jul 2026
 
 Shipped fully, DB-verified, all screens live per role. What Module 5 deliberately

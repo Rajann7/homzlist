@@ -8,5 +8,7 @@ import { ListingDetail } from "@/components/listings/ListingDetail";
 export const dynamic = "force-dynamic";
 
 export default function Page({ params }: { params: { id: string } }) {
-  return <ListingDetail id={params.id} />;
+  // The public host is the guest surface — middleware strips any session before
+  // this renders, so every viewer here is a guest. Actions gate to login.
+  return <ListingDetail id={params.id} isGuest />;
 }

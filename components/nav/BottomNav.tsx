@@ -28,12 +28,13 @@ export interface NavItem {
   badge?: number;
 }
 
-// Canonical 5 (P3): home · search · plus (create) · heart (saved) · user (profile).
+// Canonical 5 (P3): home · search · plus (create) · message (chat) · user (profile).
+// (Messages sits in the nav; Saved moved to the feed header top-right.)
 export const DEFAULT_NAV: NavItem[] = [
   { name: "home", href: "/", label: "Home", match: (p) => p === "/" },
   { name: "search", href: "/search", label: "Search", match: (p) => p.startsWith("/search") },
   { name: "plus", href: "/create", label: "Create", match: (p) => p.startsWith("/create") },
-  { name: "heart", href: "/saved", label: "Saved", match: (p) => p.startsWith("/saved") },
+  { name: "message", href: "/messages", label: "Messages", match: (p) => p.startsWith("/messages") },
   { name: "user", href: "/profile", label: "Profile", match: (p) => p.startsWith("/profile") },
 ];
 
@@ -68,9 +69,9 @@ export function BottomNav({ items = DEFAULT_NAV }: { items?: NavItem[] }) {
             >
               <Icon name={item.name} size={26} filled={active} strokeWidth={active ? 2 : 1.7} />
               {item.dot && <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-accent" />}
-              {item.badge && item.badge > 0 && (
+              {(item.badge ?? 0) > 0 && (
                 <span className="absolute -right-1.5 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-error px-1 text-[10px] font-semibold text-white">
-                  {item.badge > 9 ? "9+" : item.badge}
+                  {item.badge! > 9 ? "9+" : item.badge}
                 </span>
               )}
             </span>

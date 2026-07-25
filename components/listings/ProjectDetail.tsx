@@ -77,6 +77,19 @@ export function ProjectDetail({ id }: { id: string }) {
   const units: any[] = p.units ?? [];
   const priceBand = bandOf(units);
 
+  // A builder's number is always public for a project (Doc2 §6), so contact is
+  // direct: Call dials it, WhatsApp/Enquire opens a prefilled chat. No inquiry
+  // thread — projects have no chat pipeline (that's for listings).
+  const contactBuilder = (via: "call" | "whatsapp", unitType?: string) => {
+    const number = p.contact?.number ? String(p.contact.number).replace(/\D/g, "") : "";
+    if (!number) { toast.show("The builder hasn't shared a contact number"); return; }
+    if (via === "call") { window.location.href = `tel:${p.contact.number}`; return; }
+    const msg = unitType
+      ? `Hi, I'm interested in the ${unitType} at ${p.name}. Could you share more details?`
+      : `Hi, I'm interested in ${p.name}. Could you share more details?`;
+    window.open(`https://wa.me/${number}?text=${encodeURIComponent(msg)}`, "_blank");
+  };
+
   return (
     <Shell overlayTitle={p.name ?? ""}>
       {offline && <OfflineBanner />}
@@ -197,7 +210,7 @@ export function ProjectDetail({ id }: { id: string }) {
                           </div>
                         )}
                         <button
-                          onClick={() => toast.show("Enquiries arrive with the chat module")}
+                          onClick={() => contactBuilder("whatsapp", u.unitType)}
                           className="mt-1 text-13 font-semibold leading-none text-accent"
                         >
                           Enquire about this unit
@@ -275,13 +288,13 @@ export function ProjectDetail({ id }: { id: string }) {
           </>
         ) : (
           <>
-            <Button variant="outline" onClick={() => toast.show("Calling arrives with the chat module")} aria-label="Call">
+            <Button variant="outline" onClick={() => contactBuilder("call")} aria-label="Call">
               <Icon name="phone" size={18} />
             </Button>
-            <Button variant="outline" onClick={() => toast.show("WhatsApp arrives with the chat module")} aria-label="WhatsApp">
+            <Button variant="outline" onClick={() => contactBuilder("whatsapp")} aria-label="WhatsApp">
               <Icon name="message" size={18} />
             </Button>
-            <Button className="flex-1" onClick={() => toast.show("Inquiries arrive with the chat module")}>
+            <Button className="flex-1" onClick={() => contactBuilder("whatsapp")}>
               Send Inquiry
             </Button>
           </>

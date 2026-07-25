@@ -54,6 +54,7 @@ export async function GET(req: NextRequest) {
       dateLabel: scheduled.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short", timeZone: IST }),
       listing: v.listing,
       counterparty: v.counterparty,
+      threadId: v.thread_id,
       isPast,
     };
   });

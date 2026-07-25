@@ -24,6 +24,11 @@ const TABS: Record<string, string[]> = {
   builder: ["Projects", "Sell / Rent"],
 };
 const REPORT_REASONS = ["Fake profile", "Spam", "Abusive behaviour", "Fraud attempt", "Impersonation"];
+// Display label → server reason code (reports.reason). Unknowns fall back to "other".
+const REASON_CODE: Record<string, string> = {
+  "Fake profile": "fake", "Spam": "spam", "Abusive behaviour": "abusive",
+  "Fraud attempt": "fraud", "Impersonation": "other",
+};
 
 export function OtherProfile({ username }: { username: string }) {
   const router = useRouter();
@@ -222,13 +227,18 @@ export function OtherProfile({ username }: { username: string }) {
               </span>
             </button>
           ))}
-          <Button variant="destructive" className="mt-3" fullWidth disabled={!reportReason} onClick={() => { setReportSheet(false); setReportReason(null); show("Report submitted — we'll review it"); }}>
+          <Button variant="destructive" className="mt-3" fullWidth disabled={!reportReason} onClick={async () => {
+            const reason = REASON_CODE[reportReason ?? ""] ?? "other";
+            setReportSheet(false); setReportReason(null);
+            const res = await profileApi.reportUser(p.id, reason);
+            show(res.ok ? "Report submitted — we'll review it" : "Couldn't submit that report");
+          }}>
             Submit Report
           </Button>
         </div>
       </BottomSheet>
 
-      <ConfirmDialog open={blockDlg} onClose={() => setBlockDlg(false)} onConfirm={() => { setBlockDlg(false); show(`${p.name} blocked`); }} title={`Block ${p.name}?`} body="They won't be able to message you. Existing chats stay visible but you can't message each other." confirmLabel="Block" destructive />
+      <ConfirmDialog open={blockDlg} onClose={() => setBlockDlg(false)} onConfirm={async () => { setBlockDlg(false); const res = await profileApi.blockUser(p.id); show(res.ok ? `${p.name} blocked` : "Couldn't block right now"); }} title={`Block ${p.name}?`} body="They won't be able to message you. Existing chats stay visible but you can't message each other." confirmLabel="Block" destructive />
 
       <ConfirmDialog open={about} onClose={() => setAbout(false)} onConfirm={() => setAbout(false)} title="About this account" body={`Joined ${p.memberSince} · ${p.stats.listings} listings posted${p.cityName ? ` · Based in ${p.cityName}` : ""}`} confirmLabel="Got it" hideCancel />
     </div>

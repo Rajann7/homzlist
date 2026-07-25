@@ -141,7 +141,7 @@ export function BoostStatus() {
           </p>
         )}
         {list.map((b) =>
-          tab === "active" ? <ActiveCard key={b.id} b={b} onExtend={() => router.push(`/boost/new?listing=${b.listingId}`)} />
+          tab === "active" ? <ActiveCard key={b.id} b={b} onExtend={() => router.push(`/boost/new?listing=${b.listingId}`)} onView={() => router.push(`/property/${b.listingId}`)} />
           : tab === "pending" ? <PendingCard key={b.id} b={b} onCancel={() => setCancelId(b.id)} />
           : <PastCard key={b.id} b={b} onAgain={() => router.push(`/boost/new?listing=${b.listingId}`)} />,
         )}
@@ -193,7 +193,7 @@ function ListingRow({ b }: { b: BoostView }) {
   );
 }
 
-function ActiveCard({ b, onExtend }: { b: BoostView; onExtend: () => void }) {
+function ActiveCard({ b, onExtend, onView }: { b: BoostView; onExtend: () => void; onView: () => void }) {
   const toast = useToast();
   return (
     <div className="rounded-12 border-[1.5px] border-accent bg-surface-1 p-4">
@@ -222,7 +222,7 @@ function ActiveCard({ b, onExtend }: { b: BoostView; onExtend: () => void }) {
       </div>
       <div className="mt-3.5 flex items-center gap-4">
         <Button variant="outline" size="default" className="w-auto px-[18px]" onClick={onExtend}>Extend boost</Button>
-        <button onClick={() => toast.show("Listing detail arrives with the listings module")} className="text-13 font-semibold text-accent">
+        <button onClick={onView} className="text-13 font-semibold text-accent">
           View listing
         </button>
       </div>

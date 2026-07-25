@@ -36,6 +36,7 @@
     "@supabase/supabase-js": "^2.45.4",
     "bullmq": "^5.28.1",
     "clsx": "^2.1.1",
+    "firebase-admin": "^14.2.0",
     "ioredis": "^5.4.1",
     "jose": "^5.10.0",
     "next": "14.2.35",

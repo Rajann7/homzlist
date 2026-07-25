@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { AppShell, Button, Header, Icon, Skeleton, StatusBadge, useToast } from "@/components/billing/ui";
 import { BackButton } from "@/components/billing/primitives";
 import { listingsApi, type Photo, type MyListing } from "@/lib/listings/client";
+import { InquirySheet, MoreSheet, ShareSheet, ReportSheet, LoginSheet } from "@/components/feed/sheets";
+import { interactionsApi, feedApi, type FeedCard } from "@/lib/feed/client";
 import { cn } from "@/lib/utils";
 
 /**
@@ -15,7 +17,7 @@ import { cn } from "@/lib/utils";
  * contains no number at all, so the only thing this screen can offer is
  * "Request number". There is no client-side branch that could leak it.
  */
-export function ListingDetail({ id }: { id: string }) {
+export function ListingDetail({ id, isGuest = false }: { id: string; isGuest?: boolean }) {
   const router = useRouter();
   const toast = useToast();
 
@@ -26,6 +28,37 @@ export function ListingDetail({ id }: { id: string }) {
   const [notFound, setNotFound] = useState(false);
   const [viewer, setViewer] = useState(false);
   const [saved, setSaved] = useState(false);
+  // Which contact/action sheet is open. On the public host the viewer is always
+  // a guest (middleware strips the session), so any action that writes to the
+  // DB opens the login sheet instead of hitting a 401.
+  const [sheet, setSheet] = useState<null | "inquiry" | "more" | "share" | "report" | "login">(null);
+  const [reqBusy, setReqBusy] = useState(false);
+
+  // Persist the wishlist heart for real (Module 6 `saves`), gated for guests.
+  const toggleSave = async () => {
+    if (isGuest) { setSheet("login"); return; }
+    setSaved((s) => !s); // optimistic
+    const res = await interactionsApi.toggleSave(id);
+    if (res.ok) { setSaved(res.data.saved); toast.show(res.data.saved ? "Saved" : "Removed from saved"); }
+    else { setSaved((s) => !s); toast.show("Couldn't save that"); }
+  };
+
+  // "Request Number" (owner withheld their number): the only way to reach them
+  // is to start a chat request (Module 7). Sending the inquiry grows the pending
+  // thread; the number exchange then happens inside it (Request → Allow).
+  const requestNumber = async () => {
+    if (isGuest) { setSheet("login"); return; }
+    setReqBusy(true);
+    const res = await interactionsApi.inquiry(id, {
+      message: "Hi, I'm interested in this property — could you please share your contact number?",
+      intents: [],
+      shareNumber: true,
+    });
+    setReqBusy(false);
+    if (res.ok) toast.show(res.data.alreadySent ? "Request updated — continue in Messages" : "Request sent — you'll be notified when they respond");
+    else if (res.error.code === "SELF_ACTION_BLOCKED") toast.show("This is your own listing");
+    else toast.show("Couldn't send that request");
+  };
 
   useEffect(() => {
     (async () => {
@@ -96,13 +129,13 @@ export function ListingDetail({ id }: { id: string }) {
         title={listing.title ?? listing.typeLabel ?? ""}
         saved={saved}
         onBack={() => router.back()}
-        onSave={() => { setSaved((s) => !s); toast.show("Saved lists arrive with the Saved suite"); }}
+        onSave={() => void toggleSave()}
         onShare={() => {
           const url = window.location.href;
           if (navigator.share) void navigator.share({ title: listing.title ?? "", url });
           else { void navigator.clipboard?.writeText(url); toast.show("Link copied"); }
         }}
-        onMore={() => toast.show("Report and more actions arrive with the Safety module")}
+        onMore={() => setSheet("more")}
       />
 
       {/* Hero carousel — designs/P4 S1: full-bleed 4:3 on black, with the
@@ -371,7 +404,7 @@ export function ListingDetail({ id }: { id: string }) {
                   <Icon name="message" size={20} />
                 </a>
               )}
-              <Button fullWidth onClick={() => toast.show("Chat opens with the messages module")}>Send Inquiry</Button>
+              <Button fullWidth onClick={() => (isGuest ? setSheet("login") : setSheet("inquiry"))}>Send Inquiry</Button>
             </>
           ) : (
             <>
@@ -388,15 +421,56 @@ export function ListingDetail({ id }: { id: string }) {
               <Button
                 variant="outline"
                 className="flex-1 px-0"
-                onClick={() => toast.show("Number requests arrive with the messages module")}
+                loading={reqBusy}
+                onClick={() => void requestNumber()}
               >
                 <Icon name="phone" size={17} /> Request Number
               </Button>
-              <Button className="flex-1 px-0" onClick={() => toast.show("Chat opens with the messages module")}>Send Inquiry</Button>
+              <Button className="flex-1 px-0" onClick={() => (isGuest ? setSheet("login") : setSheet("inquiry"))}>Send Inquiry</Button>
             </>
           )}
         </div>
       </div>
+
+      {/* Action sheets — the same real, DB-backed sheets the feed uses (Module
+          6/7). A `FeedCard`-shaped view of the listing feeds them; the sheets
+          only read title/price/area/id, so no poster data is needed here. */}
+      {(() => {
+        const card = {
+          kind: "property",
+          id: listing.id,
+          promoted: Boolean(listing.promoted),
+          saved,
+          coverUrl: cover ?? null,
+          photos: [],
+          areaLabel: listing.areaLabel ?? null,
+          poster: { id: "", name: "", username: null, role: null, verified: false, avatarUrl: null },
+          postedAgo: "",
+          price: listing.priceOnly ?? listing.price,
+          title: listing.title ?? listing.typeLabel,
+          meta: listing.typeLabel,
+        } as FeedCard;
+        return (
+          <>
+            <MoreSheet
+              open={sheet === "more"}
+              onClose={() => setSheet(null)}
+              onShare={() => setSheet("share")}
+              onReport={() => setSheet(isGuest ? "login" : "report")}
+              onNotInterested={async () => {
+                setSheet(null);
+                if (isGuest) { setSheet("login"); return; }
+                await feedApi.notInterested({ typeCode: listing.typeCode });
+                toast.show("We'll show fewer like this");
+              }}
+            />
+            <ShareSheet open={sheet === "share"} onClose={() => setSheet(null)} card={card} />
+            <ReportSheet open={sheet === "report"} onClose={() => setSheet(null)} card={card} />
+            <InquirySheet open={sheet === "inquiry"} onClose={() => setSheet(null)} card={card} />
+            <LoginSheet open={sheet === "login"} onClose={() => setSheet(null)} />
+          </>
+        );
+      })()}
 
       {/* Fullscreen photo viewer — pinch/double-tap zoom + navigation */}
       {viewer && cover && (
