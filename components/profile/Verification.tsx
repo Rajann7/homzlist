@@ -132,7 +132,7 @@ export function Verification() {
               {v.id.status === "approved" ? (
                 <Chip label={`Verified ✓${v.id.reviewed_at ? ` · ${fmtDate(v.id.reviewed_at)}` : ""}`} />
               ) : v.id.status === "pending" ? (
-                <Strip tone="info" icon="alert" text="Under review — usually within 24 hours" action={{ label: "Cancel request", onClick: () => show("Request cancelled — coming soon") }} />
+                <Strip tone="info" icon="alert" text="Under review — usually within 24 hours" action={{ label: "Cancel request", onClick: async () => { const r = await profileApi.cancelVerification("id"); if (r.ok) { show("Request cancelled"); void load(); } else show("Couldn't cancel that"); } }} />
               ) : (
                 <>
                   {v.id.status === "rejected" && <Strip tone="error" icon="alert" text={`Rejected: ${v.id.reason ?? "Please re-upload"}`} />}

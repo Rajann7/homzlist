@@ -80,7 +80,7 @@ export const PropertyFeed = forwardRef<PropertyFeedHandle, { filter: string; sor
         <EmptyState
           title="No listings in this area yet"
           subtitle="Post a requirement and we'll notify you when something matches."
-          cta={{ label: "Post Requirement", onClick: () => router.push("/requirements/new") }}
+          cta={{ label: "Post Requirement", onClick: guard(() => router.push("/requirements/new")) }}
         />
       );
     }

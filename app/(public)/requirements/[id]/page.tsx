@@ -12,5 +12,6 @@ import { RequirementDetail } from "@/components/listings/RequirementDetail";
 export const dynamic = "force-dynamic";
 
 export default function Page({ params }: { params: { id: string } }) {
-  return <RequirementDetail id={params.id} />;
+  // Public host = guest surface → billing CTAs gate to login (seller-only routes).
+  return <RequirementDetail id={params.id} isGuest />;
 }

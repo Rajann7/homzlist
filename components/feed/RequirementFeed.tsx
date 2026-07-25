@@ -9,6 +9,7 @@ import { BottomSheet } from "@/components/ui/BottomSheet";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Checklist } from "@/components/billing/primitives";
 import { ProposalSheet } from "@/components/listings/ProposalSheet";
+import { LoginSheet } from "./sheets";
 import { browseApi, type BrowseCard } from "@/lib/listings/client";
 import { cn } from "@/lib/utils";
 
@@ -17,13 +18,17 @@ import { cn } from "@/lib/utils";
  * Reuses Module 5's `browseApi` (server-stripped locked cards) + `ProposalSheet`
  * + the same paywall. No re-modelling — this is the feed skin over browse.
  */
-export function RequirementFeed({ kind }: { kind: "all" | "sell" | "rent" }) {
+export function RequirementFeed({ kind, guest = false }: { kind: "all" | "sell" | "rent"; guest?: boolean }) {
   const router = useRouter();
   type Data = { sections: { tier: string; label: string | null; cards: BrowseCard[] }[]; unlocked: boolean; balance: { left: number; unlimited: boolean } };
   const [data, setData] = useState<Data | null>(null);
   const [paywall, setPaywall] = useState(false);
+  const [loginSheet, setLoginSheet] = useState(false);
   const [proposalFor, setProposalFor] = useState<string | null>(null);
   const [sent, setSent] = useState<Set<string>>(new Set());
+  // Billing/proposal routes are seller-only and don't exist on the public host;
+  // a guest must sign in first (then these happen on the seller subdomain).
+  const guard = (fn: () => void) => { if (guest) { setLoginSheet(true); return; } fn(); };
 
   const load = useCallback(async () => {
     setData(null);
@@ -54,7 +59,7 @@ export function RequirementFeed({ kind }: { kind: "all" | "sell" | "rent" }) {
             <div className="flex items-center gap-1.5"><Icon name="pin" size={14} className="text-ink-tertiary" /><span className="text-13 font-semibold uppercase tracking-[0.3px] text-ink-tertiary">{s.label}</span></div>
           )}
           {s.cards.map((c) => (
-            <ReqCard key={c.id} c={c} sent={sent.has(c.id) || Boolean(c.alreadySent)} onUnlock={() => setPaywall(true)} onPropose={() => setProposalFor(c.id)} onOpen={() => router.push(`/requirements/${c.id}`)} />
+            <ReqCard key={c.id} c={c} sent={sent.has(c.id) || Boolean(c.alreadySent)} onUnlock={() => guard(() => setPaywall(true))} onPropose={() => guard(() => setProposalFor(c.id))} onOpen={() => router.push(`/requirements/${c.id}`)} />
           ))}
         </div>
       ))}
@@ -71,6 +76,8 @@ export function RequirementFeed({ kind }: { kind: "all" | "sell" | "rent" }) {
       {proposalFor && (
         <ProposalSheet open={Boolean(proposalFor)} requirementId={proposalFor} onClose={() => setProposalFor(null)} onSent={() => { setSent((s) => new Set(s).add(proposalFor)); setProposalFor(null); }} />
       )}
+
+      <LoginSheet open={loginSheet} onClose={() => setLoginSheet(false)} />
     </div>
   );
 }

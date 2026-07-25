@@ -15,9 +15,12 @@ import { cn } from "@/lib/utils";
  *   unlocked → full data (Send Proposal itself lands in Module 5)
  *   own      → the poster's controls: active toggle, fulfil, delete
  */
-export function RequirementDetail({ id }: { id: string }) {
+export function RequirementDetail({ id, isGuest = false }: { id: string; isGuest?: boolean }) {
   const router = useRouter();
   const toast = useToast();
+  // Billing routes are seller-only; a guest on the public host must sign in
+  // first (unlock then happens on the seller subdomain).
+  const goOrLogin = (path: string) => router.push(isGuest ? "/login" : path);
 
   const [r, setR] = useState<Detail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -167,10 +170,10 @@ export function RequirementDetail({ id }: { id: string }) {
                 <span className="text-13 text-ink-tertiary">/month</span>
               </div>
               <Checklist items={["View all requirements", "30 proposals included", "Instant match alerts"]} />
-              <Button fullWidth className="mt-1" onClick={() => router.push("/checkout?plan=p2999")}>
+              <Button fullWidth className="mt-1" onClick={() => goOrLogin("/checkout?plan=p2999")}>
                 Continue to Payment
               </Button>
-              <button onClick={() => router.push("/plans")} className="text-13 font-semibold text-accent">
+              <button onClick={() => goOrLogin("/plans")} className="text-13 font-semibold text-accent">
                 Compare plans
               </button>
             </div>

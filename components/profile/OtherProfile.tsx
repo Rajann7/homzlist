@@ -30,9 +30,13 @@ const REASON_CODE: Record<string, string> = {
   "Fraud attempt": "fraud", "Impersonation": "other",
 };
 
-export function OtherProfile({ username }: { username: string }) {
+export function OtherProfile({ username, isGuest = false }: { username: string; isGuest?: boolean }) {
   const router = useRouter();
   const { show } = useToast();
+  // On the public host the viewer is always a guest (middleware strips the
+  // session). Block/Report/Message write or require auth, so a guest is sent to
+  // login instead of hitting a 401.
+  const guard = (fn: () => void) => { if (isGuest) { router.push("/login"); return; } fn(); };
   const [p, setP] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState(0);
@@ -151,7 +155,7 @@ export function OtherProfile({ username }: { username: string }) {
 
         {/* Message full-width (private number default — Call/WhatsApp gate on public number, Module 7) */}
         <div className="mt-4">
-          <Button fullWidth onClick={() => show("Messaging comes in the chat module")}>
+          <Button fullWidth onClick={() => guard(() => show("Open a property below to send an inquiry and chat"))}>
             Message
           </Button>
         </div>
@@ -211,8 +215,8 @@ export function OtherProfile({ username }: { username: string }) {
         <div className="flex flex-col pt-1">
           <MenuRow icon="share" label="Share profile" onClick={() => { navigator.clipboard?.writeText(`homzlist.com/${p.username}`).catch(() => {}); show("Link copied"); setMenu(false); }} />
           <MenuRow icon="copy" label="Copy link" onClick={() => { navigator.clipboard?.writeText(`homzlist.com/${p.username}`).catch(() => {}); show("Link copied"); setMenu(false); }} />
-          <MenuRow icon="alert" label="Report profile" destructive onClick={() => { setMenu(false); setReportSheet(true); }} />
-          <MenuRow icon="close" label="Block user" destructive onClick={() => { setMenu(false); setBlockDlg(true); }} />
+          <MenuRow icon="alert" label="Report profile" destructive onClick={() => { setMenu(false); guard(() => setReportSheet(true)); }} />
+          <MenuRow icon="close" label="Block user" destructive onClick={() => { setMenu(false); guard(() => setBlockDlg(true)); }} />
         </div>
       </BottomSheet>
 

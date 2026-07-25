@@ -149,7 +149,7 @@ export function FeedHome() {
 
             {mode === "property"
               ? <PropertyFeed ref={feedRef} filter={filter} sort={sort} guest={me?.guest ?? true} />
-              : <RequirementFeed kind={reqKind} />}
+              : <RequirementFeed kind={reqKind} guest={me?.guest ?? true} />}
           </>
         )}
       </div>

@@ -28,6 +28,57 @@ Everything below **fails closed** — nothing runs insecurely, the feature is ju
 
 ---
 
+# A-VERIFY. Deep multi-role live verification — 25 Jul 2026
+
+Every major M1-7 screen exercised live across guest/owner/broker/builder, driving
+real handlers via DOM (synthetic mouse clicks drop in this pane; `.click()` +
+API/DB is the reliable path). All PASS:
+- **Guest**: feed Save/Inquiry→login, More/Sort/City sheets, banner dismiss,
+  requirement mode (masked ₹00L budgets = correct server-strip), Unlock→login.
+- **Owner**: My Listings state machine (**Hide persisted, DB-verified**, reverted),
+  options menu fully wired; Edit Profile (photo/city/phone-change sheets open,
+  **Save persisted+reverted**); MyRequirements + ProposalsReceived (sender numbers,
+  status filters, Accept&Chat/Open-chat buttons); Drafts, MyPlan, Payments (GST
+  details sheet), BoostStatus, Trash all render.
+- **Builder**: dashboard (empty + real projects), project detail owner controls,
+  **plan wall shows for no-plan builder** (payment-first).
+- **Module 7 chat (headline)**: number-sealing **DevTools-proof** (no digit leaks
+  pre-allow); **request→allow→reveal verified end-to-end cross-role** (Rahul req →
+  Amit allow → number revealed); **visit scheduler creates a real linked `visits`
+  row** (DB-verified). All test mutations reverted.
+
+**Observation (seed data, NOT a code bug):** some seeded listings were inserted
+without going through slot consumption, so MyPlan shows "0/1 listings used" while
+the owner has several live. The wall logic is correct (reads real slots); only the
+seed is inconsistent. In production every listing consumes a slot via the create
+flow, so there is no real over-post path. `npm run seed:demo` could reconcile it.
+
+---
+
+# A-SWEEP3. Cross-host 404s + guest gating — 25 Jul 2026 (deep multi-role pass)
+
+Walking the feed as a **guest** and following every destination surfaced more of
+the same class as the `/property` seller-404: routes linked from surfaces that
+render on BOTH hosts, but which only exist on one.
+
+- **`/profile/:username` 404'd on the seller host** — no `/seller/profile/[username]`
+  route, so a logged-in user tapping ANY poster in the feed/suggested/proposals
+  dead-ended. Added the seller alias. Verified (was 404 → now renders).
+- **Requirement-mode paywall 404'd for guests** — `RequirementFeed` never got the
+  `guest` flag, so "Unlock"/"Continue to Payment"/"Compare plans" pushed
+  `/checkout` and `/plans` (seller-only) → 404 on the public host. Now `guest` is
+  threaded in and those gate to the login sheet. Verified live (Unlock → login).
+- **`RequirementDetail` paywall** (public, guest-viewable) — same `/checkout`
+  `/plans` 404; now `isGuest` gates them to `/login`.
+- **PropertyFeed empty-state "Post Requirement"** — pushed `/requirements/new`
+  (seller-only) ungated → now guarded to login for guests.
+- **OtherProfile guest gating** — Block/Report/Message now route a guest to
+  `/login` instead of firing an auth-required API that 401s; the Message toast no
+  longer falsely says "comes in the chat module" (chat exists — you inquire via a
+  listing). Block/Report **DB-verified through the real UI** (reason=spam row).
+
+---
+
 # A-SWEEP. Detail/flow rewiring after Modules 6/6B/7 — 25 Jul 2026
 
 A screen-by-screen live walk found several screens still carrying **placeholder
@@ -75,10 +126,14 @@ Fixed and verified:
   anchored to a listing/requirement (Doc2 §10). The profile Message button has no
   valid target, so it still toasts. Needs a product decision (route to their
   listings to inquire, or a contextless DM feature). Not a simple wire.
-- **Auth Details photo picker** (M1 registration) + **Verification "Cancel
-  request"** (M2) + **OwnProfile "Featured collections"** (M2) — each needs its own
-  backend (photo upload during signup / a cancel-verification endpoint / a
-  featured-collections table). Left honest; not faked.
+- **Verification "Cancel request"** (M2) — **NOW FIXED**: `cancelVerification()` +
+  `POST /api/v1/profile/verification/cancel` delete the pending row so the user
+  can re-submit. DB-verified (seeded pending → cancel → row gone). (RERA level has
+  no cancel button in the design, so only ID was wired.)
+- **Auth Details photo picker** (M1 registration) + **OwnProfile "Featured
+  collections"** (M2) — each needs its own backend (photo upload during signup /
+  a featured-collections table). Left honest; not faked. A profile photo can
+  still be added later via Edit profile.
 - **"Contact support"** across Plans/MyPlan/Payments/Checkout — no support surface
   (Module 12 CMS). Low priority.
 - **Project Save** — `saves` is listing-scoped (`saves.listing_id`); a project

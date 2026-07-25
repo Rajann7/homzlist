@@ -10,5 +10,6 @@ export function generateMetadata({ params }: { params: { username: string } }): 
 }
 
 export default function PublicProfilePage({ params }: { params: { username: string } }) {
-  return <OtherProfile username={params.username} />;
+  // Public host = guest surface (session stripped by middleware) → gate writes.
+  return <OtherProfile username={params.username} isGuest />;
 }
