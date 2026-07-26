@@ -65,7 +65,25 @@ export type IconName =
   | "refund"
   | "lock"
   | "check-circle"
-  | "x-circle";
+  | "x-circle"
+  | "briefcase"
+  | "building"
+  | "qr-code"
+  | "key"
+  | "search-list"
+  | "type-flat"
+  | "type-bungalow"
+  | "type-tenement"
+  | "type-farmhouse"
+  | "type-office"
+  | "type-shop"
+  | "type-showroom"
+  | "type-godown"
+  | "type-plot-res"
+  | "type-plot-com"
+  | "type-plot-agri"
+  | "type-plot-farm"
+  | "type-pg";
 
 interface IconProps extends React.SVGProps<SVGSVGElement> {
   name: IconName;
@@ -289,6 +307,82 @@ const PATHS: Record<IconName, (f: boolean) => React.ReactNode> = {
     <>
       <circle cx="12" cy="12" r="9" />
       <path d="M12 16v-4M12 8h.01" />
+    </>
+  ),
+  briefcase: () => (
+    <>
+      <rect x="3" y="8" width="18" height="12" rx="2" />
+      <path d="M8 8V6a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+      <path d="M3 13h18" />
+    </>
+  ),
+  building: () => (
+    <>
+      <rect x="5" y="3" width="14" height="18" rx="1.5" />
+      <path d="M9 7h2M13 7h2M9 11h2M13 11h2M9 15h2M13 15h2" />
+    </>
+  ),
+  "qr-code": () => (
+    <>
+      <rect x="3" y="3" width="7" height="7" rx="1" />
+      <rect x="14" y="3" width="7" height="7" rx="1" />
+      <rect x="3" y="14" width="7" height="7" rx="1" />
+      <path d="M14 14h3v3M21 14v.01M17 21h.01M21 17v4" />
+    </>
+  ),
+  key: () => (
+    <>
+      <circle cx="8" cy="15" r="4" />
+      <path d="m11 12 8-8 3 3M16 7l2 2" />
+    </>
+  ),
+  "type-flat": () => (
+    <>
+      <rect x="4" y="3" width="16" height="18" rx="1" />
+      <path d="M8 7h2M14 7h2M8 11h2M14 11h2M8 15h2M14 15h2" />
+    </>
+  ),
+  "type-bungalow": () => (
+    <>
+      <path d="M3 11 12 4l9 7v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z" />
+      <path d="M9 21v-6h6v6" />
+    </>
+  ),
+  "type-tenement": () => <path d="M4 21V8l5-4 5 4v13M14 21V11l6 4v6M4 21h16" />,
+  "type-farmhouse": () => (
+    <>
+      <path d="M3 21V10l7-5 7 5v11M8 21v-6h4v6" />
+      <path d="M17 21v-7l4 3v4" />
+    </>
+  ),
+  "type-office": () => (
+    <>
+      <rect x="4" y="3" width="16" height="18" rx="1" />
+      <path d="M8 7h3M8 11h3M8 15h3M14 7h2M14 11h2" />
+    </>
+  ),
+  "type-shop": () => <path d="M4 9h16l-1-4H5zM5 9v11h14V9M9 20v-5h6v5" />,
+  "type-showroom": () => <path d="M3 9l2-5h14l2 5M3 9v11h18V9M3 9h18M8 13h8" />,
+  "type-godown": () => <path d="M3 21V8l9-4 9 4v13M3 21h18M7 21v-8h10v8" />,
+  "type-plot-res": () => (
+    <>
+      <path d="M3 3h18v18H3z" strokeDasharray="3 3" />
+      <path d="M9 15l3-4 3 4" />
+    </>
+  ),
+  "type-plot-com": () => (
+    <>
+      <path d="M3 3h18v18H3z" strokeDasharray="3 3" />
+      <path d="M8 16V9h3a2 2 0 0 1 0 4H8" />
+    </>
+  ),
+  "type-plot-agri": () => <path d="M2 20h20M4 20c0-4 2-6 4-6M12 20c0-6 2-10 2-10M20 20c0-4-2-6-4-6" />,
+  "type-plot-farm": () => <path d="M2 20h20M5 20v-6l3-2 3 2v6M14 20v-8l3-2 3 2v8" />,
+  "type-pg": () => <path d="M3 20V6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v14M3 20h18M7 9h2M7 13h2M15 9h2M15 13h2" />,
+  "search-list": () => (
+    <>
+      <circle cx="11" cy="11" r="7" />
+      <path d="m20 20-3.2-3.2M8 11h6M8 8h6M8 14h3" />
     </>
   ),
   refund: () => (

@@ -1431,6 +1431,28 @@ Both render, but they are different colours for the same meaning, and
 CLAUDE.md asks for one badge language. Aligning listings would change existing
 badge colours — **design-locked, so needs Rajan's call.**
 
+## D5. Two non-overlapping "draft" systems, found during the 26 Jul QA pass
+
+There are two entirely separate things both called a "draft", and neither
+screen shows the other's items:
+
+1. **Listing drafts** — real rows in `listings` with `status='draft'` (a
+   listing that reached the DB). Shown as `DRAFT`-badged tiles in the seller's
+   own-profile grid. Amit Shah (broker, `+919999000007`) has 2.
+2. **Form auto-save drafts** — `GET /api/v1/listings/drafts`, a separate
+   payload-blob table keyed by an in-progress CREATE FORM session, never
+   promoted to a real listing. Shown on the "Drafts" screen reached via
+   Create → "Continue from drafts". Amit Shah has 3 here (capped at 3,
+   independently of the 2 above) — one is even a `godown` type that has no
+   corresponding row in `listings` at all.
+
+Both caps enforce "3" independently, so a seller could plausibly hit "Drafts
+full" on the auto-save screen while their own-profile grid shows only 2 (or
+0) draft tiles, with no visible link between the two counters. Whether this is
+intended (form-recovery vs a real draft listing are legitimately different
+concepts) or should be unified is a product call, not something to guess at —
+**needs Rajan's decision**, not a blind merge.
+
 ---
 
 # Regression suites (run these after any billing change)

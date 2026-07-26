@@ -142,7 +142,7 @@ export function FeedCard({
               <span className={cn("shrink-0 text-17 font-bold text-ink-primary", !card.title && "flex-1")}>{card.price}</span>
             </span>
             <span className="flex w-full items-center gap-2">
-              <span className={cn("rounded-full px-2 py-0.5 text-11 font-semibold", card.saleLabel === "For Rent" ? "bg-warning-soft text-warning" : "bg-accent-soft text-accent")}>
+              <span className={cn("rounded-4 px-2 py-[3px] text-11 font-semibold uppercase tracking-[0.3px]", card.saleLabel === "For Rent" ? "bg-warning-soft text-warning" : "bg-accent-soft text-accent")}>
                 {card.saleLabel}
               </span>
               {card.meta && <span className="truncate text-13 text-ink-secondary">{card.meta}</span>}
@@ -166,7 +166,7 @@ export function FeedCard({
             <Avatar src={card.poster.avatarUrl} name={card.poster.name} size={24} />
             <span className="truncate text-13 font-semibold text-ink-primary">{card.poster.name}</span>
             {card.poster.verified && <Icon name="verified" size={14} className="shrink-0 text-accent" />}
-            {card.poster.role && <span className="shrink-0 rounded-4 bg-surface-2 px-1.5 py-0.5 text-11 capitalize text-ink-secondary">{card.poster.role}</span>}
+            {card.poster.role && <span className="shrink-0 rounded-full bg-surface-2 px-1.5 py-0.5 text-11 capitalize text-ink-secondary">{card.poster.role}</span>}
           </button>
           <span className="ml-auto shrink-0 text-11 text-ink-tertiary">{card.postedAgo}</span>
         </div>
@@ -177,8 +177,8 @@ export function FeedCard({
             <Icon name="bookmark" size={24} filled={card.saved} className={card.saved ? "text-accent" : "text-ink-primary"} />
           </button>
           <div className="ml-auto flex items-center gap-2">
-            <Button variant="outline" className="h-9 px-3 text-13" onClick={onOpen}>{isProject ? "View Project" : "View Property"}</Button>
-            <Button className="h-9 px-4 text-13" onClick={onInquiry}>Inquiry</Button>
+            <Button variant="outline" className="h-10 px-3 text-13" onClick={onOpen}>{isProject ? "View Project" : "View Property"}</Button>
+            <Button className="h-10 px-4 text-13" onClick={onInquiry}>Inquiry</Button>
           </div>
           <button aria-label="More" onClick={onMore} className="grid h-11 w-9 place-items-center">
             <Icon name="more" size={22} className="text-ink-secondary" />

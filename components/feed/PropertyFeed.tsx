@@ -66,7 +66,9 @@ export const PropertyFeed = forwardRef<PropertyFeedHandle, { filter: string; sor
 
     const notInterested = async (card: Card) => {
       setMoreFor(null);
-      if (card.typeCode) await feedApi.notInterested({ typeCode: card.typeCode });
+      if (guest) { setLoginSheet(true); return; }
+      const res = card.typeCode ? await feedApi.notInterested({ typeCode: card.typeCode }) : { ok: true as const };
+      if (!res.ok) { if (res.error.code === "UNAUTHORIZED") setLoginSheet(true); return; }
       setCards((cs) => (cs ?? []).filter((c) => c.id !== card.id));
       toast.show("We'll show fewer like this");
     };

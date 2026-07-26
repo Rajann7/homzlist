@@ -153,7 +153,7 @@ export function OwnProfile() {
               Share profile
             </Button>
             <Button variant="outline" size="default" aria-label="QR code" className="w-11 px-0" onClick={() => setQrSheet(true)}>
-              <Icon name="image" size={20} strokeWidth={1.7} />
+              <Icon name="qr-code" size={20} strokeWidth={1.7} />
             </Button>
           </div>
         )}

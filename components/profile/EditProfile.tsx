@@ -169,7 +169,7 @@ export function EditProfile() {
           <button onClick={() => setCitySheet(true)} className="flex h-11 items-center gap-2 rounded-8 border border-border bg-surface-2 px-3 text-left">
             <Icon name="pin" size={20} className="text-ink-tertiary" strokeWidth={1.7} />
             <span className={cn("flex-1 text-15", city ? "text-ink-primary" : "text-ink-tertiary")}>{city?.name || "Select your city"}</span>
-            <Icon name="chevron-down" size={18} className="text-ink-tertiary" strokeWidth={1.7} />
+            <Icon name="chevron-right" size={18} className="text-ink-tertiary" strokeWidth={1.7} />
           </button>
           <p className="text-11 text-ink-tertiary">Changing your city updates your feed and stories.</p>
         </div>

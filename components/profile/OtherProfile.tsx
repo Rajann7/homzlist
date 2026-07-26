@@ -150,7 +150,7 @@ export function OtherProfile({ username, isGuest = false }: { username: string; 
           {p.responseLabel ? ` · ${p.responseLabel}` : ""}
         </p>
         <button onClick={() => setAbout(true)} className="mt-1 flex items-center gap-1 text-11 text-ink-tertiary">
-          <Icon name="alert" size={14} strokeWidth={1.7} /> About this account
+          <Icon name="info" size={14} strokeWidth={1.7} /> About this account
         </button>
 
         {/* Message full-width (private number default — Call/WhatsApp gate on public number, Module 7) */}

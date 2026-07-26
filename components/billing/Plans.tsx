@@ -18,6 +18,18 @@ import { TopupSheet } from "./TopupSheet";
 
 type CouponState = "closed" | "open" | "applied" | "invalid";
 
+function roleLabelPlural(role: string): string {
+  return { owner: "Owners", broker: "Brokers", builder: "Builders" }[role] ?? "You";
+}
+
+/** The one-line marketing tagline under a plan's price (P11 S1) — shared by the
+ * card and the "Recommended for {role}" banner so they can never disagree. */
+function planTagline(plan: PlanCard): string {
+  if (plan.lifetime && plan.code === "p999") return "Lifetime listing — never expires";
+  if (plan.code === "p2999") return "Unlock every requirement";
+  return "";
+}
+
 export function Plans({ onBuy }: { onBuy?: (code: string) => void }) {
   const router = useRouter();
   const toast = useToast();
@@ -109,6 +121,17 @@ export function Plans({ onBuy }: { onBuy?: (code: string) => void }) {
             </span>
           </Banner>
         )}
+
+        {/* Recommended-for-role teaser (P11 S1) — the sub-copy is the recommended
+            plan's own `subLabel`, never invented text, so it can't drift from
+            the plan it's pointing at. */}
+        {d?.role && d.recommended && (() => {
+          const rec = d.plans.find((p) => p.code === d.recommended);
+          if (!rec) return null;
+          return (
+            <Banner tone="info" icon={<Icon name="user" size={20} />} title={`Recommended for ${roleLabelPlural(d.role)}`} sub={planTagline(rec)} />
+          );
+        })()}
 
         {/* Plan cards, recommended first — order comes from the server's role hint. */}
         {orderPlans(d?.plans ?? [], d?.recommended).map((p, i) => (
@@ -215,11 +238,9 @@ function PlanCardView({
         <span className="text-11 text-ink-tertiary">{plan.subLabel}</span>
       </div>
       {plan.lifetime && plan.code === "p999" ? (
-        <div className="mb-3.5 mt-1 text-13 font-semibold text-accent">Lifetime listing — never expires</div>
+        <div className="mb-3.5 mt-1 text-13 font-semibold text-accent">{planTagline(plan)}</div>
       ) : (
-        <div className="mb-3.5 mt-1 text-13 text-ink-secondary">
-          {plan.code === "p2999" ? "Unlock every requirement" : ""}
-        </div>
+        <div className="mb-3.5 mt-1 text-13 text-ink-secondary">{planTagline(plan)}</div>
       )}
       <Checklist items={plan.features} />
       <Button variant={recommended ? "primary" : "outline"} fullWidth className={recommended ? "mt-4" : "mt-4 border-accent text-accent"} onClick={onBuy}>

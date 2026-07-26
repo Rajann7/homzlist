@@ -172,7 +172,7 @@ function VisitCard({ v, onReschedule, onCancel, onOutcome, onMessage }: {
       <div className="flex items-center gap-2">
         <Icon name="clock" size={16} className="text-ink-tertiary" />
         <span className="text-13 font-semibold text-ink-primary">{v.dateLabel} · {v.timeLabel}</span>
-        <span className={cn("ml-auto rounded-full px-2.5 py-1 text-11 font-semibold", chip.cls)}>{chip.label}</span>
+        <span className={cn("ml-auto rounded-4 px-2.5 py-1 text-11 font-semibold uppercase tracking-[0.3px]", chip.cls)}>{chip.label}</span>
       </div>
 
       <div className="flex items-center gap-2 text-11 text-ink-tertiary">

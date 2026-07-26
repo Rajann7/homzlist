@@ -138,7 +138,7 @@ export function Verification() {
                   {v.id.status === "rejected" && <Strip tone="error" icon="alert" text={`Rejected: ${v.id.reason ?? "Please re-upload"}`} />}
                   <button onClick={() => setDocSheet(true)} className="mt-2 flex h-11 items-center justify-between rounded-8 border border-border bg-surface-2 px-3 text-left text-15">
                     <span className={docType ? "text-ink-primary" : "text-ink-tertiary"}>{docType ? DOC_TYPES.find((d) => d.v === docType)?.l : "Select document type"}</span>
-                    <Icon name="chevron-down" size={18} className="text-ink-tertiary" strokeWidth={1.7} />
+                    <Icon name="chevron-right" size={18} className="text-ink-tertiary" strokeWidth={1.7} />
                   </button>
                   <UploadTile
                     onClick={() => idFileRef.current?.click()}

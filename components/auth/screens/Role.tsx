@@ -15,8 +15,8 @@ type Role = "owner" | "broker" | "builder";
 
 const ROLES: Array<{ id: Role; icon: IconName; title: string; line: string; info: { title: string; body: string } }> = [
   { id: "owner", icon: "home", title: "Owner", line: "Buy, sell or rent my own property", info: { title: "Owner account", body: "Owners can list their own properties for sale or rent and manage inquiries directly. You get Phone and ID verification badges." } },
-  { id: "broker", icon: "user", title: "Broker", line: "List and manage client properties", info: { title: "Broker account", body: "Brokers can list client properties and get a verified badge after RERA verification. You can request verification anytime from your profile." } },
-  { id: "builder", icon: "image", title: "Builder", line: "Post my projects and reach buyers", info: { title: "Builder account", body: "Builders can post projects with units, floor plans and RERA details, and reach matched buyers. RERA verification unlocks the verified badge." } },
+  { id: "broker", icon: "briefcase", title: "Broker", line: "List and manage client properties", info: { title: "Broker account", body: "Brokers can list client properties and get a verified badge after RERA verification. You can request verification anytime from your profile." } },
+  { id: "builder", icon: "building", title: "Builder", line: "Post my projects and reach buyers", info: { title: "Builder account", body: "Builders can post projects with units, floor plans and RERA details, and reach matched buyers. RERA verification unlocks the verified badge." } },
 ];
 
 export function Role({ onContinue }: { onContinue: (role: Role) => void }) {
@@ -26,8 +26,8 @@ export function Role({ onContinue }: { onContinue: (role: Role) => void }) {
   return (
     <div className="flex min-h-[100dvh] flex-col bg-page px-4">
       <div className="mt-6 flex gap-2">
-        <span className="h-1 w-8 rounded-full bg-accent" />
-        <span className="h-1 w-8 rounded-full bg-surface-3" />
+        <span className="h-1 w-5 rounded-full bg-accent" />
+        <span className="h-1 w-5 rounded-full bg-surface-3" />
       </div>
 
       <h1 className="mt-6 text-24 font-bold text-ink-primary">I am a…</h1>
@@ -62,7 +62,7 @@ export function Role({ onContinue }: { onContinue: (role: Role) => void }) {
                 }}
                 className="grid h-8 w-8 place-items-center rounded-full text-ink-tertiary"
               >
-                <Icon name="alert" size={18} strokeWidth={1.7} />
+                <Icon name="info" size={18} strokeWidth={1.7} />
               </span>
             </button>
           );

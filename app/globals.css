@@ -41,6 +41,10 @@
   --gradient-photo: linear-gradient(transparent 60%, rgba(0, 0, 0, 0.6) 100%);
   /* Photo dim overlay (dark only overrides below) */
   --photo-dim: rgba(0, 0, 0, 0);
+  /* Story ring gradients (Doc1 §2 #7 — StoryCircle) */
+  --ring-unseen-grad: linear-gradient(45deg, var(--accent), var(--warning));
+  --ring-project-grad: linear-gradient(45deg, var(--info), #5ac8fa);
+  --ring-boosted-grad: linear-gradient(45deg, var(--warning), #ffd54f);
 
   color-scheme: light;
 }
@@ -70,6 +74,9 @@
   --info: #3ba7f8;
   --info-soft: #0f2233;
   --photo-dim: rgba(0, 0, 0, 0.06); /* Doc1 §1.2 — 6% dim on photos in dark */
+  --ring-unseen-grad: linear-gradient(45deg, var(--accent), var(--warning));
+  --ring-project-grad: linear-gradient(45deg, var(--info), #5ac8fa);
+  --ring-boosted-grad: linear-gradient(45deg, var(--warning), #ffd54f);
 
   color-scheme: dark;
 }
@@ -99,6 +106,9 @@
     --info: #3ba7f8;
     --info-soft: #0f2233;
     --photo-dim: rgba(0, 0, 0, 0.06);
+    --ring-unseen-grad: linear-gradient(45deg, var(--accent), var(--warning));
+    --ring-project-grad: linear-gradient(45deg, var(--info), #5ac8fa);
+    --ring-boosted-grad: linear-gradient(45deg, var(--warning), #ffd54f);
     color-scheme: dark;
   }
 }

@@ -228,7 +228,7 @@ function LeadCard({ l, onMessage, onMove, onMore, onOpenProperty }: {
           <span className="text-15 font-semibold text-ink-primary">{l.lead.name}</span>
           {l.lead.verified.phone && <Icon name="verified" size={14} className="text-accent" />}
         </div>
-        <span className={cn("rounded-full px-2.5 py-1 text-11 font-semibold", chip.cls)}>{chip.label}</span>
+        <span className={cn("rounded-4 px-2.5 py-1 text-11 font-semibold uppercase tracking-[0.3px]", chip.cls)}>{chip.label}</span>
       </div>
 
       <div className="text-11 text-ink-tertiary">{trust}</div>

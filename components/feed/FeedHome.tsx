@@ -13,6 +13,22 @@ import { storiesApi, feedApi, type StoryCircle } from "@/lib/feed/client";
 import type { CityRow } from "./CitySheet";
 import { cn } from "@/lib/utils";
 
+// Guest city choice is a UI-only preference (no identity, no server profile to hold it) —
+// stored client-side so it survives reload/navigation instead of resetting every time.
+const GUEST_CITY_KEY = "hz_guest_city";
+function readGuestCity(): { cityId: string | null; cityName: string | null } {
+  if (typeof window === "undefined") return { cityId: null, cityName: null };
+  try {
+    const raw = window.localStorage.getItem(GUEST_CITY_KEY);
+    if (!raw) return { cityId: null, cityName: null };
+    const { id, name } = JSON.parse(raw);
+    return { cityId: id ?? null, cityName: name ?? null };
+  } catch { return { cityId: null, cityName: null }; }
+}
+function writeGuestCity(id: string, name: string) {
+  try { window.localStorage.setItem(GUEST_CITY_KEY, JSON.stringify({ id, name })); } catch { /* ignore */ }
+}
+
 /**
  * The P2 feed home — the app's main screen. Orchestrates the shell (header +
  * story row + mode toggle + bottom nav), the city switch (persists to the
@@ -44,8 +60,8 @@ export function FeedHome() {
         const j = await res.json();
         const p = j.data?.profile;
         setMe({ guest: false, role: p?.role ?? null, cityId: p?.cityId ?? null, cityName: p?.cityName ?? null });
-      } else setMe({ guest: true, role: null, cityId: null, cityName: null });
-    } catch { setMe({ guest: true, role: null, cityId: null, cityName: null }); }
+      } else setMe({ guest: true, role: null, ...readGuestCity() });
+    } catch { setMe({ guest: true, role: null, ...readGuestCity() }); }
   }, []);
 
   const loadStories = useCallback(async () => {
@@ -76,6 +92,8 @@ export function FeedHome() {
     setMe((m) => (m ? { ...m, cityId: c.id, cityName: c.name } : m));
     if (me && !me.guest) {
       await fetch("/api/v1/profile/me", { method: "PATCH", headers: { "Content-Type": "application/json" }, credentials: "same-origin", body: JSON.stringify({ cityId: c.id }) });
+    } else {
+      writeGuestCity(c.id, c.name);
     }
     loadedAt.current = Date.now(); setNewCount(0);
     feedRef.current?.refresh(); void loadStories();

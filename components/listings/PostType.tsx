@@ -26,8 +26,8 @@ export function PostType({ slotsLeft }: { slotsLeft?: number }) {
 
   const options = [
     { key: "sell", label: "Sell a property", sub: "List a property for sale", icon: "home" as const, href: "/create/type?kind=sell" },
-    { key: "rent", label: "Rent out a property", sub: "List a property to rent", icon: "home" as const, href: "/create/type?kind=rent" },
-    { key: "requirement", label: "Post a requirement", sub: "Tell sellers what you're looking for", icon: "search" as const, href: "/requirements/new" },
+    { key: "rent", label: "Rent out a property", sub: "List a property to rent", icon: "key" as const, href: "/create/type?kind=rent" },
+    { key: "requirement", label: "Post a requirement", sub: "Tell sellers what you're looking for", icon: "search-list" as const, href: "/requirements/new" },
     ...(role === "builder"
       ? [{ key: "project", label: "New Project", sub: "Builder project with unit types", icon: "image" as const, href: "/projects/new" }]
       : []),
@@ -100,6 +100,25 @@ export function PostType({ slotsLeft }: { slotsLeft?: number }) {
   );
 }
 
+// Per-type icon (Doc1 component gallery / designs/P5 S3) — decorative mapping
+// keyed to the fixed set of type codes, not business data, so it's safe to
+// keep client-side even though the type LIST itself comes from server config.
+const TYPE_ICON: Record<string, Parameters<typeof Icon>[0]["name"]> = {
+  flat: "type-flat",
+  bungalow: "type-bungalow",
+  tenement: "type-tenement",
+  farmhouse: "type-farmhouse",
+  office: "type-office",
+  shop: "type-shop",
+  showroom: "type-showroom",
+  godown: "type-godown",
+  plot_res: "type-plot-res",
+  plot_com: "type-plot-com",
+  plot_agri: "type-plot-agri",
+  plot_farm: "type-plot-farm",
+  pg: "type-pg",
+};
+
 /**
  * P5 S3 — Property type picker: flat category sections over a 3-up icon grid,
  * confirmed with Continue (designs/P5 S3). It used to be collapsible
@@ -169,7 +188,7 @@ export function PropertyTypePicker({ kind }: { kind: "sell" | "rent" }) {
                           : "border-border bg-surface-2",
                       )}
                     >
-                      <Icon name="home" size={24} className={active ? "text-accent" : "text-ink-secondary"} />
+                      <Icon name={TYPE_ICON[t.code] ?? "home"} size={24} className={active ? "text-accent" : "text-ink-secondary"} />
                       <span className="text-11 font-semibold leading-[1.2] text-ink-primary">{t.label}</span>
                     </button>
                   );

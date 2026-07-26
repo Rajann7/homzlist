@@ -141,55 +141,58 @@ export function Otp({
         </button>
       </div>
 
-      <h1 className="mt-2 text-20 font-bold text-ink-primary">Enter verification code</h1>
-      <p className="mt-2 text-15 text-ink-secondary">
-        Sent to {masked}{" "}
-        <button onClick={onEdit} className="font-semibold text-accent">
-          Edit
-        </button>
-      </p>
-
-      {exhausted && error && <div className="chrome mt-4 rounded-8 bg-error-soft px-3 py-2 text-13 text-error">{error}</div>}
-
-      <div className={cn("mt-6 flex justify-between gap-2", shake && "animate-[shake_0.4s]")}>
-        {digits.map((d, i) => (
-          <input
-            key={i}
-            ref={(el) => {
-              inputs.current[i] = el;
-            }}
-            type="tel"
-            inputMode="numeric"
-            autoComplete={i === 0 ? "one-time-code" : "off"}
-            maxLength={6}
-            value={d}
-            disabled={exhausted}
-            onChange={(e) => setDigit(i, e.target.value)}
-            onKeyDown={(e) => onKeyDown(i, e)}
-            className={cn(
-              "h-[52px] w-[48px] rounded-8 bg-surface-2 text-center text-20 font-bold text-ink-primary outline-none border transition-colors",
-              error && !exhausted ? "border-error" : d ? "border-accent" : "border-transparent",
-              "focus:border-accent disabled:opacity-50",
-            )}
-          />
-        ))}
-      </div>
-
-      {error && !exhausted && <p className="mt-3 text-13 text-error">{error}</p>}
-
-      <div className="mt-4 text-13">
-        {resendsUsed >= 3 ? (
-          <span className="chrome text-ink-tertiary">Resend limit reached</span>
-        ) : secondsLeft > 0 ? (
-          <span className="chrome text-ink-tertiary">Resend code in 00:{String(secondsLeft).padStart(2, "0")}</span>
-        ) : (
-          <button onClick={resend} className="font-semibold text-accent">
-            Resend code
+      <div className="flex-1">
+        <h1 className="mt-2 text-20 font-bold text-ink-primary">Enter verification code</h1>
+        <p className="mt-2 text-15 text-ink-secondary">
+          Sent to {masked}{" "}
+          <button onClick={onEdit} className="font-semibold text-accent">
+            Edit
           </button>
-        )}
+        </p>
+
+        {exhausted && error && <div className="chrome mt-4 rounded-8 bg-error-soft px-3 py-2 text-13 text-error">{error}</div>}
+
+        <div className={cn("mt-6 flex justify-between gap-2", shake && "animate-[shake_0.4s]")}>
+          {digits.map((d, i) => (
+            <input
+              key={i}
+              ref={(el) => {
+                inputs.current[i] = el;
+              }}
+              type="tel"
+              inputMode="numeric"
+              autoComplete={i === 0 ? "one-time-code" : "off"}
+              autoFocus={i === 0}
+              maxLength={6}
+              value={d}
+              disabled={exhausted}
+              onChange={(e) => setDigit(i, e.target.value)}
+              onKeyDown={(e) => onKeyDown(i, e)}
+              className={cn(
+                "h-[52px] w-[48px] rounded-8 bg-surface-2 text-center text-20 font-bold text-ink-primary outline-none border transition-colors",
+                error && !exhausted ? "border-error" : d ? "border-accent" : "border-transparent",
+                "focus:border-accent disabled:opacity-50",
+              )}
+            />
+          ))}
+        </div>
+
+        {error && !exhausted && <p className="mt-3 text-13 text-error">{error}</p>}
+
+        <div className="mt-4 text-13">
+          {resendsUsed >= 3 ? (
+            <span className="chrome text-ink-tertiary">Resend limit reached</span>
+          ) : secondsLeft > 0 ? (
+            <span className="chrome text-ink-tertiary">Resend code in 00:{String(secondsLeft).padStart(2, "0")}</span>
+          ) : (
+            <button onClick={resend} className="font-semibold text-accent">
+              Resend code
+            </button>
+          )}
+        </div>
       </div>
 
-      <Button className="mt-6" fullWidth loading={loading} disabled={code.length !== 6 || exhausted} onClick={verify}>
+      <Button className="mb-4" fullWidth loading={loading} disabled={code.length !== 6 || exhausted} onClick={verify}>
         Verify
       </Button>
 

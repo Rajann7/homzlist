@@ -48,8 +48,8 @@ export function Details({ role, onBack, onDone }: { role: string; onBack: () => 
           <Icon name="arrow-left" size={24} strokeWidth={1.7} />
         </button>
         <div className="flex gap-2">
-          <span className="h-1 w-8 rounded-full bg-accent" />
-          <span className="h-1 w-8 rounded-full bg-accent" />
+          <span className="h-1 w-5 rounded-full bg-surface-3" />
+          <span className="h-1 w-5 rounded-full bg-accent" />
         </div>
       </div>
 
@@ -76,14 +76,14 @@ export function Details({ role, onBack, onDone }: { role: string; onBack: () => 
       </div>
 
       <div className="mt-6 flex flex-col gap-4">
-        <Input id="details-name" label="Full name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" error={nameError ?? undefined} maxLength={60} autoComplete="name" />
+        <Input id="details-name" label="Full name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Rupal Kachhadiya" error={nameError ?? undefined} maxLength={60} autoComplete="name" />
 
         <div className="flex flex-col gap-2">
           <label className="chrome text-13 font-semibold text-ink-secondary">City</label>
           <button onClick={() => setCitySheet(true)} className="flex h-11 items-center gap-2 rounded-8 border border-border bg-surface-2 px-3 text-left">
             <Icon name="pin" size={20} className="text-ink-tertiary" strokeWidth={1.7} />
             <span className={cn("flex-1 text-15", city ? "text-ink-primary" : "text-ink-tertiary")}>{city ? `${city.name}, ${city.state}` : "Select your city"}</span>
-            <Icon name="chevron-down" size={18} className="text-ink-tertiary" strokeWidth={1.7} />
+            <Icon name="chevron-right" size={18} className="text-ink-tertiary" strokeWidth={1.7} />
           </button>
         </div>
 

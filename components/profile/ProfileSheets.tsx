@@ -91,7 +91,7 @@ export function ProfileMenuSheet({
         <Row icon="bookmark" label="Archived" onClick={() => onPlaceholder("Archived")} />
         <Row icon="alert" label="Account status" onClick={onAccountStatus} />
         <Row icon="user" label="View as visitor" onClick={onViewAsVisitor} />
-        <Row icon="image" label="QR code" onClick={onQr} />
+        <Row icon="qr-code" label="QR code" onClick={onQr} />
         <Row icon="message" label="Help" onClick={() => onPlaceholder("Help")} />
       </div>
     </BottomSheet>
