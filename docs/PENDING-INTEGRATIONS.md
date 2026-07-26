@@ -1468,3 +1468,92 @@ npm run check:fields        # every property type's field list resolves, has
                             # options, and its show_if points at a field the
                             # type actually renders (all 13 types × 3 roles)
 ```
+
+---
+
+# M8. Module 8 — Search & SEO (P3), 26 Jul 2026
+
+Built: search home + autocomplete + peek, results (5 tabs, cascade, zero-state),
+filter sheet (dynamic per-type, nested location sheet, live count), area page /
+programmatic landing matrix, city coming-soon, sitemaps, robots, OG images,
+saved-search alerts. Migrations 0030-0036, all applied to dev.
+
+## M8.0 — What the hunt FOUND (fixed inside this module)
+
+These were pre-existing defects the module surfaced, not new work it created.
+
+| # | Found | Impact before the fix | Fix |
+|---|---|---|---|
+| **F1** | `location_adjacency` had **0 rows** since migration 0005 | The "NEARBY:" location cascade in **search, the feed AND requirement matching** queried the table, got nothing, and silently degraded to "no nearby areas". No cascade section had ever rendered in this app. | 0030 seeds 42 symmetric adjacency pairs across all 4 cities. Cascade now fires — verified live. |
+| **F2** | `field_definitions.furnishing` offers `full`, but Module 4 wrote `furnished` on 4 live listings | The "Fully furnished" filter chip could **never match anything**, forever. | 0032 normalises the drifted value. |
+| **F3** | `locations.name_gu` was **NULL on all 35 rows** | "All-Indian-script Unicode search input" (Doc7 §108) was wired — trigram index on `name_gu`, no transliteration — but fed nothing, so a Gujarati query ran cleanly and matched zero. | 0035 populates real Gujarati names for all 31 Gujarat locations. `માવડી` now returns the same 15 results as `Mavdi`. |
+| **F4** | Gujarati query resolved the area but still returned 0 | `parseQuery` stripped only the **English** name from the residue, so the Gujarati text fell through to a free-text ILIKE against English titles. | `stripName` now strips whichever language matched. |
+| **F5** | Per-sqft was computed on **rent** listings | Cards showed "₹19/sqft" beside a ₹28,000 monthly rent — a number that looks like a price comparison but is rent-per-sqft-per-month. | Search hydrator omits per-sqft for rent. **See M8.1 — the feed has the same bug.** |
+| **F6** | `hz_area_stats` averaged per-sqft across sale AND rent | One rented flat dragged an area's "Avg ₹5,600/sqft" down by hundreds, in the Areas tab, the autocomplete meta line and the area page stats strip. | 0033 makes per-sqft sale-only unless an intent is named. |
+| **F7** | Mixed-intent pages quoted a monthly rent as the headline price | `/area/mavdi-rajkot` read "Prices from ₹14,471" next to ₹1.1 Cr sale inventory. | Price envelope is always single-intent; the strip labels it ("Sale range"), and the meta description drops the clause on mixed pages. |
+| **F8** | `New construction` rendered **twice** in the filter sheet | Once as a per-type facet, once as a "More" toggle row. | 0034 drops the duplicate facet; the design's "More" row wins. |
+| **F9** | `saved_searches.alerts_enabled` was a toggle with **no job behind it** | The classic "promise with nothing doing it" — and `notification_type` had no enum value for it, so an insert would have *raised* if anything had tried. | 0036 adds the enum value; `lib/search/alerts.ts` + `app/api/v1/cron/search` implement and trigger it. Verified: real notification row, watermark advances, re-run is idempotent. |
+| **F10** | `city_interest_requests.notified_at` had nothing that would ever set it | "We'll notify you when we launch" would never have been kept. | `notifyLaunchedCities()` in the same cron marks and notifies on launch. |
+| **F11** | `@vercel/og` crashed the response mid-pipe on Windows/Node runtime | OG image endpoint killed the socket (`.\file:\C:\…` invalid font path). | Route moved to the `edge` runtime it targets; data read over PostgREST. |
+| **F12** | Partial dynamic segment `sitemap-[type].xml` | Not supported by the App Router — **all five sitemaps 404'd**. | Five explicit routes over one shared factory. |
+
+## M8.1 — ✅ CLOSED 26 Jul 2026 — the FEED had bug F5 too
+
+`lib/feed/service.ts · toCard()` computed `perSqft` for every card regardless of
+`kind`, so the **home feed and stories** printed "₹19/sqft" on rent listings too.
+Originally left out of scope, since the feed belongs to Module 6.
+
+**Rajan, 26 Jul 2026 ("baki ke sab pending fix") → FIXED.** `lib/feed/service.ts`
+now guards the `perSqft` calculation with `l.kind !== "rent"`, identical to
+`lib/search/service.ts · hydrate()`. One line, no design change — a rent card
+simply drops the meaningless third meta segment.
+
+## M8.2 — ✅ CLOSED 26 Jul 2026 — `profiles.response_label` now computed
+
+Doc2 §11 specifies an automatic response-time chip, and the P3 Brokers & Builders
+row reads "24 listings · Usually responds in 2 hours". The column had existed
+since Module 2 and was NULL on all 35 profiles, because nothing measured reply
+latency — so search rendered only the honest half, "24 listings".
+
+**Rajan, 26 Jul 2026 → FIXED.** Migration `0037_response_time.sql` adds
+`hz_recompute_response_labels()`, run daily by `/api/v1/cron/search`:
+
+- **Median**, not mean, first-reply latency per seller — one all-night reply must
+  not brand somebody a slow responder, and "usually" means the median.
+- A "first reply" is the seller's earliest message in a thread AFTER the other
+  party's first one. Threads they never answered are excluded from the median
+  rather than counted as infinite.
+- **Below 3 answered threads → NULL**, no chip at all. Two data points is not
+  "usually".
+- Only the last **90 days** counts, and the function CLEARS the label on anyone
+  who has gone quiet — a stale "responds in 2 hours" is worse than no chip.
+
+Verified live: 7 sellers now carry a computed label, and the search row reads
+"12 listings · Usually responds in 1 hour" while sellers without enough history
+still show just the count.
+
+## M8.3 — 🟡 Boost placement in search: done here, admin panel DEFERRED by Rajan
+
+Search ranks active boosts first (`hz_search_listings` orders on the boost join)
+and the Explore grid hoists a boosted listing into the 2×2 hero cell. This closes
+the *search half* of **A3**. It remains unobservable in production for the same
+reason as **A1**: no admin panel exists to approve a paid boost, so nothing can
+reach `status='active'` except by seed.
+
+**Rajan, 26 Jul 2026: "admin panel abhi banana nahi hai"** — Module 11 stays
+deferred by decision, not by blocker. The search side needs no further work; the
+moment a boost can reach `status='active'`, it ranks first and takes the 2×2
+Explore hero with no code change.
+
+## M8.4 — Meilisearch seam
+
+Doc3 §5 says Postgres-indexed at launch, Meilisearch in Phase 2. The swap point
+is deliberately one function: `lib/search/service.ts · runRpc()`. Everything else
+(filter parsing, cascade, hydration, counts) is transport-agnostic. Trigram
+indexes on title/area_label/name/name_gu are in 0030.
+
+## M8.5 — Cron dependency
+
+`/api/v1/cron/search` (daily 04:00) is registered in `vercel.json` and inherits
+**B2**: like every other cron it does nothing until `CRON_SECRET` is set on the
+host. Without it the route refuses (401) rather than running open.

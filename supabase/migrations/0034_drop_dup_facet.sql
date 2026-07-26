@@ -1,0 +1,12 @@
+-- ============================================================================
+-- HomzList — Migration 0034: drop the duplicated "New construction" facet
+--
+-- 0031 registered `construction_status` as a per-type facet, but the P3 design
+-- already carries "New construction" as one of the four "More" toggle rows at
+-- the bottom of the sheet. Live QA showed both rendering, so selecting Flat
+-- gave the user the same filter twice under two different headings.
+--
+-- The "More" row wins (it is the design's placement, and it applies across
+-- types); the facet row goes.
+-- ============================================================================
+delete from public.search_filter_facets where field_key = 'construction_status';

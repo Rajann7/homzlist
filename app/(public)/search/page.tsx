@@ -1,23 +1,18 @@
-import { AppShell, Header, Wordmark, EmptyState } from "@/components";
+import { SearchHome } from "@/components/search/SearchHome";
 
 /**
- * Search is P3 — **Module 8** (Search & SEO) — and isn't built yet — but Search is one of the five
- * canonical bottom-nav items, so the tap has to land somewhere. It used to hit
- * the 404 page on every screen with a nav (CLAUDE.md rule 10: no dead-ends).
- *
- * Deliberately the shell + EmptyState, the same pattern the feed placeholder
- * uses: the nav keeps all five items, so nothing about the design moves.
+ * P3 S1 on the PUBLIC host. The public host is the guest surface (middleware
+ * strips any session on it — Doc6 §4), so this is always the logged-out view:
+ * no recents, and gated actions bounce to login on the seller subdomain.
  */
-export const metadata = { title: "Search" };
+export const metadata = {
+  title: "Search",
+  description: "Search flats, plots, shops and projects by area, city or society.",
+  // The search UI itself has nothing to index — the LANDING pages are the
+  // indexable surface (Doc3 §4). Follow, so crawlers still traverse to them.
+  robots: { index: false, follow: true },
+};
 
-export default function SearchPlaceholderPage() {
-  return (
-    <AppShell header={<Header left={<Wordmark />} title="Search" centerTitle />}>
-      <EmptyState
-        title="Search is coming"
-        subtitle="You'll be able to search by area, budget, BHK and property type. For now, browse from Home."
-        cta={{ label: "Go to Home", href: "/" }}
-      />
-    </AppShell>
-  );
+export default function PublicSearchPage() {
+  return <SearchHome isGuest />;
 }

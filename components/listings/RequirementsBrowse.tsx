@@ -134,7 +134,7 @@ export function RequirementsBrowse() {
           <Checklist items={["Unlock every requirement", "30 proposals included", "Instant match alerts for your areas", "Direct chat after acceptance"]} />
           <Button fullWidth onClick={() => router.push("/checkout?plan=p2999")}>Continue to Payment</Button>
           <button className="text-13 font-semibold text-accent" onClick={() => router.push("/plans")}>Compare plans</button>
-          <p className="text-11 text-ink-tertiary">Auto-renewal is off. You'll be reminded before expiry.</p>
+          <p className="text-11 text-ink-tertiary">Auto-renewal is off. You&apos;ll be reminded before expiry.</p>
         </div>
       </BottomSheet>
 

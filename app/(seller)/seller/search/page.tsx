@@ -1,16 +1,12 @@
-import { AppShell, Header, Wordmark, EmptyState } from "@/components";
+import { SearchHome } from "@/components/search/SearchHome";
 
-/** Seller-zone twin of the public search placeholder — see that file. */
-export const metadata = { title: "Search" };
+/**
+ * P3 S1 on the SELLER host — the authenticated surface. Same screen as the
+ * public one, but the session is real here, so recents persist, own listings
+ * are excluded server-side and save/inquiry act instead of bouncing to login.
+ */
+export const metadata = { title: "Search", robots: { index: false, follow: false } };
 
-export default function SellerSearchPlaceholderPage() {
-  return (
-    <AppShell header={<Header left={<Wordmark />} title="Search" centerTitle />}>
-      <EmptyState
-        title="Search is coming"
-        subtitle="You'll be able to search by area, budget, BHK and property type. For now, browse from Home."
-        cta={{ label: "Go to Home", href: "/" }}
-      />
-    </AppShell>
-  );
+export default function SellerSearchPage() {
+  return <SearchHome />;
 }

@@ -59,7 +59,7 @@ export function ProposalsReceived({ requirementId }: { requirementId: string }) 
         <Header left={<BackButton fallback="/requirements/mine" />} title="Proposals" />
         <div className="flex flex-col items-center gap-3 px-6 py-16 text-center">
           <h2 className="text-20 font-bold text-ink-primary">Requirement not found</h2>
-          <p className="text-15 text-ink-secondary">It may have been removed, or it isn't yours.</p>
+          <p className="text-15 text-ink-secondary">It may have been removed, or it isn&apos;t yours.</p>
           <Button className="mt-2" onClick={() => router.push("/requirements/mine")}>Go to My Requirements</Button>
         </div>
       </AppShell>

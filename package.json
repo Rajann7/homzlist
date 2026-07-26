@@ -27,7 +27,9 @@
     "seed:demo": "node scripts/seed-demo-content.mjs",
     "check:roles": "node scripts/check-roles-live.mjs",
     "verify:trash": "node scripts/verify-trash.mjs",
-    "check:fields": "node scripts/check-field-config.mjs"
+    "check:fields": "node scripts/check-field-config.mjs",
+    "seed:module8": "node scripts/seed-module8.mjs",
+    "check:search": "node scripts/check-search-live.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1091.0",

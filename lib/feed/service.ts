@@ -246,7 +246,14 @@ function toCard(
   const l = c.row;
   const bhk = l.attributes?.bhk;
   const sqft = l.area_sqft as number | null;
-  const perSqft = l.price_paise && sqft ? Math.round((l.price_paise / 100) / sqft) : null;
+  // Per-sqft is a SALE metric. Dividing a monthly rent by area printed
+  // "₹19/sqft" beside a ₹28,000 rent — a figure that reads like a price
+  // comparison but is rent-per-sqft-per-month, meaningless next to the sale
+  // cards in the same feed. Found during the Module 8 search pass and fixed in
+  // both places (PENDING §M8.1).
+  const perSqft = l.kind !== "rent" && l.price_paise && sqft
+    ? Math.round((l.price_paise / 100) / sqft)
+    : null;
   const meta = [
     bhk ? `${bhk} BHK` : null,
     sqft ? `${sqft.toLocaleString("en-IN")} sqft` : null,

@@ -41,7 +41,7 @@ export function Blocked({ base = "/messages" }: { base?: string }) {
         </div>
       ) : (
         <div className="pb-nav-safe">
-          <p className="px-4 py-2 text-11 text-ink-tertiary">Blocked people can't message you. Existing messages stay visible.</p>
+          <p className="px-4 py-2 text-11 text-ink-tertiary">Blocked people can&apos;t message you. Existing messages stay visible.</p>
           {users.map((u) => (
             <div key={u.id} className="flex items-center gap-3 border-b border-divider px-4 py-3">
               <button onClick={() => router.push(`/profile/${u.id}`)} className="flex min-w-0 flex-1 items-center gap-3 text-left">

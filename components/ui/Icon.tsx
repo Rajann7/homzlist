@@ -71,6 +71,9 @@ export type IconName =
   | "qr-code"
   | "key"
   | "search-list"
+  // P3 search: the landing-page row marker and the ⋯ sheet's not-interested
+  | "grid"
+  | "eye-off"
   | "type-flat"
   | "type-bungalow"
   | "type-tenement"
@@ -383,6 +386,22 @@ const PATHS: Record<IconName, (f: boolean) => React.ReactNode> = {
     <>
       <circle cx="11" cy="11" r="7" />
       <path d="m20 20-3.2-3.2M8 11h6M8 8h6M8 14h3" />
+    </>
+  ),
+  // designs/P3: the four-square marker on autocomplete "PAGES" rows and on the
+  // results screen's landing-suggestion strip.
+  grid: () => (
+    <>
+      <rect x="3" y="3" width="7" height="7" rx="1" />
+      <rect x="14" y="3" width="7" height="7" rx="1" />
+      <rect x="3" y="14" width="7" height="7" rx="1" />
+      <rect x="14" y="14" width="7" height="7" rx="1" />
+    </>
+  ),
+  "eye-off": () => (
+    <>
+      <path d="M9.9 4.2A9.7 9.7 0 0 1 12 4c6 0 10 8 10 8a17 17 0 0 1-2.2 3.2M6.6 6.6A17 17 0 0 0 2 12s4 8 10 8a9.6 9.6 0 0 0 5.4-1.6" />
+      <path d="M2 2l20 20" />
     </>
   ),
   refund: () => (

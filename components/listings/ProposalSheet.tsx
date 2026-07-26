@@ -184,7 +184,7 @@ export function ProposalSheet({
             {data.alreadySent && (
               <div className="flex items-center gap-2 rounded-8 bg-warning-soft px-3 py-2.5">
                 <Icon name="alert" size={16} className="shrink-0 text-warning" />
-                <span className="text-11 text-ink-secondary">You've already sent a proposal for this requirement</span>
+                <span className="text-11 text-ink-secondary">You&apos;ve already sent a proposal for this requirement</span>
               </div>
             )}
 

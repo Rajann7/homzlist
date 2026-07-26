@@ -107,7 +107,7 @@ export function MyRequirements() {
       {/* ⓘ tooltip popup */}
       <BottomSheet open={tip} onClose={() => setTip(false)} title="About your quota">
         <p className="pb-4 text-13 leading-[1.5] text-ink-secondary">
-          Your plan includes requirement posts for a fixed validity. Turning a requirement off or deleting it still uses the quota — turning it back on won't restore it.
+          Your plan includes requirement posts for a fixed validity. Turning a requirement off or deleting it still uses the quota — turning it back on won&apos;t restore it.
         </p>
       </BottomSheet>
 

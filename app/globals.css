@@ -308,3 +308,52 @@ img[data-protected="true"] {
   -webkit-touch-callout: none;
   pointer-events: none;
 }
+
+/* ---------------------------------------------------------------------------
+ * P3 filter sheet — dual-range budget slider (designs/P3 S3).
+ *
+ * Two native range inputs overlaid in one 24px track. The TRACK ignores pointer
+ * events so the lower input cannot swallow clicks meant for the upper one; only
+ * the thumbs accept them. That is what keeps both handles grabbable when they
+ * are dragged next to each other.
+ * ------------------------------------------------------------------------- */
+input[type="range"].hz-rng {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  pointer-events: none;
+  position: absolute;
+  left: 0;
+  right: 0;
+  width: 100%;
+  height: 24px;
+  margin: 0;
+}
+input[type="range"].hz-rng::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  pointer-events: auto;
+  width: 22px;
+  height: 22px;
+  border-radius: 9999px;
+  background: var(--accent);
+  border: 3px solid #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+}
+input[type="range"].hz-rng::-moz-range-thumb {
+  pointer-events: auto;
+  width: 22px;
+  height: 22px;
+  border-radius: 9999px;
+  background: var(--accent);
+  border: 3px solid #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+}
+
+/* Long-press peek popup on the Explore grid (designs/P3 S1) */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}

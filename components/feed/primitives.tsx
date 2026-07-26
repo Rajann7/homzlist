@@ -24,7 +24,7 @@ export function CaughtUp({ onNearby }: { onNearby?: () => void }) {
   return (
     <div className="flex flex-col items-center gap-1.5 px-6 py-10 text-center">
       <Icon name="check-circle" size={32} className="text-accent" />
-      <div className="text-15 font-semibold text-ink-primary">You're all caught up</div>
+      <div className="text-15 font-semibold text-ink-primary">You&apos;re all caught up</div>
       {onNearby && (
         <button onClick={onNearby} className="text-13 font-semibold text-accent">See listings in nearby areas</button>
       )}
