@@ -1,6 +1,7 @@
 import "server-only";
 import { createServiceClient } from "@/lib/supabase/server";
 import { hasRequirementAccess, type RequirementRow } from "./requirements";
+import { placementsFor, outOfCityIds, stateIdOfCity } from "@/lib/billing/placement";
 
 /**
  * The matching cascade (Doc2 §8.3) — ONE engine, used in both directions:
@@ -199,7 +200,31 @@ export async function browseRequirements(
   if (anchor.cityId) q = q.eq("city_id", anchor.cityId);
 
   const { data } = await q;
-  const rows = (data ?? []) as RequirementRow[];
+  let rows = (data ?? []) as RequirementRow[];
+
+  // ---- requirement boost placement (Doc2 §13, §9.2) -------------------------
+  // "requirement boost → requirement-mode feed top + story first + locked-but-top
+  // for unpaid". `isBoosted` was hard-coded false until Module 9, so a boosted
+  // requirement was indistinguishable from an organic one.
+  //
+  // "Locked-but-top" falls out of doing the ranking here and the stripping in
+  // `toBrowseCard`: an unpaid viewer gets the boosted card FIRST but still
+  // without budget or poster — the position is bought, the data is not.
+  const placements = await placementsFor(
+    { cityId: anchor.cityId, stateId: anchor.cityId ? await stateIdOfCity(anchor.cityId) : null },
+    ["requirement"],
+  );
+
+  // State / All-India targeted requirement boosts reach viewers whose city the
+  // requirement isn't in, which the city-scoped query above cannot return.
+  const missing = outOfCityIds(placements, "requirement").filter((id) => !rows.some((r) => r.id === id));
+  if (missing.length) {
+    let xq = db().from("requirements").select("*").in("id", missing).eq("status", "live").eq("is_active", true);
+    if (viewerId) xq = xq.neq("profile_id", viewerId);
+    if (filters.kind) xq = xq.eq("kind", filters.kind);
+    if (filters.typeCode) xq = xq.eq("type_code", filters.typeCode);
+    rows = [...(((await xq).data ?? []) as RequirementRow[]), ...rows];
+  }
 
   const cityName = anchor.cityId
     ? ((await db().from("locations").select("name").eq("id", anchor.cityId).maybeSingle()).data as { name: string } | null)?.name ?? null
@@ -248,12 +273,25 @@ export async function browseRequirements(
   }
 
   const sections: Record<Tier, BrowseCard[]> = { exact: [], adjacent: [], city: [] };
+  // Boosted cards are pulled OUT of their tier and hoisted to the very top of the
+  // list — the design has no separate "Promoted" section header, so they lead the
+  // first section with their Promoted tag (Doc2 §9.2 "boosted top").
+  const boosted: { card: BrowseCard; rank: number }[] = [];
+
   for (const r of rows) {
+    const rank = placements.rank.get(r.id);
+    const card = toBrowseCard(
+      r, unlocked, sentSet.has(r.id), countMap.get(r.id) ?? 0, posterMap.get(r.profile_id), rank !== undefined,
+    );
+    if (rank !== undefined) { boosted.push({ card, rank }); continue; }
     const inExact = (r.area_ids ?? []).some((a) => anchor.areas.has(a));
     const inAdj = (r.area_ids ?? []).some((a) => adjacent.has(a));
     const tier: Tier = inExact ? "exact" : inAdj ? "adjacent" : "city";
-    sections[tier].push(toBrowseCard(r, unlocked, sentSet.has(r.id), countMap.get(r.id) ?? 0, posterMap.get(r.profile_id)));
+    sections[tier].push(card);
   }
+
+  boosted.sort((a, b) => a.rank - b.rank); // FIFO by boost start, like the feed
+  const boostedCards = boosted.map((b) => b.card);
 
   const order: Tier[] = ["exact", "adjacent", "city"];
   const built: BrowseSection[] = [];
@@ -263,6 +301,12 @@ export async function browseRequirements(
     const firstArea = sections[tier][0]?.areaLabel ?? null;
     built.push({ tier, label: tierLabel(tier, firstArea, cityName), cards: sections[tier] });
   }
+
+  if (boostedCards.length) {
+    if (built.length) built[0].cards = [...boostedCards, ...built[0].cards];
+    else built.push({ tier: "exact", label: null, cards: boostedCards });
+  }
+
   return { sections: built, unlocked, cityName };
 }
 
@@ -272,6 +316,7 @@ function toBrowseCard(
   alreadySent: boolean,
   proposalCount: number,
   poster?: { name: string | null; role: string | null; verified: boolean },
+  isBoosted = false,
 ): BrowseCard {
   const kindLabel = r.kind === "rent" ? "Looking to Rent" : "Looking to Buy";
   const summary = [r.bhk ? `${r.bhk} BHK` : null, r.kind === "rent" ? "Rent" : "Buy", r.area_label ? `${r.area_label} area` : null]
@@ -285,7 +330,10 @@ function toBrowseCard(
     bhk: r.bhk,
     summary,
     isUrgent: r.urgency === "immediate",
-    isBoosted: false, // boost placement is Module 9 — never faked here
+    // Server-decided placement (Doc2 §13). A locked card still carries this flag:
+    // the Promoted tag and the top slot are what the boost bought, while budget
+    // and poster stay stripped — "locked-but-top" (Doc2 §9.2).
+    isBoosted,
     postedAgo: timeAgo(r.created_at),
     tier: "city",
   };

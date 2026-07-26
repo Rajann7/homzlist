@@ -104,6 +104,9 @@ export interface CheckoutSession {
 export interface BoostView {
   id: string;
   listingId: string;
+  /** what `listingId` points at — a boost can be on a listing, project or requirement */
+  subjectKind: "listing" | "project" | "requirement";
+  subjectNoun: string;
   listingTitle: string;
   listingPrice: string;
   status: string;
@@ -119,12 +122,19 @@ export interface BoostView {
   stoppedReason: string | null;
   refundedOn: string | null;
   paidAgo: string;
+  paidAt: string;
 }
 
 export interface CheckoutIntent {
   planId: string;
   listingId?: string;
+  /** Boost subject kind (Doc2 §13). Defaults to "listing" server-side. */
+  subjectKind?: "listing" | "project" | "requirement";
   targeting?: string;
+  /**
+   * Display only. The server resolves the real label from the subject's location
+   * and ignores this — a client-supplied label used to be stored verbatim.
+   */
   targetLabel?: string;
   couponCode?: string | null;
   gstin?: string | null;
@@ -192,9 +202,15 @@ export const billingApi = {
 
   boostEligible: () =>
     req<{
-      listings: { id: string; title: string; areaLabel: string | null; price: string; coverUrl: string | null; eligible: boolean; lockLabel: string | null }[];
+      listings: {
+        id: string; subjectKind: "listing" | "project" | "requirement";
+        title: string; areaLabel: string | null; price: string;
+        coverUrl: string | null; eligible: boolean; lockLabel: string | null;
+      }[];
       durations: { code: string; label: string; price: string; pricePaise: number; perDay: string; bestValue: boolean }[];
       targets: { key: string; reach: string }[];
+      /** "<kind>:<id>" → { area|city|state|india → the real place name } */
+      targetLabels: Record<string, Record<string, string>>;
     }>("/billing/boost/eligible", "GET"),
 
   boostStatus: () =>

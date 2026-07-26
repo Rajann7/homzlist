@@ -1,6 +1,7 @@
 import "server-only";
 import { createServiceClient } from "@/lib/supabase/server";
 import { consumeQuota, releaseQuota, reserveSlot, transitionSlot } from "@/lib/billing/service";
+import { stopBoostsForSubject, pauseBoostsForSubject, resumeBoostsForSubject } from "@/lib/billing/boost";
 import { primaryAreaSqft } from "./validate";
 
 /**
@@ -765,13 +766,20 @@ export async function setListingStatus(id: string, profileId: string, action: St
   const { data } = await db().from("listings").update(patch).eq("id", id).eq("profile_id", profileId).select("*").maybeSingle();
   if (!data) return null;
 
-  // Auto-stop any live boost (Doc2 §13: sold mid-boost → stop, no refund).
+  // Auto-stop any live boost (Doc2 §13: sold mid-boost → stop, no refund) — but
+  // a boost still awaiting approval is REFUNDED instead, because it never got a
+  // minute of placement. `stopBoostsForSubject` owns that distinction.
   if (["sold", "rented", "completed"].includes(action)) {
-    await db()
-      .from("boosts")
-      .update({ status: "stopped", stopped_reason: `Listing marked as ${action} · boost stopped automatically` })
-      .eq("listing_id", id)
-      .in("status", ["active", "pending_approval"]);
+    await stopBoostsForSubject(id, `Listing marked as ${action} · boost stopped automatically`);
+  }
+  // Hidden → the listing is placed nowhere, so the boost pauses (days are given
+  // back on resume) rather than quietly running down against an invisible row.
+  if (action === "hide") {
+    await pauseBoostsForSubject(id, "Listing hidden · boost paused");
+  }
+  // Back in the feed → resume whatever the hide paused.
+  if ((data as ListingRow).status === "live") {
+    await resumeBoostsForSubject(id);
   }
 
   return data as ListingRow;
@@ -834,11 +842,7 @@ export async function softDeleteListing(id: string, profileId: string) {
     await db().from("listings").update({ slot_id: null }).eq("id", id);
   }
 
-  await db()
-    .from("boosts")
-    .update({ status: "stopped", stopped_reason: "Listing deleted" })
-    .eq("listing_id", id)
-    .in("status", ["active", "pending_approval"]);
+  await stopBoostsForSubject(id, "Listing deleted");
 
   return true;
 }

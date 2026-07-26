@@ -1,5 +1,6 @@
 import "server-only";
 import { createServiceClient } from "@/lib/supabase/server";
+import { resumeBoostsForSubject, stopBoostsForSubject } from "@/lib/billing/boost";
 
 /**
  * Moderation — the half of Module 4 that decides whether anything ever goes
@@ -142,6 +143,14 @@ export async function moderate(
   });
 
   const u = updated as { status: string; reject_count: number | null; is_locked: boolean | null };
+
+  // Back in the feed → resume any boost that was paused while it was hidden or
+  // under review, so the buyer gets those days back (Doc2 §13 pause/resume).
+  if (u.status === "live") await resumeBoostsForSubject(id);
+  // Rejected outright → it will not be placed, so a boost on it cannot stand.
+  // Pending-approval boosts are refunded by the same shared path.
+  if (u.status === "rejected") await stopBoostsForSubject(id, "Not approved by moderation · boost stopped");
+
   return { ok: true, status: u.status, locked: Boolean(u.is_locked), rejectCount: u.reject_count ?? 0 };
 }
 

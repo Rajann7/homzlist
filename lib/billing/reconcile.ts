@@ -2,9 +2,10 @@ import "server-only";
 import { createServiceClient } from "@/lib/supabase/server";
 import { fetchOrderPayments, refundPayment, isConfigured, methodLabel } from "./razorpay";
 import {
-  activatePaidOrder, refundAndRevoke, expirePlans, expireBoosts, releaseCouponSlot,
+  activatePaidOrder, refundAndRevoke, expirePlans, releaseCouponSlot,
   sendExpiryReminders, claimBoostRefund, releaseBoostRefundClaim, getSettings, type OrderRow,
 } from "./service";
+import { expireBoostsAndNotify, sendBoostExpiryReminders } from "./boost";
 
 /**
  * Hourly billing reconciliation (Doc2 §4.3, Doc7 §21 item 12).
@@ -32,6 +33,10 @@ export interface ReconcileReport {
   markedFailed: number;
   boostRefunds: number;
   boostsTimedOut: number;
+  /** boosts whose window ran out this sweep (owner notified) */
+  boostsExpired: number;
+  /** "ends tomorrow · Renew in 1 tap" notices sent (Doc2 §13) */
+  boostRenewNotices: number;
   plansExpired: number;
   remindersSent: number;
   checked: number;
@@ -223,12 +228,14 @@ export async function runBillingReconciliation(): Promise<ReconcileReport> {
   const boostsTimedOut = await timeoutStalePendingBoosts();
   const boostRefunds = await refundRejectedBoosts();
 
-  // Reminders BEFORE expiry runs, so a plan crossing its end date in this same
-  // sweep still gets its 1-day notice rather than silently flipping to expired.
+  // Reminders BEFORE expiry runs, so a plan or boost crossing its end date in
+  // this same sweep still gets its 1-day notice rather than silently flipping to
+  // expired with no word to the owner.
   const remindersSent = await sendExpiryReminders();
+  const boostRenewNotices = await sendBoostExpiryReminders();
 
   await expirePlans();
-  await expireBoosts();
+  const boostsExpired = await expireBoostsAndNotify();
   const { count } = await db()
     .from("user_plans")
     .select("id", { count: "exact", head: true })
@@ -240,6 +247,8 @@ export async function runBillingReconciliation(): Promise<ReconcileReport> {
     markedFailed: settled.failed,
     boostRefunds,
     boostsTimedOut,
+    boostsExpired,
+    boostRenewNotices,
     plansExpired: count ?? 0,
     remindersSent,
     checked: settled.checked,

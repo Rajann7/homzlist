@@ -2,6 +2,7 @@ import "server-only";
 import { createServiceClient } from "@/lib/supabase/server";
 import { formatShortRupees } from "@/lib/billing/money";
 import { timeAgo } from "@/lib/listings/matching";
+import { placementsFor, outOfCityIds, stateIdOfCity, type PlacementSet } from "@/lib/billing/placement";
 
 /**
  * The Property-mode feed (Doc7 §78, Doc2 §9.1).
@@ -58,21 +59,6 @@ async function viewerCity(viewerId: string | null): Promise<string | null> {
   return (data as { city_id: string | null } | null)?.city_id ?? null;
 }
 
-/** Active boosts right now → the listing ids that rank first, in FIFO order. */
-async function activeBoostOrder(): Promise<{ ids: string[]; rank: Map<string, number> }> {
-  const nowIso = new Date().toISOString();
-  const { data } = await db()
-    .from("boosts")
-    .select("listing_id, starts_at")
-    .eq("status", "active")
-    .lte("starts_at", nowIso)
-    .or(`ends_at.is.null,ends_at.gt.${nowIso}`)
-    .order("starts_at", { ascending: true });
-  const rows = (data ?? []) as { listing_id: string; starts_at: string | null }[];
-  const rank = new Map<string, number>();
-  rows.forEach((r, i) => { if (!rank.has(r.listing_id)) rank.set(r.listing_id, i); });
-  return { ids: [...rank.keys()], rank };
-}
 
 async function notInterested(viewerId: string | null): Promise<{ types: Set<string>; areas: Set<string> }> {
   const types = new Set<string>(); const areas = new Set<string>();
@@ -98,6 +84,14 @@ export async function getFeed(
 
   const cityId = await viewerCity(viewerId);
   const hidden = await notInterested(viewerId);
+
+  // Which boosts target THIS viewer (Doc2 §13 targeting), FIFO by boost start.
+  // Resolved once per request and reused for ranking, for the out-of-city
+  // injection below, and for the Promoted flag on the card.
+  const placements = await placementsFor(
+    { cityId, stateId: cityId ? await stateIdOfCity(cityId) : null },
+    ["listing", "project"],
+  );
 
   // ---- listing candidates ----
   // Recency = `live_at` (when it entered the feed), NOT `created_at` (when the
@@ -138,13 +132,33 @@ export async function getFeed(
     (l) => !hidden.types.has(l.type_code) && !(l.area_id && hidden.areas.has(l.area_id)),
   );
 
-  const { rank } = await activeBoostOrder();
+  const rank = placements.rank;
+
+  // ---- boosted candidates from OUTSIDE the viewer's city ---------------------
+  // A state- or All-India-targeted boost reaches viewers whose city the subject
+  // isn't in — and the city-scoped queries above can never produce those rows.
+  // Without this fetch, wider targeting was money for nothing: it is what the
+  // buyer paid the same ₹1,499 for.
+  //
+  // Only on the FIRST page: boosts occupy the top slots, and re-injecting them
+  // on every page would repeat the same cards forever.
+  if (!cursor) {
+    const injected = await injectOutOfCity(placements, {
+      cityId, viewerId, filter,
+      haveListingIds: new Set(listings.map((l) => l.id)),
+      haveProjectIds: new Set(projRows.map((p) => p.id)),
+    });
+    listings = [...injected.listings, ...listings];
+    projRows = [...injected.projects, ...projRows];
+  }
 
   // Merge listings + projects into one candidate list with a common sort key.
   type Cand = { row: any; kind: "property" | "project"; ts: string; boost: number | null; price: number };
   const cands: Cand[] = [
     ...listings.map((l) => ({ row: l, kind: "property" as const, ts: l.live_at ?? l.created_at, boost: rank.has(l.id) ? rank.get(l.id)! : null, price: l.price_paise ?? Number.MAX_SAFE_INTEGER })),
-    ...projRows.map((p) => ({ row: p, kind: "project" as const, ts: p.live_at ?? p.created_at, boost: null, price: Number.MAX_SAFE_INTEGER })),
+    // Projects are boostable too (Doc2 §13) — they used to be hard-coded to
+    // `boost: null`, so a boosted project could never reach the top slot.
+    ...projRows.map((p) => ({ row: p, kind: "project" as const, ts: p.live_at ?? p.created_at, boost: rank.has(p.id) ? rank.get(p.id)! : null, price: Number.MAX_SAFE_INTEGER })),
   ];
 
   // Boosted always first (FIFO). The rest by the chosen sort.
@@ -178,6 +192,58 @@ export async function getFeed(
   const items = page.map((c) => toCard(c, profMap, verifiedSet, photosByListing, savedSet, priceFromByProject, rank));
 
   return { items, nextCursor, sections: [{ label: null, items }] };
+}
+
+/**
+ * Fetch the boosted listings/projects that the city-scoped candidate queries
+ * couldn't see (state / All-India targeting), minus anything already in hand.
+ *
+ * Everything the normal query enforces is re-applied here — live, available,
+ * not the viewer's own, matching the Buy/Rent filter — so the injection is a
+ * widening of REACH, never a way for a boost to bypass a feed rule.
+ */
+async function injectOutOfCity(
+  placements: PlacementSet,
+  ctx: {
+    cityId: string | null;
+    viewerId: string | null;
+    filter: FeedFilter;
+    haveListingIds: Set<string>;
+    haveProjectIds: Set<string>;
+  },
+): Promise<{ listings: any[]; projects: any[] }> {
+  const listingIds = outOfCityIds(placements, "listing").filter((id) => !ctx.haveListingIds.has(id));
+  const projectIds = outOfCityIds(placements, "project").filter((id) => !ctx.haveProjectIds.has(id));
+  if (!listingIds.length && !projectIds.length) return { listings: [], projects: [] };
+
+  const tasks: Promise<any>[] = [];
+
+  if (listingIds.length) {
+    let q = db()
+      .from("listings")
+      .select("id,profile_id,type_code,kind,title,price_paise,price_on_request,is_negotiable,area_label,area_id,city_id,cover_url,attributes,area_sqft,created_at,live_at")
+      .in("id", listingIds)
+      .eq("status", "live")
+      .eq("availability", "available");
+    if (ctx.viewerId) q = q.neq("profile_id", ctx.viewerId);
+    if (ctx.filter === "buy") q = q.eq("kind", "sell");
+    if (ctx.filter === "rent") q = q.eq("kind", "rent");
+    tasks.push(q);
+  } else tasks.push(Promise.resolve({ data: [] }));
+
+  // Projects only appear in the unfiltered feed, same as the main query.
+  if (projectIds.length && ctx.filter === "all") {
+    let q = db()
+      .from("projects")
+      .select("id,profile_id,name,build_status,rera_number,rera_exempt,area_label,area_id,city_id,cover_url,created_at,live_at")
+      .in("id", projectIds)
+      .eq("status", "live");
+    if (ctx.viewerId) q = q.neq("profile_id", ctx.viewerId);
+    tasks.push(q);
+  } else tasks.push(Promise.resolve({ data: [] }));
+
+  const [lRes, pRes] = await Promise.all(tasks);
+  return { listings: (lRes.data ?? []) as any[], projects: (pRes.data ?? []) as any[] };
 }
 
 async function photosFor(listingIds: string[]): Promise<Map<string, string[]>> {
@@ -233,7 +299,7 @@ function toCard(
     const pf = priceFromByProject.get(c.row.id);
     const buildLabel = c.row.build_status === "ready" ? "Ready to move" : c.row.build_status === "under_construction" ? "Under construction" : "Booking open";
     return {
-      kind: "project", id: c.row.id, promoted: false, saved: false,
+      kind: "project", id: c.row.id, promoted: boostRank.has(c.row.id), saved: false,
       coverUrl: c.row.cover_url, photos: c.row.cover_url ? [c.row.cover_url] : [],
       areaLabel: c.row.area_label, poster, postedAgo: timeAgo(c.row.live_at ?? c.row.created_at),
       title: c.row.name,

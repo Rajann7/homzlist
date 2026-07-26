@@ -1,6 +1,7 @@
 import "server-only";
 import { createServiceClient } from "@/lib/supabase/server";
 import { consumeQuota, releaseQuota } from "@/lib/billing/service";
+import { stopBoostsForSubject, pauseBoostsForSubject, resumeBoostsForSubject } from "@/lib/billing/boost";
 import { detectNumberInText } from "./validate";
 
 /**
@@ -392,7 +393,14 @@ export async function setRequirementActive(id: string, profileId: string, active
     .in("status", ["live", "paused"])
     .select("id")
     .maybeSingle();
-  return Boolean(data);
+  if (!data) return false;
+
+  // A requirement boost (Doc2 §13) is placed only while the requirement is
+  // browsable, so toggling it off pauses the boost instead of burning days on
+  // something nobody can see — and turning it back on resumes it.
+  if (active) await resumeBoostsForSubject(id);
+  else await pauseBoostsForSubject(id, "Requirement turned off · boost paused");
+  return true;
 }
 
 export async function fulfillRequirement(id: string, profileId: string) {
@@ -404,7 +412,10 @@ export async function fulfillRequirement(id: string, profileId: string) {
     .in("status", ["live", "paused"])
     .select("id")
     .maybeSingle();
-  return Boolean(data);
+  if (!data) return false;
+  // Fulfilled is this subject's version of "sold" — the boost auto-stops.
+  await stopBoostsForSubject(id, "Requirement marked fulfilled · boost stopped automatically");
+  return true;
 }
 
 /**
@@ -468,5 +479,7 @@ export async function deleteRequirement(id: string, profileId: string) {
     .eq("profile_id", profileId)
     .select("id")
     .maybeSingle();
-  return Boolean(data);
+  if (!data) return false;
+  await stopBoostsForSubject(id, "Requirement deleted · boost stopped");
+  return true;
 }

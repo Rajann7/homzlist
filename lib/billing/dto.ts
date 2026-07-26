@@ -294,11 +294,16 @@ const BOOST_BADGE: Record<BoostRow["status"], { kind: string; label: string }> =
   pending_payment: { kind: "pending", label: "Awaiting payment" },
   pending_approval: { kind: "pending", label: "Pending approval" },
   active: { kind: "active", label: "Active" },
+  // Admin-hide → pause (Doc2 §13). The buyer sees an honest "Paused" rather than
+  // an "Active" card for a boost that is currently placed nowhere.
+  paused: { kind: "pending", label: "Paused" },
   expired: { kind: "expired", label: "Expired" },
   rejected: { kind: "failed", label: "Rejected" },
   stopped: { kind: "expired", label: "Stopped" },
   cancelled: { kind: "expired", label: "Cancelled" },
 };
+
+const SUBJECT_NOUN: Record<string, string> = { listing: "Listing", project: "Project", requirement: "Requirement" };
 
 /**
  * Boost status for the user. Deliberately carries NO analytics — Doc2 §13 says
@@ -308,10 +313,13 @@ const BOOST_BADGE: Record<BoostRow["status"], { kind: string; label: string }> =
 export function boostDTO(b: BoostRow, listingLabel: { title: string; price: string } | null) {
   const total = b.starts_at && b.ends_at ? new Date(b.ends_at).getTime() - new Date(b.starts_at).getTime() : 0;
   const gone = b.starts_at ? Date.now() - new Date(b.starts_at).getTime() : 0;
+  const kind = b.subject_kind ?? "listing";
   return {
     id: b.id,
     listingId: b.listing_id,
-    listingTitle: listingLabel?.title ?? "Listing",
+    subjectKind: kind,
+    subjectNoun: SUBJECT_NOUN[kind] ?? "Listing",
+    listingTitle: listingLabel?.title ?? SUBJECT_NOUN[kind] ?? "Listing",
     listingPrice: listingLabel?.price ?? "",
     status: b.status,
     badge: BOOST_BADGE[b.status],
@@ -325,6 +333,20 @@ export function boostDTO(b: BoostRow, listingLabel: { title: string; price: stri
     rejectReason: b.reject_reason,
     stoppedReason: b.stopped_reason,
     refundedOn: ist(b.refunded_at),
-    paidAgo: istTime(b.created_at),
+    // The pending card reads "Paid ₹1,499 · 2h ago" — a relative age, not a
+    // timestamp. It used to render the full IST datetime here.
+    paidAgo: relativeAge(b.created_at),
+    paidAt: istTime(b.created_at),
   };
+}
+
+/** "2h ago" / "Yesterday" / "12 Jan" — the Doc2 §15 age format. */
+function relativeAge(iso: string): string {
+  const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60_000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  if (hrs < 48) return "Yesterday";
+  return ist(iso) ?? "";
 }

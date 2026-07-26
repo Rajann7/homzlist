@@ -1,6 +1,7 @@
 import "server-only";
 import { createServiceClient } from "@/lib/supabase/server";
 import { formatShortRupees } from "@/lib/billing/money";
+import { placementsFor, outOfCityIds, stateIdOfCity } from "@/lib/billing/placement";
 
 /**
  * Stories (Doc7 §84-86, Doc2 §9.3) — AUTO-GENERATED ONLY.
@@ -17,6 +18,9 @@ import { formatShortRupees } from "@/lib/billing/money";
  */
 
 const db = () => createServiceClient();
+
+/** Stand-in id for "match nothing", so a guest's `neq` filter stays valid SQL. */
+const NIL = "00000000-0000-0000-0000-000000000000";
 
 export type Ring = "unseen" | "seen" | "project" | "boosted";
 
@@ -74,16 +78,45 @@ export async function getStories(viewerId: string | null, cityOverride?: string 
   if (viewerId) pq = pq.neq("profile_id", viewerId);
 
   const [{ data: lRows }, { data: pRows }] = await Promise.all([lq, pq]);
-  const listings = (lRows ?? []) as any[];
-  const projects = (pRows ?? []) as any[];
+  let listings = (lRows ?? []) as any[];
+  let projects = (pRows ?? []) as any[];
+
+  // Which boosts target THIS viewer (Doc2 §13). Placement used to be a bare
+  // `status = 'active'` read, so an area-targeted boost in another city put a
+  // gold ring at the front of everyone's row.
+  const placements = await placementsFor(
+    { cityId, stateId: cityId ? await stateIdOfCity(cityId) : null },
+    ["listing", "project"],
+  );
+  const boostedIds = placements.rank;
+
+  // Doc2 §13 promises "story-row first" for the areas targeted, and a state or
+  // All-India boost targets viewers outside the subject's own city — which the
+  // city-scoped queries above filter out. Fetch those explicitly (still inside
+  // the 24h story window, still live, still not the viewer's own).
+  const missingListing = outOfCityIds(placements, "listing").filter((id) => !listings.some((l) => l.id === id));
+  const missingProject = outOfCityIds(placements, "project").filter((id) => !projects.some((p) => p.id === id));
+  if (missingListing.length || missingProject.length) {
+    const [extraL, extraP] = await Promise.all([
+      missingListing.length
+        ? db().from("listings")
+            .select("id,profile_id,cover_url,price_paise,price_on_request,area_label,area_id,attributes,area_sqft,live_at")
+            .in("id", missingListing).eq("status", "live").eq("availability", "available").gte("live_at", since)
+            .neq("profile_id", viewerId ?? NIL)
+        : Promise.resolve({ data: [] }),
+      missingProject.length
+        ? db().from("projects")
+            .select("id,profile_id,cover_url,name,area_label,area_id,live_at")
+            .in("id", missingProject).eq("status", "live").gte("live_at", since)
+            .neq("profile_id", viewerId ?? NIL)
+        : Promise.resolve({ data: [] }),
+    ]);
+    listings = [...((extraL.data ?? []) as any[]), ...listings];
+    projects = [...((extraP.data ?? []) as any[]), ...projects];
+  }
 
   const posterIds = [...new Set([...listings, ...projects].map((r) => r.profile_id))];
   if (!posterIds.length) return [];
-
-  // Active boosts → which listings are boosted (their poster's ring is gold).
-  const nowIso = new Date().toISOString();
-  const { data: boosts } = await db().from("boosts").select("listing_id").eq("status", "active").lte("starts_at", nowIso).or(`ends_at.is.null,ends_at.gt.${nowIso}`);
-  const boostedListing = new Set(((boosts ?? []) as { listing_id: string }[]).map((b) => b.listing_id));
 
   const [{ data: profs }, { data: vers }, seen] = await Promise.all([
     db().from("profiles").select("id,name,photo_url,role").in("id", posterIds),
@@ -113,28 +146,36 @@ export async function getStories(viewerId: string | null, cityOverride?: string 
       price: l.price_on_request ? "Price on request" : formatShortRupees(l.price_paise),
       meta: [bhk ? `${bhk} BHK` : null, l.area_sqft ? `${l.area_sqft.toLocaleString("en-IN")} sqft` : null, l.area_label].filter(Boolean).join(" · "),
       areaLabel: l.area_label, available: true,
-    }, boostedListing.has(l.id), false);
+    }, boostedIds.has(l.id), false);
   }
   for (const p of projects) {
     pushSeg(p.profile_id, {
       id: p.id, kind: "project", cover: p.cover_url, price: p.name,
+      // Projects are boostable too (Doc2 §13) — this was hard-coded `false`.
       meta: p.area_label ?? "", areaLabel: p.area_label, available: true,
-    }, false, true);
+    }, boostedIds.has(p.id), true);
   }
 
   // Boosted posters first, then insertion (recency) order.
-  const circles: StoryCircle[] = order.map((posterId) => {
+  const circles: (StoryCircle & { boostRank: number })[] = order.map((posterId) => {
     const g = byPoster.get(posterId)!;
     const prof = profMap.get(posterId) ?? {};
     const allSeen = g.segments.every((s) => seen.has(s.id));
     const ring: Ring = g.boosted ? "boosted" : allSeen ? "seen" : g.isProject ? "project" : "unseen";
+    // Doc2 §9.3: "boosted-seen → normal position (no re-first)". Once the viewer
+    // has watched a boosted circle it stops jumping the queue on every refresh —
+    // otherwise the same gold ring sat at slot 0 all day, which is what made the
+    // row feel stale rather than promoted.
+    const jumpsQueue = g.boosted && !allSeen;
     return {
       posterId, posterName: prof.name ?? "HomzList user", posterAvatar: prof.photo_url ?? null,
       verified: verifiedSet.has(posterId), ring, boosted: g.boosted, isProject: g.isProject, segments: g.segments,
+      // FIFO among boosted circles, mirroring the feed's tie-break.
+      boostRank: jumpsQueue ? Math.min(...g.segments.map((s) => boostedIds.get(s.id) ?? Number.MAX_SAFE_INTEGER)) : Number.MAX_SAFE_INTEGER,
     };
   });
-  circles.sort((a, b) => (a.boosted === b.boosted ? 0 : a.boosted ? -1 : 1));
-  return circles;
+  circles.sort((a, b) => a.boostRank - b.boostRank);
+  return circles.map(({ boostRank: _boostRank, ...c }) => c);
 }
 
 async function seenSet(viewerId: string | null, cityId: string | null): Promise<Set<string>> {

@@ -29,7 +29,10 @@
     "verify:trash": "node scripts/verify-trash.mjs",
     "check:fields": "node scripts/check-field-config.mjs",
     "seed:module8": "node scripts/seed-module8.mjs",
-    "check:search": "node scripts/check-search-live.mjs"
+    "check:search": "node scripts/check-search-live.mjs",
+    "seed:module9": "node scripts/seed-module9.mjs",
+    "check:boost": "node scripts/check-boost-live.mjs",
+    "q": "node scripts/q.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1091.0",

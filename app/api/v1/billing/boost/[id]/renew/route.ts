@@ -1,6 +1,7 @@
 import { ok, fail } from "@/lib/api";
 import { getCurrentUser } from "@/lib/auth/current-user";
-import { getBoost, getCatalogItem, isListingBoostEligible } from "@/lib/billing/service";
+import { getBoost, getCatalogItem } from "@/lib/billing/service";
+import { isBoostSubjectEligible, type BoostSubjectKind } from "@/lib/billing/boost";
 
 /**
  * POST /api/v1/billing/boost/:id/renew (Doc7 §41) — 1-tap renew.
@@ -22,9 +23,11 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
   const boost = await getBoost(params.id, claims.sub);
   if (!boost) return fail("NOT_FOUND");
 
-  // The listing must still be live — renewing a sold/hidden listing's boost is
-  // exactly the "boost an ineligible listing" abuse Doc9 §11 calls out.
-  if (!(await isListingBoostEligible(claims.sub, boost.listing_id))) return fail("LISTING_STATE_LOCKED");
+  // The subject must still be live — renewing a sold/hidden listing's boost is
+  // exactly the "boost an ineligible listing" abuse Doc9 §11 calls out. Checked
+  // against the subject's OWN table since Module 9 (listing/project/requirement).
+  const subjectKind = (boost.subject_kind ?? "listing") as BoostSubjectKind;
+  if (!(await isBoostSubjectEligible(claims.sub, subjectKind, boost.listing_id))) return fail("LISTING_STATE_LOCKED");
 
   // Price is re-read from the catalog, so an admin rate change applies to the
   // renewal (a renewal is a new purchase, not a grandfathered one).
@@ -35,7 +38,10 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
     checkout: {
       planId: item.code,
       listingId: boost.listing_id,
+      subjectKind,
       targeting: boost.targeting,
+      // Echoed for display only — checkout re-resolves the label from the
+      // subject's location and ignores whatever the client posts back.
       targetLabel: boost.target_label,
     },
   });

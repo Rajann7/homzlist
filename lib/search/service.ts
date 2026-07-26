@@ -3,6 +3,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { formatShortRupees } from "@/lib/billing/money";
 import { timeAgo } from "@/lib/listings/matching";
 import type { FeedCard } from "@/lib/feed/service";
+import { placementsFor, viewerScope, type ViewerScope } from "@/lib/billing/placement";
 import { parseQuery, pgrstSafe, type ParsedQuery } from "./parse";
 import { bucketRange } from "./filters";
 import type {
@@ -61,6 +62,10 @@ interface RpcArgs {
   p_ready: boolean;
   p_verified_only: boolean;
   p_exclude_profile: string | null;
+  /** Boost targeting (migration 0039) — who the boost-first ordering applies to. */
+  p_viewer_city_id: string | null;
+  p_viewer_state_id: string | null;
+  p_scope_area_ids: string[] | null;
 }
 
 /**
@@ -126,6 +131,30 @@ async function buildArgs(
     p_verified_only: Boolean(f.verifiedOnly),
     // Own listings never appear in your own search results (same rule as feed).
     p_exclude_profile: viewerId,
+    // ---- boost targeting (Doc2 §13, migration 0039) -------------------------
+    // The RPC's boost-first ORDER BY only applies to boosts whose targeting
+    // covers this viewer. `p_scope_area_ids` is the surface's own area scope, so
+    // an area-targeted boost tops the area page it paid for and no other.
+    ...(await viewerTargetArgs(viewerId, f.cityId ?? parsed.cityId ?? null, areas)),
+  };
+}
+
+/**
+ * The viewer's location for the RPC's targeting predicate. Falls back to the
+ * SEARCH's city when the viewer has none (a guest filtering to Rajkot is, for
+ * placement purposes, in Rajkot) — otherwise every guest search would be treated
+ * as location-unknown and match every boost in the country.
+ */
+async function viewerTargetArgs(
+  viewerId: string | null,
+  searchCityId: string | null,
+  scopeAreaIds: string[],
+): Promise<{ p_viewer_city_id: string | null; p_viewer_state_id: string | null; p_scope_area_ids: string[] | null }> {
+  const scope = await viewerScope(viewerId, searchCityId);
+  return {
+    p_viewer_city_id: scope.cityId,
+    p_viewer_state_id: scope.stateId,
+    p_scope_area_ids: scopeAreaIds.length ? scopeAreaIds : null,
   };
 }
 
@@ -158,7 +187,11 @@ async function runRpc(args: RpcArgs, sort: SearchSort, limit: number, offset: nu
 export async function countProperties(f: SearchFilters, viewerId: string | null): Promise<number> {
   const parsed = await parseQuery(f.q ?? "", { cityId: f.cityId });
   const args = await buildArgs(f, parsed, viewerId);
-  const { data, error } = await db().rpc("hz_search_count", args);
+  // `hz_search_count` filters but doesn't ORDER, so the boost-targeting params
+  // aren't part of its signature — passing them would make PostgREST fail to
+  // resolve the function at all.
+  const { p_viewer_city_id: _c, p_viewer_state_id: _s, p_scope_area_ids: _a, ...countArgs } = args;
+  const { data, error } = await db().rpc("hz_search_count", countArgs);
   if (error) throw new Error(`count failed: ${error.message}`);
   return Number(data ?? 0);
 }
@@ -180,10 +213,18 @@ export async function searchProperties(
   const limit = Math.min(opts.limit ?? PAGE, 30);
   const offset = cursorToOffset(opts.cursor);
 
+  // Placement scope for the Promoted badge — the same values the RPC ordered on,
+  // so the tag and the position can never disagree.
+  const scope: ViewerScope = {
+    cityId: args.p_viewer_city_id,
+    stateId: args.p_viewer_state_id,
+    areaIds: args.p_scope_area_ids,
+  };
+
   // ---- exact tier ----
   const exact = await runRpc(args, sort, limit, offset);
   const sections: SearchSection<FeedCard>[] = [];
-  const exactCards = await hydrate(exact.ids, viewerId);
+  const exactCards = await hydrate(exact.ids, viewerId, scope);
   sections.push({ label: null, items: exactCards });
 
   /**
@@ -201,8 +242,11 @@ export async function searchProperties(
     const room = limit - exactCards.length;
 
     if (adjacent.length && room > 0) {
-      const nearby = await runRpc({ ...args, p_area_ids: adjacent.map((a) => a.id) }, sort, room, 0);
-      const cards = await hydrate(nearby.ids, viewerId);
+      // The area scope moves with the tier, so an area-targeted boost tops the
+      // "Nearby" section only if it bought one of THOSE areas.
+      const adjIds = adjacent.map((a) => a.id);
+      const nearby = await runRpc({ ...args, p_area_ids: adjIds, p_scope_area_ids: adjIds }, sort, room, 0);
+      const cards = await hydrate(nearby.ids, viewerId, { ...scope, areaIds: adjIds });
       if (cards.length) {
         // Label names the areas the extra results actually came from.
         const names = [...new Set(cards.map((c) => c.areaLabel?.split(",")[0]).filter(Boolean))] as string[];
@@ -214,9 +258,10 @@ export async function searchProperties(
     const shown = sections.reduce((n, s) => n + s.items.length, 0);
     if (shown < limit && args.p_city_id) {
       const seen = new Set(sections.flatMap((s) => s.items.map((i) => i.id)));
-      const city = await runRpc({ ...args, p_area_ids: null }, sort, limit * 2, 0);
+      // City tier has no area scope, so `area` targeting falls back to the city.
+      const city = await runRpc({ ...args, p_area_ids: null, p_scope_area_ids: null }, sort, limit * 2, 0);
       const fresh = city.ids.filter((id) => !seen.has(id)).slice(0, limit - shown);
-      const cards = await hydrate(fresh, viewerId);
+      const cards = await hydrate(fresh, viewerId, { ...scope, areaIds: null });
       if (cards.length) {
         const cityName = await locationName(args.p_city_id);
         sections.push({ label: `More in ${cityName ?? "this city"}`, items: cards });
@@ -280,8 +325,18 @@ async function locationNames(ids: string[]): Promise<string[]> {
 // Hydration — ids → the SAME card shape the feed renders
 // ---------------------------------------------------------------------------
 
-export async function hydrate(ids: string[], viewerId: string | null): Promise<FeedCard[]> {
+export async function hydrate(
+  ids: string[],
+  viewerId: string | null,
+  /**
+   * The surface's placement scope, so the Promoted badge agrees with the
+   * ordering the RPC applied. Resolved from the viewer's profile when the caller
+   * doesn't have one to hand.
+   */
+  scope?: ViewerScope,
+): Promise<FeedCard[]> {
   if (!ids.length) return [];
+  const viewer = scope ?? (await viewerScope(viewerId));
 
   const { data: rows } = await db()
     .from("listings")
@@ -298,7 +353,7 @@ export async function hydrate(ids: string[], viewerId: string | null): Promise<F
     db().from("verifications").select("profile_id").eq("status", "approved").in("level", ["phone", "id", "rera"]).in("profile_id", posterIds.length ? posterIds : [NIL]),
     photosFor(ids),
     savedFor(viewerId, ids),
-    boostedSet(ids),
+    boostedSet(ids, viewer),
   ]);
 
   const profMap = new Map<string, any>(((profs ?? []) as any[]).map((p) => [p.id, p]));
@@ -362,13 +417,18 @@ async function savedFor(viewerId: string | null, ids: string[]): Promise<Set<str
   const { data } = await db().from("saves").select("listing_id").eq("profile_id", viewerId).in("listing_id", ids);
   return new Set(((data ?? []) as { listing_id: string }[]).map((s) => s.listing_id));
 }
-async function boostedSet(ids: string[]): Promise<Set<string>> {
+/**
+ * Which of these ids carry a "Promoted" tag FOR THIS VIEWER.
+ *
+ * Targeting-aware since Module 9: the badge has to agree with the ranking. A
+ * plain `status = 'active'` read (what this used to be) labelled a card
+ * "Promoted" for viewers the boost never targeted and never placed it for — a
+ * tag with nothing behind it.
+ */
+async function boostedSet(ids: string[], viewer: ViewerScope): Promise<Set<string>> {
   if (!ids.length) return new Set();
-  const nowIso = new Date().toISOString();
-  const { data } = await db().from("boosts").select("listing_id")
-    .eq("status", "active").in("listing_id", ids)
-    .lte("starts_at", nowIso).or(`ends_at.is.null,ends_at.gt.${nowIso}`);
-  return new Set(((data ?? []) as { listing_id: string }[]).map((b) => b.listing_id));
+  const set = await placementsFor(viewer, ["listing"]);
+  return new Set(ids.filter((id) => set.rank.has(id)));
 }
 
 // ---------------------------------------------------------------------------
@@ -752,6 +812,7 @@ export interface ExploreTile {
 }
 
 export async function exploreGrid(cityId: string | null, viewerId: string | null, limit = 12): Promise<ExploreTile[]> {
+  const viewer = await viewerScope(viewerId, cityId);
   let q = db().from("listings")
     .select("id,cover_url,photo_count,price_paise,price_on_request,area_label,attributes,type_code")
     .eq("status", "live").eq("availability", "available")
@@ -764,7 +825,7 @@ export async function exploreGrid(cityId: string | null, viewerId: string | null
   const rows = ((data ?? []) as any[]);
   if (!rows.length) return [];
 
-  const boosted = await boostedSet(rows.map((r) => r.id));
+  const boosted = await boostedSet(rows.map((r) => r.id), viewer);
   const { data: types } = await db().from("property_types").select("code,label");
   const labelOf = new Map<string, string>(((types ?? []) as { code: string; label: string }[]).map((t) => [t.code, t.label]));
 

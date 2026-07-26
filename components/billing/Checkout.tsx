@@ -36,6 +36,9 @@ export function Checkout() {
 
   const planId = params.get("plan") ?? "";
   const listingId = params.get("listing") ?? undefined;
+  // Boost subjects can be a listing, project or requirement (Doc2 §13). The
+  // server validates the value and re-checks ownership either way.
+  const subjectKind = (params.get("kind") ?? undefined) as "listing" | "project" | "requirement" | undefined;
   const targeting = params.get("targeting") ?? undefined;
   const targetLabel = params.get("targetLabel") ?? undefined;
   const next = params.get("next") ?? undefined;
@@ -145,6 +148,7 @@ export function Checkout() {
     const intent: CheckoutIntent = {
       planId,
       listingId,
+      subjectKind,
       targeting,
       targetLabel,
       couponCode,

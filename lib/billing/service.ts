@@ -2,6 +2,7 @@ import "server-only";
 import { createServiceClient } from "@/lib/supabase/server";
 import { computeTax, formatShortRupees, type TaxBreakdown, COUPON_RE } from "./money";
 import { formatPhone } from "@/lib/auth/phone";
+import { isBoostSubjectEligible } from "./boost";
 
 /**
  * Billing persistence + business rules (Doc2 §4, Doc7 §3, Doc9 §11–12).
@@ -73,7 +74,14 @@ export interface OrderRow {
   place_of_supply: string;
   razorpay_order_id: string | null;
   status: "created" | "pending" | "paid" | "failed" | "expired" | "refunded";
-  boost_request: { listingId: string; catalogCode: string; targeting: string; targetLabel: string } | null;
+  boost_request: {
+    listingId: string;
+    catalogCode: string;
+    targeting: string;
+    targetLabel: string;
+    /** what `listingId` points at — listing (default), project or requirement */
+    subjectKind?: "listing" | "project" | "requirement";
+  } | null;
   created_at: string;
 }
 
@@ -789,14 +797,16 @@ export async function refundAndRevoke(args: {
 export interface BoostRow {
   id: string;
   profile_id: string;
+  /** the SUBJECT id — resolve it in the table named by `subject_kind` */
   listing_id: string;
+  subject_kind: "listing" | "project" | "requirement";
   order_id: string | null;
   catalog_code: string;
   duration_days: number;
   targeting: "area" | "city" | "state" | "india";
   target_label: string;
   price_paise: number;
-  status: "pending_payment" | "pending_approval" | "active" | "expired" | "rejected" | "stopped" | "cancelled";
+  status: "pending_payment" | "pending_approval" | "active" | "paused" | "expired" | "rejected" | "stopped" | "cancelled";
   starts_at: string | null;
   ends_at: string | null;
   approved_at: string | null;
@@ -813,17 +823,30 @@ export async function createBoost(args: {
   targeting: BoostRow["targeting"];
   targetLabel: string;
   orderId: string;
+  subjectKind?: "listing" | "project" | "requirement";
+  /**
+   * Resolved targeting geography (migration 0038). Placement matches these ids
+   * against the viewer, so they are derived server-side from the SUBJECT — never
+   * from anything the browser sent.
+   */
+  targetAreaId?: string | null;
+  targetCityId?: string | null;
+  targetStateId?: string | null;
 }): Promise<string> {
   const { data, error } = await db()
     .from("boosts")
     .insert({
       profile_id: args.profileId,
       listing_id: args.listingId,
+      subject_kind: args.subjectKind ?? "listing",
       order_id: args.orderId,
       catalog_code: args.item.code,
       duration_days: args.item.period_days ?? 7,
       targeting: args.targeting,
       target_label: args.targetLabel,
+      target_area_id: args.targetAreaId ?? null,
+      target_city_id: args.targetCityId ?? null,
+      target_state_id: args.targetStateId ?? null,
       price_paise: args.item.price_paise,
       status: "pending_payment",
     })
@@ -839,13 +862,17 @@ export async function createBoost(args: {
  * listing auto-refunds instead of silently going live.
  */
 async function activateBoostForOrder(order: OrderRow): Promise<string | undefined> {
-  const { data } = await db().from("boosts").select("id,listing_id").eq("order_id", order.id).maybeSingle();
+  const { data } = await db().from("boosts").select("id,listing_id,subject_kind").eq("order_id", order.id).maybeSingle();
   if (!data) return undefined;
-  const boost = data as { id: string; listing_id: string };
+  const boost = data as { id: string; listing_id: string; subject_kind: "listing" | "project" | "requirement" };
 
-  const eligible = await isListingBoostEligible(order.profile_id, boost.listing_id);
+  // Subject-aware since Module 9: a project or requirement boost has to be
+  // re-checked against ITS table, not against `listings` (where its id simply
+  // isn't found — which used to reject every non-listing boost outright).
+  const eligible = await isBoostSubjectEligible(order.profile_id, boost.subject_kind ?? "listing", boost.listing_id);
   if (!eligible) {
-    await db().from("boosts").update({ status: "rejected", reject_reason: "Listing was not live at payment time" }).eq("id", boost.id);
+    const noun = boost.subject_kind === "requirement" ? "Requirement" : boost.subject_kind === "project" ? "Project" : "Listing";
+    await db().from("boosts").update({ status: "rejected", reject_reason: `${noun} was not live at payment time` }).eq("id", boost.id);
     return boost.id; // the refund worker picks rejected+paid boosts up
   }
   await db().from("boosts").update({ status: "pending_approval" }).eq("id", boost.id);
@@ -1061,7 +1088,14 @@ async function deliverExpiryReminder(profileId: string, planName: string, milest
   });
 }
 
-/** Hourly cron: expire boosts whose window has passed (Doc7 §21). */
+/**
+ * Expire boosts whose window has passed (Doc7 §21).
+ *
+ * Called on read (so the status screen is never stale) AND by the hourly cron,
+ * which uses `expireBoostsAndNotify` in lib/billing/boost.ts instead — that one
+ * also sends the Doc2 §14 "boost expiry" notice. This stays a silent sweep on
+ * purpose: a page render must not fan out notifications.
+ */
 export async function expireBoosts() {
   await db().from("boosts").update({ status: "expired" }).eq("status", "active").lt("ends_at", new Date().toISOString());
 }

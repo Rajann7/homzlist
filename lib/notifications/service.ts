@@ -14,7 +14,10 @@ import { sendPushToProfile } from "./push";
 
 export type NotificationType =
   | "inquiry_received" | "proposal_received" | "chat_accepted"
-  | "number_requested" | "number_shared" | "new_message";
+  | "number_requested" | "number_shared" | "new_message"
+  // Boost events (Doc2 §14 catalog: "boost approval/active/expiry+renew").
+  // `boost_expiring` is the one that carries the 1-tap Renew action.
+  | "boost_approved" | "boost_rejected" | "boost_expiring" | "boost_expired" | "boost_stopped";
 
 export interface NotifyInput {
   profileId: string;              // recipient

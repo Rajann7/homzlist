@@ -1,5 +1,6 @@
 import "server-only";
 import { createServiceClient } from "@/lib/supabase/server";
+import { stopBoostsForSubject, pauseBoostsForSubject } from "@/lib/billing/boost";
 
 /**
  * Listing lifecycle crons (Doc2 §5.4, Doc7 §21 items 1-4, 18).
@@ -51,7 +52,12 @@ async function autoHide(): Promise<number> {
     .eq("status", "live")
     .lt("still_available_asked_at", ago(15))
     .select("id");
-  return (data ?? []).length;
+  const rows = (data ?? []) as { id: string }[];
+  // A hidden listing is placed nowhere, so its boost must not keep burning days
+  // in the background. Pausing (not stopping) means the days come back if the
+  // owner answers and it goes live again.
+  for (const r of rows) await pauseBoostsForSubject(r.id, "Listing hidden — boost paused");
+  return rows.length;
 }
 
 /** Step 3 — hidden for a month → soft-delete (recoverable from trash). */
@@ -62,7 +68,11 @@ async function autoSoftDelete(): Promise<number> {
     .eq("status", "hidden")
     .lt("hidden_at", ago(30))
     .select("id");
-  return (data ?? []).length;
+  const rows = (data ?? []) as { id: string }[];
+  // Past the point of coming back — a paused boost here would sit forever, so
+  // it ends (and one still awaiting approval is refunded).
+  for (const r of rows) await stopBoostsForSubject(r.id, "Listing deleted · boost stopped");
+  return rows.length;
 }
 
 /**
@@ -82,7 +92,11 @@ async function expireProjects(): Promise<number> {
     .eq("status", "live")
     .lt("expires_at", new Date().toISOString())
     .select("id");
-  return (data ?? []).length;
+  const rows = (data ?? []) as { id: string }[];
+  // A project boost (Doc2 §13) can outlive its project's 1-year window; the
+  // archive ends it, and one not yet approved is refunded.
+  for (const r of rows) await stopBoostsForSubject(r.id, "Project archived · boost stopped");
+  return rows.length;
 }
 
 /** Drafts expire at 90 days (Doc2 §5.3). */
@@ -116,11 +130,11 @@ export async function answerStillAvailable(listingId: string, profileId: string,
   if (!data) return false;
 
   if (!stillAvailable) {
-    await db()
-      .from("boosts")
-      .update({ status: "stopped", stopped_reason: "Listing marked as sold · boost stopped automatically" })
-      .eq("listing_id", listingId)
-      .in("status", ["active", "pending_approval"]);
+    // Shared path (lib/billing/boost.ts): a RUNNING boost stops with no refund,
+    // but one still waiting for approval is cancelled + REFUNDED — it never got
+    // a minute of placement. This used to mark both `stopped`, silently keeping
+    // the money for a boost that never ran.
+    await stopBoostsForSubject(listingId, "Listing marked as sold · boost stopped automatically");
   }
   return true;
 }

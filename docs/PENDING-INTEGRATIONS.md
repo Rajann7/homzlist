@@ -678,7 +678,32 @@ no fake saved-list is shown. The table underneath is real; nothing saved is lost
 
 These are the ones people forget, because no credential will ever fix them.
 
-## A1. 🔴 A paid boost never becomes active
+## A1. ✅ CLOSED 26 Jul 2026 (Module 9) — a paid boost CAN now become active
+
+`approveBoost()` in `lib/billing/boost.ts` is the transition that did not exist,
+exposed at `POST /api/v1/admin/moderate/boost/:id` with
+`{action: "approve" | "reject" | "pause" | "resume"}` and gated by the same
+`staff` table as listing moderation (404 to everyone else, so the endpoint isn't
+confirmable by probing). Approve sets `status='active'` with
+`starts_at`/`ends_at`/`approved_at`/`approved_by`, **re-checks eligibility at the
+moment of approval** (Doc2 §13's race seal — a listing that sold while it waited
+is rejected + refunded instead of quietly going live), enforces
+`billing_settings.boost_city_cap`, and queues consecutively behind any boost
+already running on the same subject. Reject stores the reason and leaves
+`refunded_at` null so the existing single-flight sweep owns the money. Every
+decision writes a `boost_reviews` row and notifies the seller.
+
+Verified live via `node scripts/check-boost-live.mjs`: staff approved a pending
+₹1,499 boost → `active` with a 30-day window matching the duration paid for; a
+second approve was refused (no doubled window); pause/resume returned the paused
+time to `ends_at`; reject stored the reason with `refunded_at` still null.
+
+The admin *screen* is still Module 11 — see **M9.6**. The safety valve below stays
+in place as a backstop for boosts nobody reviews.
+
+### Original gap, kept for history
+
+## A1-orig. 🔴 A paid boost never becomes active
 
 **The gap.** `activateBoostForOrder` sets a paid boost to `pending_approval`
 (`lib/billing/service.ts:817`). **No code anywhere moves it to `active`.** Grep
@@ -738,7 +763,19 @@ are admin-only by design (Doc2 §4). `plan_reminders`/`db:proof` show
 **Verify when built:** granted user's My Plan shows the trial card and its
 "Buying a plan ends the trial" note; buying a plan ends it.
 
-## A3. Boost placement is not wired (Module 9)
+## A3. ✅ CLOSED 26 Jul 2026 (Module 9) — boost placement is wired
+
+Feed, story row, search results, the Explore 2×2 hero, area landing pages and the
+requirement-mode feed all place boosts now, through one shared read path
+(`lib/billing/placement.ts`) so no two surfaces can disagree about ranking.
+Targeting is honoured against resolved location ids (migration 0038) — which is
+what the old text-only `target_label` could never do — and requirement boosts are
+locked-but-top for unpaid viewers. Full detail, plus the eight defects found on the
+way, in **M9** at the bottom of this file.
+
+### Original gap, kept for history
+
+## A3-orig. Boost placement is not wired (Module 9)
 
 Module 9's prompt is *"wire boost placement into feed/story/search (top slots,
 "Promoted" tag, location targeting) … Requirement-boost = locked-but-top for
@@ -1557,3 +1594,131 @@ indexes on title/area_label/name/name_gu are in 0030.
 `/api/v1/cron/search` (daily 04:00) is registered in `vercel.json` and inherits
 **B2**: like every other cron it does nothing until `CRON_SECRET` is set on the
 host. Without it the route refuses (401) rather than running open.
+
+# M9. Module 9 — Boost placement (P11 boost), 26 Jul 2026
+
+Boost PURCHASE shipped in Module 3. Module 9 is everything that had to happen for
+the thing being purchased to actually exist. It closes **A1** (the approval
+transition) and **A3** (placement), and fixes eight defects found while walking
+the prompt line by line.
+
+## M9.1 — What was actually broken (found, not listed in the prompt)
+
+1. **Nothing could approve a boost.** `pending_approval` → `active` had no code
+   path anywhere, so every paid boost eventually hit the 48h timeout from
+   migration 0012 and was refunded. This was A1; it is now `approveBoost()` in
+   `lib/billing/boost.ts` behind `POST /api/v1/admin/moderate/boost/:id`.
+2. **Targeting was decorative.** `boosts.targeting`/`target_label` were free text
+   with no location ids behind them, and every placement query was a bare
+   `status = 'active'`. It was wrong in both directions: a "this area only" boost
+   (₹499, the cheapest reach) topped the entire city feed and every other city's
+   search results, while "All India" (₹1,499, the same price as a city boost) did
+   **literally nothing** — feed and search are city-scoped, so an out-of-city
+   listing was never even a candidate row. Migration 0038 adds
+   `target_area_id`/`target_city_id`/`target_state_id`, resolved server-side at
+   purchase from the SUBJECT's own location; migration 0039 moves the match into
+   the search RPC's boost join (that function also paginates, so a service-layer
+   re-sort could not have fixed it).
+3. **The client chose its own target label.** Checkout stored `body.targetLabel`
+   verbatim, so a crafted request could make the boost status screen claim any
+   reach it liked. The label is now composed from the `locations` table and the
+   posted value is ignored entirely.
+4. **Only listings could be boosted.** Doc2 §13 makes projects and requirements
+   boostable too — the requirement case is §9.2's "locked-but-top", which was in
+   this module's own prompt. `boosts.listing_id` is now a subject id qualified by
+   `subject_kind`, and the picker, status screen, admin queue, eligibility check
+   and "View listing" link are all subject-aware. `lib/listings/matching.ts` had
+   `isBoosted: false, // boost placement is Module 9` hard-coded.
+5. **Selling a listing before its boost was approved kept the money.** All three
+   auto-stop call sites marked `pending_approval` boosts `stopped` alongside the
+   running ones. `stopped` means "ran, no refund for unused days" — but this boost
+   had never been placed for a single minute, AND `stopped` is a state the refund
+   sweep does not look at, so nothing downstream would ever have caught it. One
+   shared `stopBoostsForSubject()` now sends never-live boosts to `cancelled` —
+   the same refundable state the user's own Cancel button produces.
+6. **Hiding a listing burned boost days silently.** A hidden listing is placed
+   nowhere, so the window ran down against something invisible. Hide now pauses
+   (`paused`, new in migration 0038 — also Doc2 §13's "admin-hide → pause/resume",
+   which previously had no state to sit in), and resume adds the paused duration
+   back to `ends_at`.
+7. **"Renew in 1 tap" had no producer.** The P11 banner was computed on read from
+   `daysLeft <= 1`, so it existed only while the user was already looking at the
+   boost screen, and the notification version of it in the P11 notifications
+   design had no code at all. Doc2 §13 makes renewal a *notification* precisely
+   because nothing auto-charges. `sendBoostExpiryReminders()` (migration 0040's
+   `boost_reminders`, once-only per boost+milestone) runs on the hourly cron, and
+   `expireBoostsAndNotify()` tells the seller when a boost actually ends.
+8. **Boosted-but-seen story circles never stopped jumping the queue.** Doc2 §9.3
+   says "boosted-seen → normal position (no re-first)"; the sort was
+   `boosted ? -1 : 1` with no seen check, so the same gold ring held slot 0 all
+   day. Separately, `target_label` on pre-Module-9 rows was placeholder or flatly
+   wrong text ("City", or "Rajkot" on a Vadodara listing) — repaired by
+   migration 0041.
+
+Two smaller ones. `requirements.city_id` is nullable and some live rows have it
+empty, which made an area- or city-targeted requirement boost resolve to
+all-nulls and place nowhere; the city is now walked up from the first area, and a
+scope that still cannot be resolved falls back to the widest one that can rather
+than being sold as dead placement. And the Promoted BADGE was read from a
+non-targeted query while the ORDER came from a targeted one, so a card could be
+tagged "Promoted" for a viewer it was never placed for — both now come from the
+same call.
+
+## M9.2 — 🟡 "Story first" for a requirement boost is ambiguous — needs Rajan
+
+Doc2 §13 says a requirement boost gets *"requirement-mode feed top + story first
++ locked-but-top for unpaid"*. The feed-top and locked-but-top halves are built
+and verified live. **Story first is not**, because a requirement has no story:
+stories are auto-generated from listing/project PHOTOS (Doc2 §9.3) and a
+requirement has none. Rather than invent a requirement-story format, this is
+flagged instead of guessed.
+
+**Decide one:** (a) "story first" means only the boosted poster's existing listing
+stories, in which case nothing further is needed; or (b) requirement boosts should
+generate a story card of some kind, which needs a design.
+
+## M9.3 — 🟡 Boost notifications are written; the SCREEN is Module 10
+
+`boost_approved`, `boost_rejected`, `boost_expiring`, `boost_expired` and
+`boost_stopped` are real `notifications` rows (verified live), and the P11 boost
+screen's own renew banner works. But `/notifications` is still the Module 10
+placeholder, so the in-app list — including the design's inline "Renew — ₹1,499"
+button on the expiry notification — has nowhere to render yet. The rows are
+waiting for it; no boost work is outstanding.
+
+## M9.4 — Cron dependency
+
+The boost expiry notice, the auto-expire sweep and the pending-approval timeout
+all ride `/api/v1/cron/billing` (hourly). Inherits **B2**: nothing runs until
+`CRON_SECRET` is set on the host. The route refuses (401) rather than running open.
+
+## M9.5 — City boost cap is enforced but not editable in-app
+
+`billing_settings.boost_city_cap` (default 10) is checked at approval, and the
+queue row reports "City boost cap: N of M used" exactly as the P13-15 panel
+designs it. Editing it is an admin-settings screen (Module 11); until then it is a
+one-line SQL update, no deploy.
+
+## M9.6 — Admin boost SCREEN is still Module 11
+
+The API and the payload it needs are built and tested — `GET
+/api/v1/admin/queue/boost` returns each pending boost with the amount paid, the
+window being bought and the three eligibility checks the P13-15 right-sheet lists.
+Rendering it is a UI job in Module 11, not a rewrite. Rajan deferred the admin
+panel by decision (26 Jul 2026, "admin panel abhi banana nahi hai"), and unlike
+before, a boost can now be approved without it via the staff-gated endpoint.
+
+## Regression suite
+
+```bash
+node scripts/seed-module9.mjs
+```
+
+```bash
+BOOST_BASE=http://localhost:3000 node scripts/check-boost-live.mjs
+```
+
+The sweep reseeds itself first, because it CONSUMES states (it approves, rejects,
+pauses and sells). It needs a freshly started dev server: the OTP limiter is
+5/hour per number and dev uses an in-memory KV, so a second run against the same
+process is throttled and reports `[SKIP]` on the blocks that need a login.

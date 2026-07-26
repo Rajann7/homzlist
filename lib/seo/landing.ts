@@ -3,6 +3,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { formatShortRupees } from "@/lib/billing/money";
 import type { FeedCard } from "@/lib/feed/service";
 import { hydrate, areaStats, searchProjects } from "@/lib/search/service";
+import { placementsFor, stateIdOfCity, type ViewerScope } from "@/lib/billing/placement";
 import { buildPath, pluralLabel, type LandingSpec } from "./slugs";
 import { renderIntro, renderFaqs, type Faq } from "./content";
 
@@ -92,8 +93,26 @@ export async function buildLandingPage(spec: LandingSpec, viewerId: string | nul
 
   // ---- the listing set + measured stats, one predicate for both -------------
   const stats = await statsFor(spec);
+
+  // Boost placement (Doc2 §13 "search top"): the area landing page IS the search
+  // screen for that area (Doc2 §12), so an area-targeted boost belongs at the top
+  // of it — scoped to THIS area, so a Mavdi boost never tops the Raiya Road page.
+  const scope: ViewerScope = {
+    cityId: spec.city.id,
+    stateId: await stateIdOfCity(spec.city.id),
+    areaIds: scopeArea ? [scopeArea] : null,
+  };
+  const placements = await placementsFor(scope, ["listing"]);
+
   const ids = await listingIds(spec, 12);
-  const cards = await hydrate(ids, viewerId);
+  const ordered = [...ids].sort((a, b) => {
+    const ra = placements.rank.get(a), rb = placements.rank.get(b);
+    if (ra !== undefined && rb !== undefined) return ra - rb; // FIFO among boosts
+    if (ra !== undefined) return -1;
+    if (rb !== undefined) return 1;
+    return 0; // otherwise keep the recency order the query returned
+  });
+  const cards = await hydrate(ordered, viewerId, scope);
 
   const projects = spec.kind === "projects" || spec.kind === "area" || spec.kind === "city"
     ? (await searchProjects({ cityId: spec.city.id, areas: scopeArea ? [scopeArea] : undefined }, viewerId, 6)).items

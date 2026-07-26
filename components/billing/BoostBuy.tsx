@@ -10,14 +10,25 @@ import { cn } from "@/lib/utils";
 /**
  * P11 S4 — Boost purchase.
  *
- * Eligible listings, durations and rates all come from
+ * Boostable subjects, durations and rates all come from
  * `/billing/boost/eligible` — the rates are admin-editable, and eligibility is
- * a server verdict. Ineligible listings are rendered dimmed with their lock
+ * a server verdict. Ineligible subjects are rendered dimmed with their lock
  * label (as designed) and are not selectable; the server refuses them at
  * checkout too, so the dimming is never the actual control (Doc2 §13).
+ *
+ * A subject is a LISTING, a PROJECT or a REQUIREMENT (Doc2 §13) — the picker is
+ * one row of the same cards regardless, so the screen is unchanged; it just no
+ * longer pretends listings are the only thing that can be boosted.
+ *
+ * The "Where to show" place names ("Whole city — Rajkot") are resolved
+ * SERVER-side per subject and read from `targetLabels`. They used to be the
+ * literal strings "Your city" / "Your state" in this file.
  */
 
-const TARGET_LABELS: Record<string, { title: string; sub?: string }> = {
+/** The summary line names what is being boosted, not always "Listing". */
+const SUBJECT_NOUN: Record<string, string> = { listing: "Listing", project: "Project", requirement: "Requirement" };
+
+const TARGET_TITLES: Record<string, { title: string; sub?: string }> = {
   area: { title: "This area only", sub: "Reach: local buyers" },
   city: { title: "Whole city" },
   state: { title: "Whole state" },
@@ -31,6 +42,9 @@ export function BoostBuy() {
 
   const [data, setData] = useState<Awaited<ReturnType<typeof billingApi.boostEligible>> | null>(null);
   const [listingId, setListingId] = useState<string | null>(params.get("listing"));
+  const [subjectKind, setSubjectKind] = useState<"listing" | "project" | "requirement">(
+    (params.get("kind") as "listing" | "project" | "requirement") ?? "listing",
+  );
   const [duration, setDuration] = useState<string | null>(null);
   const [targeting, setTargeting] = useState("area");
   const [infoOpen, setInfoOpen] = useState(false);
@@ -42,7 +56,9 @@ export function BoostBuy() {
     if (res.ok) {
       // Preselect the first eligible listing + the best-value duration, matching
       // the design's default selection.
-      setListingId((cur) => cur ?? res.data.listings.find((l) => l.eligible)?.id ?? null);
+      const first = res.data.listings.find((l) => l.eligible);
+      setListingId((cur) => cur ?? first?.id ?? null);
+      if (!params.get("listing") && first) setSubjectKind(first.subjectKind);
       setDuration((cur) => cur ?? (res.data.durations.find((d) => d.bestValue)?.code ?? res.data.durations[0]?.code ?? null));
     }
   }, []);
@@ -68,9 +84,10 @@ export function BoostBuy() {
   const eligible = d.listings.filter((l) => l.eligible);
   const selectedListing = d.listings.find((l) => l.id === listingId) ?? null;
   const selectedDuration = d.durations.find((x) => x.code === duration) ?? null;
-  const targetLabel = selectedListing
-    ? { area: selectedListing.areaLabel ?? "This area", city: "Your city", state: "Your state", india: "All India" }[targeting]!
-    : TARGET_LABELS[targeting].title;
+  // Every place name comes from the server's `targetLabels` map, keyed by the
+  // selected subject — the client never composes one.
+  const labelsForSubject = selectedListing ? d.targetLabels[`${selectedListing.subjectKind}:${selectedListing.id}`] ?? {} : {};
+  const targetLabel = labelsForSubject[targeting] ?? TARGET_TITLES[targeting].title;
 
   if (!eligible.length) {
     return (
@@ -95,6 +112,7 @@ export function BoostBuy() {
     const qs = new URLSearchParams({
       plan: selectedDuration.code,
       listing: listingId,
+      kind: subjectKind,
       targeting,
       targetLabel,
       next: "/boost",
@@ -111,7 +129,7 @@ export function BoostBuy() {
             <button
               key={l.id}
               disabled={!l.eligible}
-              onClick={() => setListingId(l.id)}
+              onClick={() => { setListingId(l.id); setSubjectKind(l.subjectKind); }}
               className={cn(
                 "relative w-[120px] shrink-0 overflow-hidden rounded-8 border-[1.5px] text-left",
                 listingId === l.id ? "border-accent" : "border-border",
@@ -168,10 +186,11 @@ export function BoostBuy() {
         <SectionLabel>Where to show</SectionLabel>
         <div>
           {d.targets.map((t, i) => {
-            const meta = TARGET_LABELS[t.key];
-            const title = t.key === "area" && selectedListing?.areaLabel
-              ? `This area only — ${selectedListing.areaLabel}`
-              : meta.title;
+            const meta = TARGET_TITLES[t.key];
+            // "This area only — Mavdi, Rajkot" / "Whole city — Rajkot", exactly as
+            // designed, with the place name coming from the server.
+            const place = labelsForSubject[t.key];
+            const title = place && t.key !== "india" ? `${meta.title} — ${place}` : meta.title;
             return (
               <button
                 key={t.key}
@@ -198,7 +217,9 @@ export function BoostBuy() {
         </p>
 
         <div className="rounded-12 bg-surface-2 p-4">
-          <div className="py-1.5 text-13 text-ink-primary">Listing: {selectedListing?.title ?? "—"}</div>
+          <div className="py-1.5 text-13 text-ink-primary">
+            {SUBJECT_NOUN[selectedListing?.subjectKind ?? "listing"]}: {selectedListing?.title ?? "—"}
+          </div>
           <div className="py-1.5 text-13 text-ink-primary">Duration: {selectedDuration?.label ?? "—"}</div>
           <div className="py-1.5 text-13 text-ink-primary">Targeting: {targetLabel}</div>
           <div className="my-2 h-px bg-divider" />

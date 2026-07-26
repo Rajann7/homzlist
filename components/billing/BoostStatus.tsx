@@ -63,7 +63,16 @@ export function BoostStatus() {
       return;
     }
     const c = res.data.checkout;
-    router.push(`/checkout?${new URLSearchParams({ plan: c.planId, listing: c.listingId ?? "", targeting: c.targeting ?? "area", targetLabel: c.targetLabel ?? "", next: "/boost" }).toString()}`);
+    router.push(
+      `/checkout?${new URLSearchParams({
+        plan: c.planId,
+        listing: c.listingId ?? "",
+        kind: c.subjectKind ?? "listing",
+        targeting: c.targeting ?? "area",
+        targetLabel: c.targetLabel ?? "",
+        next: "/boost",
+      }).toString()}`,
+    );
   };
 
   if (!data) {
@@ -141,9 +150,9 @@ export function BoostStatus() {
           </p>
         )}
         {list.map((b) =>
-          tab === "active" ? <ActiveCard key={b.id} b={b} onExtend={() => router.push(`/boost/new?listing=${b.listingId}`)} onView={() => router.push(`/property/${b.listingId}`)} />
+          tab === "active" ? <ActiveCard key={b.id} b={b} onExtend={() => router.push(`/boost/new?listing=${b.listingId}&kind=${b.subjectKind}`)} onView={() => router.push(subjectHref(b))} />
           : tab === "pending" ? <PendingCard key={b.id} b={b} onCancel={() => setCancelId(b.id)} />
-          : <PastCard key={b.id} b={b} onAgain={() => router.push(`/boost/new?listing=${b.listingId}`)} />,
+          : <PastCard key={b.id} b={b} onAgain={() => router.push(`/boost/new?listing=${b.listingId}&kind=${b.subjectKind}`)} />,
         )}
       </div>
 
@@ -179,6 +188,17 @@ function Shell({ children }: { children: React.ReactNode }) {
   );
 }
 
+/**
+ * Where "View listing" goes. A boost can be on a project or a requirement
+ * (Doc2 §13), and this used to be a hard-coded `/property/:id` — so the link on a
+ * project or requirement boost led to a 404.
+ */
+function subjectHref(b: BoostView): string {
+  if (b.subjectKind === "project") return `/project/${b.listingId}`;
+  if (b.subjectKind === "requirement") return `/requirements/${b.listingId}`;
+  return `/property/${b.listingId}`;
+}
+
 function ListingRow({ b }: { b: BoostView }) {
   return (
     <div className="flex items-center gap-3 pt-3">
@@ -194,18 +214,23 @@ function ListingRow({ b }: { b: BoostView }) {
 }
 
 function ActiveCard({ b, onExtend, onView }: { b: BoostView; onExtend: () => void; onView: () => void }) {
-  const toast = useToast();
+  // Admin-hide → paused (Doc2 §13). The card keeps its shape; only the status
+  // line and the badge tell the truth, because saying "Boost active" for a boost
+  // that is currently placed nowhere would be the UI lying about the server.
+  const paused = b.status === "paused";
   return (
     <div className="rounded-12 border-[1.5px] border-accent bg-surface-1 p-4">
-      <StatusBadge kind="promoted" />
+      <StatusBadge kind={paused ? "pending-approval" : "promoted"} label={paused ? "Paused" : undefined} />
       <ListingRow b={b} />
       <div className="my-3.5 h-px bg-divider" />
       <div className="flex items-center gap-2">
-        <span className="text-accent"><Icon name="rocket" /></span>
+        <span className={paused ? "text-ink-tertiary" : "text-accent"}><Icon name="rocket" /></span>
         <div>
-          <div className="text-17 font-semibold text-ink-primary">Boost active</div>
+          <div className="text-17 font-semibold text-ink-primary">{paused ? "Boost paused" : "Boost active"}</div>
           <div className="text-13 text-ink-secondary">
-            Ends on {b.endsOn} · {b.daysLeft} day{b.daysLeft === 1 ? "" : "s"} left
+            {paused
+              ? `${b.stoppedReason ?? "Paused by admin"} · your remaining days are kept`
+              : `Ends on ${b.endsOn} · ${b.daysLeft} day${b.daysLeft === 1 ? "" : "s"} left`}
           </div>
         </div>
       </div>
@@ -223,7 +248,7 @@ function ActiveCard({ b, onExtend, onView }: { b: BoostView; onExtend: () => voi
       <div className="mt-3.5 flex items-center gap-4">
         <Button variant="outline" size="default" className="w-auto px-[18px]" onClick={onExtend}>Extend boost</Button>
         <button onClick={onView} className="text-13 font-semibold text-accent">
-          View listing
+          View {b.subjectNoun.toLowerCase()}
         </button>
       </div>
     </div>

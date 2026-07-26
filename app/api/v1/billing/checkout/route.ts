@@ -6,9 +6,13 @@ import { rateLimit } from "@/lib/auth/rate-limit";
 import { GSTIN_RE } from "@/lib/billing/money";
 import {
   getCatalogItem, quote, createOrderRow, findIdempotentOrder, attachRazorpayOrder,
-  recentPaidOrder, getSettings, createBoost, isListingBoostEligible,
+  recentPaidOrder, getSettings, createBoost,
   claimCouponSlot, abandonOrder,
 } from "@/lib/billing/service";
+import {
+  getBoostSubject, resolveTarget, SUBJECT_KINDS, TARGETINGS,
+  type BoostSubject, type BoostSubjectKind, type BoostTargeting, type ResolvedTarget,
+} from "@/lib/billing/boost";
 import { quoteDTO } from "@/lib/billing/dto";
 import { createOrder, isConfigured, publicKeyId } from "@/lib/billing/razorpay";
 
@@ -21,7 +25,6 @@ import { createOrder, isConfigured, publicKeyId } from "@/lib/billing/razorpay";
  */
 export const dynamic = "force-dynamic";
 
-const TARGET_LABELS: Record<string, string> = { area: "This area", city: "City", state: "State", india: "All India" };
 
 export async function POST(req: NextRequest) {
   const claims = await getCurrentUser();
@@ -77,18 +80,38 @@ export async function POST(req: NextRequest) {
 
   // Boost checkout carries its intent; eligibility is re-checked here AND again
   // in the webhook (Doc2 §13 "race sealed").
-  let boostRequest: { listingId: string; catalogCode: string; targeting: string; targetLabel: string } | null = null;
+  //
+  // Since Module 9 the subject can be a listing, a PROJECT or a REQUIREMENT
+  // (Doc2 §13), and the targeting label + geography are resolved from that
+  // subject's own location. The client's `targetLabel` is ignored entirely —
+  // it used to be stored verbatim, so a crafted request could make the boost
+  // status screen claim any reach it liked.
+  let boostRequest: {
+    listingId: string; catalogCode: string; targeting: string; targetLabel: string; subjectKind: BoostSubjectKind;
+  } | null = null;
+  let boostSubject: BoostSubject | null = null;
+  let boostTarget: ResolvedTarget | null = null;
+
   if (item.kind === "boost") {
-    const listingId = typeof body.listingId === "string" ? body.listingId : null;
-    const targeting = typeof body.targeting === "string" ? body.targeting : "area";
-    if (!listingId) return fail("VALIDATION_ERROR", { field: "listingId" });
-    if (!["area", "city", "state", "india"].includes(targeting)) return fail("VALIDATION_ERROR", { field: "targeting" });
-    if (!(await isListingBoostEligible(claims.sub, listingId))) return fail("LISTING_STATE_LOCKED");
+    const subjectId = typeof body.listingId === "string" ? body.listingId : null;
+    const subjectKind = (typeof body.subjectKind === "string" ? body.subjectKind : "listing") as BoostSubjectKind;
+    const targeting = (typeof body.targeting === "string" ? body.targeting : "area") as BoostTargeting;
+    if (!subjectId) return fail("VALIDATION_ERROR", { field: "listingId" });
+    if (!SUBJECT_KINDS.includes(subjectKind)) return fail("VALIDATION_ERROR", { field: "subjectKind" });
+    if (!TARGETINGS.includes(targeting)) return fail("VALIDATION_ERROR", { field: "targeting" });
+
+    // Ownership + eligibility in one read: a subject belonging to someone else
+    // resolves to null, so this is also the IDOR gate (Doc9 §API1).
+    boostSubject = await getBoostSubject(claims.sub, subjectKind, subjectId);
+    if (!boostSubject || !boostSubject.eligible) return fail("LISTING_STATE_LOCKED");
+
+    boostTarget = await resolveTarget(boostSubject, targeting);
     boostRequest = {
-      listingId,
+      listingId: subjectId,
       catalogCode: item.code,
       targeting,
-      targetLabel: typeof body.targetLabel === "string" ? body.targetLabel.slice(0, 80) : TARGET_LABELS[targeting],
+      targetLabel: boostTarget.label,
+      subjectKind,
     };
   }
 
@@ -119,13 +142,17 @@ export async function POST(req: NextRequest) {
     return fail("VALIDATION_ERROR", { field: "coupon", couponError: "USED" });
   }
 
-  if (boostRequest) {
+  if (boostRequest && boostTarget) {
     await createBoost({
       profileId: claims.sub,
       listingId: boostRequest.listingId,
+      subjectKind: boostRequest.subjectKind,
       item,
       targeting: boostRequest.targeting as "area" | "city" | "state" | "india",
-      targetLabel: boostRequest.targetLabel,
+      targetLabel: boostTarget.label,
+      targetAreaId: boostTarget.areaId,
+      targetCityId: boostTarget.cityId,
+      targetStateId: boostTarget.stateId,
       orderId: order.id,
     });
   }
