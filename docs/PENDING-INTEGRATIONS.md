@@ -2711,3 +2711,66 @@ change, so it is recorded rather than silently left or silently scoped in.
 
 Console: one dev-only React HMR warning naming `HotReload`, present before this
 change (the diff touches no effects) and absent from production builds.
+
+---
+
+## Public profile — Projects tab fixed, ⋯ menu trimmed, own-link routing
+
+### 1. Builder Projects tab — FIXED (the bug reported in the previous section)
+
+The tab now has an endpoint behind it: `GET /api/v1/profile/:username/projects`
+→ `listPublicProjectsByProfile()`, **live projects only**, mirroring the public
+rule for listings so the tab and the header count can never disagree. Non-builders
+get `{ items: [] }` (projects are Builder-only, Doc2 §6) rather than an error.
+
+Proven live on `manishagarwal9b4e`: header "1 Project", Projects tab renders the
+one real project (*Green Meadows Villas*, READY TO MOVE, Kalawad Road) and the
+Sell / Rent tab renders 5 listings — **two different sets**, where before both
+tabs rendered byte-identical content.
+
+### 2. ⋯ menu — Copy link and Block user removed
+
+- **Copy link** was byte-identical to Share profile: same clipboard write, same
+  toast. The sheet offered one action twice under two names.
+- **Block user** removed on Rajan's instruction. Blocking still exists where it
+  has context — inside a chat thread (P7) and the Blocked-users settings screen —
+  so `blockUserById`, the endpoint and `profileApi.blockUser` all stay; only this
+  entry point is gone. The now-unreachable ConfirmDialog and its state were
+  deleted rather than left as dead code.
+
+The menu is now **Share profile** + **Report profile**.
+
+### 3. Your own profile link now opens YOUR profile
+
+Pasting your own profile URL (or tapping your own name from a thread) rendered
+the VISITOR view of yourself: no stats, no Edit profile, and a Message / Report
+set aimed at you. `seller/profile/[username]` now compares the session's username
+server-side and renders `OwnProfile` on a match, so the correct screen paints
+first with no flash. Case-insensitive, since usernames are stored lowercased.
+
+Verified live: as Amit Shah, `/profile/amitshah1235` → own profile (8 Listings ·
+3 Requirements · 0 Leads, Edit profile, Requirements tab, hamburger menu);
+`/profile/rkproperties2f21` → still the visitor view. No regression.
+
+NOTE — this is seller-host only by design. The public host strips the session in
+middleware (it is the guest surface), so it cannot know who you are there.
+
+### 4. Bio
+
+Already rendered and still does — verified end-to-end: the API returns
+`bio: "Vadodara developer — RERA compliant projects."` and the screen prints it
+under the identity block. `rkproperties2f21` shows none because that row's `bio`
+is **NULL in the database**, not because the screen drops it. No placeholder is
+invented for an empty bio (CLAUDE.md §7).
+
+### Live verification of the ⋯ actions (real rows, then cleaned up)
+
+- **Share profile** — copies the link, toast shown.
+- **Report profile** — as a guest it correctly bounces to Sign in; signed in, the
+  sheet opens and submitting wrote a real row: `reports(subject_type='user',
+  reason='spam', status='open')`. (The enum value is `user`, not `profile`.)
+- **Block user** — before removal, confirmed it wrote `chat_blocks(Amit Shah →
+  RK Properties)`; both test rows deleted afterwards.
+
+Console errors: 0. `tsc` clean · lint **0 errors** · build succeeds · bundle
+secret-free.

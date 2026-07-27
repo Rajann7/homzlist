@@ -11,7 +11,7 @@ import { Skeleton } from "@/components/ui/Skeleton";
 import { useToast } from "@/components/ui/Toast";
 import { ProfileBadges } from "./ProfileBadges";
 import { FeaturedCollectionSheet } from "./ProfileSheets";
-import { profileApi, type FeaturedCollection, type FeaturedItem } from "@/lib/profile/client";
+import { profileApi, type FeaturedCollection, type FeaturedItem, type PublicProject } from "@/lib/profile/client";
 import { cn } from "@/lib/utils";
 
 /**
@@ -45,11 +45,17 @@ export function OtherProfile({ username, isGuest = false }: { username: string; 
   const [about, setAbout] = useState(false);
   const [reportSheet, setReportSheet] = useState(false);
   const [reportReason, setReportReason] = useState<string | null>(null);
-  const [blockDlg, setBlockDlg] = useState(false);
+  // "Block user" was removed from the ⋯ menu. Blocking still exists where it has
+  // context — inside a chat thread (P7) and the Blocked-users settings screen —
+  // so the endpoint and `profileApi.blockUser` stay; only this entry point is gone.
   const [notFound, setNotFound] = useState(false);
   const [listings, setListings] = useState<
     { id: string; title: string | null; price: string; coverUrl: string | null; areaLabel: string | null; kind: "sell" | "rent" }[] | null
   >(null);
+  // Builder-only. The Projects tab used to fall through to `listings`, so it
+  // rendered exactly what the Sell / Rent tab did and a builder's projects were
+  // nowhere on their public profile.
+  const [projects, setProjects] = useState<PublicProject[] | null>(null);
   // Featured circles (P9 S2) — public, and only ones with something live in them.
   const [collections, setCollections] = useState<FeaturedCollection[] | null>(null);
   const [openedCollection, setOpenedCollection] = useState<FeaturedCollection | null>(null);
@@ -72,6 +78,14 @@ export function OtherProfile({ username, isGuest = false }: { username: string; 
   useEffect(() => {
     profileApi.publicFeatured(username).then((r) => setCollections(r.ok ? r.data.items : []));
   }, [username]);
+
+  // Projects are a Builder-only product (Doc2 §6), so only a builder's profile
+  // pays for the extra request — and the tab that needs them isn't rendered for
+  // anyone else anyway.
+  useEffect(() => {
+    if (p?.role !== "builder") return;
+    profileApi.publicProjects(username).then((r) => setProjects(r.ok ? r.data.items : []));
+  }, [username, p?.role]);
 
   /** Tapping a circle asks the server what's inside, every time. */
   async function openCollection(c: FeaturedCollection) {
@@ -263,6 +277,54 @@ export function OtherProfile({ username, isGuest = false }: { username: string; 
         <div className="grid grid-cols-2 gap-2 p-4">
           {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="aspect-[4/5] w-full rounded-12" />)}
         </div>
+      ) : tabs[tab] === "Projects" ? (
+        // Real projects, not the listings this tab used to borrow.
+        projects === null ? (
+          <div className="grid grid-cols-2 gap-2 p-4">
+            {[0, 1].map((i) => <Skeleton key={i} className="aspect-[4/5] w-full rounded-12" />)}
+          </div>
+        ) : projects.length === 0 ? (
+          <EmptyGrid title="No projects yet" body="This builder hasn't published a project." />
+        ) : (
+          <div className="grid grid-cols-2 gap-2 p-4">
+            {projects.map((pr) => (
+              <button
+                key={pr.id}
+                onClick={() => router.push(`/project/${pr.id}`)}
+                className="overflow-hidden rounded-12 border border-border bg-surface-1 text-left shadow-l1 active:opacity-90 dark:shadow-none"
+                aria-label={pr.name}
+              >
+                <span className="relative block aspect-[4/3] overflow-hidden bg-surface-2">
+                  {pr.coverUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={pr.coverUrl} alt="" data-protected="true" className="h-full w-full object-cover" />
+                  ) : (
+                    <span className="grid h-full place-items-center text-ink-tertiary"><Icon name="building" size={26} /></span>
+                  )}
+                  {pr.buildStatusLabel && (
+                    <span className="chrome absolute left-1.5 top-1.5 rounded-4 bg-black/60 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.3px] text-white">
+                      {pr.buildStatusLabel}
+                    </span>
+                  )}
+                </span>
+                <span className="block px-2.5 py-2">
+                  {/* A project with no priced unit yet leads with its name; the
+                      name is not repeated underneath in that case. */}
+                  <span className="block truncate text-15 font-bold leading-tight text-ink-primary">
+                    {pr.priceFrom ? `From ${pr.priceFrom}` : pr.name}
+                  </span>
+                  {pr.priceFrom && <span className="mt-1 block truncate text-11 text-ink-secondary">{pr.name}</span>}
+                  {pr.areaLabel && (
+                    <span className="mt-0.5 flex items-center gap-1 text-11 text-ink-tertiary">
+                      <Icon name="pin" size={11} strokeWidth={2} />
+                      <span className="truncate">{pr.areaLabel}</span>
+                    </span>
+                  )}
+                </span>
+              </button>
+            ))}
+          </div>
+        )
       ) : (() => {
         const label = tabs[tab];
         const shown = label === "Sell" ? listings.filter((l) => l.kind === "sell")
@@ -270,15 +332,10 @@ export function OtherProfile({ username, isGuest = false }: { username: string; 
           : listings;
         if (!shown.length) {
           return (
-            <div className="flex flex-1 flex-col items-center justify-center gap-2.5 px-6 py-16 text-center">
-              <span className="grid h-14 w-14 place-items-center rounded-full bg-surface-2 text-ink-tertiary">
-                <Icon name="home" size={26} strokeWidth={1.5} />
-              </span>
-              <p className="text-15 font-semibold text-ink-primary">Nothing here yet</p>
-              <p className="max-w-[240px] text-13 text-ink-tertiary">
-                {label === "Rent" ? "No properties listed for rent right now." : "No properties listed for sale right now."}
-              </p>
-            </div>
+            <EmptyGrid
+              title="Nothing here yet"
+              body={label === "Rent" ? "No properties listed for rent right now." : "No properties listed for sale right now."}
+            />
           );
         }
         return (
@@ -320,10 +377,11 @@ export function OtherProfile({ username, isGuest = false }: { username: string; 
       {/* ⋯ menu */}
       <BottomSheet open={menu} onClose={() => setMenu(false)} hideHeader>
         <div className="flex flex-col pt-1">
+          {/* "Copy link" was removed — it was byte-identical to Share profile
+              (same clipboard write, same toast), so the sheet offered the same
+              action twice under two names. */}
           <MenuRow icon="share" label="Share profile" onClick={() => { navigator.clipboard?.writeText(`homzlist.com/${p.username}`).catch(() => {}); show("Link copied"); setMenu(false); }} />
-          <MenuRow icon="copy" label="Copy link" onClick={() => { navigator.clipboard?.writeText(`homzlist.com/${p.username}`).catch(() => {}); show("Link copied"); setMenu(false); }} />
           <MenuRow icon="alert" label="Report profile" destructive onClick={() => { setMenu(false); guard(() => setReportSheet(true)); }} />
-          <MenuRow icon="close" label="Block user" destructive onClick={() => { setMenu(false); guard(() => setBlockDlg(true)); }} />
         </div>
       </BottomSheet>
 
@@ -348,8 +406,6 @@ export function OtherProfile({ username, isGuest = false }: { username: string; 
           </Button>
         </div>
       </BottomSheet>
-
-      <ConfirmDialog open={blockDlg} onClose={() => setBlockDlg(false)} onConfirm={async () => { setBlockDlg(false); const res = await profileApi.blockUser(p.id); show(res.ok ? `${p.name} blocked` : "Couldn't block right now"); }} title={`Block ${p.name}?`} body="They won't be able to message you. Existing chats stay visible but you can't message each other." confirmLabel="Block" destructive />
 
       {/* Tapping a featured circle — read-only here: no Remove for a visitor. */}
       <FeaturedCollectionSheet
@@ -394,6 +450,18 @@ function StatText({ value, label }: { value: string; label: string }) {
  */
 function priceMain(price: string) {
   return price.split("·")[0].trim();
+}
+
+function EmptyGrid({ title, body }: { title: string; body: string }) {
+  return (
+    <div className="flex flex-1 flex-col items-center justify-center gap-2.5 px-6 py-16 text-center">
+      <span className="grid h-14 w-14 place-items-center rounded-full bg-surface-2 text-ink-tertiary">
+        <Icon name="home" size={26} strokeWidth={1.5} />
+      </span>
+      <p className="text-15 font-semibold text-ink-primary">{title}</p>
+      <p className="max-w-[240px] text-13 text-ink-tertiary">{body}</p>
+    </div>
+  );
 }
 
 function MenuRow({ icon, label, destructive, onClick }: { icon: any; label: string; destructive?: boolean; onClick: () => void }) {

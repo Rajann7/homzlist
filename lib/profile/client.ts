@@ -58,6 +58,18 @@ export interface FeaturedItem {
   subtitle: string;
 }
 
+/** A builder's project as a visitor sees it (P9 S2 Projects tab). */
+export interface PublicProject {
+  id: string;
+  name: string;
+  coverUrl: string | null;
+  areaLabel: string | null;
+  /** Cheapest unit, already formatted server-side ("₹65 Lakh"), or null. */
+  priceFrom: string | null;
+  buildStatusLabel: string | null;
+  possessionLabel: string | null;
+}
+
 export const profileApi = {
   me: () => req<{ profile: OwnProfile }>("/profile/me", "GET"),
   // ---- featured collections (P9 S1) ----------------------------------------
@@ -78,6 +90,9 @@ export const profileApi = {
     req<{ items: { id: string; title: string | null; price: string; coverUrl: string | null; areaLabel: string | null; kind: "sell" | "rent" }[] }>(
       `/profile/${encodeURIComponent(username)}/listings`, "GET",
     ),
+  /** Live projects for a builder's public profile — the P9 S2 Projects tab. */
+  publicProjects: (username: string) =>
+    req<{ items: PublicProject[] }>(`/profile/${encodeURIComponent(username)}/projects`, "GET"),
   verificationStatus: () => req<{ verification: any }>("/profile/verification/status", "GET"),
   submitId: (docType: string, docKey?: string | null) => req<{ status: string }>("/profile/verification/id", "POST", { docType, docKey }),
   submitRera: (reraNumber: string, docKey?: string | null) => req<{ status: string }>("/profile/verification/rera", "POST", { reraNumber, docKey }),

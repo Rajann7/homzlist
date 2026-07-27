@@ -267,6 +267,31 @@ export async function listMyProjects(profileId: string) {
 }
 
 /**
+ * A builder's projects as a VISITOR may see them (P9 S2 Projects tab).
+ *
+ * The visitor profile's Projects tab used to fall through to the same `listings`
+ * array the Sell/Rent tab renders, so a builder's projects were nowhere on their
+ * public profile and the tab silently lied — the header could say "1 Project"
+ * while the tab showed five listings. This is the query behind that tab.
+ *
+ * `live` only, mirroring `listPublicByProfile` for listings: a project still in
+ * review is not public, and the count on the same screen is computed the same
+ * way, so the tab and the number can never disagree.
+ */
+export async function listPublicProjectsByProfile(profileId: string) {
+  const { data } = await db()
+    .from("projects")
+    .select("*, project_units(*)")
+    .eq("profile_id", profileId)
+    .eq("status", "live")
+    .is("deleted_at", null)
+    .order("created_at", { ascending: false })
+    .limit(60);
+  const amenityLabels = await getAmenityLabels();
+  return ((data ?? []) as any[]).map((p) => projectDTO(p, p.project_units ?? [], amenityLabels));
+}
+
+/**
  * Project detail. Numbers are always public here by design (Doc2 §6), so unlike
  * a listing there is no contact-withholding branch.
  */
