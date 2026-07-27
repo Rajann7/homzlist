@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 import { ok, fail } from "@/lib/api";
-import { getCurrentUser } from "@/lib/auth/current-user";
+import { getUploader, registerScopeAllows } from "@/lib/auth/uploader";
 import { rateLimit } from "@/lib/auth/rate-limit";
 import { createUploadGrant } from "@/lib/storage";
 import { ALLOWED_IMAGE_MIME, MAX_IMAGE_BYTES } from "@/lib/image-pipeline";
@@ -26,10 +26,10 @@ const KINDS = {
 } as const;
 
 export async function POST(req: NextRequest) {
-  const claims = await getCurrentUser();
-  if (!claims) return fail("UNAUTHORIZED");
+  const uploader = await getUploader();
+  if (!uploader) return fail("UNAUTHORIZED");
 
-  const limited = await rateLimit(`upload-presign:${claims.sub}`, 60, 3600);
+  const limited = await rateLimit(`upload-presign:${uploader.id}`, 60, 3600);
   if (!limited.allowed) return fail("RATE_LIMITED");
 
   let body: Record<string, any>;
@@ -41,6 +41,8 @@ export async function POST(req: NextRequest) {
 
   const spec = KINDS[body.kind as keyof typeof KINDS];
   if (!spec) return fail("VALIDATION_ERROR", { field: "kind" });
+  // Registration window: profile photo only, never logos/docs/chat.
+  if (!registerScopeAllows(uploader, body.kind)) return fail("UNAUTHORIZED");
 
   const contentType = typeof body.contentType === "string" ? body.contentType : "";
   if (!(spec.mimes as readonly string[]).includes(contentType)) return fail("FILE_TYPE_BLOCKED");
@@ -48,7 +50,7 @@ export async function POST(req: NextRequest) {
 
   // Keyed under the owner's id so an object is always attributable.
   const grant = await createUploadGrant({
-    prefix: `${spec.prefix}/${claims.sub}`,
+    prefix: `${spec.prefix}/${uploader.id}`,
     contentType,
     isPrivate: spec.private,
   });

@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { writeFile, mkdir } from "node:fs/promises";
 import path from "node:path";
 import { ok, fail } from "@/lib/api";
-import { getCurrentUser } from "@/lib/auth/current-user";
+import { getUploader } from "@/lib/auth/uploader";
 import { storageDriver } from "@/lib/storage";
 import { validateImage, MAX_IMAGE_BYTES } from "@/lib/image-pipeline";
 
@@ -23,12 +23,14 @@ export const runtime = "nodejs";
 export async function PUT(req: NextRequest) {
   if (process.env.NODE_ENV === "production" || storageDriver() !== "local") return fail("NOT_FOUND");
 
-  const claims = await getCurrentUser();
-  if (!claims) return fail("UNAUTHORIZED");
+  const uploader = await getUploader();
+  if (!uploader) return fail("UNAUTHORIZED");
 
   const key = new URL(req.url).searchParams.get("key") ?? "";
   // Keys are server-minted; reject anything that could escape the upload dir.
   if (!/^[A-Za-z0-9/_-]+$/.test(key) || key.includes("..")) return fail("VALIDATION_ERROR", { field: "key" });
+  // The registration window can only write its own avatar object.
+  if (uploader.scope === "register" && !key.startsWith(`avatars/${uploader.id}/`)) return fail("VALIDATION_ERROR", { field: "key" });
 
   const buf = Buffer.from(await req.arrayBuffer());
   if (buf.byteLength > MAX_IMAGE_BYTES) return fail("FILE_TOO_LARGE");

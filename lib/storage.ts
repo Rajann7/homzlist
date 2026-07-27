@@ -149,6 +149,17 @@ export function publicUrlFor(key: string, bucket: string = BUCKET.public): strin
   return `${serverEnv().r2.publicCdnUrl}/${key}`;
 }
 
+/**
+ * Reverse of `publicUrlFor` for the public prefixes we mint. Lets a caller that
+ * only has a stored profile URL delete the object it points at (avatar/logo
+ * replacement). Returns null for anything that isn't one of our own keys.
+ */
+export function keyFromPublicUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  const m = /(?:^|\/)((?:avatars|logos|chat)\/[A-Za-z0-9_-]+\/[A-Za-z0-9_-]+)(?:[?#]|$)/.exec(url);
+  return m ? m[1] : null;
+}
+
 export async function deleteObject(key: string, bucket: string = BUCKET.public): Promise<void> {
   const driver = storageDriver();
 

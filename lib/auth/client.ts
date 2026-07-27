@@ -25,7 +25,7 @@ export const authApi = {
   verifyOtp: (otpSession: string, code: string) =>
     post<{ isNew: true; next: "role" } | { isNew: false; user: unknown; next: "seller" | "suspended" }>("/otp/verify", { otpSession, code }),
   resendOtp: (otpSession: string) => post<{ resendIn: number; devCode?: string }>("/otp/resend", { otpSession }),
-  register: (input: { role: string; name: string; cityId: string; photoUrl?: string | null; consent18: boolean; consentDpdp: boolean; hp?: string }) =>
+  register: (input: { role: string; name: string; cityId: string; email?: string | null; consent18: boolean; consentDpdp: boolean; hp?: string }) =>
     post<{ user: unknown; redirect: string }>("/register", input),
   logout: () => post<{ loggedOut: boolean }>("/logout"),
   refresh: () => post<{ refreshed: boolean }>("/refresh"),

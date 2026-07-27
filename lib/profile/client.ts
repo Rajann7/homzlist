@@ -110,3 +110,12 @@ export async function uploadProfileMedia(
   }
   return { ok: true, ...commit.data };
 }
+
+/**
+ * Clear the profile photo (column + object). Works both for a live session and
+ * inside the registration window, where PATCH /profile/me isn't reachable yet.
+ */
+export async function removeProfilePhoto(): Promise<{ ok: boolean }> {
+  const res = await req<{ removed: boolean }>("/uploads/avatar", "DELETE");
+  return { ok: res.ok };
+}

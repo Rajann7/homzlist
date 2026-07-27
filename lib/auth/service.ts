@@ -83,7 +83,8 @@ export interface RegistrationInput {
   role: "owner" | "broker" | "builder";
   name: string;
   cityId: string;
-  photoUrl?: string | null;
+  /** Optional at S7 — invoices/updates only, never a login identifier. */
+  email?: string | null;
   tcVersion: string;
   ipHash?: string;
 }
@@ -119,7 +120,11 @@ export async function completeRegistration(profileId: string, input: Registratio
       name: input.name,
       username: makeUsername(input.name, profileId),
       city_id: input.cityId,
-      photo_url: input.photoUrl ?? null,
+      email: input.email ?? null,
+      // photo_url is NOT written here: the S7 picker commits it server-side via
+      // /uploads/commit (and clears it via /uploads/avatar), so the client can
+      // never hand us an arbitrary URL — and a photo already uploaded in this
+      // window must survive this update.
       is_registered: true,
       last_active_at: new Date().toISOString(),
     })

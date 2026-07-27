@@ -12,7 +12,7 @@ import { Skeleton } from "@/components/ui/Skeleton";
 import { CitySheet, type City } from "@/components/auth/CitySheet";
 import { PhotoSheet } from "@/components/auth/PhotoSheet";
 import { NumberChange } from "./NumberChange";
-import { profileApi, uploadProfileMedia, type OwnProfile } from "@/lib/profile/client";
+import { profileApi, uploadProfileMedia, removeProfilePhoto, type OwnProfile } from "@/lib/profile/client";
 import { useToast } from "@/components/ui/Toast";
 import { cn } from "@/lib/utils";
 
@@ -225,7 +225,10 @@ export function EditProfile() {
         onChoose={() => { setPhotoSheet(false); fileRef.current?.removeAttribute("capture"); fileRef.current?.click(); }}
         onRemove={async () => {
           setPhotoSheet(false);
-          const r = await profileApi.update({ photoUrl: null });
+          // PATCH /profile/me does NOT whitelist photoUrl — it 200s and changes
+          // nothing. The photo is server-owned, so removal goes through the
+          // upload layer, which clears the column AND drops the object.
+          const r = await removeProfilePhoto();
           if (r.ok) { setPhotoUrl(null); show("Photo removed"); } else show("Could not remove the photo");
         }}
       />

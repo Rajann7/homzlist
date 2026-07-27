@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
   const profileId = await verifyRegisterToken(cookies().get(COOKIE.REGISTER)?.value ?? "");
   if (!profileId) return fail("UNAUTHORIZED");
 
-  let body: { role?: string; name?: string; cityId?: string; photoUrl?: string | null; consent18?: boolean; consentDpdp?: boolean; hp?: string };
+  let body: { role?: string; name?: string; cityId?: string; email?: string | null; consent18?: boolean; consentDpdp?: boolean; hp?: string };
   try {
     body = await req.json();
   } catch {
@@ -36,6 +36,11 @@ export async function POST(req: NextRequest) {
   if (!cityId) return fail("VALIDATION_ERROR", { field: "city" });
   if (body.consent18 !== true || body.consentDpdp !== true) return fail("VALIDATION_ERROR", { field: "consent" });
 
+  // Email is optional at S7 (same rule as PATCH /profile/me) — it's for invoices
+  // and updates, never a login identifier, so it never gates registration.
+  const email = (body.email ?? "").trim();
+  if (email && (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))) return fail("VALIDATION_ERROR", { field: "email" });
+
   const existing = await getProfileById(profileId);
   if (!existing) return fail("UNAUTHORIZED");
   if (existing.is_registered) return fail("FORBIDDEN");
@@ -46,7 +51,7 @@ export async function POST(req: NextRequest) {
       role,
       name,
       cityId,
-      photoUrl: body.photoUrl ?? null,
+      email: email || null,
       tcVersion: TC_VERSION,
       ipHash: await hashIp(clientIp(req.headers)),
     });

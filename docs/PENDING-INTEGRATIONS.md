@@ -1877,3 +1877,30 @@ mid-session — environment, not app): the touch-only swipe-to-dismiss gesture a
 a live network-drop offline test. Both were exercised structurally, and the
 dismiss API path is covered by the regression suite; a visual pass is worth
 redoing when the pane is healthy.
+
+## S7 profile photo + email (2026-07-27)
+
+**Fixed here, not deferred**
+- P1 S7 "Take photo" / "Choose from gallery" were toast stubs — no upload, no
+  row. Both now run the real presign → PUT → commit pipeline. Because the S7
+  window has no access token yet (only the OTP-verified register cookie),
+  `lib/auth/uploader.ts` resolves either identity and gives the register cookie a
+  narrower scope: `avatar` only, own `avatars/<id>/` prefix only.
+- `completeRegistration` no longer writes `photo_url` from the request body. The
+  photo is server-owned via commit, so the client can't hand us an arbitrary URL
+  and a photo uploaded during S7 survives the registration update.
+- **Edit profile → "Remove photo" never worked.** `PATCH /profile/me` does not
+  whitelist `photoUrl`, so the call 200'd, the toast said "Photo removed", and
+  `profiles.photo_url` kept its value. Both screens now use
+  `DELETE /api/v1/uploads/avatar`, which clears the column *and* deletes the
+  object. Replacing a photo also deletes the object it replaces (no orphans).
+
+**Known remaining gap**
+- Verification documents (`kind: "doc"`) are still committed with no
+  object-lifecycle cleanup — re-submitting leaves the previous object in the
+  private bucket. Avatars and logos are cleaned up in `uploads/commit` now; docs
+  deliberately are not, because a replaced doc may still be under admin review
+  and deleting it would break the reviewer's view. Needs a decision on doc
+  retention before it can be cleaned up.
+- `chat` uploads are one-shot (they attach to no column), so an abandoned
+  composer leaves an orphan object. Unchanged by this work.

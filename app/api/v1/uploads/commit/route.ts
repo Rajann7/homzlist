@@ -1,8 +1,8 @@
 import type { NextRequest } from "next/server";
 import { ok, fail } from "@/lib/api";
-import { getCurrentUser } from "@/lib/auth/current-user";
+import { getUploader, registerScopeAllows } from "@/lib/auth/uploader";
 import { createServiceClient } from "@/lib/supabase/server";
-import { readObject, deleteObject, publicUrlFor, BUCKET } from "@/lib/storage";
+import { readObject, deleteObject, publicUrlFor, keyFromPublicUrl, BUCKET } from "@/lib/storage";
 import { validateImage } from "@/lib/image-pipeline";
 
 /**
@@ -16,8 +16,8 @@ import { validateImage } from "@/lib/image-pipeline";
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
-  const claims = await getCurrentUser();
-  if (!claims) return fail("UNAUTHORIZED");
+  const uploader = await getUploader();
+  if (!uploader) return fail("UNAUTHORIZED");
 
   let body: Record<string, any>;
   try {
@@ -29,10 +29,12 @@ export async function POST(req: NextRequest) {
   const key = typeof body.key === "string" ? body.key : "";
   const kind = body.kind as "avatar" | "logo" | "doc" | "chat";
   if (!key || !["avatar", "logo", "doc", "chat"].includes(kind)) return fail("VALIDATION_ERROR");
+  // Registration window: profile photo only, never logos/docs/chat.
+  if (!registerScopeAllows(uploader, kind)) return fail("UNAUTHORIZED");
 
   // The key must sit under THIS user's prefix — a crafted key pointing at
   // someone else's object can't be claimed.
-  const expected = `${kind === "doc" ? "docs" : kind === "logo" ? "logos" : kind === "chat" ? "chat" : "avatars"}/${claims.sub}/`;
+  const expected = `${kind === "doc" ? "docs" : kind === "logo" ? "logos" : kind === "chat" ? "chat" : "avatars"}/${uploader.id}/`;
   if (!key.startsWith(expected)) return fail("VALIDATION_ERROR", { field: "key" });
 
   const bucket = kind === "doc" ? BUCKET.private : BUCKET.public;
@@ -62,7 +64,18 @@ export async function POST(req: NextRequest) {
   if (kind === "avatar" || kind === "logo") {
     const url = publicUrlFor(key, bucket);
     const column = kind === "avatar" ? "photo_url" : "company_logo_url";
-    await createServiceClient().from("profiles").update({ [column]: url }).eq("id", claims.sub);
+    const db = createServiceClient();
+
+    // Replacing a photo: drop the object it replaces so re-uploading in a loop
+    // doesn't leave orphans in the bucket.
+    const { data: prev } = await db.from("profiles").select(column).eq("id", uploader.id).maybeSingle();
+    const prevUrl = (prev as Record<string, string | null> | null)?.[column] ?? null;
+
+    await db.from("profiles").update({ [column]: url }).eq("id", uploader.id);
+
+    const prevKey = keyFromPublicUrl(prevUrl);
+    if (prevKey && prevKey !== key) await deleteObject(prevKey, bucket).catch(() => undefined);
+
     return ok({ url });
   }
 
