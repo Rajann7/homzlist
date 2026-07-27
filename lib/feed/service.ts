@@ -29,6 +29,8 @@ export interface FeedCard {
   id: string;
   promoted: boolean;
   saved: boolean;
+  /** Posted by the viewer — hides Save, which they may not do on their own. */
+  isOwn: boolean;
   coverUrl: string | null;
   photos: string[];
   areaLabel: string | null;
@@ -189,7 +191,7 @@ export async function getFeed(
   const profMap = new Map<string, any>((profs ?? []).map((p: any) => [p.id, p]));
   const verifiedSet = new Set(((vers ?? []) as { profile_id: string }[]).map((v) => v.profile_id));
 
-  const items = page.map((c) => toCard(c, profMap, verifiedSet, photosByListing, savedSet, priceFromByProject, rank));
+  const items = page.map((c) => toCard(c, profMap, verifiedSet, photosByListing, savedSet, priceFromByProject, rank, viewerId));
 
   return { items, nextCursor, sections: [{ label: null, items }] };
 }
@@ -291,6 +293,7 @@ function toCard(
   savedSet: Set<string>,
   priceFromByProject: Map<string, { from: number | null; types: string[] }>,
   boostRank: Map<string, number>,
+  viewerId: string | null,
 ): FeedCard {
   const p = profMap.get(c.row.profile_id) ?? {};
   const poster: PosterInfo = { id: c.row.profile_id, name: p.name ?? "HomzList user", username: p.username ?? null, role: p.role ?? null, verified: verifiedSet.has(c.row.profile_id), avatarUrl: p.photo_url ?? null };
@@ -300,6 +303,7 @@ function toCard(
     const buildLabel = c.row.build_status === "ready" ? "Ready to move" : c.row.build_status === "under_construction" ? "Under construction" : "Booking open";
     return {
       kind: "project", id: c.row.id, promoted: boostRank.has(c.row.id), saved: false,
+      isOwn: viewerId !== null && c.row.profile_id === viewerId,
       coverUrl: c.row.cover_url, photos: c.row.cover_url ? [c.row.cover_url] : [],
       areaLabel: c.row.area_label, poster, postedAgo: timeAgo(c.row.live_at ?? c.row.created_at),
       title: c.row.name,
@@ -331,6 +335,9 @@ function toCard(
     kind: "property", id: l.id,
     promoted: boostRank.has(l.id),
     saved: savedSet.has(l.id),
+    // The viewer's own listing — no wishlist heart on it. The server refuses a
+    // self-save regardless (feed/interactions.toggleSave); this is the UI half.
+    isOwn: viewerId !== null && l.profile_id === viewerId,
     coverUrl: l.cover_url, photos,
     // "2d ago" = since it went LIVE, not since the draft was created.
     areaLabel: l.area_label, poster, postedAgo: timeAgo(l.live_at ?? l.created_at),

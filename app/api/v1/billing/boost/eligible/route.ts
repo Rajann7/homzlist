@@ -35,8 +35,6 @@ export async function GET() {
     getSettings(),
   ]);
 
-  const reach = (settings.boost_reach ?? {}) as Record<string, string>;
-
   // Resolved label per (subject, scope). The client switches cards without a
   // round-trip, and every label it can render came from the server.
   const targetLabels: Record<string, Record<string, string>> = {};
@@ -65,7 +63,11 @@ export async function GET() {
       perDay: `≈ ₹${Math.round(r.price_paise / 100 / (r.period_days ?? 7))}/day`,
       bestValue: (r.period_days ?? 7) >= 30,
     })),
-    targets: TARGETINGS.map((key) => ({ key, reach: reach[key] ?? "" })),
+    // City / state / all-India. Area-only targeting is no longer sold, and the
+    // per-scope "reach" estimate is no longer sent: it came from an admin-typed
+    // settings blob, not from a count of anything, so it read as a promise the
+    // product could not keep.
+    targets: TARGETINGS.map((key) => ({ key })),
     targetLabels,
   });
 }

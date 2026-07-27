@@ -47,6 +47,8 @@ const TABLES = [
   ["property_types", "Module 4 · dynamic field config"],
   ["field_definitions", "Module 4 · field labels + option lists"],
   ["listing_views", "Module 4 · unique detail opens per day"],
+  ["listing_shares", "P9 S5 · shares per sharer/channel/day (owner's own not counted)"],
+  ["boost_credits", "Unused boost days released when a subject was sold/rented/off"],
   ["staff", "Module 4 · who may moderate"],
   ["moderation_log", "Module 4 · every approve/changes/reject, attributed"],
   ["inquiries", "Module 6 · inquiry → chat request"],

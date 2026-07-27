@@ -18,6 +18,9 @@ async function req<T>(path: string, method: string, body?: unknown): Promise<Api
       headers: body ? { "Content-Type": "application/json" } : undefined,
       body: body ? JSON.stringify(body) : undefined,
       credentials: "same-origin",
+      // A thread is re-read straight after sending into it; a cached reply
+      // would drop the message that was just sent. See lib/listings/client.
+      cache: "no-store",
     });
     return (await res.json()) as ApiResult<T>;
   } catch {

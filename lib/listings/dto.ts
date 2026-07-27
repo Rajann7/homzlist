@@ -306,8 +306,14 @@ function ownerExtras(
   };
 }
 
-/** Manager row (Doc7 §56) — statuses + what the owner must act on. */
-const STATUS_BADGE: Record<string, { kind: string; label: string }> = {
+/**
+ * Manager row (Doc7 §56) — statuses + what the owner must act on.
+ *
+ * Exported because `projects` uses the same `listing_state` enum, so a builder's
+ * Projects tab must speak the same badge language as their listings rather than
+ * growing a second, drifting vocabulary.
+ */
+export const STATUS_BADGE: Record<string, { kind: string; label: string }> = {
   draft: { kind: "expired", label: "Draft" },
   payment_pending: { kind: "pending", label: "Payment pending" },
   pending_review: { kind: "pending", label: "Under review" },
@@ -332,6 +338,52 @@ export function myListingDTO(l: ListingRow) {
     // manager has to actually ASK, not just carry the timestamp silently.
     stillAvailableAsked: Boolean(l.still_available_asked_at) && l.status === "live",
     createdOn: ist(l.created_at),
+  };
+}
+
+/**
+ * P9 S5 — Listing insights.
+ *
+ * Everything the screen prints is here, computed on the server: the four metric
+ * counts, the "Live since … · Lifetime listing" line, whether the 2-month
+ * check-in is currently asking, and which of the design's cards apply. The
+ * client renders this payload and decides nothing about it.
+ */
+export function listingInsightsDTO(
+  l: ListingRow,
+  opts: {
+    stats: { views: number; saves: number; shares: number; leads: number };
+    promoted: boolean;
+    planLabel: string | null;
+    boostFromPaise: number | null;
+  },
+) {
+  const { stats, promoted, planLabel, boostFromPaise } = opts;
+  const liveDays = l.live_at ? Math.floor((Date.now() - new Date(l.live_at).getTime()) / 86_400_000) : null;
+
+  // The design's advice card ("No inquiries in 30 days"). It is an OBSERVATION,
+  // so it only renders when the observation is actually true — a listing that
+  // went live yesterday must not be told it has been ignored for a month.
+  const tip =
+    l.status === "live" && stats.leads === 0 && liveDays !== null && liveDays >= 30
+      ? {
+          title: "No inquiries in 30 days",
+          body: "Listings with 5+ daylight photos and a clear price get up to 3× more inquiries.",
+        }
+      : null;
+
+  return {
+    ...myListingDTO(l),
+    promoted,
+    planLabel,
+    liveSince: l.live_at
+      ? new Date(l.live_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", timeZone: "Asia/Kolkata" })
+      : null,
+    liveDays,
+    stats,
+    tip,
+    /** "Boost — from ₹499", priced from plan_catalog rather than written in. */
+    boostFrom: boostFromPaise === null ? null : formatShortRupees(boostFromPaise),
   };
 }
 

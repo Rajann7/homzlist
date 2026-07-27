@@ -16,6 +16,9 @@ async function req<T>(path: string, method = "GET", body?: unknown): Promise<Api
       headers: body ? { "Content-Type": "application/json" } : undefined,
       body: body ? JSON.stringify(body) : undefined,
       credentials: "same-origin",
+      // Save/unsave then re-read the feed — a cached page would put the heart
+      // back. See lib/listings/client for the case this was caught on.
+      cache: "no-store",
     });
     return (await res.json()) as ApiResult<T>;
   } catch {
@@ -26,7 +29,7 @@ async function req<T>(path: string, method = "GET", body?: unknown): Promise<Api
 export interface PosterInfo { id: string; name: string; username: string | null; role: string | null; verified: boolean; avatarUrl: string | null; }
 export interface FeedCard {
   kind: "property" | "project";
-  id: string; promoted: boolean; saved: boolean; coverUrl: string | null; photos: string[];
+  id: string; promoted: boolean; saved: boolean; isOwn?: boolean; coverUrl: string | null; photos: string[];
   areaLabel: string | null; poster: PosterInfo; postedAgo: string;
   price?: string; saleLabel?: "For Sale" | "For Rent"; meta?: string; listingKind?: "sell" | "rent"; typeCode?: string;
   title?: string; priceFrom?: string; buildStatus?: string; rera?: boolean;

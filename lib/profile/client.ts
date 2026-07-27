@@ -7,6 +7,10 @@ async function req<T>(path: string, method: string, body?: unknown): Promise<{ o
     method,
     headers: body ? { "Content-Type": "application/json" } : undefined,
     body: body ? JSON.stringify(body) : undefined,
+    // Same reason as lib/listings/client: the profile re-reads collections and
+    // /profile/me right after changing them, and the browser's HTTP cache will
+    // otherwise answer with the pre-change response.
+    cache: "no-store",
   });
   return res.json();
 }

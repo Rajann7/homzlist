@@ -23,6 +23,9 @@ async function req<T>(path: string, method = "GET", body?: unknown): Promise<Api
       headers: body ? { "Content-Type": "application/json" } : undefined,
       body: body ? JSON.stringify(body) : undefined,
       credentials: "same-origin",
+      // Saved searches are re-read right after being created or deleted.
+      // See lib/listings/client for the case this was caught on.
+      cache: "no-store",
     });
     return (await res.json()) as ApiResult<T>;
   } catch {

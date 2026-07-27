@@ -73,6 +73,10 @@ export type IconName =
   | "search-list"
   // P3 search: the landing-page row marker and the ⋯ sheet's not-interested
   | "grid"
+  // P9 S1: the profile tab bar's list-view toggle, and the photo-count marker
+  // on a grid tile.
+  | "list"
+  | "stack"
   | "eye-off"
   | "type-flat"
   | "type-bungalow"
@@ -408,6 +412,10 @@ const PATHS: Record<IconName, (f: boolean) => React.ReactNode> = {
       <rect x="14" y="14" width="7" height="7" rx="1" />
     </>
   ),
+  // designs/P9 `listic` — the grid/list toggle's list half.
+  list: () => <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />,
+  // designs/P9 `stack` — "this tile has N photos".
+  stack: () => <path d="M2 7l10 5 10-5-10-5zM2 12l10 5 10-5M2 17l10 5 10-5" />,
   "eye-off": () => (
     <>
       <path d="M9.9 4.2A9.7 9.7 0 0 1 12 4c6 0 10 8 10 8a17 17 0 0 1-2.2 3.2M6.6 6.6A17 17 0 0 0 2 12s4 8 10 8a9.6 9.6 0 0 0 5.4-1.6" />

@@ -20,6 +20,11 @@ async function req<T>(path: string, method: string, body?: unknown): Promise<Api
       headers: body ? { "Content-Type": "application/json" } : undefined,
       body: body ? JSON.stringify(body) : undefined,
       credentials: "same-origin",
+      // These screens re-GET the exact URL they just POSTed against (buy a
+      // boost → re-read boost status). Without this the browser's HTTP cache
+      // answers the second GET from the first one's response, so the write
+      // lands in Supabase and the screen keeps showing the old state.
+      cache: "no-store",
     });
     return (await res.json()) as ApiResult<T>;
   } catch {
@@ -208,7 +213,7 @@ export const billingApi = {
         coverUrl: string | null; eligible: boolean; lockLabel: string | null;
       }[];
       durations: { code: string; label: string; price: string; pricePaise: number; perDay: string; bestValue: boolean }[];
-      targets: { key: string; reach: string }[];
+      targets: { key: string }[];
       /** "<kind>:<id>" → { area|city|state|india → the real place name } */
       targetLabels: Record<string, Record<string, string>>;
     }>("/billing/boost/eligible", "GET"),
@@ -222,6 +227,19 @@ export const billingApi = {
       renewPrompt: { boostId: string; price: string; durationLabel: string; targetLabel: string } | null;
     }>("/billing/boost/status", "GET"),
 
+  /** Unused boost days released when a boosted subject was sold/rented/off. */
+  boostCredits: () =>
+    req<{
+      credits: { id: string; days: number; reason: string | null; expiresOn: string }[];
+      totalDays: number;
+    }>("/billing/boost/credit", "GET"),
+  /** Spend them on another subject — no payment, the days were already bought. */
+  applyBoostCredit: (subjectKind: "listing" | "project" | "requirement", subjectId: string, targeting: string) =>
+    req<{ boostId: string; days: number; endsAt: string; targetLabel: string }>(
+      "/billing/boost/credit",
+      "POST",
+      { subjectKind, subjectId, targeting },
+    ),
   cancelBoost: (id: string) => req<{ cancelled: boolean; refund: string }>(`/billing/boost/${id}/cancel`, "POST", {}),
   renewBoost: (id: string) => req<{ checkout: CheckoutIntent }>(`/billing/boost/${id}/renew`, "POST", {}),
 };

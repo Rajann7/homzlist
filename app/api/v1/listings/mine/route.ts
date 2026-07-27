@@ -1,6 +1,6 @@
 import { ok, fail } from "@/lib/api";
 import { getCurrentUser } from "@/lib/auth/current-user";
-import { listMine } from "@/lib/listings/service";
+import { listMine, promotedListingIds } from "@/lib/listings/service";
 import { myListingDTO } from "@/lib/listings/dto";
 
 /**
@@ -17,8 +17,13 @@ export async function GET() {
   const rows = await listMine(claims.sub);
   const by = (fn: (r: (typeof rows)[number]) => boolean) => rows.filter(fn).length;
 
+  // The profile grid draws a PROMOTED chip per tile (designs/P9 S1). Which
+  // tiles get it comes from the `boosts` table in one batched query — never
+  // from anything the client could assume.
+  const promoted = await promotedListingIds(rows.map((r) => r.id));
+
   return ok({
-    items: rows.map(myListingDTO),
+    items: rows.map((r) => ({ ...myListingDTO(r), promoted: promoted.has(r.id) })),
     counts: {
       live: by((r) => r.status === "live"),
       pending: by((r) => r.status === "pending_review"),

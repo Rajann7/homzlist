@@ -371,6 +371,9 @@ export async function updateRequirementContent(
       urgency: input.urgency ?? "immediate",
       notes: (input.notes ?? "").trim() || null,
       status: "pending_review",
+      // Content diverged from what was approved — so switching it off and on
+      // again will NOT re-live it silently (migration 0050).
+      edited_since_approval: true,
       flagged_reason: v.flaggedReason,
       submitted_at: new Date().toISOString(),
     })
@@ -385,9 +388,21 @@ export async function updateRequirementContent(
 
 /** Poster actions (P4 S4c): pause/resume, mark fulfilled, delete. */
 export async function setRequirementActive(id: string, profileId: string, active: boolean) {
+  // Turning a requirement back ON re-lives it only if its content still matches
+  // what was approved. An edit since then puts it back in the queue instead of
+  // letting the on/off switch publish unreviewed content (migration 0050).
+  const { data: current } = await db()
+    .from("requirements")
+    .select("edited_since_approval,live_at")
+    .eq("id", id)
+    .eq("profile_id", profileId)
+    .maybeSingle();
+  const c = current as { edited_since_approval: boolean; live_at: string | null } | null;
+  const relives = Boolean(c?.live_at) && !c?.edited_since_approval;
+
   const { data } = await db()
     .from("requirements")
-    .update({ is_active: active, status: active ? "live" : "paused" })
+    .update({ is_active: active, status: active ? (relives ? "live" : "pending_review") : "paused" })
     .eq("id", id)
     .eq("profile_id", profileId)
     .in("status", ["live", "paused"])

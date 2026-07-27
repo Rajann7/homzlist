@@ -8,6 +8,7 @@ import { Toggle } from "@/components/ui/Toggle";
 import { useToast } from "@/components/ui/Toast";
 import { SheetOption } from "@/components/billing/primitives";
 import { interactionsApi, type FeedCard } from "@/lib/feed/client";
+import { listingsApi } from "@/lib/listings/client";
 import { cn } from "@/lib/utils";
 
 // ---- Sort sheet (P2 S1) ----------------------------------------------------
@@ -50,7 +51,15 @@ export function MoreSheet({
 export function ShareSheet({ open, onClose, card }: { open: boolean; onClose: () => void; card: FeedCard | null }) {
   const toast = useToast();
   const link = card ? `${typeof location !== "undefined" ? location.origin : "https://homzlist.com"}/${card.kind === "project" ? "project" : "property"}/${card.id}` : "";
-  const copy = () => { void navigator.clipboard?.writeText(link); toast.show("Link copied"); };
+
+  // The Shares metric on P9 S5 counts what actually happened here. Fire-and-
+  // forget: a share must never wait on (or be blocked by) analytics. Projects
+  // have no shares table, so only a property records one.
+  const record = (channel: "copy" | "whatsapp" | "native") => {
+    if (!card || card.kind === "project") return;
+    void listingsApi.recordShare(card.id, channel);
+  };
+  const copy = () => { void navigator.clipboard?.writeText(link); record("copy"); toast.show("Link copied"); };
   return (
     <BottomSheet open={open} onClose={onClose} title="Share">
       {card && (
@@ -67,9 +76,9 @@ export function ShareSheet({ open, onClose, card }: { open: boolean; onClose: ()
             <button onClick={copy} className="text-13 font-semibold text-accent">Copy</button>
           </div>
           <div className="flex justify-around">
-            <ShareDest icon="message" label="WhatsApp" onClick={() => { window.open(`https://wa.me/?text=${encodeURIComponent(link)}`, "_blank"); }} />
+            <ShareDest icon="message" label="WhatsApp" onClick={() => { record("whatsapp"); window.open(`https://wa.me/?text=${encodeURIComponent(link)}`, "_blank"); }} />
             <ShareDest icon="copy" label="Copy Link" onClick={copy} />
-            <ShareDest icon="share" label="More" onClick={() => { if (navigator.share) void navigator.share({ url: link }); else copy(); }} />
+            <ShareDest icon="share" label="More" onClick={() => { if (navigator.share) { record("native"); void navigator.share({ url: link }); } else copy(); }} />
           </div>
         </div>
       )}

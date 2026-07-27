@@ -48,9 +48,14 @@ export function FeedCard({
     if (now - scrolledAt.current < 400) return; // that was a swipe, not a tap
     if (now - lastTap.current < 300) {
       if (openTimer.current) { clearTimeout(openTimer.current); openTimer.current = null; }
-      setHeart(true);
-      setTimeout(() => setHeart(false), 600);
-      if (!card.saved) onSave();
+      // Double-tap-to-save must respect the same rule as the heart button, or
+      // it becomes the one way left to save your own post (and would flash a
+      // heart the server then refuses).
+      if (!card.isOwn) {
+        setHeart(true);
+        setTimeout(() => setHeart(false), 600);
+        if (!card.saved) onSave();
+      }
     } else {
       openTimer.current = setTimeout(() => { openTimer.current = null; onOpen(); }, 300);
     }
@@ -173,9 +178,16 @@ export function FeedCard({
 
         {/* action bar */}
         <div className="mt-2 flex items-center gap-2">
-          <button aria-label={card.saved ? "Saved" : "Save"} onClick={onSave} className="grid h-11 w-11 place-items-center">
-            <Icon name="bookmark" size={24} filled={card.saved} className={card.saved ? "text-accent" : "text-ink-primary"} />
-          </button>
+          {/* Your own post carries no wishlist heart — it is already yours, and
+              the server refuses a self-save anyway. The spacer keeps the action
+              bar's layout identical so the card doesn't reflow. */}
+          {card.isOwn ? (
+            <span className="h-11 w-11" aria-hidden="true" />
+          ) : (
+            <button aria-label={card.saved ? "Saved" : "Save"} onClick={onSave} className="grid h-11 w-11 place-items-center">
+              <Icon name="bookmark" size={24} filled={card.saved} className={card.saved ? "text-accent" : "text-ink-primary"} />
+            </button>
+          )}
           <div className="ml-auto flex items-center gap-2">
             <Button variant="outline" className="h-10 px-3 text-13" onClick={onOpen}>{isProject ? "View Project" : "View Property"}</Button>
             <Button className="h-10 px-4 text-13" onClick={onInquiry}>Inquiry</Button>

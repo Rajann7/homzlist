@@ -2,7 +2,7 @@ import "server-only";
 import { createServiceClient } from "@/lib/supabase/server";
 import { computeTax, formatShortRupees, type TaxBreakdown, COUPON_RE } from "./money";
 import { formatPhone } from "@/lib/auth/phone";
-import { isBoostSubjectEligible } from "./boost";
+import { isBoostSubjectEligible, startBoostNow } from "./boost";
 import { notify } from "@/lib/notifications/service";
 
 /**
@@ -914,7 +914,11 @@ async function activateBoostForOrder(order: OrderRow): Promise<string | undefine
     await db().from("boosts").update({ status: "rejected", reject_reason: `${noun} was not live at payment time` }).eq("id", boost.id);
     return boost.id; // the refund worker picks rejected+paid boosts up
   }
-  await db().from("boosts").update({ status: "pending_approval" }).eq("id", boost.id);
+  // The subject is eligible, and eligible MEANS already approved and live — so
+  // there is nothing left for a moderator to decide. The window starts now
+  // (`startBoostNow` falls back to the admin queue only if the city cap is
+  // full, which is the one refusal that isn't about the subject).
+  await startBoostNow(boost.id);
   return boost.id;
 }
 

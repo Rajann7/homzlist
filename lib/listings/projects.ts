@@ -3,6 +3,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { consumeQuota, reserveSlot, transitionSlot } from "@/lib/billing/service";
 import { formatShortRupees } from "@/lib/billing/money";
 import { getAmenityLabels } from "./service";
+import { STATUS_BADGE } from "./dto";
 
 /**
  * Builder projects (Doc2 §6, Doc7 §59-61).
@@ -151,6 +152,8 @@ export async function updateProject(
     .update({
       name: input.name,
       status: "pending_review",
+      // Content diverged from what was approved (migration 0050).
+      edited_since_approval: true,
       submitted_at: new Date().toISOString(),
       rera_number: input.reraNumber,
       rera_exempt: input.reraExempt,
@@ -195,6 +198,63 @@ export async function updateProject(
   return projectDTO(data, units);
 }
 
+/**
+ * Record a project lead (migration 0051).
+ *
+ * Fired when a signed-in viewer taps Call or WhatsApp on a live project that
+ * isn't theirs — the only two contact affordances a project detail has, and
+ * until now both left no trace whatsoever.
+ *
+ * Idempotent per (builder, person, project) via the partial unique index: a
+ * buyer tapping Call four times is ONE lead whose activity moves forward, not
+ * four. A guest cannot be a lead — `leads.lead_profile_id` is not nullable and
+ * an anonymous "someone" is not something a builder can follow up.
+ *
+ * Never throws: failing to record a lead must not stop the call connecting.
+ */
+export async function recordProjectLead(
+  projectId: string,
+  ownerId: string,
+  leadProfileId: string,
+  activity: string,
+): Promise<boolean> {
+  if (ownerId === leadProfileId) return false;
+  try {
+    const { error } = await db().from("leads").upsert(
+      {
+        owner_id: ownerId,
+        lead_profile_id: leadProfileId,
+        project_id: projectId,
+        source: "inquiry",
+        stage: "new",
+        last_activity: activity.slice(0, 120),
+        last_activity_at: new Date().toISOString(),
+      },
+      { onConflict: "owner_id,lead_profile_id,project_id" },
+    );
+    return !error;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The builder's insight count for one project: LEADS, and only leads.
+ *
+ * Views and shares were briefly built here and are deliberately gone — a
+ * builder's question is "who wants this project", not "how many people
+ * scrolled past it", and two of the four cards would have been noise. Nothing
+ * else about a project is countable today without inventing it.
+ */
+export async function ownerProjectLeadCount(projectId: string): Promise<number> {
+  const { count } = await db()
+    .from("leads")
+    .select("id", { count: "exact", head: true })
+    .eq("project_id", projectId)
+    .eq("is_relevant", true);
+  return count ?? 0;
+}
+
 export async function listMyProjects(profileId: string) {
   const { data } = await db()
     .from("projects")
@@ -232,6 +292,10 @@ export async function getProject(id: string, viewerId: string | null) {
   return {
     ...projectDTO(p, p.project_units ?? [], amenityLabels),
     isOwner,
+    // The builder's profile id. Needed to write a lead against them when a
+    // viewer taps Call/WhatsApp, and no more sensitive than the poster id the
+    // feed already publishes on every card.
+    profileId: p.profile_id,
     contact: (poster as { phone?: string | null } | null)?.phone
       ? { number: (poster as { phone: string }).phone, name: (poster as { name?: string | null }).name ?? null }
       : null,
@@ -271,7 +335,17 @@ const BUILD_STATUS_LABEL: Record<string, string> = {
 };
 
 function projectDTO(p: any, units: any[], amenityLabels?: Map<string, string>) {
+  // Cheapest unit — what a project card shows where a listing shows its price.
+  const from = (units ?? [])
+    .map((u) => u.price_from_paise)
+    .filter((v): v is number => typeof v === "number" && v > 0)
+    .sort((a, b) => a - b)[0];
+
   return {
+    // Projects live on the same `listing_state` enum as listings, so they carry
+    // the same badge rather than a parallel one (designs/P9 S1 Projects tab).
+    badge: STATUS_BADGE[p.status] ?? { kind: "expired", label: p.status },
+    priceFrom: from ? formatShortRupees(from) : null,
     buildStatusLabel: p.build_status ? BUILD_STATUS_LABEL[p.build_status] ?? p.build_status : null,
     possessionLabel: p.possession_date
       ? new Date(p.possession_date).toLocaleDateString("en-IN", { month: "short", year: "numeric" })

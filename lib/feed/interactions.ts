@@ -20,6 +20,12 @@ export async function toggleSave(profileId: string, listingId: string): Promise<
   // The listing must be a real live listing — never save an arbitrary id.
   const { data: live } = await db().from("listings").select("id,profile_id").eq("id", listingId).eq("status", "live").maybeSingle();
   if (!live) return { saved: false };
+  // You cannot save your own listing. The owner already has it on their profile
+  // and in My Listings, and a self-save would inflate the Saves metric the
+  // owner reads on P9 S5 with their own tap. `profile_id` was already being
+  // selected here and simply never compared — the UI hides the control, this is
+  // the wall behind it.
+  if ((live as { profile_id: string }).profile_id === profileId) return { saved: false };
   await db().from("saves").insert({ profile_id: profileId, listing_id: listingId });
   return { saved: true };
 }

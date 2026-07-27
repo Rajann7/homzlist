@@ -61,6 +61,8 @@ export interface ListingRow {
   reject_reason: string | null;
   is_locked: boolean;
   still_available_asked_at: string | null;
+  /** Content edited since the last moderator approval (migration 0050). */
+  edited_since_approval: boolean;
   area_sqft: number | null;
   created_at: string;
   live_at: string | null;
@@ -567,6 +569,52 @@ export async function recordListingView(listingId: string, viewerKey: string): P
 }
 
 /**
+ * Which of these listings are boosted right now.
+ *
+ * The batch form of `isPromoted`, for lists: the profile grid draws a PROMOTED
+ * chip per tile (designs/P9 S1), and asking per tile would be one query per
+ * listing. Same source of truth — the `boosts` table, never a client flag.
+ */
+export async function promotedListingIds(listingIds: string[]): Promise<Set<string>> {
+  if (!listingIds.length) return new Set();
+  const now = new Date().toISOString();
+  const { data } = await db()
+    .from("boosts")
+    .select("listing_id")
+    .in("listing_id", listingIds)
+    .eq("status", "active")
+    .lte("starts_at", now)
+    .gt("ends_at", now);
+  return new Set((data ?? []).map((r: { listing_id: string }) => r.listing_id));
+}
+
+/**
+ * Record one share (P9 S5's Shares card, migration 0049).
+ *
+ * Same shape as `recordListingView`: idempotent per (listing, sharer, channel,
+ * IST day) via the unique index, so pasting the same copied link repeatedly
+ * counts once. Never throws — a failed analytics write must not break a share.
+ *
+ * The caller is responsible for NOT calling this for the listing's own owner;
+ * the screen's footnote ("Your own views and shares aren't counted") is a
+ * promise the route keeps before it gets here.
+ */
+export async function recordListingShare(
+  listingId: string,
+  sharerKey: string,
+  channel: "copy" | "whatsapp" | "native",
+): Promise<void> {
+  try {
+    await db().from("listing_shares").upsert(
+      { listing_id: listingId, sharer_key: sharerKey, channel },
+      { onConflict: "listing_id,sharer_key,channel,shared_on", ignoreDuplicates: true },
+    );
+  } catch {
+    /* analytics is best-effort */
+  }
+}
+
+/**
  * Is this listing currently boosted? Drives the PROMOTED badge on the detail
  * hero (designs/P4 S1). Read from `boosts`, never from a client flag.
  */
@@ -604,6 +652,69 @@ export async function ownerListingStats(listingId: string) {
     db().from("leads").select("id", { count: "exact", head: true }).eq("listing_id", listingId).eq("is_relevant", true),
   ]);
   return { views: views ?? 0, saves: saves ?? 0, leads: leads ?? 0 };
+}
+
+/**
+ * P9 S5 Listing insights — the four metric cards.
+ *
+ * Same three counts as the detail strip plus SHARES (migration 0049), which had
+ * no table until now and therefore could never have been anything but a
+ * hardcoded number on that screen.
+ */
+export async function ownerListingInsights(listingId: string) {
+  const [base, { count: shares }] = await Promise.all([
+    ownerListingStats(listingId),
+    db().from("listing_shares").select("id", { count: "exact", head: true }).eq("listing_id", listingId),
+  ]);
+  return { ...base, shares: shares ?? 0 };
+}
+
+/**
+ * "Live since 12 Jan · Lifetime listing" — the line under the insights card.
+ *
+ * The validity half is the PLAN's, read through the slot the listing consumed:
+ * `user_plans.expires_at IS NULL` is the ₹999 lifetime listing, anything else
+ * expires and the owner is told when. A listing with no slot (admin-seeded,
+ * legacy) returns null rather than being told it lives forever.
+ */
+export async function listingPlanLabel(listingId: string): Promise<string | null> {
+  const { data: slot } = await db()
+    .from("listing_slots")
+    .select("user_plan_id")
+    .eq("listing_id", listingId)
+    .maybeSingle();
+  if (!slot?.user_plan_id) return null;
+
+  const { data: plan } = await db()
+    .from("user_plans")
+    .select("expires_at")
+    .eq("id", slot.user_plan_id)
+    .maybeSingle();
+  if (!plan) return null;
+
+  if (!plan.expires_at) return "Lifetime listing";
+  return `Valid till ${new Date(plan.expires_at).toLocaleDateString("en-IN", {
+    day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Kolkata",
+  })}`;
+}
+
+/**
+ * The cheapest active boost, for P9 S5's "Boost — from ₹499" button.
+ *
+ * ₹499 is `plan_catalog.boost7` today, but the button must not SAY 499 — it
+ * says whatever the catalog charges, so an admin repricing a boost moves the
+ * screen instead of leaving it lying to the seller (CLAUDE.md §7).
+ */
+export async function cheapestBoostPaise(): Promise<number | null> {
+  const { data } = await db()
+    .from("plan_catalog")
+    .select("price_paise")
+    .eq("kind", "boost")
+    .eq("is_active", true)
+    .order("price_paise", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  return data?.price_paise ?? null;
 }
 
 export async function listMine(profileId: string) {
@@ -723,6 +834,11 @@ export async function updateListing(
   // A major edit on a live listing goes back for review; the live version stays
   // visible until the edit is approved (Doc2 §5.4).
   if (isMajor && wasLive) next.status = "pending_review";
+  // ANY content edit marks the listing as diverged from what a moderator
+  // approved — including a minor one that doesn't trigger re-review on its own.
+  // This is what stops "edit quietly, then hide + unhide" from being a way to
+  // push unreviewed content live (migration 0050 / `relivesWithoutReview`).
+  next.edited_since_approval = true;
 
   const { data } = await db().from("listings").update(next).eq("id", id).eq("profile_id", profileId).select("*").maybeSingle();
   if (!data) return null;
@@ -740,6 +856,24 @@ export async function updateListing(
   }
 
   return { listing: data as ListingRow, reReview: isMajor && wasLive };
+}
+
+/**
+ * May this listing go straight back to `live`, skipping moderation?
+ *
+ * Only when BOTH hold:
+ *  · it has been approved before (`live_at` is set) — a listing that has never
+ *    passed a moderator cannot let itself through on a flag alone; and
+ *  · nothing about its CONTENT has changed since that approval
+ *    (`edited_since_approval`, migration 0050 — set by `updateListing`, cleared
+ *    by `moderate`).
+ *
+ * Pausing, hiding, marking rented and re-activating are all status moves, not
+ * content moves, so a seller who did only those is re-showing the exact bytes a
+ * moderator already said yes to. Editing anything puts it back in the queue.
+ */
+function relivesWithoutReview(l: ListingRow): boolean {
+  return Boolean(l.live_at) && !l.edited_since_approval;
 }
 
 export type StatusAction = "sold" | "rented" | "completed" | "reactivate" | "restore" | "hide" | "unhide";
@@ -775,9 +909,17 @@ export async function setListingStatus(id: string, profileId: string, action: St
       patch = { availability: action, status: "archived", archived_at: now, sold_at: now };
       break;
     case "reactivate":
-      // Re-activate reuses the SAME slot for free, but goes back for review.
+      // Re-activate reuses the SAME slot for free. It goes straight back LIVE
+      // when the content a moderator already approved has not been touched
+      // since — see `relivesWithoutReview`. Only an edited (or never-approved)
+      // listing queues for a second pass over identical content.
       if (current.availability !== "rented") return null;
-      patch = { availability: "available", status: "pending_review", archived_at: null, sold_at: null };
+      patch = {
+        availability: "available",
+        status: relivesWithoutReview(current) ? "live" : "pending_review",
+        archived_at: null,
+        sold_at: null,
+      };
       break;
     case "restore":
       // Only from trash, and only inside the 30-day window the purge cron
@@ -789,7 +931,9 @@ export async function setListingStatus(id: string, profileId: string, action: St
       patch = { status: "hidden", hidden_at: now };
       break;
     case "unhide":
-      patch = { status: "pending_review", hidden_at: null };
+      // Same rule as re-activate: hiding is not an edit, so unhiding unchanged
+      // content does not need a second approval of that same content.
+      patch = { status: relivesWithoutReview(current) ? "live" : "pending_review", hidden_at: null };
       break;
   }
 

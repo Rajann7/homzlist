@@ -20,6 +20,13 @@ async function req<T>(path: string, method: string, body?: unknown): Promise<Api
       headers: body ? { "Content-Type": "application/json" } : undefined,
       body: body ? JSON.stringify(body) : undefined,
       credentials: "same-origin",
+      // Every screen here re-reads the same URL right after mutating it (hide a
+      // listing → GET its insights again). Without this the browser's HTTP
+      // cache answers the second GET from the first one's response, so the
+      // action succeeds in the database and the screen keeps showing the old
+      // state — which reads as a dead button. Found live: "Hide" wrote
+      // status=hidden and the badge stayed LIVE until a hard reload.
+      cache: "no-store",
     });
     return (await res.json()) as ApiResult<T>;
   } catch {
@@ -100,7 +107,52 @@ export interface MyListing {
   stillAvailableAsked?: boolean;
   /** Trash only — days before the purge cron removes it for good. */
   daysLeft?: number;
+  /** Boosted right now — the PROMOTED chip on a profile tile (P9 S1). */
+  promoted?: boolean;
   createdOn: string | null;
+}
+
+/** A builder's project as the profile's Projects tab needs it (P9 S1). */
+export interface MyProject {
+  id: string;
+  name: string;
+  status: string;
+  badge: { kind: string; label: string };
+  /** Cheapest unit, or null while no unit carries a price. */
+  priceFrom: string | null;
+  areaLabel: string | null;
+  coverUrl: string | null;
+  buildStatusLabel: string | null;
+  possessionLabel: string | null;
+  totalUnits: number | null;
+  availableUnits: number | null;
+}
+
+/**
+ * Project insights. ONE metric — leads (migration 0051). Views and shares were
+ * briefly here and were removed: a builder's question is who wants the project,
+ * not how many people scrolled past it.
+ */
+export interface ProjectInsights extends MyProject {
+  promoted: boolean;
+  canBoost: boolean;
+  leads: number;
+  boostFrom: string | null;
+}
+
+/** P9 S5 — Listing insights. Every field is the server's, none derived here. */
+export interface ListingInsights extends MyListing {
+  promoted: boolean;
+  /** "Lifetime listing" / "Valid till 24 Apr 2027" — null if no plan slot. */
+  planLabel: string | null;
+  /** "12 Jan" — the date half of "Live since 12 Jan". */
+  liveSince: string | null;
+  liveDays: number | null;
+  stats: { views: number; saves: number; shares: number; leads: number };
+  /** The advice card, only when the observation behind it is actually true. */
+  tip: { title: string; body: string } | null;
+  /** Cheapest boost, priced from plan_catalog — "Boost — from ₹499". */
+  boostFrom: string | null;
 }
 
 export const listingsApi = {
@@ -145,6 +197,11 @@ export const listingsApi = {
   purge: (id: string) => req<{ purged: boolean }>(`/listings/${id}/purge`, "POST"),
   /** Similar live listings for the detail rail — matched server-side. */
   similar: (id: string) => req<{ items: MyListing[] }>(`/listings/${id}/similar`, "GET"),
+  /** P9 S5 — owner-only; 404 for anyone else's listing, same as a bad id. */
+  insights: (id: string) => req<{ listing: ListingInsights }>(`/listings/${id}/insights`, "GET"),
+  /** Records a share for the Shares metric. Open to guests; owner's own is dropped. */
+  recordShare: (id: string, channel: "copy" | "whatsapp" | "native") =>
+    req<{ recorded: boolean }>(`/listings/${id}/share`, "POST", { channel }),
   setStatus: (id: string, action: string) => req<{ listing: MyListing }>(`/listings/${id}/status`, "POST", { action }),
   submit: (id: string) => req<{ submitted: boolean; already?: boolean }>(`/listings/${id}/submit`, "POST", {}),
   stillAvailable: (id: string, stillAvailable: boolean) =>
@@ -154,7 +211,7 @@ export const listingsApi = {
   /** The ₹9,999 slot is drawn server-side; PLAN_REQUIRED comes back if none. */
   createProject: (payload: Record<string, unknown>) =>
     req<{ project: { id: string } }>("/projects", "POST", payload),
-  myProjects: () => req<{ items: any[] }>("/projects", "GET"),
+  myProjects: () => req<{ items: MyProject[] }>("/projects", "GET"),
   brochure: (projectId: string) =>
     req<{ brochure: { url: string | null; scanned: boolean } | null }>(`/projects/${projectId}/brochure`, "GET"),
   deleteBrochure: (projectId: string) =>
@@ -174,6 +231,11 @@ export const listingsApi = {
     req<{ requirement: RequirementCard }>(`/requirements/${id}`, "PATCH", payload),
 
   getProject: (id: string) => req<{ project: any }>(`/projects/${id}`, "GET"),
+  /** Builder-only project insights; 404 for anyone else's, same as a bad id. */
+  projectInsights: (id: string) => req<{ project: ProjectInsights }>(`/projects/${id}/insights`, "GET"),
+  /** Tapping Call/WhatsApp on a project records a lead for the builder. */
+  recordProjectContact: (id: string, channel: "call" | "whatsapp") =>
+    req<{ recorded: boolean }>(`/projects/${id}/contact`, "POST", { channel }),
   /** Per-unit sold-out toggle — the builder's most frequent update (Doc2 §6). */
   updateProjectUnits: (id: string, units: { id: string; available: boolean }[]) =>
     req<{ project: any }>(`/projects/${id}/units`, "PATCH", { units }),

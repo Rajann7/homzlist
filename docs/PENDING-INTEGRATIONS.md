@@ -2102,3 +2102,301 @@ requested under this username → 404 · junk id → 404 · unknown username →
 `%` as a username (LIKE-wildcard probe) → 404 · DELETE against the public route →
 405 · suspended profile → empty list and 404 on detail (restored after the test).
 Production bundle clean.
+
+---
+
+## Profile tabs + Listing insights (P9 S1 / S5) — 2026-07-27
+
+**Listing insights did not exist.** P9 S5 is a whole screen (`registerScreen
+('listingStats', …)`) and nothing in the app rendered it — tapping a profile
+tile opened the PUBLIC P4 detail instead, whose owner sticky bar had "Edit" and
+"Mark as Sold" both pushing to `/listings/<id>`, i.e. to the page you were
+already on. Two dead buttons on the seller's most-used screen.
+
+Built at `/listings/:id/insights`, backed by `GET /listings/:id/insights`:
+the 2-month availability check-in, the listing card with "Live since 12 Jun ·
+Lifetime listing", four metric cards, the boost card, the advice card, the
+sticky bar, and the ⋯ sheet.
+
+**Shares had no table.** Three of the four metric cards had a real query behind
+them; the fourth could only ever have been a hardcoded number. Migration `0049`
+adds `listing_shares` (RLS on, deny-all for clients) with the same dedupe shape
+as `listing_views`: unique on (listing, sharer, channel, IST day). `POST
+/listings/:id/share` records it and the feed/detail/insights share sheets all
+call it. Verified: the owner's own share returns 200 and writes **0 rows** —
+which is what the screen's own footnote promises ("Your own views and shares
+aren't counted") — a guest share writes 1, repeating the same channel stays at
+1, a different channel adds 1, and the card then read 2.
+
+**Nothing on the screen is a constant.** "Boost — from ₹499" is
+`min(plan_catalog.price_paise) where kind='boost'`, so repricing a boost moves
+the button. "Lifetime listing" is `user_plans.expires_at IS NULL` read through
+the listing's slot; a listing with no slot prints nothing rather than being
+told it lives forever. The advice card ("No inquiries in 30 days") only renders
+when the observation is TRUE — live, 0 leads, ≥30 days — instead of the
+design's always-on prototype copy.
+
+**No dead controls, per state.** The third sticky slot and the ⋯ rows are
+chosen from the listing's actual state: live → Mark as Sold/Rented, Hide;
+hidden → Unhide; archived+rented → Re-activate; anything else → View. Boost
+becomes "View boost status" once the listing is already promoted, rather than
+selling a second boost. Verified live end-to-end with DB proof after each:
+hide → `status=hidden`, unhide → `pending_review`, mark rented → `archived` +
+`availability=rented` + the running boost `stopped`, re-activate →
+`pending_review`, delete → `status=deleted` with a redirect to My Listings
+(the screen's subject no longer exists, so it must not stay), edit → title
+written and the listing correctly sent back to `pending_review`.
+
+### Defects found and fixed
+
+- **Stale-read after every mutation (real bug, fixed).** `lib/listings/client`
+  and `lib/profile/client` issued their `fetch` with no `cache: "no-store"`.
+  Every screen here re-reads the same URL right after mutating it, so the
+  browser's HTTP cache answered the second GET from the first one's response:
+  "Hide" wrote `status=hidden` to the database and the badge kept saying LIVE
+  until a hard reload — indistinguishable from a dead button. Caught live.
+- **"Mark as rented" hid a consequence.** The server stops a running boost with
+  no refund for `rented` exactly as it does for `sold`, but the confirm copy
+  promised only the upside ("re-activate for free"). Fixed in both the insights
+  screen and My Listings.
+- **Requirements tab was a dead card.** No chevron, no proposal count, no area
+  chips, and nothing happened on tap. It now matches P9's `reqTabContent` and
+  opens the requirement.
+- **Builder's Projects tab showed listings.** `tab === "Projects"` fell through
+  to "show everything they own", so a builder's projects were nowhere on their
+  own profile. It now reads `GET /projects`; `projectDTO` gained a `badge` (the
+  same `listing_state` vocabulary listings use — projects share the enum) and a
+  `priceFrom` from the cheapest unit.
+- **Grid tiles were missing everything the design draws on them**: the
+  photo-count marker, the Promoted / Under Review chip and the diagonal
+  SOLD / RENTED ribbon. `promoted` is a new batched `boosts` query on
+  `/listings/mine`, not a client guess.
+- **The grid/list toggle drew the wrong glyphs** — an image icon and a ⋯ — so
+  the two view modes read as "photos" and "menu". Now P9's `gridic`/`listic`.
+
+### Out of scope, recorded
+
+- **`cache: "no-store"` is still missing** on `lib/billing/client`,
+  `lib/chat/client`, `lib/feed/client` and `lib/search/client`. Same bug class
+  as the one fixed above; those modules were not re-verified in this pass, so
+  the one-line fix is deliberately not applied blind.
+- **"Pin to profile" is absent from the ⋯ sheet on purpose.** P9's
+  `Sheets.listingMore` lists it, but pinning was removed from the product on
+  Rajan's instruction (migration `0048` — the profile keeps ONE curation
+  surface, the featured circles). A row that pins nothing would be the dead
+  control this whole pass is about. If it should come back as "Add to
+  featured", say so and it is a small change.
+- **Project detail badge row overflows** — `NEW PROJECT / READY TO MOVE /
+  POSSESSION … / RERA APPROVED` clips at 375px on `/projects/:id`. Pre-existing
+  (P6 S5), untouched here.
+- **Seed data**: the builder `manishagarwal9b4e` has a mojibake byte in their
+  bio ("Vadodara developer � RERA compliant projects").
+
+**Verified in all three roles at 375px**: broker `rkproperties2f21` (28
+listings covering draft / pending / changes-requested / rejected / live /
+hidden / archived-sold / archived-rented), owner `snehapatel4da9` (14 listings,
+11 requirements), builder `manishagarwal9b4e` (4 projects, 5 listings, both
+tab sets). No horizontal overflow (`scrollWidth === innerWidth === 375`), no
+console errors.
+
+**Security**: insights unauthenticated → 401 · another seller's LIVE listing
+(readable as a public detail page) → **404, byte-identical to a nonexistent
+uuid**, so the endpoint can't be used to probe which ids are real · junk uuid →
+404 · share with an invented channel → 422 · share with no body → 422 · both
+new routes rate-limited per caller · production bundle contains no
+`service_role`, no `SUPABASE_SERVICE_ROLE_KEY`, no `RAZORPAY_KEY_SECRET`,
+no `R2_SECRET`.
+
+---
+
+## Boost reclaim, instant activation, save/share rules — 2026-07-27 (part 2)
+
+### MAJOR 1 — unused boost days survive the subject (migration 0050)
+
+**Before:** selling the flat destroyed the boost. `stopBoostsForSubject` set an
+`active` boost to `stopped` and every remaining day was burned — a seller who
+bought 30 days and sold on day 4 lost 26 days they had paid for. The copy even
+said so ("Unused days aren't refunded").
+
+**Now:** money still doesn't come back, but the DAYS do. `boost_credits` (RLS
+on, unique on `source_boost_id` so a retried or racing stop can't mint two)
+holds the whole days left over, spendable free on any other eligible listing,
+project or requirement for 90 days.
+
+**Verified live, end to end, with DB rows at each step:** a broker's boosted
+₹1.75 L showroom (30-day boost, 28 days left) marked rented →
+`listings.availability=rented`, `boosts.status=stopped`, and a `boost_credits`
+row of **28 days**. Applying it to a different listing →  a new boost,
+`status=active`, `price_paise=0`, `order_id=null`, `duration_days=28`,
+`target_label='Ahmedabad'`. A second attempt → **422 `noCredit`**, so the same
+days cannot be spent twice. The credit is claimed with `consumed_at is null` in
+the UPDATE predicate (not a prior read), and released if the boost insert then
+fails — the failure mode is "you still have your days", never "days gone, no
+boost".
+
+### MAJOR 2 — no admin approval for a boost on an approved subject
+
+`activateBoostForOrder` used to park every paid boost in `pending_approval`.
+A moderator clicking approve was never reviewing the boost: the SUBJECT had
+already passed moderation, the money had cleared, and the duration, geography
+and price are all the server's. `startBoostNow` opens the window as soon as
+payment clears. The two gates with an actual reason are kept — the city cap
+(falls back to `pending_approval` so a human can place it, rather than losing a
+captured payment) and consecutive queueing.
+
+Copy that had gone false was fixed with it: "Boosts start after admin approval"
+and "Boosts need admin approval before going live" are both gone.
+
+### MAJOR 2b — re-activating unedited content skips re-review
+
+`listings/projects/requirements.edited_since_approval` (migration 0050) is set
+by every content edit and cleared by `moderate(approve)`. Re-activate, unhide
+and the requirement on/off switch now go **straight back to live** when the
+subject was approved before AND has not been edited since; anything edited
+still queues.
+
+**Verified live:** unedited listing → `hide -> hidden | unhide -> live`. Then
+one PATCH to its description → `hide -> hidden | unhide -> pending_review`.
+That second case is the hole this closes: without the flag, "edit quietly, then
+hide and unhide" would have been a way to push unreviewed content live, because
+a description is not a MAJOR field and does not trigger re-review on its own.
+
+### Save and share rules
+
+- **Self-save was possible.** `toggleSave` selected the listing's `profile_id`
+  and never compared it. An owner could save their own listing and inflate the
+  Saves metric on their own insights screen with their own tap. Now refused
+  server-side; verified 0 self-save rows exist. The heart is hidden on the
+  detail screen, on feed cards and in search results (`isOwn`, server-set), and
+  double-tap-to-save respects the same rule — otherwise it would have been the
+  one remaining way to do it.
+- **Share only on live.** A draft / under-review / hidden / sold subject 404s
+  for everyone else, so offering Share there handed out a dead link. Gated on
+  the listing detail, the listing insights ⋯ sheet and the project detail.
+- **The project Save button was fake** — a `useState` toggle with a "Saved
+  lists arrive with the Saved suite" toast, persisting nothing, and `saves` is
+  keyed to `listings` so a project has never been savable. Removed rather than
+  left pretending. **Project saves are not implemented** and are recorded here.
+
+### Boost targeting and picker
+
+- **"This area only" removed** — city, state, all-India are the three scopes.
+  Enforced server-side, not just hidden: `TARGETINGS` no longer contains it and
+  a request for `area` is **422** at the boundary (verified). Boosts SOLD with
+  area targeting keep running on it — `resolveTarget` widens a legacy `area` to
+  its city rather than refusing, so nobody loses placement they paid for.
+- **Reach estimates removed.** "~2,400 users" came from an admin-typed settings
+  blob, not a count of anything — a number the buyer could plan against that
+  the product could not stand behind.
+- **Picker thumbnails fixed.** The card is 120px wide *including* a 1.5px
+  border, and the image was a hardcoded 120px child, so every thumbnail
+  overflowed its content box by 3px and the cards came out unequal.
+  `aspect-square w-full` tracks the content box.
+
+### Project insights (migration 0051)
+
+A project tile on the profile now opens **Project insights**, matching what a
+property tile does. Projects had no analytics of any kind — every table is
+foreign-keyed to `listings.id` — so `project_views` and `project_shares` were
+built, mirroring `listing_views`/`listing_shares` including the per-IST-day
+dedupe and the salted guest key.
+
+**Two metric cards, not four, deliberately:** `saves` and `leads` are keyed to
+listings, so a project genuinely has none and a "0 Saves" card would be a
+fabricated number. Verified live: a guest view + share on a live project wrote
+1 row each and the screen then read **Views 1 · Shares 1**.
+
+### Also fixed
+
+- `cache: "no-store"` applied to `lib/billing`, `lib/chat`, `lib/feed` and
+  `lib/search` — the last four helpers with the stale-read bug.
+- The builder seed bio's mojibake byte (`U+FFFD` → em dash), in 2 profiles.
+- **Correction to an earlier note in this file:** the project detail's badge row
+  is NOT an overflow bug. It is a deliberate horizontal scroll rail (`hz-x`,
+  `overflow-x: auto`), which is what P4 S3 draws. Nothing to fix.
+
+### Security
+
+Project insights unauthenticated → 401 · another builder's project → **404,
+identical to a nonexistent uuid** · boost credit GET/POST unauthenticated →
+401 · a credit aimed at someone else's listing → 404 · `area` targeting → 422 ·
+project share with an invented channel → 422 · both new routes rate-limited per
+caller · production build clean of `service_role`, `SUPABASE_SERVICE_ROLE_KEY`,
+`RAZORPAY_KEY_SECRET` and `R2_SECRET`. No horizontal overflow at 375px
+(`scrollWidth === innerWidth === 375`), no console errors.
+
+### Still open
+
+- **Project saves** — no table, no endpoint. The fake control is gone; the
+  feature is not built.
+- **Requirement insights** — a requirement tile opens the requirement detail,
+  which is the right screen for it (it already carries proposals, edit, delete).
+  No insights screen was asked for and none was built.
+
+---
+
+## Project insights → Leads; profile chip legibility — 2026-07-27 (part 3)
+
+**Project insights now shows ONE metric: Leads.** Views and shares are gone from
+the screen — a builder's question is who wants the project, not how many people
+scrolled past it.
+
+**That meant building project leads, because they did not exist.** `leads`
+carried `listing_id` and `requirement_id` only, and the chat thread a lead is
+born from has the same two columns — so a builder has never had any record of
+who contacted them about a project. The project detail's only contact
+affordances are Call and WhatsApp, and both opened the dialler / wa.me leaving
+no trace whatsoever. Migration `0051` adds `leads.project_id`, and
+`POST /projects/:id/contact` (signed-in only — `lead_profile_id` is NOT NULL and
+an anonymous "somebody rang" is not a lead a builder can act on) records it.
+
+**Verified live, both directions:** the builder tapping their own project's
+WhatsApp → 200 and **0 rows** (you are not your own lead). Sneha Patel tapping
+Call → one row, `stage=new`, `source=inquiry`, "Tapped Call on the project".
+Tapping WhatsApp again → still **1 row**, activity moved to "Tapped WhatsApp".
+The builder's screen then read **Leads 1**, and their profile stat row moved
+0 → 1 with it. A second person (RK Properties) → a second row, so the dedupe is
+per person, not global.
+
+**Migration 0051 was rewritten, not stacked.** It had created
+`project_views`/`project_shares` earlier the same day; those tables are dropped
+on dev, their `_migrations` row removed, and the file now only adds
+`leads.project_id`. Production has run neither version, so it will never create
+the two dead tables — same approach the 0047/0048 pair took.
+
+**A real bug caught while verifying it:** the first version of the unique index
+was PARTIAL (`where project_id is not null`). Postgres can only infer a partial
+index for `ON CONFLICT` when the statement repeats the predicate, which
+PostgREST does not emit — so the upsert failed silently and no lead was written,
+while the endpoint still answered 200. Caught because the row count was checked
+rather than the status code. The index is now plain; existing listing/requirement
+leads are unaffected because their `project_id` is NULL and NULLs do not collide.
+
+**Profile tile chips were illegible.** "Under review" was `bg-info-soft
+text-info` — pale blue on pale blue — sitting on top of a photo, where it washed
+out completely; "Changes requested" on a green cover was effectively invisible.
+All tile chips now use Doc1 §7's on-photo treatment (60% black, white text), the
+same one the Promoted chip already used. Same size, same position, same radius —
+only readable now, on light covers, dark covers and the no-photo placeholder.
+
+**Also:** the project detail's Share-only-when-live gating and the removed fake
+Save button are unchanged from part 2; project shares have no table and the
+screen no longer claims a number for them.
+
+### Full re-check before shipping
+
+`tsc --noEmit` clean · `next lint` 0 errors · `next build` succeeds · every
+migration applied through `0051` · production bundle free of `service_role`,
+`SUPABASE_SERVICE_ROLE_KEY`, `RAZORPAY_KEY_SECRET`, `R2_SECRET`.
+
+Unauthenticated: listing insights 401 · project insights 401 · boost credit
+GET/POST 401 · project contact 401 · listing share 200 (guest shares are
+counted by design). Signed in as a broker: own listing insights 200 · another
+seller's project insights **404, identical to a nonexistent uuid** · contact
+with an invented channel 422 · boost credit with no credit held 422 · boost
+`targeting=area` **422** (the removed scope is refused at the boundary, not just
+hidden) · self-save 200 with **0 rows written**.
+
+DB state after the sweep: 0 self-save rows · 2 project leads · 1 spent boost
+credit · 2 listing shares. No horizontal overflow at 375px on any screen
+touched (`scrollWidth === innerWidth === 375`).

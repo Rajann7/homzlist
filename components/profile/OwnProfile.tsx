@@ -14,7 +14,8 @@ import { AccountSwitchSheet, CreateFeaturedSheet, FeaturedCollectionSheet, Profi
 import { AccountStatus } from "./AccountStatus";
 import { profileApi, type FeaturedCollection, type FeaturedItem, type OwnProfile as OwnProfileT } from "@/lib/profile/client";
 import { authApi, type DeviceAccount } from "@/lib/auth/client";
-import { listingsApi, type MyListing, type RequirementCard } from "@/lib/listings/client";
+import { StatusBadge, type BadgeKind } from "@/components/ui/StatusBadge";
+import { listingsApi, type MyListing, type MyProject, type RequirementCard } from "@/lib/listings/client";
 import { cn } from "@/lib/utils";
 
 /**
@@ -56,6 +57,9 @@ export function OwnProfile() {
   // filtered per tab. Nothing here is a placeholder count.
   const [listings, setListings] = useState<MyListing[] | null>(null);
   const [requirements, setRequirements] = useState<RequirementCard[] | null>(null);
+  // Builder-only. The Projects tab used to render the same LISTINGS the other
+  // two tabs show, so a builder's projects were nowhere on their own profile.
+  const [projects, setProjects] = useState<MyProject[] | null>(null);
   // P9 S1 featured collections — null while loading so the circles row never
   // flashes an empty state the profile doesn't actually have.
   const [collections, setCollections] = useState<FeaturedCollection[] | null>(null);
@@ -83,6 +87,14 @@ export function OwnProfile() {
       setLoading(false);
     });
   }, []);
+
+  // Projects are a Builder-only product (Doc2 §6), so only a builder pays for
+  // the extra request — and the tab that needs them can't render before the
+  // role is known anyway.
+  useEffect(() => {
+    if (p?.role !== "builder") return;
+    void listingsApi.myProjects().then((r) => setProjects(r.ok ? (r.data.items as MyProject[]) : []));
+  }, [p?.role]);
 
   // A switch is a full page load, so the design's "Switched to <user>" toast is
   // handed across it. UI-only, cleared on read — no account data is stored.
@@ -332,12 +344,15 @@ export function OwnProfile() {
             </button>
           ))}
         </div>
+        {/* The design's grid/list toggle (P9 `gridic` / `listic`). It used to
+            draw an image and a ⋯ glyph, which read as "photos" and "menu"
+            rather than as the two view modes they actually switch between. */}
         <div className="flex items-center px-2">
-          <button aria-label="Grid" onClick={() => setView("grid")} className={cn("grid h-9 w-9 place-items-center", view === "grid" ? "text-ink-primary" : "text-ink-tertiary")}>
-            <Icon name="image" size={20} strokeWidth={1.7} />
+          <button aria-label="Grid view" aria-pressed={view === "grid"} onClick={() => setView("grid")} className={cn("grid h-9 w-9 place-items-center", view === "grid" ? "text-ink-primary" : "text-ink-tertiary")}>
+            <Icon name="grid" size={20} strokeWidth={1.7} />
           </button>
-          <button aria-label="List" onClick={() => setView("list")} className={cn("grid h-9 w-9 place-items-center", view === "list" ? "text-ink-primary" : "text-ink-tertiary")}>
-            <Icon name="more" size={20} strokeWidth={1.7} />
+          <button aria-label="List view" aria-pressed={view === "list"} onClick={() => setView("list")} className={cn("grid h-9 w-9 place-items-center", view === "list" ? "text-ink-primary" : "text-ink-tertiary")}>
+            <Icon name="list" size={20} strokeWidth={1.7} />
           </button>
         </div>
       </div>
@@ -349,9 +364,20 @@ export function OwnProfile() {
         viewAs={viewAs}
         listings={listings}
         requirements={requirements}
-        onOpenListing={(id) => router.push(`/listings/${id}`)}
+        projects={projects}
+        // A tile on your OWN profile opens its insights (designs/P9 S1 →
+        // `go('listingStats')`), not the public detail page — this is the
+        // seller's own view of what the listing is doing.
+        onOpenListing={(id) => router.push(`/listings/${id}/insights`)}
+        // A project tile opens its insights, exactly as a property tile does.
+        onOpenProject={(id) => router.push(`/projects/${id}/insights`)}
+        onOpenRequirement={(id) => router.push(`/requirements/${id}`)}
         onCreate={() =>
-          router.push(tabs[tab] === "Requirements" ? "/requirements/new" : "/create")
+          router.push(
+            tabs[tab] === "Requirements" ? "/requirements/new"
+            : tabs[tab] === "Projects" ? "/projects/new"
+            : "/create",
+          )
         }
       />
       </div>
@@ -502,30 +528,40 @@ function ProfileSkeleton() {
  * so the tab can never disagree with the listing itself.
  */
 function TabContent({
-  tab, view, viewAs, listings, requirements, onOpenListing, onCreate,
+  tab, view, viewAs, listings, requirements, projects,
+  onOpenListing, onOpenProject, onOpenRequirement, onCreate,
 }: {
   tab: string;
   view: "grid" | "list";
   viewAs: boolean;
   listings: MyListing[] | null;
   requirements: RequirementCard[] | null;
+  projects: MyProject[] | null;
   onOpenListing: (id: string) => void;
+  onOpenProject: (id: string) => void;
+  onOpenRequirement: (id: string) => void;
   onCreate: () => void;
 }) {
   const isRequirements = tab === "Requirements";
+  const isProjects = tab === "Projects";
 
   // Still loading — show skeletons rather than an "empty" state that would be a
   // lie for a user who does have listings.
-  if ((isRequirements ? requirements : listings) === null) {
+  const source = isRequirements ? requirements : isProjects ? projects : listings;
+  if (source === null) {
     return (
-      <div className={cn("p-1", view === "grid" ? "grid grid-cols-3 gap-1" : "flex flex-col gap-2 p-4")}>
+      <div className={cn(view === "grid" && !isRequirements ? "grid grid-cols-3 gap-[2px] p-0" : "flex flex-col gap-2 p-4")}>
         {[0, 1, 2].map((i) => (
-          <Skeleton key={i} className={view === "grid" ? "aspect-square w-full rounded-4" : "h-16 w-full rounded-8"} />
+          <Skeleton key={i} className={view === "grid" && !isRequirements ? "aspect-square w-full rounded-none" : "h-[88px] w-full rounded-12"} />
         ))}
       </div>
     );
   }
 
+  // ---- Requirements tab (designs/P9 `reqTabContent`) -----------------------
+  // Budget as the headline, "3 BHK · Buy" under it, the areas as chips, the
+  // status badge, and the proposal count with a chevron. The card used to be a
+  // dead div: no chevron, no proposals, and nothing happened on tap.
   if (isRequirements) {
     const items = requirements ?? [];
     if (!items.length) {
@@ -541,28 +577,104 @@ function TabContent({
     }
     return (
       <div className="flex flex-col gap-2 p-4">
-        {items.map((r) => (
-          <div key={r.id} className="rounded-12 border border-border bg-surface-1 p-3">
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-15 font-semibold text-ink-primary">
-                {r.bhk ? `${r.bhk} BHK · ` : ""}{r.kindLabel}
-              </span>
-              <span className="text-11 font-semibold uppercase text-ink-tertiary">{r.badge.label}</span>
-            </div>
-            <div className="mt-1 text-13 text-ink-secondary">{r.budgetLabel}</div>
-            {r.areaLabel && <div className="mt-0.5 text-11 text-ink-tertiary">{r.areaLabel}</div>}
-          </div>
+        {items.map((r) => {
+          // `daysLeft` is the server's countdown; the design prints it beside
+          // the status ("Active · 22d") only while the requirement is running.
+          const badgeLabel =
+            r.status === "live" && r.daysLeft !== null ? `${r.badge.label} · ${r.daysLeft}d` : r.badge.label;
+          const areas = (r.areaLabel ?? "").split(",").map((a) => a.trim()).filter(Boolean);
+          return (
+            <button
+              key={r.id}
+              onClick={() => onOpenRequirement(r.id)}
+              className="w-full rounded-12 border border-border bg-surface-1 p-3 text-left shadow-l1 dark:shadow-none"
+            >
+              <div className="flex items-start gap-2">
+                <span className="min-w-0 flex-1 text-17 font-semibold text-ink-primary">{r.budgetLabel}</span>
+                <StatusBadge kind={r.badge.kind as BadgeKind} label={badgeLabel} />
+              </div>
+              <div className="mt-1 text-13 text-ink-secondary">
+                {[r.bhk ? `${r.bhk} BHK` : null, r.kindLabel].filter(Boolean).join(" · ")}
+              </div>
+              {!!areas.length && (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {areas.map((a) => (
+                    <span key={a} className="chrome flex h-[26px] items-center rounded-full bg-surface-2 px-2.5 text-11 text-ink-primary">
+                      {a}
+                    </span>
+                  ))}
+                </div>
+              )}
+              <div className="mt-2.5 flex items-center">
+                {/* Proposals only exist on a live requirement, so a paused or
+                    expired one shows its status line instead of a fake "0". */}
+                <span className="flex-1 text-11 text-ink-tertiary">
+                  {r.proposals
+                    ? `${r.proposals.total} proposal${r.proposals.total === 1 ? "" : "s"}${r.proposals.newCount ? ` · ${r.proposals.newCount} new` : ""}`
+                    : r.createdOn
+                    ? `Posted ${r.createdOn}`
+                    : ""}
+                </span>
+                <Icon name="chevron-right" size={18} className="text-ink-tertiary" />
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    );
+  }
+
+  // ---- Projects tab (builder) ---------------------------------------------
+  if (isProjects) {
+    const items = projects ?? [];
+    if (!items.length) {
+      return (
+        <Empty
+          title="No projects yet"
+          body="List your project and it appears on your profile and in search."
+          cta="Create Project"
+          viewAs={viewAs}
+          onCreate={onCreate}
+        />
+      );
+    }
+    if (view === "list") {
+      return (
+        <div className="flex flex-col gap-2 p-4">
+          {items.map((p) => (
+            <Row
+              key={p.id}
+              onClick={() => onOpenProject(p.id)}
+              coverUrl={p.coverUrl}
+              title={p.name}
+              sub={[p.priceFrom ? `From ${p.priceFrom}` : null, p.areaLabel].filter(Boolean).join(" · ")}
+              badge={p.badge}
+            />
+          ))}
+        </div>
+      );
+    }
+    return (
+      <div className="grid grid-cols-3 gap-[2px]">
+        {items.map((p) => (
+          <Tile
+            key={p.id}
+            onClick={() => onOpenProject(p.id)}
+            coverUrl={p.coverUrl}
+            status={p.status}
+            badgeLabel={p.badge.label}
+          />
         ))}
       </div>
     );
   }
 
-  // Sell / Rent / Projects tabs read the listing rows, filtered by kind.
+  // ---- Sell / Rent (owner, broker) and Sell / Rent (builder) ---------------
   const all = listings ?? [];
   const items =
     tab === "Sell" ? all.filter((l) => l.kind === "sell")
     : tab === "Rent" ? all.filter((l) => l.kind === "rent")
-    : all; // "Projects" and "Sell / Rent" (builder) show everything they own
+    : all; // builder's combined "Sell / Rent" tab
 
   if (!items.length) {
     return (
@@ -580,33 +692,140 @@ function TabContent({
     return (
       <div className="flex flex-col gap-2 p-4">
         {items.map((l) => (
-          <button key={l.id} onClick={() => onOpenListing(l.id)} className="flex gap-3 rounded-12 border border-border bg-surface-1 p-3 text-left">
-            <Thumb url={l.coverUrl} className="h-16 w-16 shrink-0 rounded-8" />
-            <div className="min-w-0 flex-1">
-              <div className="truncate text-15 font-semibold text-ink-primary">{l.title ?? "Untitled listing"}</div>
-              <div className="mt-0.5 text-13 text-ink-secondary">{l.price}</div>
-              <div className="mt-0.5 truncate text-11 text-ink-tertiary">{l.areaLabel}</div>
-            </div>
-            <span className="shrink-0 self-start text-11 font-semibold uppercase text-ink-tertiary">{l.badge.label}</span>
-          </button>
+          <Row
+            key={l.id}
+            onClick={() => onOpenListing(l.id)}
+            coverUrl={l.coverUrl}
+            title={l.title ?? "Untitled listing"}
+            sub={[l.price, l.areaLabel].filter(Boolean).join(" · ")}
+            badge={l.badge}
+          />
         ))}
       </div>
     );
   }
 
   return (
-    <div className="grid grid-cols-3 gap-1 p-1">
+    <div className="grid grid-cols-3 gap-[2px]">
       {items.map((l) => (
-        <button key={l.id} onClick={() => onOpenListing(l.id)} className="relative aspect-square">
-          <Thumb url={l.coverUrl} className="h-full w-full rounded-4" />
-          {l.badge.label !== "Live" && (
-            <span className="absolute left-1 top-1 rounded-4 bg-black/60 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-white">
-              {l.badge.label}
-            </span>
-          )}
-        </button>
+        <Tile
+          key={l.id}
+          onClick={() => onOpenListing(l.id)}
+          coverUrl={l.coverUrl}
+          photoCount={l.photoCount}
+          promoted={l.promoted}
+          status={l.status}
+          availability={l.availability}
+          badgeLabel={l.badge.label}
+        />
       ))}
     </div>
+  );
+}
+
+/**
+ * One profile grid tile (designs/P9 `ptile`).
+ *
+ * The design puts four distinct things on a tile and the old version drew none
+ * of them: the photo-count marker bottom-right, a Promoted or Under Review chip
+ * top-left, and the diagonal SOLD / RENTED ribbon. Only two chips may sit on a
+ * photo (Doc1 §7), which is why Promoted wins over Under Review — a listing
+ * can't be both anyway.
+ */
+function Tile({
+  onClick, coverUrl, photoCount, promoted, status, availability, badgeLabel,
+}: {
+  onClick: () => void;
+  coverUrl: string | null;
+  photoCount?: number;
+  promoted?: boolean;
+  status: string;
+  availability?: string;
+  badgeLabel: string;
+}) {
+  const ribbon =
+    availability === "sold" ? "SOLD"
+    : availability === "rented" ? "RENTED"
+    : null;
+  const chip =
+    promoted ? "Promoted"
+    : status === "live" ? null
+    : badgeLabel;
+
+  return (
+    <button onClick={onClick} className="relative aspect-square overflow-hidden bg-surface-3 active:opacity-80">
+      {coverUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={coverUrl} alt="" data-protected="true" className="h-full w-full object-cover" />
+      ) : (
+        <span className="grid h-full place-items-center text-ink-tertiary"><Icon name="home" size={30} /></span>
+      )}
+
+      {/* Status chip. Every tile chip sits ON a photo, so it uses Doc1 §7's
+          on-photo treatment — 60% black with white text — rather than a tinted
+          pill. "Under review" was `bg-info-soft text-info`: pale blue on pale
+          blue, which washed out completely over a bright photo and read as a
+          different, weaker kind of label than the Promoted chip beside it.
+          Same size, same position, same corner radius; only legible now. */}
+      {chip && (
+        <span
+          className={cn(
+            "chrome absolute left-1.5 top-1.5 max-w-[calc(100%-12px)] rounded-4 bg-black/60 px-1.5 py-0.5",
+            "text-[10px] font-semibold uppercase leading-[1.25] tracking-[0.3px] text-white",
+          )}
+        >
+          {chip}
+        </span>
+      )}
+
+      {!!photoCount && photoCount > 1 && (
+        <span className="chrome absolute bottom-1.5 right-1.5 flex items-center gap-[3px] text-11 font-semibold text-white [text-shadow:0_1px_2px_rgba(0,0,0,.5)]">
+          <Icon name="stack" size={13} />
+          {photoCount}
+        </span>
+      )}
+
+      {ribbon && (
+        <span
+          className={cn(
+            "chrome pointer-events-none absolute -right-[26px] top-2.5 rotate-45 px-[30px] py-[3px] text-11 font-semibold tracking-[0.5px] text-white",
+            ribbon === "RENTED" ? "bg-warning" : "bg-ink-primary",
+          )}
+        >
+          {ribbon}
+        </span>
+      )}
+    </button>
+  );
+}
+
+/** One list-view row (designs/P9 `listContent`): thumb, title, meta, badge, ›. */
+function Row({
+  onClick, coverUrl, title, sub, badge,
+}: {
+  onClick: () => void;
+  coverUrl: string | null;
+  title: string;
+  sub: string;
+  badge: { kind: string; label: string };
+}) {
+  return (
+    <button onClick={onClick} className="flex w-full items-center gap-3 rounded-12 border border-border bg-surface-1 p-3 text-left shadow-l1 active:bg-surface-2 dark:shadow-none">
+      <span className="grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-8 bg-surface-3 text-ink-tertiary">
+        {coverUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={coverUrl} alt="" data-protected="true" className="h-full w-full object-cover" />
+        ) : (
+          <Icon name="home" size={22} />
+        )}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-15 font-semibold text-ink-primary">{title}</span>
+        <span className="mt-0.5 block truncate text-13 text-ink-tertiary">{sub}</span>
+      </span>
+      <StatusBadge kind={badge.kind as BadgeKind} label={badge.label} />
+      <Icon name="chevron-right" size={20} className="shrink-0 text-ink-tertiary" />
+    </button>
   );
 }
 

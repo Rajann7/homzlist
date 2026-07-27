@@ -105,6 +105,10 @@ export async function moderate(
       // the old complaint.
       review_notes: null,
       reject_reason: null,
+      // This IS the approval, so the content and the approval are back in sync.
+      // From here a pause/hide/rented round-trip re-lives without a second pass
+      // over identical content (migration 0050).
+      edited_since_approval: false,
     };
   } else if (input.action === "request_changes") {
     const notes = input.notes ?? {};

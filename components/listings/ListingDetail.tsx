@@ -128,6 +128,14 @@ export function ListingDetail({ id, isGuest = false }: { id: string; isGuest?: b
       <DetailHeader
         title={listing.title ?? listing.typeLabel ?? ""}
         saved={saved}
+        // You don't wishlist your own property — it's already on your profile
+        // and in My Listings, and the tap would land in the Saves metric you
+        // read on your own insights screen. The server refuses it either way.
+        canSave={!isOwner}
+        // Sharing a link only makes sense for something a visitor can open. A
+        // draft / under-review / hidden / sold listing 404s for everyone else,
+        // so offering Share there hands out a dead link.
+        canShare={listing.status === "live"}
         onBack={() => router.back()}
         onSave={() => void toggleSave()}
         onShare={() => {
@@ -642,10 +650,14 @@ function Shell({ children }: { children: React.ReactNode }) {
  * photo has scrolled away.
  */
 function DetailHeader({
-  title, saved, onBack, onSave, onShare, onMore,
+  title, saved, canSave = true, canShare = true, onBack, onSave, onShare, onMore,
 }: {
   title: string;
   saved: boolean;
+  /** Owner viewing their own listing — no wishlist control. */
+  canSave?: boolean;
+  /** Only a live listing has a link a visitor can actually open. */
+  canShare?: boolean;
   onBack: () => void;
   onSave: () => void;
   onShare: () => void;
@@ -690,10 +702,14 @@ function DetailHeader({
       >
         {title}
       </span>
-      <button aria-label={saved ? "Remove from saved" : "Save"} onClick={onSave} className={btn}>
-        <Icon name="bookmark" size={21} filled={saved} />
-      </button>
-      <button aria-label="Share" onClick={onShare} className={btn}><Icon name="share" size={21} /></button>
+      {canSave && (
+        <button aria-label={saved ? "Remove from saved" : "Save"} onClick={onSave} className={btn}>
+          <Icon name="bookmark" size={21} filled={saved} />
+        </button>
+      )}
+      {canShare && (
+        <button aria-label="Share" onClick={onShare} className={btn}><Icon name="share" size={21} /></button>
+      )}
       <button aria-label="More" onClick={onMore} className={btn}><Icon name="more" size={21} /></button>
     </div>
   );

@@ -30,10 +30,21 @@ import { listingBrief, projectBrief, requirementBrief } from "@/lib/notification
 const db = () => createServiceClient();
 
 export type BoostSubjectKind = "listing" | "project" | "requirement";
+/**
+ * `area` is retained in the TYPE but not in `TARGETINGS`: boosts sold before
+ * 27 Jul 2026 still carry it in `boosts.targeting` and placement must keep
+ * honouring them for the rest of their window. It is simply no longer sellable.
+ */
 export type BoostTargeting = "area" | "city" | "state" | "india";
 
 export const SUBJECT_KINDS: BoostSubjectKind[] = ["listing", "project", "requirement"];
-export const TARGETINGS: BoostTargeting[] = ["area", "city", "state", "india"];
+/**
+ * The scopes a buyer may CHOOSE: city, state, all-India. Area-only targeting was
+ * removed on Rajan's instruction — three scopes, nothing narrower.
+ * `resolveTarget` still maps a legacy `area` request down to the city that
+ * contains it rather than rejecting it.
+ */
+export const TARGETINGS: BoostTargeting[] = ["city", "state", "india"];
 
 const TABLE: Record<BoostSubjectKind, string> = {
   listing: "listings",
@@ -279,23 +290,24 @@ export interface ResolvedTarget {
  * meant a boost could claim any reach it liked on the status screen.
  */
 export async function resolveTarget(subject: BoostSubject, targeting: BoostTargeting): Promise<ResolvedTarget> {
+  // Area-only targeting is no longer sold. A request that still asks for it
+  // (an old client, a renewal of a legacy boost) is widened to the city that
+  // contains the area rather than refused — the buyer gets more reach, never
+  // less, and nothing can be placed into a scope the product no longer offers.
+  if (targeting === "area") targeting = subject.cityId ? "city" : subject.stateId ? "state" : "india";
   // A scope we cannot resolve to an id is a scope we cannot place. Selling it
   // would take money for a boost that reaches nobody, so it falls back to the
   // widest scope that IS resolvable rather than silently storing nulls.
-  if (targeting === "area" && !subject.areaId) targeting = subject.cityId ? "city" : subject.stateId ? "state" : "india";
   if (targeting === "city" && !subject.cityId) targeting = subject.stateId ? "state" : "india";
   if (targeting === "state" && !subject.stateId) targeting = "india";
 
-  const [areaName, cityName, stateName] = await Promise.all([
-    subject.areaId ? locationName(subject.areaId) : Promise.resolve(null),
+  // The area name is no longer read: with `area` gone, no sellable scope has an
+  // area in its label or its ids, so a boost is never narrowed below city.
+  const [cityName, stateName] = await Promise.all([
     subject.cityId ? locationName(subject.cityId) : Promise.resolve(null),
     subject.stateId ? locationName(subject.stateId) : Promise.resolve(null),
   ]);
 
-  if (targeting === "area") {
-    const label = [areaName ?? subject.areaLabel, cityName].filter(Boolean).join(", ") || "This area";
-    return { targeting, label, areaId: subject.areaId, cityId: subject.cityId, stateId: subject.stateId };
-  }
   if (targeting === "city") {
     return { targeting, label: cityName ?? "Your city", areaId: null, cityId: subject.cityId, stateId: subject.stateId };
   }
@@ -535,6 +547,77 @@ export async function approveBoost(boostId: string, actorId: string): Promise<Bo
 }
 
 /**
+ * Payment landed on a boost whose subject is ALREADY APPROVED → start it now.
+ *
+ * A moderator approving a boost was never reviewing the boost: the subject had
+ * already passed moderation, the money had already cleared, and the duration and
+ * geography are the server's. The click added latency and a dead-end (Module 9's
+ * own finding: every paid boost sat in `pending_approval` until someone came).
+ * So an eligible subject — and `eligible` means live and available, i.e.
+ * approved — starts its window immediately.
+ *
+ * The two REAL gates are kept, because they are the ones with a reason:
+ *  · the city cap, which stops the feed becoming all-boost. Hitting it does NOT
+ *    lose the sale — the boost falls back to `pending_approval` so a human can
+ *    place it, which is the compensating path for money already captured.
+ *  · consecutive queueing, so two boosts on one subject don't overlap.
+ *
+ * `approveBoost` above stays: legacy rows still sitting in `pending_approval`,
+ * and the cap-fallback rows, are approved through it.
+ */
+export async function startBoostNow(boostId: string): Promise<"active" | "pending_approval"> {
+  const { data } = await db().from("boosts").select("*").eq("id", boostId).maybeSingle();
+  const boost = data as Record<string, any> | null;
+  if (!boost || boost.status !== "pending_payment") return "pending_approval";
+
+  const cap = await cityCapUsage(boost.target_city_id);
+  if (cap.used >= cap.cap) {
+    // Cap full — a human decides. The buyer is not charged twice and not left
+    // in limbo: this is the same queue the admin panel already works.
+    await db().from("boosts").update({ status: "pending_approval" }).eq("id", boostId).eq("status", "pending_payment");
+    return "pending_approval";
+  }
+
+  const nowIso = new Date().toISOString();
+  const { data: running } = await db()
+    .from("boosts")
+    .select("ends_at")
+    .eq("listing_id", boost.listing_id)
+    .in("status", ["active", "paused"])
+    .not("ends_at", "is", null)
+    .order("ends_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const runningEnd = (running as { ends_at: string } | null)?.ends_at ?? null;
+  const startsAt = runningEnd && runningEnd > nowIso ? runningEnd : nowIso;
+  const endsAt = new Date(new Date(startsAt).getTime() + boost.duration_days * 86_400_000).toISOString();
+
+  const { data: updated } = await db()
+    .from("boosts")
+    .update({ status: "active", approved_at: nowIso, starts_at: startsAt, ends_at: endsAt, reject_reason: null })
+    .eq("id", boostId)
+    .eq("status", "pending_payment") // concurrency guard, same shape as approveBoost
+    .select("id")
+    .maybeSingle();
+  if (!updated) return "pending_approval";
+
+  await logReview(boostId, null, "approve", "Subject already approved — boost started automatically");
+
+  const queued = startsAt !== nowIso;
+  const brief = await subjectBrief(boost.subject_kind, boost.listing_id);
+  await notify({
+    profileId: boost.profile_id,
+    type: "boost_approved",
+    title: queued ? `Your boost is **queued** on ${brief.title}` : `Your boost is **live** on ${brief.title}`,
+    body: queued
+      ? `It starts when your current boost ends, and runs till ${dateLabel(endsAt)}.`
+      : `Running till ${dateLabel(endsAt)} · ${boost.target_label}`,
+    data: { boostId, subjectKind: boost.subject_kind, subjectId: boost.listing_id, deepLink: "/boost" },
+  });
+  return "active";
+}
+
+/**
  * Reject → full refund. The money is NOT moved here: marking the boost
  * `rejected` with `refunded_at` still null is exactly what the hourly sweep in
  * lib/billing/reconcile.ts claims and refunds, single-flight (migration 0011).
@@ -684,7 +767,7 @@ export async function stopBoostsForSubject(subjectId: string, reason: string): P
     .update({ status: "stopped", stopped_reason: reason.slice(0, 300) })
     .eq("listing_id", subjectId)
     .in("status", ["active", "paused"])
-    .select("id,profile_id");
+    .select("id,profile_id,ends_at,paused_at,status");
 
   const { data: refunding } = await db()
     .from("boosts")
@@ -696,13 +779,19 @@ export async function stopBoostsForSubject(subjectId: string, reason: string): P
     .eq("status", "pending_approval")
     .select("id,profile_id,price_paise");
 
-  for (const b of (stopped ?? []) as { id: string; profile_id: string }[]) {
+  for (const b of (stopped ?? []) as { id: string; profile_id: string; ends_at: string | null; paused_at: string | null; status: string }[]) {
     await logReview(b.id, null, "auto_stop", reason.slice(0, 300));
+    // The days the seller paid for and did not get are handed back as a CREDIT
+    // they can spend on another subject. Money still doesn't come back — but
+    // succeeding (selling the flat) must not destroy placement already bought.
+    const days = await issueBoostCredit(b, reason);
     await notify({
       profileId: b.profile_id,
       type: "boost_stopped",
       title: "Your boost **stopped**",
-      body: `${reason.slice(0, 160)}. Unused days aren't refunded — see the Refund Policy.`,
+      body: days
+        ? `${reason.slice(0, 140)}. Your ${days} unused boost ${days === 1 ? "day is" : "days are"} saved — apply them to another listing, project or requirement for free.`
+        : `${reason.slice(0, 160)}. Unused days aren't refunded — see the Refund Policy.`,
       data: { boostId: b.id, deepLink: "/boost" },
     });
   }
@@ -718,6 +807,171 @@ export async function stopBoostsForSubject(subjectId: string, reason: string): P
   }
 
   return { stopped: (stopped ?? []).length, refunding: (refunding ?? []).length };
+}
+
+// ---------------------------------------------------------------------------
+// Boost credits (migration 0050)
+// ---------------------------------------------------------------------------
+
+/**
+ * Turn the unused half of an interrupted boost into a spendable credit.
+ *
+ * Whole days only, floored — a boost with 19 hours left is worth 0 days, not a
+ * free extra one. A PAUSED boost is measured from when it was paused, because
+ * its `ends_at` has not yet been extended by the pause (that happens on resume),
+ * so measuring from `now` would silently eat the paused stretch.
+ *
+ * Idempotent by the unique index on `source_boost_id`: a retried stop, or two
+ * status changes racing, cannot mint a second credit for the same boost.
+ * Returns the days credited, or 0 if there was nothing left to credit.
+ */
+async function issueBoostCredit(
+  boost: { id: string; profile_id: string; ends_at: string | null; paused_at: string | null; status: string },
+  reason: string,
+): Promise<number> {
+  if (!boost.ends_at) return 0;
+  const from = boost.status === "paused" && boost.paused_at ? new Date(boost.paused_at).getTime() : Date.now();
+  const days = Math.floor((new Date(boost.ends_at).getTime() - from) / 86_400_000);
+  if (days < 1) return 0;
+
+  const { error } = await db().from("boost_credits").insert({
+    profile_id: boost.profile_id,
+    source_boost_id: boost.id,
+    days,
+    reason: reason.slice(0, 300),
+  });
+  // A duplicate is the idempotency guard doing its job, not a failure.
+  if (error && !String(error.code) .includes("23505")) return 0;
+  return days;
+}
+
+export interface BoostCredit {
+  id: string;
+  days: number;
+  reason: string | null;
+  expiresAt: string;
+}
+
+/** Unspent, unexpired credits for one seller — newest-expiring first so the
+ *  strip can tell them what they are about to lose. */
+export async function listBoostCredits(profileId: string): Promise<BoostCredit[]> {
+  const { data } = await db()
+    .from("boost_credits")
+    .select("id,days,reason,expires_at")
+    .eq("profile_id", profileId)
+    .is("consumed_at", null)
+    .gt("expires_at", new Date().toISOString())
+    .order("expires_at", { ascending: true });
+  return ((data ?? []) as Record<string, any>[]).map((c) => ({
+    id: c.id, days: c.days, reason: c.reason, expiresAt: c.expires_at,
+  }));
+}
+
+export type CreditApplyResult =
+  | { ok: true; boostId: string; days: number; endsAt: string; targetLabel: string }
+  | { ok: false; reason: "no_credit" | "ineligible" | "not_found" | "city_cap" };
+
+/**
+ * Spend a credit on another subject. No money moves — this is placement the
+ * seller already paid for on a subject that stopped being placeable.
+ *
+ * The credit is CLAIMED FIRST, in a statement whose `consumed_at is null`
+ * predicate is the double-spend guard: two parallel calls produce one winner
+ * and one `no_credit`. Only then is the boost written, and if anything after
+ * the claim fails the credit is released back — so the failure mode is "you
+ * still have your days", never "your days vanished and no boost exists".
+ */
+export async function applyBoostCredit(
+  profileId: string,
+  kind: BoostSubjectKind,
+  subjectId: string,
+  targeting: BoostTargeting,
+): Promise<CreditApplyResult> {
+  const subject = await getBoostSubject(profileId, kind, subjectId);
+  if (!subject) return { ok: false, reason: "not_found" };
+  if (!subject.eligible) return { ok: false, reason: "ineligible" };
+
+  const credits = await listBoostCredits(profileId);
+  const credit = credits[0];
+  if (!credit) return { ok: false, reason: "no_credit" };
+
+  const target = await resolveTarget(subject, targeting);
+  const cap = await cityCapUsage(target.cityId);
+  // The cap protects the feed from being all-boost. A credit cannot buy past it.
+  if (cap.used >= cap.cap) return { ok: false, reason: "city_cap" };
+
+  // (1) claim — the predicate is the guard, not a prior read
+  const { data: claimed } = await db()
+    .from("boost_credits")
+    .update({ consumed_at: new Date().toISOString() })
+    .eq("id", credit.id)
+    .is("consumed_at", null)
+    .select("id,days")
+    .maybeSingle();
+  if (!claimed) return { ok: false, reason: "no_credit" };
+
+  const release = async () => {
+    await db().from("boost_credits").update({ consumed_at: null, consumed_boost_id: null }).eq("id", credit.id);
+  };
+
+  // (2) same consecutive-queueing rule a paid boost gets — a credit must not
+  // overlap a window already running on this subject.
+  const nowIso = new Date().toISOString();
+  const { data: running } = await db()
+    .from("boosts")
+    .select("ends_at")
+    .eq("listing_id", subjectId)
+    .in("status", ["active", "paused"])
+    .not("ends_at", "is", null)
+    .order("ends_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const runningEnd = (running as { ends_at: string } | null)?.ends_at ?? null;
+  const startsAt = runningEnd && runningEnd > nowIso ? runningEnd : nowIso;
+  const endsAt = new Date(new Date(startsAt).getTime() + credit.days * 86_400_000).toISOString();
+
+  const { data: created, error } = await db()
+    .from("boosts")
+    .insert({
+      profile_id: profileId,
+      listing_id: subjectId,
+      subject_kind: kind,
+      // Reuses the catalog code only as a label anchor; no order, no charge.
+      catalog_code: credit.days >= 30 ? "boost30" : "boost7",
+      duration_days: credit.days,
+      targeting: target.targeting,
+      target_label: target.label,
+      target_area_id: target.areaId,
+      target_city_id: target.cityId,
+      target_state_id: target.stateId,
+      // Zero, and no `order_id` — so this never enters the refund sweep, which
+      // only ever looks at boosts with a captured payment behind them.
+      price_paise: 0,
+      status: "active",
+      approved_at: nowIso,
+      starts_at: startsAt,
+      ends_at: endsAt,
+    })
+    .select("id")
+    .maybeSingle();
+
+  if (error || !created) {
+    await release();
+    return { ok: false, reason: "not_found" };
+  }
+  const boostId = (created as { id: string }).id;
+  await db().from("boost_credits").update({ consumed_boost_id: boostId }).eq("id", credit.id);
+  await logReview(boostId, null, "approve", `Applied ${credit.days} reclaimed boost day(s) — no charge`);
+
+  await notify({
+    profileId,
+    type: "boost_approved",
+    title: `Your boost is **live** on ${(await subjectBrief(kind, subjectId)).title}`,
+    body: `${credit.days} reclaimed ${credit.days === 1 ? "day" : "days"} applied at no charge · running till ${dateLabel(endsAt)} · ${target.label}`,
+    data: { boostId, deepLink: "/boost" },
+  });
+
+  return { ok: true, boostId, days: credit.days, endsAt, targetLabel: target.label };
 }
 
 /**

@@ -83,6 +83,12 @@ export function ProjectDetail({ id }: { id: string }) {
   const contactBuilder = (via: "call" | "whatsapp", unitType?: string) => {
     const number = p.contact?.number ? String(p.contact.number).replace(/\D/g, "") : "";
     if (!number) { toast.show("The builder hasn't shared a contact number"); return; }
+    // Record the lead (migration 0051). Both buttons used to leave no trace at
+    // all, which is why a builder's insights had nothing to count.
+    // Fire-and-forget: the call must connect whether or not this write lands,
+    // and the server drops it for a guest, the builder's own project, or a
+    // non-live one.
+    void listingsApi.recordProjectContact(id, via);
     if (via === "call") { window.location.href = `tel:${p.contact.number}`; return; }
     const msg = unitType
       ? `Hi, I'm interested in the ${unitType} at ${p.name}. Could you share more details?`
@@ -90,8 +96,10 @@ export function ProjectDetail({ id }: { id: string }) {
     window.open(`https://wa.me/${number}?text=${encodeURIComponent(msg)}`, "_blank");
   };
 
+  // Share only on a live project — any other status is owner-only, so the
+  // shared link would 404 for whoever receives it.
   return (
-    <Shell overlayTitle={p.name ?? ""}>
+    <Shell overlayTitle={p.name ?? ""} canShare={p.status === "live"}>
       {offline && <OfflineBanner />}
 
       {/* Cover — full-bleed 4:3 on black with the counter over it (designs/P4 S3) */}
@@ -337,13 +345,15 @@ export function ProjectDetail({ id }: { id: string }) {
   );
 }
 
-function Shell({ children, overlayTitle }: { children: React.ReactNode; overlayTitle?: string }) {
+function Shell({
+  children, overlayTitle, canShare = false,
+}: { children: React.ReactNode; overlayTitle?: string; canShare?: boolean }) {
   return (
     <AppShell showNav={false} className="flex flex-col">
       {overlayTitle === undefined ? (
         <Header left={<BackButton fallback="/listings" />} title="Project" />
       ) : (
-        <OverlayHeader title={overlayTitle} />
+        <OverlayHeader title={overlayTitle} canShare={canShare} />
       )}
       {children}
     </AppShell>
@@ -354,11 +364,10 @@ function Shell({ children, overlayTitle }: { children: React.ReactNode; overlayT
  * designs/P4 S3 uses the same "morphing" bar as the property detail:
  * transparent over the cover, solid with the project name once scrolled.
  */
-function OverlayHeader({ title }: { title: string }) {
+function OverlayHeader({ title, canShare }: { title: string; canShare: boolean }) {
   const router = useRouter();
   const toast = useToast();
   const [solid, setSolid] = useState(false);
-  const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     const onScroll = () => setSolid(window.scrollY > 160);
@@ -392,24 +401,25 @@ function OverlayHeader({ title }: { title: string }) {
       >
         {title}
       </span>
-      <button
-        aria-label={saved ? "Remove from saved" : "Save"}
-        onClick={() => { setSaved((s) => !s); toast.show("Saved lists arrive with the Saved suite"); }}
-        className={btn}
-      >
-        <Icon name="bookmark" size={21} filled={saved} />
-      </button>
-      <button
-        aria-label="Share"
-        onClick={() => {
-          const url = window.location.href;
-          if (navigator.share) void navigator.share({ title, url });
-          else { void navigator.clipboard?.writeText(url); toast.show("Link copied"); }
-        }}
-        className={btn}
-      >
-        <Icon name="share" size={21} />
-      </button>
+      {/* The Save control that used to sit here was a `useState` toggle with a
+          "Saved lists arrive with the Saved suite" toast — it persisted
+          nothing, and `saves` is keyed to `listings`, so a project has never
+          been savable. A control that only pretends is worse than no control,
+          so it is gone; project saves are recorded in
+          docs/PENDING-INTEGRATIONS.md rather than faked here. */}
+      {canShare && (
+        <button
+          aria-label="Share"
+          onClick={() => {
+            const url = window.location.href;
+            if (navigator.share) void navigator.share({ title, url });
+            else { void navigator.clipboard?.writeText(url); toast.show("Link copied"); }
+          }}
+          className={btn}
+        >
+          <Icon name="share" size={21} />
+        </button>
+      )}
     </div>
   );
 }

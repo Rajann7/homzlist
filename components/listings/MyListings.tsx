@@ -256,7 +256,9 @@ export function MyListings() {
                 onClick={() => {
                   const l = sheetFor!;
                   setSheetFor(null);
-                  setConfirm({ listing: l, action: "rented", title: "Mark as rented?", body: "The listing is archived. You can re-activate it later for free using the same slot.", label: "Mark rented" });
+                  // Same consequence as "sold": the server stops a running
+                  // boost with no refund here too (Doc2 §15).
+                  setConfirm({ listing: l, action: "rented", title: "Mark as rented?", body: "The listing is archived, and any running boost stops with no refund for unused days. You can re-activate it later for free using the same slot.", label: "Mark rented" });
                 }}
               />
               <SheetOption

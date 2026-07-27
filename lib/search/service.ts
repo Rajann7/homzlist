@@ -381,6 +381,8 @@ export async function hydrate(
       id: l.id,
       promoted: boosted.has(l.id),
       saved: saved.has(l.id),
+      // No wishlist heart on your own result — same rule as the feed.
+      isOwn: viewerId !== null && l.profile_id === viewerId,
       coverUrl: l.cover_url,
       photos: photos.get(l.id) ?? (l.cover_url ? [l.cover_url] : []),
       areaLabel: l.area_label,
@@ -468,6 +470,10 @@ export async function searchProjects(f: SearchFilters, viewerId: string | null, 
     const pf = priceFrom.get(r.id);
     return {
       kind: "project", id: r.id, promoted: false, saved: false,
+      // The query above already excludes the viewer's own projects
+      // (`neq profile_id`), so this is false by construction — stated rather
+      // than assumed, so it stays true if that filter ever changes.
+      isOwn: viewerId !== null && r.profile_id === viewerId,
       coverUrl: r.cover_url, photos: r.cover_url ? [r.cover_url] : [],
       areaLabel: r.area_label,
       poster: {

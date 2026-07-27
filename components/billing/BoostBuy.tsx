@@ -28,8 +28,13 @@ import { cn } from "@/lib/utils";
 /** The summary line names what is being boosted, not always "Listing". */
 const SUBJECT_NOUN: Record<string, string> = { listing: "Listing", project: "Project", requirement: "Requirement" };
 
-const TARGET_TITLES: Record<string, { title: string; sub?: string }> = {
-  area: { title: "This area only", sub: "Reach: local buyers" },
+/**
+ * The three scopes a boost can be bought for. "This area only" was removed on
+ * Rajan's instruction — city, state and all-India are the whole set — and the
+ * per-scope reach estimates ("~2,400 users") were removed with it: they were
+ * an admin-typed guess presented as a number the buyer could plan against.
+ */
+const TARGET_TITLES: Record<string, { title: string }> = {
   city: { title: "Whole city" },
   state: { title: "Whole state" },
   india: { title: "All India" },
@@ -46,13 +51,20 @@ export function BoostBuy() {
     (params.get("kind") as "listing" | "project" | "requirement") ?? "listing",
   );
   const [duration, setDuration] = useState<string | null>(null);
-  const [targeting, setTargeting] = useState("area");
+  const [targeting, setTargeting] = useState("city");
   const [infoOpen, setInfoOpen] = useState(false);
   const [paying, setPaying] = useState(false);
+  // Unused days released when a previous boost's subject was sold, rented or
+  // switched off (migration 0050). They are spendable here at no charge.
+  const [credits, setCredits] = useState<{ totalDays: number; expiresOn: string | null } | null>(null);
+  const [applying, setApplying] = useState(false);
 
   const load = useCallback(async () => {
     const res = await billingApi.boostEligible();
     setData(res);
+    void billingApi.boostCredits().then((r) =>
+      setCredits(r.ok ? { totalDays: r.data.totalDays, expiresOn: r.data.credits[0]?.expiresOn ?? null } : null),
+    );
     if (res.ok) {
       // Preselect the first eligible listing + the best-value duration, matching
       // the design's default selection.
@@ -120,9 +132,52 @@ export function BoostBuy() {
     router.push(`/checkout?${qs.toString()}`);
   };
 
+  /** Spend reclaimed days instead of paying. Same subject + scope the buy flow
+   *  has selected, so there is nothing extra for the seller to choose. */
+  const applyCredit = async () => {
+    if (!listingId) return;
+    setApplying(true);
+    const res = await billingApi.applyBoostCredit(subjectKind, listingId, targeting);
+    setApplying(false);
+    if (!res.ok) {
+      toast.show(
+        res.error.code === "LISTING_STATE_LOCKED" ? "That one can't be boosted right now"
+        : (res.error as { noCredit?: boolean }).noCredit ? "Those days have already been used"
+        : "Couldn't apply your boost days",
+      );
+      void load();
+      return;
+    }
+    toast.show(`${res.data.days} boost ${res.data.days === 1 ? "day" : "days"} applied — live now`);
+    router.push("/boost");
+  };
+
   return (
     <Shell onInfo={() => setInfoOpen(true)}>
       <div className="flex flex-col gap-4 p-4">
+        {/* Reclaimed days. Shown only when there are some, and only above a
+            picker that has something eligible to spend them on. */}
+        {credits && credits.totalDays > 0 && (
+          <div className="rounded-12 bg-accent-soft p-3.5">
+            <div className="flex items-start gap-3">
+              <Icon name="gift" size={22} className="shrink-0 text-accent" />
+              <div className="flex-1">
+                <div className="text-15 font-semibold text-ink-primary">
+                  You have {credits.totalDays} boost {credits.totalDays === 1 ? "day" : "days"} left over
+                </div>
+                <div className="mt-0.5 text-13 leading-[1.45] text-ink-secondary">
+                  From a boost that stopped when its property was sold, rented or switched off. Apply them to the
+                  selection below at no charge.
+                  {credits.expiresOn ? ` Use by ${credits.expiresOn}.` : ""}
+                </div>
+              </div>
+            </div>
+            <Button fullWidth className="mt-3" loading={applying} onClick={() => void applyCredit()}>
+              Use my {credits.totalDays} {credits.totalDays === 1 ? "day" : "days"} — free
+            </Button>
+          </div>
+        )}
+
         <SectionLabel>Select a listing</SectionLabel>
         <div className="no-scrollbar -mx-4 flex gap-3 overflow-x-auto px-4 pb-1.5">
           {d.listings.map((l) => (
@@ -136,7 +191,12 @@ export function BoostBuy() {
                 !l.eligible && "opacity-50",
               )}
             >
-              <span className="grid h-[120px] w-[120px] place-items-center bg-surface-3 text-ink-tertiary">
+              {/* Square, sized from the card rather than a hardcoded 120px.
+                  The card is 120px wide WITH a 1.5px border, so a 120px child
+                  overflowed its content box by 3px — every thumbnail was
+                  clipped on the right and the cards ended up unequal heights.
+                  `aspect-square w-full` tracks the content box instead. */}
+              <span className="grid aspect-square w-full place-items-center overflow-hidden bg-surface-3 text-ink-tertiary">
                 {l.coverUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={l.coverUrl} alt="" className="h-full w-full object-cover" />
@@ -203,11 +263,7 @@ export function BoostBuy() {
                 <Radio on={targeting === t.key} />
                 <span className="flex-1">
                   <span className="block text-15 text-ink-primary">{title}</span>
-                  {meta.sub && <span className="block text-11 text-ink-tertiary">{meta.sub}</span>}
                 </span>
-                {t.reach && (
-                  <span className="chrome inline-flex rounded-full bg-surface-2 px-2.5 py-1 text-11 font-semibold text-ink-secondary">{t.reach}</span>
-                )}
               </button>
             );
           })}
@@ -229,8 +285,13 @@ export function BoostBuy() {
           </div>
         </div>
 
+        {/* This used to read "Boosts start after admin approval" — no longer
+            true, and a promise about timing is exactly the kind of copy that
+            must track the code. An eligible subject is already approved, so
+            the window opens as soon as the payment clears. */}
         <p className="text-11 leading-[1.45] text-ink-tertiary">
-          Boosts start after admin approval. If a boost is rejected, you&apos;re refunded automatically.
+          Your boost starts as soon as the payment goes through. If it can&apos;t start, you&apos;re refunded
+          automatically.
         </p>
       </div>
 
@@ -290,7 +351,8 @@ function InfoSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
             "Your listing appears at the top of the feed, first in stories and top of search in the areas you choose.",
             "Boosted listings show a 'Promoted' tag.",
             "Detailed analytics aren't provided — you'll see the boost status only.",
-            "Boosts need admin approval before going live (usually within a few hours).",
+            "Your boost goes live as soon as payment clears — your listing is already approved.",
+            "If the property is sold, rented or switched off mid-boost, the unused days are saved and you can apply them to another one.",
           ]}
         />
       </div>
