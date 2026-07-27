@@ -22,6 +22,7 @@ export type IconName =
   | "user"
   | "bell"
   | "message"
+  | "whatsapp"
   | "bookmark"
   | "close"
   | "chevron-right"
@@ -135,6 +136,14 @@ const PATHS: Record<IconName, (f: boolean) => React.ReactNode> = {
     </>
   ),
   message: () => <path d="M4 5h16v11H9l-5 4V5Z" />,
+  // Brand-recognisable WhatsApp mark, drawn in the same 1.5px outline family:
+  // speech bubble with a tail + handset inside.
+  whatsapp: () => (
+    <>
+      <path d="M4 20l1.3-3.9A8 8 0 1 1 8 19z" />
+      <path d="M9 8.5c-.3 0-.6.1-.8.4-.3.3-.9.9-.9 2s.9 2.3 1 2.5c.1.2 1.8 2.9 4.5 3.9 2.2.9 2.7.7 3.2.7.5-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.1-1.2 0-.1-.3-.2-.6-.4-.3-.2-1.5-.8-1.7-.8-.2-.1-.4-.1-.6.1-.2.3-.6.8-.8 1-.1.1-.3.2-.5.1-.3-.2-1.1-.5-2-1.3-.7-.6-1.2-1.4-1.4-1.7-.1-.2 0-.4.1-.5l.4-.5c.1-.2.2-.3.3-.5.1-.2 0-.4 0-.5 0-.1-.6-1.5-.8-2-.2-.5-.4-.4-.6-.4z" />
+    </>
+  ),
   bookmark: () => <path d="M6 3h12v18l-6-4-6 4z" />,
   close: () => <path d="M6 6l12 12M18 6 6 18" />,
   "chevron-right": () => <path d="m9 5 7 7-7 7" />,

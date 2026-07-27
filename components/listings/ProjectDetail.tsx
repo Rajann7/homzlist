@@ -300,7 +300,7 @@ export function ProjectDetail({ id }: { id: string }) {
               <Icon name="phone" size={18} />
             </Button>
             <Button variant="outline" onClick={() => contactBuilder("whatsapp")} aria-label="WhatsApp">
-              <Icon name="message" size={18} />
+              <Icon name="whatsapp" size={18} />
             </Button>
             <Button className="flex-1" onClick={() => contactBuilder("whatsapp")}>
               Send Inquiry
