@@ -2,8 +2,9 @@ import type { NextRequest } from "next/server";
 import { ok, fail } from "@/lib/api";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { getProfileById, getVerifications, getCityName, updateOwnProfile } from "@/lib/profile/service";
-import { getProfileCounts } from "@/lib/listings/service";
+import { getProfileCounts, countProfileRequirements } from "@/lib/listings/service";
 import { countProfileLeads } from "@/lib/listings/leads";
+import { countThreads } from "@/lib/chat/service";
 import { ownProfileDTO } from "@/lib/profile/dto";
 
 /**
@@ -20,11 +21,21 @@ async function loadOwn(id: string) {
   // Every tile is a real query: listings/projects (Module 4), views (migration
   // 0018), leads (Module 5's `leads` table — this was a hardcoded 0 until the
   // table existed; D3 in PENDING-INTEGRATIONS).
-  const [counts, leads] = await Promise.all([getProfileCounts(id, profile.role), countProfileLeads(id)]);
+  // The P9 stat row is Listings / Requirements / Leads for owner+broker and
+  // Listings / Projects / Messages / Leads for builders. Every one of these is a
+  // real count against the same rows the screen it links to reads.
+  const [counts, leads, requirements, messages] = await Promise.all([
+    getProfileCounts(id, profile.role),
+    countProfileLeads(id),
+    countProfileRequirements(id),
+    countThreads(id),
+  ]);
   const stats = {
     listings: counts.listings,
     views: counts.views,
     leads,
+    requirements,
+    messages,
     ...(profile.role === "builder" ? { projects: counts.projects } : {}),
   };
   return ownProfileDTO(profile, verifications, cityName, stats);

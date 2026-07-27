@@ -14,6 +14,8 @@ import { verifyAccessEdge } from "@/lib/auth/edge";
  */
 const ACCESS_COOKIE = "hz_at";
 const REFRESH_COOKIE = "hz_rt";
+/** Multi-account pool (lib/auth/account-pool) — treated exactly like hz_rt. */
+const POOL_COOKIE = "hz_accts";
 
 type Zone = "public" | "seller" | "admin";
 function getZone(host: string): Zone {
@@ -61,13 +63,20 @@ export async function middleware(request: NextRequest) {
       const cookie = requestHeaders.get("cookie") ?? "";
       const kept = cookie
         .split(/;\s*/)
-        .filter((c) => c && !c.startsWith(`${ACCESS_COOKIE}=`) && !c.startsWith(`${REFRESH_COOKIE}=`))
+        .filter(
+          (c) =>
+            c &&
+            !c.startsWith(`${ACCESS_COOKIE}=`) &&
+            !c.startsWith(`${REFRESH_COOKIE}=`) &&
+            !c.startsWith(`${POOL_COOKIE}=`),
+        )
         .join("; ");
       if (kept) requestHeaders.set("cookie", kept);
       else requestHeaders.delete("cookie");
       const res = NextResponse.next({ request: { headers: requestHeaders } });
       res.cookies.delete(ACCESS_COOKIE);
       res.cookies.delete(REFRESH_COOKIE);
+      res.cookies.delete(POOL_COOKIE);
       return res;
     }
     // /messages and /notifications are seller-only authenticated surfaces — they
@@ -84,7 +93,11 @@ export async function middleware(request: NextRequest) {
   }
 
   if (zone === "seller") {
-    if (isLogin && user) return NextResponse.redirect(new URL("/", request.url));
+    // "Add account" (P9 S1) is the one reason a signed-in user may reach /login:
+    // they are deliberately signing a SECOND account into this device. Every
+    // other authenticated hit on /login still bounces home.
+    const addingAccount = url.searchParams.get("add") === "1";
+    if (isLogin && user && !addingAccount) return NextResponse.redirect(new URL("/", request.url));
     if (!isLogin && !user) return NextResponse.redirect(new URL("/login", request.url));
     url.pathname = `/seller${pathname === "/" ? "" : pathname}`;
     return NextResponse.rewrite(url);

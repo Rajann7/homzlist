@@ -519,6 +519,20 @@ export async function getProfileCounts(profileId: string, role: string | null) {
 }
 
 /**
+ * Requirements the profile has POSTED (the P9 stat tile that replaced Views for
+ * owner/broker). Same rows as "My requirements", so tapping the tile can never
+ * open a list that disagrees with the number on it.
+ */
+export async function countProfileRequirements(profileId: string): Promise<number> {
+  const { count } = await db()
+    .from("requirements")
+    .select("id", { count: "exact", head: true })
+    .eq("profile_id", profileId)
+    .neq("status", "deleted");
+  return count ?? 0;
+}
+
+/**
  * Total unique-per-day views across everything this profile has listed.
  *
  * Two queries rather than a join because PostgREST can't count through a
@@ -602,6 +616,7 @@ export async function listMine(profileId: string) {
     .limit(100);
   return (data ?? []) as ListingRow[];
 }
+
 
 /**
  * Trash (Doc2 §5.4) — soft-deleted listings, restorable for 30 days.

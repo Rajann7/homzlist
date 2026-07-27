@@ -10,7 +10,8 @@ import { ConfirmDialog } from "@/components/ui/Dialog";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { useToast } from "@/components/ui/Toast";
 import { ProfileBadges } from "./ProfileBadges";
-import { profileApi } from "@/lib/profile/client";
+import { FeaturedCollectionSheet } from "./ProfileSheets";
+import { profileApi, type FeaturedCollection, type FeaturedItem } from "@/lib/profile/client";
 import { cn } from "@/lib/utils";
 
 /**
@@ -49,6 +50,10 @@ export function OtherProfile({ username, isGuest = false }: { username: string; 
   const [listings, setListings] = useState<
     { id: string; title: string | null; price: string; coverUrl: string | null; areaLabel: string | null; kind: "sell" | "rent" }[] | null
   >(null);
+  // Featured circles (P9 S2) — public, and only ones with something live in them.
+  const [collections, setCollections] = useState<FeaturedCollection[] | null>(null);
+  const [openedCollection, setOpenedCollection] = useState<FeaturedCollection | null>(null);
+  const [collectionItems, setCollectionItems] = useState<FeaturedItem[] | null>(null);
 
   useEffect(() => {
     profileApi.publicProfile(username).then((r) => {
@@ -62,6 +67,19 @@ export function OtherProfile({ username, isGuest = false }: { username: string; 
   useEffect(() => {
     profileApi.publicListings(username).then((r) => setListings(r.ok ? r.data.items : []));
   }, [username]);
+
+  // The featured circles this profile has published (P9 S2).
+  useEffect(() => {
+    profileApi.publicFeatured(username).then((r) => setCollections(r.ok ? r.data.items : []));
+  }, [username]);
+
+  /** Tapping a circle asks the server what's inside, every time. */
+  async function openCollection(c: FeaturedCollection) {
+    setOpenedCollection(c);
+    setCollectionItems(null);
+    const r = await profileApi.publicFeaturedItems(username, c.id);
+    setCollectionItems(r.ok ? r.data.items : []);
+  }
 
   const header = (right?: React.ReactNode) => (
     <header className="chrome sticky top-0 z-header flex h-header items-center gap-2 border-b border-border bg-surface-1 px-4">
@@ -161,6 +179,28 @@ export function OtherProfile({ username, isGuest = false }: { username: string; 
         </div>
       </div>
 
+      {/* Featured circles (P9 S2 draws this row on the visitor profile too —
+          same 64px circle + name, with no "+ New" because a visitor doesn't
+          curate someone else's shelf). Only collections with something live in
+          them come back from the server. */}
+      {collections !== null && collections.length > 0 && (
+        <div className="no-scrollbar mt-4 flex gap-4 overflow-x-auto px-4">
+          {collections.map((c) => (
+            <button key={c.id} onClick={() => void openCollection(c)} className="flex w-16 shrink-0 flex-col items-center gap-1">
+              <span className="grid h-16 w-16 place-items-center overflow-hidden rounded-full border border-border bg-surface-2 text-ink-tertiary">
+                {c.coverUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={c.coverUrl} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  <Icon name="home" size={22} strokeWidth={1.7} />
+                )}
+              </span>
+              <span className="chrome max-w-16 truncate text-11 text-ink-secondary">{c.name}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Tabs + grid (live-only, empty until listings) */}
       <div className="chrome mt-4 flex border-b border-border">
         {tabs.map((t, i) => (
@@ -244,6 +284,18 @@ export function OtherProfile({ username, isGuest = false }: { username: string; 
 
       <ConfirmDialog open={blockDlg} onClose={() => setBlockDlg(false)} onConfirm={async () => { setBlockDlg(false); const res = await profileApi.blockUser(p.id); show(res.ok ? `${p.name} blocked` : "Couldn't block right now"); }} title={`Block ${p.name}?`} body="They won't be able to message you. Existing chats stay visible but you can't message each other." confirmLabel="Block" destructive />
 
+      {/* Tapping a featured circle — read-only here: no Remove for a visitor. */}
+      <FeaturedCollectionSheet
+        open={Boolean(openedCollection)}
+        onClose={() => setOpenedCollection(null)}
+        collection={openedCollection}
+        items={collectionItems}
+        loading={collectionItems === null}
+        onOpenListing={(id) => {
+          setOpenedCollection(null);
+          router.push(`/property/${id}`);
+        }}
+      />
       <ConfirmDialog open={about} onClose={() => setAbout(false)} onConfirm={() => setAbout(false)} title="About this account" body={`Joined ${p.memberSince} · ${p.stats.listings} listings posted${p.cityName ? ` · Based in ${p.cityName}` : ""}`} confirmLabel="Got it" hideCancel />
     </div>
   );

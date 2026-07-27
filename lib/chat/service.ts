@@ -537,6 +537,31 @@ export async function requestsSummary(posterId: string) {
 }
 
 /** Unread total across every accepted thread — the bottom-nav + header badge. */
+/**
+ * Live conversations this profile is in — the P9 stat tile that replaced Views
+ * for builders. Accepted threads only (a pending inquiry is not a conversation
+ * yet) and archived-by-me threads are excluded, so the number matches what the
+ * Messages screen actually opens with.
+ */
+export async function countThreads(me: string): Promise<number> {
+  const { data } = await db()
+    .from("chat_threads")
+    .select("id")
+    .or(`buyer_id.eq.${me},poster_id.eq.${me}`)
+    .eq("status", "accepted");
+  const ids = ((data as { id: string }[]) ?? []).map((t) => t.id);
+  if (!ids.length) return 0;
+
+  const parts = await db()
+    .from("thread_participants")
+    .select("thread_id,archived")
+    .eq("profile_id", me)
+    .in("thread_id", ids)
+    .eq("archived", true);
+  const archived = new Set(((parts.data as { thread_id: string }[]) ?? []).map((p) => p.thread_id));
+  return ids.filter((id) => !archived.has(id)).length;
+}
+
 export async function unreadTotal(me: string): Promise<number> {
   const { data } = await db().from("chat_threads").select("id").or(`buyer_id.eq.${me},poster_id.eq.${me}`).eq("status", "accepted");
   const ids = (data as { id: string }[] ?? []).map((t) => t.id);

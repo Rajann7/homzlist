@@ -19,7 +19,26 @@ async function post<T>(path: string, body?: unknown): Promise<{ ok: true; data: 
   return res.json();
 }
 
+/** One row of the P9 S1 switch sheet — every field comes from the server. */
+export interface DeviceAccount {
+  id: string;
+  username: string;
+  name: string;
+  photoUrl: string | null;
+  roleCity: string;
+  current: boolean;
+}
+
+async function get<T>(path: string): Promise<{ ok: true; data: T } | { ok: false; error: ApiError }> {
+  const res = await fetch(`/api/v1/auth${path}`, { cache: "no-store" });
+  return res.json();
+}
+
 export const authApi = {
+  /** Accounts signed in on THIS device (server-verified sessions, live profile data). */
+  accounts: () => get<{ accounts: DeviceAccount[] }>("/accounts"),
+  switchAccount: (profileId: string) => post<{ switched: boolean; profileId: string }>("/switch", { profileId }),
+  removeAccount: (profileId: string) => post<{ removed: boolean; profileId: string }>("/accounts/remove", { profileId }),
   requestOtp: (phone: string, hp = "") =>
     post<{ otpSession: string; resendIn: number; attemptsLeft: number; devCode?: string }>("/otp/request", { phone, hp }),
   verifyOtp: (otpSession: string, code: string) =>
@@ -27,7 +46,7 @@ export const authApi = {
   resendOtp: (otpSession: string) => post<{ resendIn: number; devCode?: string }>("/otp/resend", { otpSession }),
   register: (input: { role: string; name: string; cityId: string; email?: string | null; consent18: boolean; consentDpdp: boolean; hp?: string }) =>
     post<{ user: unknown; redirect: string }>("/register", input),
-  logout: () => post<{ loggedOut: boolean }>("/logout"),
+  logout: () => post<{ loggedOut: boolean; switchedTo: string | null }>("/logout"),
   refresh: () => post<{ refreshed: boolean }>("/refresh"),
 };
 

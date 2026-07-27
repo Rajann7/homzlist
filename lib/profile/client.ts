@@ -30,13 +30,43 @@ export interface OwnProfile {
   memberSince: string;
   responseLabel: string | null;
   badges: Badges;
-  stats: { listings: number; views: number; leads: number; projects?: number };
+  // `views` is still returned (the listing manager shows it) — the P9 stat row
+  // now uses `requirements` (owner/broker) or `messages` (builder) in its place.
+  stats: { listings: number; views: number; leads: number; projects?: number; requirements: number; messages: number };
   state: string;
   company: { logoUrl: string | null; establishedYear: number | null; projectsDone: number | null; officeAddress: string | null; areasCovered: string[] };
 }
 
+/** One P9 S1 featured circle. Counts and cover are the server's answer. */
+export interface FeaturedCollection {
+  id: string;
+  name: string;
+  count: number;
+  coverUrl: string | null;
+}
+
+/** A listing inside a collection, as the collection sheet renders it. */
+export interface FeaturedItem {
+  id: string;
+  title: string | null;
+  price: string;
+  coverUrl: string | null;
+  subtitle: string;
+}
+
 export const profileApi = {
   me: () => req<{ profile: OwnProfile }>("/profile/me", "GET"),
+  // ---- featured collections (P9 S1) ----------------------------------------
+  featured: () => req<{ items: FeaturedCollection[]; max: number; maxItems: number }>("/profile/featured", "GET"),
+  createFeatured: (name: string, listingIds: string[]) =>
+    req<{ id: string }>("/profile/featured", "POST", { name, listingIds }),
+  featuredItems: (id: string) => req<{ id: string; name: string; items: FeaturedItem[] }>(`/profile/featured/${id}`, "GET"),
+  deleteFeatured: (id: string) => req<{ removed: boolean }>(`/profile/featured/${id}`, "DELETE"),
+  /** The same circles as seen by a VISITOR (P9 S2) — public, live listings only. */
+  publicFeatured: (username: string) =>
+    req<{ items: FeaturedCollection[] }>(`/profile/${encodeURIComponent(username)}/featured`, "GET"),
+  publicFeaturedItems: (username: string, id: string) =>
+    req<{ id: string; name: string; items: FeaturedItem[] }>(`/profile/${encodeURIComponent(username)}/featured/${id}`, "GET"),
   update: (patch: Record<string, unknown>) => req<{ profile: OwnProfile }>("/profile/me", "PATCH", patch),
   publicProfile: (username: string) => req<{ profile: any }>(`/profile/${encodeURIComponent(username)}`, "GET"),
   /** Live listings for someone else's profile grid (P9 S2). */

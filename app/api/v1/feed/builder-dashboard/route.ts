@@ -1,7 +1,7 @@
 import { ok, fail } from "@/lib/api";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { getProfileById } from "@/lib/profile/service";
-import { builderDashboard } from "@/lib/feed/service";
+import { builderDashboard, PROJECT_STATE_LABEL } from "@/lib/feed/service";
 import { requirementDTO } from "@/lib/listings/dto";
 
 /**
@@ -22,7 +22,11 @@ export async function GET() {
   return ok({
     projects: projects.map((p) => ({
       id: p.id, name: p.name, coverUrl: p.coverUrl,
+      // The state leads the existing stat line when the project isn't live yet —
+      // no new element on the card, but the builder can finally see that their
+      // project exists and is waiting on review.
       statLine: [
+        PROJECT_STATE_LABEL[p.status] ?? null,
         p.unitsAvailable != null && p.unitsTotal != null ? `${p.unitsAvailable}/${p.unitsTotal} units` : null,
         `${p.leads} lead${p.leads === 1 ? "" : "s"}`,
       ].filter(Boolean).join(" · "),

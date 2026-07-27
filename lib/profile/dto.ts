@@ -24,7 +24,15 @@ function memberSince(iso: string): string {
 }
 
 /** Full own profile (server is the gating truth). Stats come from listings later. */
-export function ownProfileDTO(p: FullProfile, v: VerificationRow[], cityName: string | null, stats: { listings: number; views: number; leads: number; projects?: number }) {
+export function ownProfileDTO(
+  p: FullProfile,
+  v: VerificationRow[],
+  cityName: string | null,
+  // `requirements` (owner/broker) and `messages` (builder) replaced Views on the
+  // P9 stat row — Views is still computed and still shown in the listing
+  // manager, it just isn't one of the three profile tiles any more.
+  stats: { listings: number; views: number; leads: number; projects?: number; requirements: number; messages: number },
+) {
   return {
     id: p.id,
     username: p.username,

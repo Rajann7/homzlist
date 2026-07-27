@@ -2,6 +2,7 @@ import type { NextRequest } from "next/server";
 import { cookies } from "next/headers";
 import { ok, fail } from "@/lib/api";
 import { COOKIE, verifyRegisterToken, signAccess, createRefreshSession, setSessionCookies } from "@/lib/auth/session";
+import { absorbOutgoingSession } from "@/lib/auth/account-pool";
 import { completeRegistration, getProfileById } from "@/lib/auth/service";
 import { clientIp, hashIp } from "@/lib/auth/rate-limit";
 import { toUserDTO, TC_VERSION } from "@/lib/auth/dto";
@@ -60,12 +61,17 @@ export async function POST(req: NextRequest) {
     throw e;
   }
 
+  // Same "Add account" rule as OTP verify — registering a brand-new account on a
+  // device that already has one parks the old session instead of dropping it.
+  const outgoing = cookies().get(COOKIE.REFRESH)?.value;
+
   const access = await signAccess({ sub: profile.id, role: profile.role, registered: true });
   const refresh = await createRefreshSession(profile.id, {
     ua: req.headers.get("user-agent") ?? "",
     ipHash: await hashIp(clientIp(req.headers)),
   });
   await setSessionCookies(access, refresh);
+  await absorbOutgoingSession(profile.id, outgoing);
 
   return ok({ user: toUserDTO(profile), redirect: publicEnv.sellerUrl });
 }

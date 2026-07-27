@@ -146,6 +146,21 @@ async function notifyNewDevice(profileId: string, ua: string) {
   }
 }
 
+/**
+ * Validate a refresh cookie WITHOUT rotating it. Used by the multi-account pool
+ * (a background account's token must stay usable until it is switched into, so
+ * listing the accounts must not consume it). A mismatch here is not treated as
+ * theft — the caller simply drops the dead entry.
+ */
+export async function peekRefreshSession(cookieValue: string): Promise<{ profileId: string; sid: string } | null> {
+  const [profileId, sid, secret] = (cookieValue ?? "").split(".");
+  if (!profileId || !sid || !secret) return null;
+  const raw = await kv.get(refreshKey(profileId, sid));
+  if (!raw) return null;
+  if (JSON.parse(raw).secretHash !== hashSecret(secret)) return null;
+  return { profileId, sid };
+}
+
 export async function rotateRefreshSession(cookieValue: string): Promise<{ profileId: string; newCookie: string } | null> {
   const [profileId, sid, secret] = (cookieValue ?? "").split(".");
   if (!profileId || !sid || !secret) return null;
@@ -187,7 +202,9 @@ export async function listSessions(profileId: string): Promise<Array<{ sid: stri
   return out.sort((a, b) => b.lastUsedAt - a.lastUsedAt);
 }
 
-function cookieOpts(maxAge: number) {
+export const REFRESH_MAX_AGE_SEC = REFRESH_TTL_SEC;
+
+export function cookieOpts(maxAge: number) {
   return {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",

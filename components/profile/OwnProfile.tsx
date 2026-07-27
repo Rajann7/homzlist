@@ -10,20 +10,23 @@ import { useToast } from "@/components/ui/Toast";
 import { ConfirmDialog } from "@/components/ui/Dialog";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { ProfileBadges } from "./ProfileBadges";
-import { AccountSwitchSheet, ProfileMenuSheet, QRSheet } from "./ProfileSheets";
+import { AccountSwitchSheet, CreateFeaturedSheet, FeaturedCollectionSheet, ProfileMenuSheet, QRSheet } from "./ProfileSheets";
 import { AccountStatus } from "./AccountStatus";
-import { profileApi, type OwnProfile as OwnProfileT } from "@/lib/profile/client";
-import { authApi } from "@/lib/auth/client";
+import { profileApi, type FeaturedCollection, type FeaturedItem, type OwnProfile as OwnProfileT } from "@/lib/profile/client";
+import { authApi, type DeviceAccount } from "@/lib/auth/client";
 import { listingsApi, type MyListing, type RequirementCard } from "@/lib/listings/client";
 import { cn } from "@/lib/utils";
 
 /**
  * S1 Own Profile (P9, pixel-exact). Header (username + switch + create + ⋯),
  * collapsing profile header (avatar 84, stats ×3, name+badges+role, bio, meta,
- * Edit/Share/QR), featured circles, pinned strip, role-based tabs + grid/list,
+ * Edit/Share/QR), featured collections, role-based tabs + grid/list,
  * grid (empty until listings — Module 4), account-switch / menu / QR sheets,
  * view-as-visitor mode, account-status sub-screen. Backend-driven (/profile/me).
  */
+
+/** Carries the design's post-switch toast across the reload. UI-only. */
+const SWITCH_TOAST_KEY = "hz-switched-to";
 
 const TABS: Record<string, string[]> = {
   owner: ["Sell", "Rent", "Requirements"],
@@ -41,19 +44,36 @@ export function OwnProfile() {
   const [switchSheet, setSwitchSheet] = useState(false);
   const [menuSheet, setMenuSheet] = useState(false);
   const [qrSheet, setQrSheet] = useState(false);
-  const [viewsInfo, setViewsInfo] = useState(false);
   const [viewAs, setViewAs] = useState(false);
   const [subScreen, setSubScreen] = useState<null | "account-status">(null);
+  // Multi-account (P9 S1). The list, and which one is active, is the server's
+  // answer — nothing about the other accounts is kept in the browser.
+  const [accounts, setAccounts] = useState<DeviceAccount[]>([]);
+  const [accountsLoading, setAccountsLoading] = useState(false);
+  const [accountBusy, setAccountBusy] = useState<string | null>(null);
+  const [removeTarget, setRemoveTarget] = useState<DeviceAccount | null>(null);
   // The grid is real data now (Module 4): the owner's listings and requirements,
   // filtered per tab. Nothing here is a placeholder count.
   const [listings, setListings] = useState<MyListing[] | null>(null);
   const [requirements, setRequirements] = useState<RequirementCard[] | null>(null);
+  // P9 S1 featured collections — null while loading so the circles row never
+  // flashes an empty state the profile doesn't actually have.
+  const [collections, setCollections] = useState<FeaturedCollection[] | null>(null);
+  const [createFeatured, setCreateFeatured] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [openedCollection, setOpenedCollection] = useState<FeaturedCollection | null>(null);
+  const [collectionItems, setCollectionItems] = useState<FeaturedItem[] | null>(null);
+  const [removeCollection, setRemoveCollection] = useState<FeaturedCollection | null>(null);
+  /** The per-collection cap, taken from the server rather than assumed. */
+  const [maxFeaturedItems, setMaxFeaturedItems] = useState(20);
 
   useEffect(() => {
     void (async () => {
-      const [l, r] = await Promise.all([listingsApi.mine(), listingsApi.myRequirements()]);
+      const [l, r, f] = await Promise.all([listingsApi.mine(), listingsApi.myRequirements(), profileApi.featured()]);
       setListings(l.ok ? l.data.items : []);
       setRequirements(r.ok ? r.data.items : []);
+      setCollections(f.ok ? f.data.items : []);
+      if (f.ok) setMaxFeaturedItems(f.data.maxItems);
     })();
   }, []);
 
@@ -64,6 +84,15 @@ export function OwnProfile() {
     });
   }, []);
 
+  // A switch is a full page load, so the design's "Switched to <user>" toast is
+  // handed across it. UI-only, cleared on read — no account data is stored.
+  useEffect(() => {
+    const to = sessionStorage.getItem(SWITCH_TOAST_KEY);
+    if (!to) return;
+    sessionStorage.removeItem(SWITCH_TOAST_KEY);
+    show(`Switched to ${to}`);
+  }, [show]);
+
   if (subScreen === "account-status") return <AccountStatus onBack={() => setSubScreen(null)} />;
 
   if (loading) return <ProfileSkeleton />;
@@ -72,8 +101,92 @@ export function OwnProfile() {
   const tabs = TABS[p.role ?? "owner"];
   const roleLabel = p.role ? p.role[0].toUpperCase() + p.role.slice(1) : "";
 
+  /** The sheet always asks the server who is signed in — it never renders a cache. */
+  async function openSwitchSheet() {
+    setSwitchSheet(true);
+    setAccountsLoading(true);
+    const r = await authApi.accounts();
+    if (r.ok) setAccounts(r.data.accounts);
+    setAccountsLoading(false);
+  }
+
+  async function switchTo(a: DeviceAccount) {
+    setAccountBusy(a.id);
+    const r = await authApi.switchAccount(a.id);
+    if (r.ok) {
+      // Hard navigation: every server-rendered page and cached payload on screen
+      // belongs to the account being left, so none of it may survive the switch.
+      sessionStorage.setItem(SWITCH_TOAST_KEY, a.username);
+      window.location.href = "/profile";
+      return;
+    }
+    setAccountBusy(null);
+    // The server already dropped a dead session from the pool — mirror that here
+    // instead of leaving a row that can never work.
+    setAccounts((list) => list.filter((x) => x.id !== a.id));
+    show(r.error.code === "NOT_FOUND" || r.error.code === "UNAUTHORIZED" ? "That account is signed out on this device" : "Couldn't switch account");
+  }
+
+  async function removeAccount(a: DeviceAccount) {
+    setRemoveTarget(null);
+    setAccountBusy(a.id);
+    const r = await authApi.removeAccount(a.id);
+    setAccountBusy(null);
+    if (!r.ok) {
+      show("Couldn't remove account");
+      return;
+    }
+    setAccounts((list) => list.filter((x) => x.id !== a.id));
+    show(`Removed ${a.username}`);
+  }
+
+  /** Tapping a circle: open it and ask the server what's inside, every time. */
+  async function openCollection(c: FeaturedCollection) {
+    setOpenedCollection(c);
+    setCollectionItems(null);
+    const r = await profileApi.featuredItems(c.id);
+    setCollectionItems(r.ok ? r.data.items : []);
+  }
+
+  async function createCollection(name: string, listingIds: string[]) {
+    setCreating(true);
+    const r = await profileApi.createFeatured(name, listingIds);
+    setCreating(false);
+    if (!r.ok) {
+      // The caps are the server's, so the message quotes what it enforced.
+      show(r.error.field === "collections" ? `You can have up to ${r.error.max} collections` : "Couldn't create that collection");
+      return;
+    }
+    setCreateFeatured(false);
+    await refreshCollections();
+    show("Featured created");
+  }
+
+  async function deleteCollection(c: FeaturedCollection) {
+    setRemoveCollection(null);
+    setOpenedCollection(null);
+    const r = await profileApi.deleteFeatured(c.id);
+    if (!r.ok) {
+      show("Couldn't remove that collection");
+      return;
+    }
+    await refreshCollections();
+    show("Collection removed");
+  }
+
+  /** The circles are re-read from the server, never patched blind. */
+  async function refreshCollections() {
+    const fresh = await profileApi.featured();
+    if (fresh.ok) setCollections(fresh.data.items);
+  }
+
   async function logout() {
-    await authApi.logout();
+    const r = await authApi.logout();
+    // With another account signed in on this device we land on it, not on /login.
+    if (r.ok && r.data.switchedTo) {
+      window.location.href = "/profile";
+      return;
+    }
     window.location.href = "/login";
   }
 
@@ -94,7 +207,7 @@ export function OwnProfile() {
       <div className="flex-1 overflow-y-auto overscroll-contain">
       {/* Header */}
       <header className="chrome sticky top-0 z-header flex h-header items-center justify-between border-b border-border bg-surface-1 px-4">
-        <button onClick={() => !viewAs && setSwitchSheet(true)} className="flex items-center gap-1">
+        <button onClick={() => !viewAs && void openSwitchSheet()} className="flex items-center gap-1">
           <span className="text-17 font-semibold text-ink-primary">{p.username}</span>
           {!viewAs && <Icon name="chevron-down" size={18} className="text-ink-primary" strokeWidth={1.7} />}
         </button>
@@ -114,13 +227,24 @@ export function OwnProfile() {
       <div className="px-4 pt-4">
         <div className="flex items-center gap-4">
           <Avatar name={p.name ?? undefined} src={p.photoUrl ?? undefined} size={84} />
-          {/* Stats ×3 */}
+          {/* Stats ×3 (×4 for builders, who keep their Projects tile).
+              Owner + Broker: Listings · Requirements · Leads
+              Builder:        Listings · Projects · Messages · Leads
+              Every tile opens the screen it counts — no tile is decorative. */}
           <div className="flex flex-1 justify-around">
             {/* Tapping Listings opens the manager — that's where an under-review
                 listing is visible (Doc4 §56). */}
             <Stat n={p.stats.listings} label="Listings" onClick={() => router.push("/listings")} />
-            {p.role === "builder" && <Stat n={p.stats.projects ?? 0} label="Projects" onClick={() => router.push("/listings")} />}
-            {!viewAs && <Stat n={p.stats.views} label="Views" onClick={() => setViewsInfo(true)} />}
+            {/* A builder's projects live on their dashboard (FeedHome renders
+                BuilderDashboard at "/" for builders), NOT in My Listings — the
+                old destination showed listings and never a single project. */}
+            {p.role === "builder" && <Stat n={p.stats.projects ?? 0} label="Projects" onClick={() => router.push("/")} />}
+            {!viewAs &&
+              (p.role === "builder" ? (
+                <Stat n={p.stats.messages} label="Messages" onClick={() => router.push("/messages")} />
+              ) : (
+                <Stat n={p.stats.requirements} label="Requirements" onClick={() => router.push("/requirements/mine")} />
+              ))}
             {!viewAs && <Stat n={p.stats.leads} label="Leads" onClick={() => router.push("/leads")} />}
           </div>
         </div>
@@ -159,20 +283,36 @@ export function OwnProfile() {
         )}
       </div>
 
-      {/* Featured circles (empty until listings — only "+ New") */}
+      {/* Featured circles (P9 S1): the owner's real collections, then "+ New".
+          64px circle, name underneath, clipped to 64px like the design. */}
       <div className="no-scrollbar mt-4 flex gap-4 overflow-x-auto px-4">
-        <button onClick={() => show("Featured collections need listings — coming in the listings module")} className="flex w-16 shrink-0 flex-col items-center gap-1">
-          <span className="grid h-16 w-16 place-items-center rounded-full border-2 border-dashed border-border text-ink-tertiary">
-            <Icon name="plus" size={22} strokeWidth={1.7} />
-          </span>
-          <span className="chrome text-11 text-ink-tertiary">New</span>
-        </button>
-      </div>
-
-      {/* Pinned (empty) */}
-      <div className="mt-5 px-4">
-        <p className="chrome text-13 font-semibold uppercase tracking-[0.3px] text-ink-tertiary">Pinned</p>
-        <p className="mt-2 text-11 text-ink-tertiary">Pin up to 3 listings to the top of your profile.</p>
+        {collections === null
+          ? [0, 1].map((i) => (
+              <div key={i} className="flex w-16 shrink-0 flex-col items-center gap-1">
+                <Skeleton className="h-16 w-16 rounded-full" />
+                <Skeleton className="h-2.5 w-10" />
+              </div>
+            ))
+          : collections.map((c) => (
+              <button key={c.id} onClick={() => void openCollection(c)} className="flex w-16 shrink-0 flex-col items-center gap-1">
+                <span className="grid h-16 w-16 place-items-center overflow-hidden rounded-full border border-border bg-surface-2 text-ink-tertiary">
+                  {c.coverUrl ? (
+                    <Thumb url={c.coverUrl} className="h-full w-full" />
+                  ) : (
+                    <Icon name="home" size={22} strokeWidth={1.7} />
+                  )}
+                </span>
+                <span className="chrome max-w-16 truncate text-11 text-ink-secondary">{c.name}</span>
+              </button>
+            ))}
+        {!viewAs && (
+          <button onClick={() => setCreateFeatured(true)} className="flex w-16 shrink-0 flex-col items-center gap-1">
+            <span className="grid h-16 w-16 place-items-center rounded-full border-[1.5px] border-dashed border-border text-ink-tertiary">
+              <Icon name="plus" size={22} strokeWidth={1.7} />
+            </span>
+            <span className="chrome text-11 text-ink-secondary">New</span>
+          </button>
+        )}
       </div>
 
       {/* Tabs + grid/list toggle */}
@@ -223,9 +363,36 @@ export function OwnProfile() {
       <AccountSwitchSheet
         open={switchSheet}
         onClose={() => setSwitchSheet(false)}
-        current={{ username: p.username ?? "", roleCity: `${roleLabel} · ${p.cityName ?? ""}`, name: p.name ?? "", photoUrl: p.photoUrl }}
-        onAddAccount={() => show("Add account — sign in with another number")}
+        // Until the server answers, the sheet still shows the account we already
+        // know is active — it never renders an empty or wrong list.
+        accounts={
+          accounts.length
+            ? accounts
+            : [{ id: p.id, username: p.username ?? "", name: p.name ?? "", photoUrl: p.photoUrl, roleCity: [roleLabel, p.cityName].filter(Boolean).join(" · "), current: true }]
+        }
+        loading={accountsLoading}
+        busyId={accountBusy}
+        onSwitch={(a) => void switchTo(a)}
+        onRequestRemove={(a) => setRemoveTarget(a)}
+        onAddAccount={() => {
+          setSwitchSheet(false);
+          // Hard navigation on purpose: a soft push can render the auth flow
+          // before the router has committed the `add` param, and this screen's
+          // cached RSC payload belongs to the account we may be about to leave.
+          window.location.href = "/login?add=1";
+        }}
         onLogout={logout}
+      />
+      <ConfirmDialog
+        open={Boolean(removeTarget)}
+        onClose={() => setRemoveTarget(null)}
+        onConfirm={() => {
+          if (removeTarget) void removeAccount(removeTarget);
+        }}
+        title="Remove account?"
+        body={`${removeTarget?.username ?? "This account"} will be signed out of this device. You can add it again with an OTP.`}
+        confirmLabel="Remove"
+        destructive
       />
       <ProfileMenuSheet
         open={menuSheet}
@@ -248,16 +415,45 @@ export function OwnProfile() {
         }}
         onPlaceholder={(what) => show(`${what} — coming in a later module`)}
       />
-      <QRSheet open={qrSheet} onClose={() => setQrSheet(false)} name={p.name ?? ""} roleCity={`${roleLabel} · ${p.cityName ?? ""}`} username={p.username ?? ""} onShare={() => show("Link copied")} />
-      <ConfirmDialog
-        open={viewsInfo}
-        onClose={() => setViewsInfo(false)}
-        onConfirm={() => setViewsInfo(false)}
-        title="What counts as a view?"
-        body="Views = unique property detail opens per day. Your own views aren't counted."
-        confirmLabel="Got it"
-        hideCancel
+      {/* Featured collections (P9 S1): create, open, remove. */}
+      <CreateFeaturedSheet
+        open={createFeatured}
+        onClose={() => setCreateFeatured(false)}
+        // Only live+available listings can be grouped — a collection circle is
+        // public, so a hidden or sold listing would render an empty shelf.
+        listings={(listings ?? []).filter((l) => l.status === "live" && l.availability === "available")}
+        maxItems={maxFeaturedItems}
+        busy={creating}
+        onCreate={(name, ids) => void createCollection(name, ids)}
       />
+      <FeaturedCollectionSheet
+        open={Boolean(openedCollection)}
+        onClose={() => setOpenedCollection(null)}
+        collection={openedCollection}
+        items={collectionItems}
+        loading={collectionItems === null}
+        onOpenListing={(id) => {
+          setOpenedCollection(null);
+          router.push(`/listings/${id}`);
+        }}
+        onRemove={() => setRemoveCollection(openedCollection)}
+      />
+      <ConfirmDialog
+        open={Boolean(removeCollection)}
+        onClose={() => setRemoveCollection(null)}
+        onConfirm={() => {
+          if (removeCollection) void deleteCollection(removeCollection);
+        }}
+        title="Remove this collection?"
+        body={`"${removeCollection?.name ?? ""}" disappears from your profile. The listings inside it stay live.`}
+        confirmLabel="Remove"
+        destructive
+      />
+      <QRSheet open={qrSheet} onClose={() => setQrSheet(false)} name={p.name ?? ""} roleCity={`${roleLabel} · ${p.cityName ?? ""}`} username={p.username ?? ""} onShare={() => show("Link copied")} />
+      {/* The "What counts as a view?" dialog lived here for the Views tile.
+          That tile is now Requirements/Messages, so nothing could open it —
+          removed rather than left as unreachable code. Views themselves are
+          unchanged and still shown per listing in the manager. */}
     </div>
   );
 }

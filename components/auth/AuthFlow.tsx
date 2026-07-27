@@ -40,6 +40,13 @@ export function AuthFlow() {
   const [flow, setFlow] = useState<{ phone: string; otpSession: string; devCode?: string; role?: string }>({ phone: "", otpSession: "" });
   const [saved, setSaved] = useState<SavedAccountHint[]>([]);
   const legalRef = useRef<"terms" | "privacy">("terms");
+  // /login?add=1 — arriving from the P9 switch sheet to sign a SECOND account
+  // into this device. The server keeps both sessions (lib/auth/account-pool).
+  // Read on every render, NOT via useState: this component is server-rendered
+  // first, so a lazy initial state would freeze the SSR value (false) through
+  // hydration and the flag would never be seen. Nothing renders from it.
+  const addingAccount =
+    typeof window !== "undefined" && new URLSearchParams(window.location.search).get("add") === "1";
 
   const screen = stack[stack.length - 1];
 
@@ -73,6 +80,13 @@ export function AuthFlow() {
       replace("browserUnsupported");
       return;
     }
+    // "Add account" (P9 S1): a session already exists on purpose. Refreshing it
+    // would bounce straight home, and the S5 picker would offer the account
+    // that is already signed in — go straight to the number entry.
+    if (addingAccount) {
+      replace("login");
+      return;
+    }
     let cancelled = false;
     (async () => {
       const refreshed = await authApi.refresh().catch(() => ({ ok: false }) as const);
@@ -91,7 +105,7 @@ export function AuthFlow() {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [screen]);
+  }, [screen, addingAccount]);
 
   const finishOnboarding = () => {
     localStorage.setItem(ONBOARDED_KEY, "1");
@@ -112,8 +126,10 @@ export function AuthFlow() {
   };
   // Relative so it works on any host (localhost, a LAN IP via nip.io, the real
   // domain). The seller dashboard lives on the same host as /login already.
+  // Adding an account lands back on the profile, where the switch sheet is —
+  // that's where the user was and where the new account is now visible.
   const goHome = () => {
-    window.location.href = "/";
+    window.location.href = addingAccount ? "/profile" : "/";
   };
 
   return (
@@ -148,7 +164,7 @@ export function AuthFlow() {
             else {
               const hint = hintFromUser(flow.phone, res.user);
               if (hint) rememberAccount(hint);
-              window.location.href = "/";
+              goHome();
             }
           }}
         />

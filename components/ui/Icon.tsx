@@ -92,6 +92,8 @@ export type IconName =
   | "hourglass"
   | "arrow-down"
   | "users"
+  | "user-plus"
+  | "log-out"
   | "bulb"
   | "chart"
   | "device";
@@ -455,6 +457,21 @@ const PATHS: Record<IconName, (f: boolean) => React.ReactNode> = {
       <path d="M2.5 20a6.5 6.5 0 0 1 13 0" />
       <path d="M16 5a3.5 3.5 0 0 1 0 6.5" />
       <path d="M17.5 20a6.5 6.5 0 0 0-3-5.5" />
+    </>
+  ),
+  // P9 S1 switch sheet: "Add account" (userplus) and "Log out" (logout).
+  "user-plus": () => (
+    <>
+      <circle cx="10" cy="8" r="3.5" />
+      <path d="M3.5 20a6.5 6.5 0 0 1 13 0" />
+      <path d="M19 8.5v5M16.5 11h5" />
+    </>
+  ),
+  "log-out": () => (
+    <>
+      <path d="M14.5 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3" />
+      <path d="M10 8 6 12l4 4" />
+      <path d="M6 12h9" />
     </>
   ),
   bulb: () => (

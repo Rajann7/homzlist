@@ -373,15 +373,33 @@ export async function newCount(viewerId: string | null, sinceIso: string): Promi
 export interface BuilderProjectStat {
   id: string; name: string; coverUrl: string | null;
   unitsAvailable: number | null; unitsTotal: number | null; leads: number; buildStatus: string;
+  /** Raw status, so the card can say "Under review" instead of vanishing. */
+  status: string;
 }
+
+/** A non-live project still belongs on the builder's own dashboard, labelled. */
+export const PROJECT_STATE_LABEL: Record<string, string> = {
+  pending_review: "Under review",
+  changes_requested: "Changes requested",
+  rejected: "Rejected",
+  hidden: "Hidden",
+  archived: "Archived",
+};
+
 export async function builderDashboard(builderId: string): Promise<{
   projects: BuilderProjectStat[];
   matched: { requirement: any; matchedTo: string; tierLabel: string | null }[];
 }> {
+  // Every project the builder owns except drafts and deletions — NOT just live.
+  // A project sits in `pending_review` after posting, and while it did, it
+  // appeared on no screen in the entire app: the profile counted it, this
+  // dashboard hid it, and My Listings only ever held listings. The builder had
+  // paid ₹9,999 for something they could not see.
   const { data: projData } = await db()
     .from("projects")
-    .select("id,name,cover_url,available_units,total_units,build_status,city_id,area_id,area_label")
-    .eq("profile_id", builderId).eq("status", "live")
+    .select("id,name,cover_url,available_units,total_units,build_status,city_id,area_id,area_label,status")
+    .eq("profile_id", builderId)
+    .not("status", "in", "(draft,deleted)")
     .order("created_at", { ascending: false });
   const projects = (projData ?? []) as any[];
 
@@ -394,14 +412,18 @@ export async function builderDashboard(builderId: string): Promise<{
     unitsAvailable: p.available_units ?? null, unitsTotal: p.total_units ?? null,
     leads: leadsTotal, // pipeline is per-builder, not per-project (leads don't link to projects yet)
     buildStatus: p.build_status === "ready" ? "Ready to move" : p.build_status === "under_construction" ? "Under construction" : "Booking open",
+    status: p.status,
   }));
 
   // Requirements matched to the builder's projects: residential requirements in
-  // the projects' cities/areas, tagged with the project + cascade tier.
+  // the projects' cities/areas, tagged with the project + cascade tier. Only a
+  // LIVE project pulls matches — an under-review project must not start
+  // generating leads before it is approved.
+  const liveProjects = projects.filter((p) => p.status === "live");
   const matched: { requirement: any; matchedTo: string; tierLabel: string | null }[] = [];
   const seen = new Set<string>();
   const RESIDENTIAL = new Set(["flat", "bungalow", "tenement", "farmhouse", "villa", "penthouse", "studio"]);
-  for (const p of projects) {
+  for (const p of liveProjects) {
     if (!p.city_id) continue;
     const adj = p.area_id ? await adjacentAreaSet([p.area_id]) : new Set<string>();
     const { data: reqs } = await db()

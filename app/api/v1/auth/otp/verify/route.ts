@@ -3,7 +3,9 @@ import { ok, fail } from "@/lib/api";
 import { verifyOtp } from "@/lib/auth/otp";
 import { resolveProfileForLogin, touchLastActive } from "@/lib/auth/service";
 import { createServiceClient } from "@/lib/supabase/server";
-import { signAccess, signRegisterToken, createRefreshSession, setSessionCookies, setRegisterCookie } from "@/lib/auth/session";
+import { COOKIE, signAccess, signRegisterToken, createRefreshSession, setSessionCookies, setRegisterCookie } from "@/lib/auth/session";
+import { absorbOutgoingSession } from "@/lib/auth/account-pool";
+import { cookies } from "next/headers";
 import { clientIp, hashIp } from "@/lib/auth/rate-limit";
 import { toUserDTO } from "@/lib/auth/dto";
 
@@ -45,12 +47,18 @@ export async function POST(req: NextRequest) {
     return ok({ isNew: true, next: "role" });
   }
 
+  // "Add account" (P9 S1): whoever was signed in on this device keeps their real
+  // server-side session, parked in the httpOnly pool, so both accounts show in
+  // the switch sheet. Captured before the cookies are overwritten.
+  const outgoing = cookies().get(COOKIE.REFRESH)?.value;
+
   const access = await signAccess({ sub: profile.id, role: profile.role, registered: true });
   const refresh = await createRefreshSession(profile.id, {
     ua: req.headers.get("user-agent") ?? "",
     ipHash: await hashIp(clientIp(req.headers)),
   });
   await setSessionCookies(access, refresh);
+  await absorbOutgoingSession(profile.id, outgoing);
   await touchLastActive(profile.id);
 
   const next = profile.state === "suspended" ? "suspended" : "seller";

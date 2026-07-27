@@ -165,6 +165,19 @@ export function listingCardDTO(l: ListingRow) {
 }
 
 /**
+ * One tile of a P9 S1 featured collection: price on top, "3 BHK Mavdi"
+ * underneath. The subtitle is composed here so the sheet never has to reach
+ * into `attributes` in the browser.
+ */
+export function featuredItemDTO(l: ListingRow) {
+  const bhk = (l.attributes as Record<string, unknown> | null)?.bhk;
+  return {
+    ...listingCardDTO(l),
+    subtitle: [bhk ? `${bhk} BHK` : null, l.area_label].filter(Boolean).join(" "),
+  };
+}
+
+/**
  * Public detail. `contact` is only present when the owner published it; the
  * caller must NOT merge in the raw row anywhere downstream.
  */

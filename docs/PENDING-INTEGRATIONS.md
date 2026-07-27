@@ -1904,3 +1904,201 @@ redoing when the pane is healthy.
   retention before it can be cleaned up.
 - `chat` uploads are one-shot (they attach to no column), so an abandoned
   composer leaves an orphan object. Unchanged by this work.
+
+---
+
+## Multi-account switching (P9 S1) — built 2026-07-27
+
+**What was actually there before this work.** The switch sheet showed *only* the
+current account. There was no second row, ever — multi-account (Doc2 §3.1
+"Account switch — multi-account dropdown") had never been built, even though the
+P9 design draws a second account row that switches on tap. "Add account" was a
+`show("Add account — sign in with another number")` toast: a dead button.
+"Log out" was real. `forgetAccount()` existed in `lib/auth/saved-accounts.ts`
+and was called from nowhere.
+
+**How it works now.** The active account still lives in `hz_at`/`hz_rt`
+unchanged. Every *other* account signed in on the device keeps its real,
+server-tracked refresh token in a second httpOnly cookie, `hz_accts`
+(`lib/auth/account-pool.ts`). Switching is `POST /auth/switch`, which rotates
+that account's genuine refresh session and swaps the active cookies. The client
+never holds a token, a role, or an account list — the sheet's rows come from
+`GET /auth/accounts`, a live Supabase read.
+
+Authorization is the pool cookie, never the request body: a `profileId` that is
+not already signed into this device is a 404, so the field cannot be used to
+reach anyone else's account.
+
+**Decisions Rajan made (2026-07-27), so they don't get re-litigated:**
+- Instant server-side switch, not re-OTP per switch.
+- Remove-from-switcher = **long-press a non-active row → confirm dialog**. The
+  design has no visible remove control and none was added; the sheet is
+  pixel-identical to P9.
+- Log out with 2 accounts = land on the remaining account, not /login. Only the
+  last account logging out clears the device.
+
+**Known remaining edge (not fixable without weakening the session model)**
+- `POST /auth/switch` rotates the target's refresh secret *before* the response
+  reaches the browser. If that response is lost in flight (connection dropped
+  mid-request), the server has rotated but the browser still holds the old pool
+  cookie, so that one account falls out of the switcher and needs a fresh OTP to
+  come back. It fails closed — no session leaks, no wrong account is entered,
+  nothing is charged — and removing the rotation to avoid it would make a
+  replayed pool cookie reusable. Left as-is deliberately.
+
+**Fixed while building, would have shipped broken**
+- Middleware bounced *every* authenticated hit on `/login` home, so "Add
+  account" could never have worked at all. `/login?add=1` is now the one
+  allowed case.
+- `POST /auth/switch` and `/auth/accounts/remove` returned a **500 with an empty
+  body** for a non-string `profileId` (`.trim()` on an object). Now a 422.
+- The public host stripped `hz_at`/`hz_rt` from forwarded requests but not the
+  new pool cookie; it now strips `hz_accts` too.
+- `POST /auth/refresh` failing now revokes the background accounts as well,
+  rather than leaving live sessions stranded behind a cleared cookie.
+
+---
+
+## Profile stat row + pinned listings (P9 S1) — 2026-07-27
+
+**Stat row changed on Rajan's instruction.** Views left the profile tiles:
+- Owner + Broker: **Listings · Requirements · Leads**
+- Builder: **Listings · Projects · Messages · Leads**
+
+`views` is still computed and still shown per listing in the manager — it just
+isn't one of the profile tiles. Every tile is a real count against the same rows
+the screen it opens reads (`countProfileRequirements`, `countThreads`,
+`countProfileLeads`, `getProfileCounts`), so a tile can never disagree with its
+destination. Verified live: broker 25/1/6 and builder 0/1/6/0 both matched a
+direct SQL count exactly.
+
+**Pinned listings: built, was never implemented.** The P9 design has drawn the
+strip since day one, but nothing stored a pin — the profile only ever rendered
+the helper line "Pin up to 3 listings…". Now:
+- migration `0047_listing_pinned.sql` (applied to dev): `listings.pinned_at` +
+  a partial index;
+- `POST /listings/:id/pin`, `GET /listings/pinned`;
+- Pin/Unpin in the My Listings options sheet, the strip on the profile, and the
+  **pin badge the design already draws is the remove control** — tapping it asks
+  to confirm, so no chrome was added to the tile.
+- Cap of 3 is server-side, with a post-write re-check that gives the pin back if
+  two requests raced. Live-and-available only, enforced in the API too
+  (`pin` on an under-review / hidden / archived listing → `LISTING_STATE_LOCKED`).
+
+**Found while building — a builder's project was invisible in the entire app.**
+A project sits in `pending_review` after posting. The profile tile counted it,
+but the builder dashboard queried `status = 'live'` only and My Listings holds
+listings, not projects — so the one screen that lists projects said "No projects
+yet" while the tile above said "1". A builder who had paid ₹9,999 could not see
+their own project anywhere until an admin approved it. `builderDashboard` now
+returns every non-draft, non-deleted project and the state leads the existing
+stat line ("Under review · 0 leads") — no new element on the card. Requirement
+matching still only runs off LIVE projects, so an unapproved project cannot
+start pulling leads.
+
+**Also fixed here**
+- A pin is released whenever the listing leaves live (sold/rented/hidden/
+  archived/restored). Without this, re-activating an old sold listing could push
+  a profile past its 3 pins, and the strip would silently hide the overflow.
+- The "What counts as a view?" dialog was left unreachable by the tile change —
+  removed rather than kept as dead code.
+- The Projects tile pushed to `/listings`, which shows listings and never a
+  single project. It now opens the builder dashboard, where projects actually
+  live.
+
+**Superseded** — pinning was removed entirely on 27 Jul 2026; see the featured
+collections section below.
+
+---
+
+## Pinned removed, featured collections built (P9 S1) — 2026-07-27
+
+**Pinning is gone from the product**, on Rajan's instruction — the profile keeps
+one curation surface. Migration `0048` drops `listings.pinned_at` (taking its
+index), and the endpoints (`/listings/pinned`, `/listings/:id/pin`), the service
+functions, the DTO fields, the My Listings sheet row and the profile strip are
+all removed. Confirmed: 0 columns named `pinned_at`, and neither route exists in
+the production build. (Chat thread pinning is a different feature and untouched.)
+
+**Featured collections are now real.** They were the last placeholder on the
+profile: the circle row rendered a single "+ New" whose only behaviour was
+`show("Featured collections need listings — coming in the listings module")`.
+
+- `featured_collections` + `featured_collection_items` (migration 0048, applied),
+  RLS on both, deny-all for clients like the rest of the schema.
+- `GET/POST /profile/featured`, `GET/DELETE /profile/featured/:id`.
+- The **Create featured** sheet is the design's `Sheets.featured` exactly: Name
+  field with the "e.g. Ready to move" placeholder, "Choose listings" 3-column
+  grid where a picked tile takes a 2px accent outline, Create button.
+- Tapping a circle opens what's inside; each tile opens its listing; **Remove
+  collection** with a confirm. The design stops at creating one, so opening and
+  removing reuse the existing BottomSheet/ConfirmDialog rather than new chrome.
+
+**Rules the server owns** (none of them are client guesses): 10 collections per
+profile, 20 listings per collection, 1–30 char name, and members must be the
+caller's OWN listings — a payload of foreign ids creates nothing at all (verified:
+422, and zero rows written, not even an empty shell).
+
+**Visible ≠ member, deliberately.** A collection SHOWS only live+available
+members but KEEPS membership. So hiding the only listing in a collection drops
+its count to 0 and the sheet says "Nothing in this collection is live right now"
+(verified live) — and the listing returns to its collection when it goes live
+again, instead of silently falling out for good.
+
+**Verified live in all three roles**: broker (create → open → tile opens the
+listing → remove, items cascaded, listings untouched), owner ("Under 50 L"), and
+builder ("Premium villas"), plus a builder with no live listings, who gets an
+honest "You need a live listing before you can group one into a collection" and a
+disabled Create rather than a dead button.
+
+**Security**: all four endpoints 401 unauthenticated · another profile's
+collection id → 404 · junk id → 404 · foreign listing ids → 422 with nothing
+written · empty/31-char/non-string name and empty list → 422 · production bundle
+clean.
+
+**CORRECTION (same day).** An earlier note here claimed `OtherProfile` had no
+featured row in the P9 design and that making collections public needed a
+decision. That was wrong — P9 S2 draws the circle row on the visitor profile
+too (`['Projects','Ready to move','Commercial']`, same `featcircle` markup,
+no "+ New" because a visitor does not curate someone else's shelf). Collections
+were always meant to be public, and the visitor side is now built — see below.
+
+---
+
+## Featured collections — visitor side + migration cleanup (2026-07-27)
+
+**Migration history collapsed.** `0047_listing_pinned.sql` (add `pinned_at`) and
+the `drop column` half of `0048` were an add-then-drop pair that no database
+should ever replay. `0047` is deleted, its `_migrations` row removed from dev,
+and `0048` no longer touches `listings` at all — it just creates the two
+featured tables. Verified after the change: `migrate:status` shows a clean run
+ending at `0048`, no `0047`, and 0 columns named `pinned_at` on `listings`.
+Production, which has run neither, now never creates the column.
+
+**Collections are public — the design always said so.** P9 S2 draws the circle
+row on the VISITOR profile as well (`['Projects','Ready to move','Commercial']`),
+which an earlier note in this file got wrong. Built:
+- `GET /profile/:username/featured` and `GET /profile/:username/featured/:id`,
+  both guest-readable;
+- the circle row on `OtherProfile` — same 64px circle + name, **no "+ New"**
+  (a visitor doesn't curate someone else's shelf);
+- tapping a circle opens the same sheet **without the Remove row** (`onRemove` is
+  optional), and a tile opens `/property/:id` — the visitor detail view with
+  Request Number / Send Inquiry, not the owner's Edit/Boost view.
+
+**Only published stock is exposed.** The public endpoints reuse the same
+live+available rule as `getPublicProfileCounts`, and a collection with nothing
+live in it isn't returned at all, so a visitor never sees an empty shelf or
+learns about unpublished listings. Verified: every item came back
+`live/available`, and the payload is the public card DTO — no phone, no private
+fields.
+
+**Verified live, all three roles, as a visitor**: broker "Ready to move" (3),
+builder "Premium villas" (1), owner "Under 50 L" (1) — signed in as another user
+on seller, and as a guest on the public host, light and dark.
+
+**Security**: guest read 200 · a collection id belonging to a different profile
+requested under this username → 404 · junk id → 404 · unknown username → 404 ·
+`%` as a username (LIKE-wildcard probe) → 404 · DELETE against the public route →
+405 · suspended profile → empty list and 404 on detail (restored after the test).
+Production bundle clean.
