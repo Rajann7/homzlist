@@ -148,35 +148,70 @@ export function OtherProfile({ username, isGuest = false }: { username: string; 
         </button>,
       )}
 
-      <div className="px-4 pt-4">
-        <div className="flex items-center gap-4">
-          <Avatar name={p.name ?? undefined} src={p.photoUrl ?? undefined} size={84} />
-          <div className="flex flex-1 justify-around">
-            <Stat n={p.stats.listings} label="Listings" />
-            {p.role === "builder" && <Stat n={p.stats.projects ?? 0} label="Projects" />}
+      {/* ---- Identity block -------------------------------------------------
+          Name and role lead, avatar beside them, and the counts sit in their own
+          balanced row underneath. The old layout put a single stat next to an
+          84px avatar with `justify-around`, which left a wide dead gap on every
+          non-builder profile and made the whole header read as unfinished. */}
+      <div className="px-4 pt-5">
+        <div className="flex items-start gap-3.5">
+          <Avatar name={p.name ?? undefined} src={p.photoUrl ?? undefined} size={64} />
+          <div className="min-w-0 flex-1 pt-0.5">
+            <div className="flex items-center gap-1.5">
+              <h2 className="truncate text-20 font-bold leading-tight text-ink-primary">{p.name}</h2>
+              <ProfileBadges badges={p.badges} />
+            </div>
+            <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+              {roleLabel && (
+                <span className="chrome rounded-full bg-accent-soft px-2.5 py-1 text-11 font-semibold text-accent">{roleLabel}</span>
+              )}
+              {p.cityName && (
+                <span className="chrome inline-flex items-center gap-1 rounded-full bg-surface-2 px-2.5 py-1 text-11 font-medium text-ink-secondary">
+                  <Icon name="pin" size={12} strokeWidth={2} />
+                  {p.cityName}
+                </span>
+              )}
+            </div>
           </div>
         </div>
 
-        <div className="mt-3 flex items-center gap-2">
-          <span className="text-15 font-semibold text-ink-primary">{p.name}</span>
-          <ProfileBadges badges={p.badges} />
-          {roleLabel && <span className="chrome rounded-full bg-surface-2 px-2 py-0.5 text-11 text-ink-secondary">{roleLabel}</span>}
+        {p.bio && <p className="mt-3.5 text-13 leading-[1.55] text-ink-secondary">{p.bio}</p>}
+
+        {/* Counts — a real row with its own surface, so one stat looks
+            deliberate instead of stranded. */}
+        <div className="mt-4 flex items-stretch overflow-hidden rounded-12 border border-border bg-surface-1">
+          <Stat n={p.stats.listings} label={p.stats.listings === 1 ? "Listing" : "Listings"} />
+          {p.role === "builder" && (
+            <>
+              <span className="w-px self-stretch bg-divider" />
+              <Stat n={p.stats.projects ?? 0} label={(p.stats.projects ?? 0) === 1 ? "Project" : "Projects"} />
+            </>
+          )}
+          <span className="w-px self-stretch bg-divider" />
+          <StatText value={p.memberSince} label="Member since" />
         </div>
-        {p.bio && <p className="mt-1 text-13 leading-[1.45] text-ink-secondary">{p.bio}</p>}
-        <p className="mt-1 text-11 text-ink-tertiary">
-          Member since {p.memberSince}
-          {p.responseLabel ? ` · ${p.responseLabel}` : ""}
-        </p>
-        <button onClick={() => setAbout(true)} className="mt-1 flex items-center gap-1 text-11 text-ink-tertiary">
-          <Icon name="info" size={14} strokeWidth={1.7} /> About this account
-        </button>
 
         {/* Message full-width (private number default — Call/WhatsApp gate on public number, Module 7) */}
-        <div className="mt-4">
+        <div className="mt-3.5 flex items-center gap-2">
           <Button fullWidth onClick={() => guard(() => show("Open a property below to send an inquiry and chat"))}>
+            <Icon name="message" size={18} strokeWidth={1.9} />
             Message
           </Button>
+          <button
+            aria-label="About this account"
+            onClick={() => setAbout(true)}
+            className="grid h-11 w-11 shrink-0 place-items-center rounded-8 border border-border text-ink-secondary active:bg-surface-2"
+          >
+            <Icon name="info" size={19} strokeWidth={1.8} />
+          </button>
         </div>
+
+        {p.responseLabel && (
+          <p className="mt-2.5 flex items-center gap-1.5 text-11 text-ink-tertiary">
+            <Icon name="clock" size={13} strokeWidth={1.8} />
+            {p.responseLabel}
+          </p>
+        )}
       </div>
 
       {/* Featured circles (P9 S2 draws this row on the visitor profile too —
@@ -184,37 +219,49 @@ export function OtherProfile({ username, isGuest = false }: { username: string; 
           curate someone else's shelf). Only collections with something live in
           them come back from the server. */}
       {collections !== null && collections.length > 0 && (
-        <div className="no-scrollbar mt-4 flex gap-4 overflow-x-auto px-4">
+        <div className="no-scrollbar mt-5 flex gap-3.5 overflow-x-auto px-4 pb-0.5">
           {collections.map((c) => (
-            <button key={c.id} onClick={() => void openCollection(c)} className="flex w-16 shrink-0 flex-col items-center gap-1">
-              <span className="grid h-16 w-16 place-items-center overflow-hidden rounded-full border border-border bg-surface-2 text-ink-tertiary">
+            // The label used to be clipped to the 64px circle, so "Ready to move"
+            // rendered as "Ready to m…". The column is wider than the ring now and
+            // the name wraps to two lines before it truncates.
+            <button key={c.id} onClick={() => void openCollection(c)} className="flex w-[76px] shrink-0 flex-col items-center gap-1.5">
+              <span className="grid h-[68px] w-[68px] place-items-center overflow-hidden rounded-full bg-surface-2 text-ink-tertiary ring-1 ring-border">
                 {c.coverUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={c.coverUrl} alt="" className="h-full w-full object-cover" />
                 ) : (
-                  <Icon name="home" size={22} strokeWidth={1.7} />
+                  <Icon name="home" size={24} strokeWidth={1.7} />
                 )}
               </span>
-              <span className="chrome max-w-16 truncate text-11 text-ink-secondary">{c.name}</span>
+              <span className="chrome line-clamp-2 w-full text-center text-11 leading-[1.3] text-ink-secondary">{c.name}</span>
             </button>
           ))}
         </div>
       )}
 
-      {/* Tabs + grid (live-only, empty until listings) */}
-      <div className="chrome mt-4 flex border-b border-border">
+      {/* Tabs + grid (live-only, empty until listings). Sticky so the grid keeps
+          its context while scrolling, and the indicator is inset to the label
+          rather than spanning the full cell. */}
+      <div className="chrome sticky top-header z-sticky mt-5 flex border-b border-border bg-page">
         {tabs.map((t, i) => (
-          <button key={t} onClick={() => setTab(i)} className={cn("relative flex-1 py-3 text-15 font-semibold", i === tab ? "text-ink-primary" : "text-ink-tertiary")}>
+          <button
+            key={t}
+            onClick={() => setTab(i)}
+            className={cn(
+              "relative flex-1 py-3 text-15 font-semibold transition-colors",
+              i === tab ? "text-ink-primary" : "text-ink-tertiary",
+            )}
+          >
             {t}
-            {i === tab && <span className="absolute inset-x-0 bottom-0 h-[1.5px] w-full bg-accent" />}
+            {i === tab && <span className="absolute inset-x-6 bottom-0 h-[2px] rounded-full bg-accent" />}
           </button>
         ))}
       </div>
       {/* Grid — tab-filtered. "Sell"/"Rent" filter by kind; the builder's
           "Sell / Rent" tab shows everything. Each tile opens the listing. */}
       {listings === null ? (
-        <div className="grid grid-cols-3 gap-0.5 p-0.5">
-          {[0, 1, 2, 3, 4, 5].map((i) => <div key={i} className="aspect-square animate-pulse bg-surface-2" />)}
+        <div className="grid grid-cols-2 gap-2 p-4">
+          {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="aspect-[4/5] w-full rounded-12" />)}
         </div>
       ) : (() => {
         const label = tabs[tab];
@@ -223,26 +270,46 @@ export function OtherProfile({ username, isGuest = false }: { username: string; 
           : listings;
         if (!shown.length) {
           return (
-            <div className="flex flex-1 items-center justify-center px-6 py-16 text-center">
-              <p className="text-13 text-ink-tertiary">No listings to show yet.</p>
+            <div className="flex flex-1 flex-col items-center justify-center gap-2.5 px-6 py-16 text-center">
+              <span className="grid h-14 w-14 place-items-center rounded-full bg-surface-2 text-ink-tertiary">
+                <Icon name="home" size={26} strokeWidth={1.5} />
+              </span>
+              <p className="text-15 font-semibold text-ink-primary">Nothing here yet</p>
+              <p className="max-w-[240px] text-13 text-ink-tertiary">
+                {label === "Rent" ? "No properties listed for rent right now." : "No properties listed for sale right now."}
+              </p>
             </div>
           );
         }
         return (
-          <div className="grid grid-cols-3 gap-0.5 p-0.5">
+          // Two columns instead of three. At 375px a third column left each tile
+          // ~124px wide, which is why "₹1.05 Cr · Negotiable" was clipping — the
+          // price, the one thing a browser scans for, was the thing being cut.
+          <div className="grid grid-cols-2 gap-2 p-4">
             {shown.map((l) => (
               <button
                 key={l.id}
                 onClick={() => router.push(`/property/${l.id}`)}
-                className="relative aspect-square overflow-hidden bg-surface-2 text-left"
+                className="group overflow-hidden rounded-12 border border-border bg-surface-1 text-left shadow-l1 active:opacity-90 dark:shadow-none"
                 aria-label={l.title ?? l.price}
               >
-                {l.coverUrl && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={l.coverUrl} alt="" className="h-full w-full object-cover" />
-                )}
-                <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-1.5 pb-1 pt-4 text-11 font-semibold text-white">
-                  {l.price}
+                <span className="relative block aspect-[4/3] overflow-hidden bg-surface-2">
+                  {l.coverUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={l.coverUrl} alt="" data-protected="true" className="h-full w-full object-cover" />
+                  ) : (
+                    <span className="grid h-full place-items-center text-ink-tertiary"><Icon name="home" size={26} /></span>
+                  )}
+                </span>
+                <span className="block px-2.5 py-2">
+                  {/* Price on its own line at full width, so it never truncates. */}
+                  <span className="block truncate text-15 font-bold leading-tight text-ink-primary">{priceMain(l.price)}</span>
+                  {l.areaLabel && (
+                    <span className="mt-1 flex items-center gap-1 text-11 text-ink-tertiary">
+                      <Icon name="pin" size={11} strokeWidth={2} />
+                      <span className="truncate">{l.areaLabel}</span>
+                    </span>
+                  )}
                 </span>
               </button>
             ))}
@@ -303,11 +370,30 @@ export function OtherProfile({ username, isGuest = false }: { username: string; 
 
 function Stat({ n, label }: { n: number; label: string }) {
   return (
-    <div className="flex flex-col items-center px-1">
-      <span className="text-17 font-bold text-ink-primary">{n.toLocaleString("en-IN")}</span>
+    <div className="flex flex-1 flex-col items-center justify-center gap-0.5 py-2.5">
+      <span className="text-17 font-bold leading-none text-ink-primary">{n.toLocaleString("en-IN")}</span>
       <span className="text-11 text-ink-tertiary">{label}</span>
     </div>
   );
+}
+
+/** Same tile shape as `Stat`, for a value that is a word rather than a count. */
+function StatText({ value, label }: { value: string; label: string }) {
+  return (
+    <div className="flex flex-1 flex-col items-center justify-center gap-0.5 py-2.5">
+      <span className="max-w-full truncate text-15 font-bold leading-none text-ink-primary">{value}</span>
+      <span className="text-11 text-ink-tertiary">{label}</span>
+    </div>
+  );
+}
+
+/**
+ * The price a card leads with. The server sends "₹68 Lakh · Negotiable"; the
+ * card shows the amount and drops the qualifier, which the detail page states in
+ * full. Nothing is recomputed here — it is the server's own string, split.
+ */
+function priceMain(price: string) {
+  return price.split("·")[0].trim();
 }
 
 function MenuRow({ icon, label, destructive, onClick }: { icon: any; label: string; destructive?: boolean; onClick: () => void }) {

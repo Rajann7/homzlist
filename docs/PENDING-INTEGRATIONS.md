@@ -2650,3 +2650,64 @@ Zone proof (the login really did happen on the seller zone, not the public one):
 
 Every row created during this pass was deleted — `save_collections` and
 `user_settings` are both back to 0.
+
+---
+
+## Public profile (P9 S2) — visual rebuild + a bug the rebuild exposed
+
+Rebuilt on Rajan's explicit instruction (this overrides the DESIGN LOCK for this
+screen only). **Functionality untouched** — the diff contains zero changes to
+state, effects, handlers or API calls; every sheet, guard, report/block flow and
+route push is byte-identical. Presentation only.
+
+### What was actually wrong
+
+- A single "Listings" stat sat beside an 84px avatar under `justify-around`,
+  leaving a wide dead gap on every owner/broker profile.
+- Featured labels were clipped to the 64px ring — "Ready to move" rendered as
+  "Ready to m…".
+- The 3-column grid gave each tile ~124px at 375px, so the price — the one thing
+  a browser scans for — was the thing being cut ("₹1.05 Cr · Negotiable").
+- Name at 15px had no more weight than the meta text; nothing led the page.
+
+### What it is now
+
+Name leads at 20px with the verified badge; role and city as pills; bio with
+real line height; the counts in a bordered row that reads as deliberate whether
+there are two tiles or three (builders get Projects). Message gained its icon and
+an adjacent info button (the old 11px "About this account" text link). Featured
+labels wrap to two lines. The grid is 2-up cards — 4:3 cover, price at full width
+so it can never truncate, area with a pin beneath. Sticky tab bar with an inset
+indicator. Real empty state instead of a bare sentence.
+
+Tokens only, no hardcoded hex; verified in light AND dark; no horizontal overflow
+at 375px; lint 0 errors; build clean.
+
+### BUG FOUND — a builder's "Projects" tab is a lie (NOT fixed, needs backend)
+
+On a builder profile, the **Projects** tab and the **Sell / Rent** tab render
+byte-identical content: both fall through to `listings`. The header says
+"1 Project" while the Projects tab shows 5 listings. Verified live on
+`manishagarwal9b4e` by switching tabs and comparing.
+
+This is pre-existing and is the exact bug that was already fixed on the OWN
+profile (`OwnProfile` gained `listingsApi.myProjects()`); the visitor profile
+never got the same treatment. It cannot be fixed here because **no public
+projects endpoint exists** — `profileApi` has `publicListings` / `publicFeatured`
+but no `publicProjects`, and `/api/v1/profile/[username]/listings` has no project
+branch. Fixing it means a new endpoint + service query, which is beyond a visual
+change, so it is recorded rather than silently left or silently scoped in.
+
+### Live role verification (public host, as a guest)
+
+- **Broker** `rkproperties2f21` — 11 Listings · Jul 2026, Rajkot pill, featured
+  "Ready to move" fully legible, 11 cards across Sell/Rent, every price readable
+  (₹82 Lakh … ₹2.1 Cr), scrolls to the last card with nothing clipped.
+- **Owner** `rahulmehta9377` — 7 Listings, bio, response label; Sell and Rent
+  tabs both populated and switching correctly.
+- **Builder** `manishagarwal9b4e` — 5 Listings · 1 Project · Jul 2026 (singular
+  "Project" correct), Builder pill, featured "Premium villas". Projects tab bug
+  above.
+
+Console: one dev-only React HMR warning naming `HotReload`, present before this
+change (the diff touches no effects) and absent from production builds.
