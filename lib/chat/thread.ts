@@ -222,10 +222,23 @@ export async function sendMessage(
   // thread — a pending inquiry already notified the poster at creation.
   if (t.status === "accepted") {
     if (!(await threadMutedFor(threadId, recipient))) {
-      await notify({
+      // Per-thread grouping (Doc2 §14): consecutive unread messages in one
+      // thread collapse into "Rahul: 5 new messages" instead of five rows.
+      // The count comes back from the atomic upsert, so the copy is a real
+      // count, not a client-side tally.
+      const who = await nameOf(me);
+      const first = await notify({
         profileId: recipient, type: "new_message", actorId: me, threadId,
-        title: await nameOf(me), body: isPhoto ? "📷 Photo" : text.slice(0, 120),
+        groupKey: `thread:${threadId}`,
+        title: `**${who}:** ${isPhoto ? "📷 Photo" : text.slice(0, 90)}`,
+        body: isPhoto ? "📷 Photo" : text.slice(0, 120),
+        data: { threadId },
       });
+      if (first.grouped && first.groupCount > 1 && first.id) {
+        await db().from("notifications")
+          .update({ title: `**${who}:** ${first.groupCount} new messages` })
+          .eq("id", first.id);
+      }
     }
   }
 
@@ -322,9 +335,13 @@ export async function requestNumber(threadId: string, me: string): Promise<{ ok:
     thread_id: threadId, requester_id: t.buyer_id, target_id: t.poster_id,
     status: "requested", message_id: (card as any).id,
   });
+  // designs/P11 S7 row 2 — the row carries the inline Allow / Deny pair, which
+  // resolve through lib/notifications/actions.ts back into numberResponse().
   await notify({
     profileId: t.poster_id, type: "number_requested", actorId: me, threadId,
-    title: "Number requested", body: `${await nameOf(me)} requested your phone number`,
+    title: `**${await nameOf(me)}** requested your phone number`,
+    body: `${await nameOf(me)} requested your phone number`,
+    data: { threadId },
   });
   await pingThread(threadId);
   return { ok: true };
@@ -350,7 +367,9 @@ export async function numberResponse(threadId: string, me: string, allow: boolea
     await db().from("chat_messages").insert({ thread_id: threadId, sender_id: null, kind: "continuity", body: "Did you connect on call?" });
     await notify({
       profileId: t.buyer_id, type: "number_shared", actorId: t.poster_id, threadId,
-      title: "Number shared", body: `${await nameOf(t.poster_id)} shared their number`,
+      title: `**${await nameOf(t.poster_id)}** shared their number with you`,
+      body: `${await nameOf(t.poster_id)} shared their number`,
+      data: { threadId },
     });
   }
   await pingThread(threadId);

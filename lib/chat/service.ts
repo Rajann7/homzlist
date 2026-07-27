@@ -3,6 +3,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { timeAgo } from "@/lib/listings/matching";
 import { formatShortRupees } from "@/lib/billing/money";
 import { notify } from "@/lib/notifications/service";
+import { listingBrief, requirementBrief } from "@/lib/notifications/subjects";
 import { pingThread, pingInbox } from "./realtime";
 
 /**
@@ -208,9 +209,16 @@ export async function ensureInquiryThread(inquiry: {
     thread_id: threadId, sender_id: inquiry.profile_id, kind: "text", body: inquiry.message,
   });
   await db().from("inquiries").update({ thread_id: threadId }).eq("id", inquiry.id);
+  // designs/P11 S7 row 1: "<b>Nirav Shah</b> sent an inquiry on your 3 BHK Flat,
+  // Mavdi" + the listing thumbnail. Both come from real rows.
+  const brief = await listingBrief(inquiry.listing_id);
   await notify({
     profileId: inquiry.poster_id, type: "inquiry_received", actorId: inquiry.profile_id, threadId,
-    title: "New inquiry", body: `${await nameOf(inquiry.profile_id)} sent you an inquiry`,
+    title: `**${await nameOf(inquiry.profile_id)}** sent an inquiry on your ${brief.title}`,
+    body: `${await nameOf(inquiry.profile_id)} sent you an inquiry`,
+    thumbUrl: brief.thumbUrl,
+    entityKind: "listing", entityId: inquiry.listing_id,
+    data: { threadId, listingId: inquiry.listing_id },
   });
   await pingInbox(inquiry.poster_id);
   return threadId;
@@ -251,9 +259,15 @@ export async function ensureProposalThread(proposal: {
     thread_id: threadId, sender_id: proposal.sender_id, kind: "text", body: proposal.message,
   });
   await db().from("proposals").update({ thread_id: threadId }).eq("id", proposal.id);
+  // designs/P11 S7: "<b>RK Properties</b> sent a proposal on your requirement
+  // (3 BHK, ₹40–60 L)" — the requirement's own attributes, not a generic line.
+  const reqBrief = await requirementBrief(proposal.requirement_id);
   await notify({
     profileId: proposal.poster_id, type: "proposal_received", actorId: proposal.sender_id, threadId,
-    title: "New proposal", body: `${await nameOf(proposal.sender_id)} proposed on your requirement`,
+    title: `**${await nameOf(proposal.sender_id)}** sent a proposal on your requirement (${reqBrief.title})`,
+    body: `${await nameOf(proposal.sender_id)} proposed on your requirement`,
+    entityKind: "requirement", entityId: proposal.requirement_id,
+    data: { threadId, requirementId: proposal.requirement_id, proposalId: proposal.id },
   });
   await pingInbox(proposal.poster_id);
   return threadId;
@@ -357,7 +371,9 @@ export async function acceptRequest(threadId: string, posterId: string): Promise
   if (buyerId) {
     await notify({
       profileId: buyerId, type: "chat_accepted", actorId: posterId, threadId,
-      title: "Inquiry accepted", body: `${await nameOf(posterId)} accepted — you can chat now`,
+      title: `**${await nameOf(posterId)}** accepted your inquiry — you can chat now`,
+      body: `${await nameOf(posterId)} accepted — you can chat now`,
+      data: { threadId },
     });
     await pingInbox(buyerId);
   }

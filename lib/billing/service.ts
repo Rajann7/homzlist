@@ -3,6 +3,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { computeTax, formatShortRupees, type TaxBreakdown, COUPON_RE } from "./money";
 import { formatPhone } from "@/lib/auth/phone";
 import { isBoostSubjectEligible } from "./boost";
+import { notify } from "@/lib/notifications/service";
 
 /**
  * Billing persistence + business rules (Doc2 §4, Doc7 §3, Doc9 §11–12).
@@ -492,6 +493,17 @@ export async function activatePaidOrder(
 
   // 5. Invoice (GST line items — Doc2 §4.3).
   result.invoiceNumber = await issueInvoice(order, payment?.id ?? null);
+
+  // 6. Tell them (Doc2 §14: "payment success"). designs/P11 S7:
+  //    "Payment successful — <b>₹999 Listing Plan</b>" + View invoice.
+  await notify({
+    profileId: order.profile_id,
+    type: "payment_success",
+    title: `Payment successful — **${rupeeLabel(order.total_paise)} ${order.terms_snapshot?.name ?? "purchase"}**`,
+    body: `Invoice ${result.invoiceNumber}. Tap to view or download it.`,
+    entityKind: "order", entityId: order.id,
+    data: { orderId: order.id, invoiceNumber: result.invoiceNumber },
+  });
   return result;
 }
 
@@ -609,6 +621,17 @@ export async function recordFailedPayment(order: OrderRow, reason: string, rzpPa
     failure_reason: reason,
   });
   await db().from("orders").update({ status: "failed" }).eq("id", order.id);
+
+  // designs/P11 S7: "Payment failed — <b>₹499 top-up</b>" + a Retry button.
+  // Retry re-opens the normal server-priced checkout; nothing here charges.
+  await notify({
+    profileId: order.profile_id,
+    type: "payment_failed",
+    title: `Payment failed — **${rupeeLabel(order.total_paise)} ${order.terms_snapshot?.name ?? "purchase"}**`,
+    body: reason.slice(0, 160),
+    entityKind: "order", entityId: order.id,
+    data: { orderId: order.id, code: order.terms_snapshot?.code ?? null },
+  });
 }
 
 export async function listPayments(
@@ -787,6 +810,22 @@ export async function refundAndRevoke(args: {
   await db().from("orders").update({ status: "refunded" }).eq("id", args.orderId);
   // Money back and benefit gone in the same statement (Doc9 §12 refund integrity).
   const { data } = await db().rpc("revoke_plan_for_refund", { p_order: args.orderId, p_reason: args.reason });
+
+  // designs/P11 S7: "<b>₹999 refunded</b> — it will reach your account in 5–7
+  // days". The amount is read back from the payment row, not passed in.
+  const { data: pay } = await db()
+    .from("payments").select("profile_id,amount_paise").eq("id", args.paymentId).maybeSingle();
+  const p = pay as { profile_id: string; amount_paise: number } | null;
+  if (p) {
+    await notify({
+      profileId: p.profile_id,
+      type: "refund_processed",
+      title: `**${rupeeLabel(p.amount_paise)} refunded** — it will reach your account in 5–7 days`,
+      body: args.reason.slice(0, 160),
+      entityKind: "order", entityId: args.orderId,
+      data: { orderId: args.orderId, paymentId: args.paymentId },
+    });
+  }
   return (data ?? []) as string[]; // listing ids to unpublish
 }
 
@@ -1047,13 +1086,13 @@ export async function sendExpiryReminders(): Promise<number> {
     const windowEnd = new Date(now + milestone * 86_400_000).toISOString();
     const { data: plans } = await db()
       .from("user_plans")
-      .select("id, profile_id, name, expires_at")
+      .select("id, profile_id, name, expires_at, is_trial, terms")
       .eq("status", "active")
       .not("expires_at", "is", null)
       .gt("expires_at", new Date(now).toISOString())
       .lte("expires_at", windowEnd);
 
-    for (const p of (plans ?? []) as { id: string; profile_id: string; name: string; expires_at: string }[]) {
+    for (const p of (plans ?? []) as { id: string; profile_id: string; name: string; expires_at: string; is_trial: boolean; terms: any }[]) {
       const prefs = await getNotificationPrefs(p.profile_id);
       if (!prefs.expiryReminders) continue;
 
@@ -1066,7 +1105,7 @@ export async function sendExpiryReminders(): Promise<number> {
       });
       if (error) continue;
 
-      await deliverExpiryReminder(p.profile_id, p.name, milestone);
+      await deliverExpiryReminder(p, milestone);
       sent++;
     }
   }
@@ -1074,17 +1113,32 @@ export async function sendExpiryReminders(): Promise<number> {
 }
 
 /**
- * Hand the reminder to the delivery channel. Push/email land in Module 7 (FCM +
- * Resend); until that provider layer exists this records an auditable trace row
- * rather than silently dropping it, so the ledger and the outbox agree.
+ * Hand the reminder to the notification engine (Module 10).
+ *
+ * This used to write a `webhook_events` trace row and stop — the My Plan screen
+ * promised "we'll notify you 7 days and 1 day before expiry" and nothing ever
+ * reached the user. Now it goes through `notify`, which writes the in-app row
+ * (designs/P11 S7: "Your <b>₹2,999 plan</b> expires in 7 days" + Renew) and
+ * fans out to push/email under the same prefs and quiet hours as everything
+ * else. A TRIAL uses the trial copy and its own milestones (Doc2 §4.2).
  */
-async function deliverExpiryReminder(profileId: string, planName: string, milestone: number) {
-  await db().from("webhook_events").insert({
-    provider: "reminder",
-    event_id: `reminder:${profileId}:${planName}:${milestone}:${Date.now()}`,
-    event_type: "plan.expiry_reminder",
-    status: "processed",
-    note: `${planName} expires in ${milestone} day${milestone === 1 ? "" : "s"}`,
+async function deliverExpiryReminder(
+  plan: { id: string; profile_id: string; name: string; expires_at: string; is_trial: boolean; terms: any },
+  milestone: number,
+) {
+  const price = plan.terms?.price_paise != null ? rupeeLabel(plan.terms.price_paise) : "";
+  const days = `${milestone} day${milestone === 1 ? "" : "s"}`;
+  await notify({
+    profileId: plan.profile_id,
+    type: plan.is_trial ? "trial_ending" : "plan_expiring",
+    title: plan.is_trial
+      ? `Your **free trial** ends in ${days}`
+      : `Your **${[price, plan.name].filter(Boolean).join(" ")}** expires in ${days}`,
+    body: plan.is_trial
+      ? "Pick a plan to keep your listings live."
+      : "Renew to keep your listings live — expired plans stop new posts.",
+    entityKind: "user_plan", entityId: plan.id,
+    data: { userPlanId: plan.id, milestone },
   });
 }
 

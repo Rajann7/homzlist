@@ -2,6 +2,7 @@ import "server-only";
 import { createServiceClient } from "@/lib/supabase/server";
 import { formatShortRupees } from "@/lib/billing/money";
 import { notify } from "@/lib/notifications/service";
+import { listingBrief, projectBrief, requirementBrief } from "@/lib/notifications/subjects";
 
 /**
  * Boost subjects, targeting and the admin decision (Doc2 §13).
@@ -410,6 +411,17 @@ function labelForKind(kind: BoostSubjectKind): string {
 }
 
 /**
+ * The boosted thing's own name, for notification copy ("…live on 3 BHK Flat,
+ * Mavdi"). `boosts.listing_id` is the subject id for every kind — the column
+ * predates projects and requirements becoming boostable.
+ */
+async function subjectBrief(kind: BoostSubjectKind, subjectId: string | null) {
+  if (kind === "project") return projectBrief(subjectId);
+  if (kind === "requirement") return requirementBrief(subjectId);
+  return listingBrief(subjectId);
+}
+
+/**
  * How many boosts are already live in a city vs the admin cap. The P13-15 boost
  * panel shows this as an eligibility check; here it is actually ENFORCED, so
  * approval refuses rather than merely displaying a red line.
@@ -509,7 +521,10 @@ export async function approveBoost(boostId: string, actorId: string): Promise<Bo
   await notify({
     profileId: boost.profile_id,
     type: "boost_approved",
-    title: queued ? "Your boost is approved and queued" : "Your boost is live",
+    // designs/P11 S7: "Your boost is <b>live</b> on 3 BHK Flat, Mavdi".
+    title: queued
+      ? `Your boost is **approved and queued** on ${(await subjectBrief(boost.subject_kind, boost.listing_id)).title}`
+      : `Your boost is **live** on ${(await subjectBrief(boost.subject_kind, boost.listing_id)).title}`,
     body: queued
       ? `It starts when your current boost ends, and runs till ${dateLabel(endsAt)}.`
       : `Running till ${dateLabel(endsAt)} · ${boost.target_label}`,
@@ -552,7 +567,7 @@ export async function rejectBoost(boostId: string, actorId: string, reason: stri
   await notify({
     profileId: row.profile_id,
     type: "boost_rejected",
-    title: "Your boost wasn't approved",
+    title: "Your boost **wasn't approved**",
     body: `${clean} · ₹${(row.price_paise / 100).toLocaleString("en-IN")} is being refunded (5–7 days).`,
     data: { boostId, deepLink: "/boost" },
   });
@@ -586,7 +601,7 @@ export async function stopBoost(boostId: string, actorId: string, reason: string
   await notify({
     profileId: row.profile_id,
     type: "boost_stopped",
-    title: "Your boost was stopped",
+    title: "Your boost was **stopped**",
     body: `${clean}. Unused days aren't refunded — see the Refund Policy.`,
     data: { boostId, deepLink: "/boost" },
   });
@@ -686,7 +701,7 @@ export async function stopBoostsForSubject(subjectId: string, reason: string): P
     await notify({
       profileId: b.profile_id,
       type: "boost_stopped",
-      title: "Your boost stopped",
+      title: "Your boost **stopped**",
       body: `${reason.slice(0, 160)}. Unused days aren't refunded — see the Refund Policy.`,
       data: { boostId: b.id, deepLink: "/boost" },
     });
@@ -696,7 +711,7 @@ export async function stopBoostsForSubject(subjectId: string, reason: string): P
     await notify({
       profileId: b.profile_id,
       type: "boost_stopped",
-      title: "Your boost was cancelled and refunded",
+      title: "Your boost was **cancelled and refunded**",
       body: `It never went live, so ₹${(b.price_paise / 100).toLocaleString("en-IN")} is being refunded (5–7 days).`,
       data: { boostId: b.id, deepLink: "/boost" },
     });
@@ -787,10 +802,13 @@ export async function sendBoostExpiryReminders(): Promise<number> {
     await notify({
       profileId: b.profile_id,
       type: "boost_expiring",
-      title: "Your boost ends tomorrow",
+      // designs/P11 S7: "Your <b>boost ends tomorrow</b>" + a priced Renew
+      // button. The price is the SERVER's number, rendered into the label —
+      // the button still opens the normal server-priced checkout, so nothing
+      // here can charge anything.
+      title: milestone === 1 ? "Your **boost ends tomorrow**" : `Your **boost ends in ${milestone} days**`,
       body: `${b.duration_days >= 30 ? "1 Month" : `${b.duration_days} Days`} · ${b.target_label} · ${price}`,
-      // `renew` is what the notification's inline button acts on — it opens the
-      // normal server-priced checkout. Nothing here charges anything.
+      actions: [{ key: "renew_boost", label: `Renew — ${price}`, style: "primary" }],
       data: { boostId: b.id, action: "renew", price, deepLink: "/boost" },
     });
     sent++;
@@ -819,7 +837,7 @@ export async function expireBoostsAndNotify(): Promise<number> {
     await notify({
       profileId: b.profile_id,
       type: "boost_expired",
-      title: "Your boost has ended",
+      title: "Your **boost has ended**",
       body: `${labelForKind((b.subject_kind ?? "listing") as BoostSubjectKind)} is back to its normal position. Boost again in 1 tap.`,
       data: { boostId: b.id, action: "renew", deepLink: "/boost" },
     });

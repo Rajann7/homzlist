@@ -61,9 +61,16 @@ export async function runSavedSearchAlerts(now = new Date()): Promise<AlertRepor
       if (fresh > 0) {
         await notify({
           profileId: row.profile_id,
-          type: "saved_search_match" as never,
-          title: `${fresh} new match${fresh === 1 ? "" : "es"} for "${row.label}"`,
+          type: "saved_search_match",
+          // designs/P11 S7: "<b>12 new properties</b> match your saved search
+          // 3 BHK · ₹40–60 L · Mavdi" — the count is bold, the search is named.
+          title: `**${fresh} new propert${fresh === 1 ? "y" : "ies"}** match your saved search ${row.label}`,
           body: `${total} total propert${total === 1 ? "y" : "ies"} now match this saved search.`,
+          // The row's own filters, so the tap lands on THOSE results rather
+          // than a bare /search.
+          href: `/search/results?${searchQuery(row.params)}`,
+          groupKey: `saved-search:${row.id}`,
+          entityKind: "saved_search", entityId: row.id,
           data: { savedSearchId: row.id, fresh, total },
         });
         report.notified++;
@@ -84,6 +91,31 @@ export async function runSavedSearchAlerts(now = new Date()): Promise<AlertRepor
   }
 
   return report;
+}
+
+/**
+ * Serialise a saved search's filters back into the results-page query string,
+ * so tapping the alert lands on exactly the search it is about. Deliberately a
+ * small local writer: `filtersToQuery` lives in a "use client" module, and the
+ * server has no business importing the client bundle to build a URL.
+ */
+function searchQuery(f: SearchFilters | null | undefined): string {
+  const p = new URLSearchParams();
+  if (!f) return "";
+  if (f.q) p.set("q", f.q);
+  if (f.intent) p.set("intent", f.intent);
+  if (f.cityId) p.set("city", f.cityId);
+  if (f.types?.length) p.set("types", f.types.join(","));
+  if (f.areas?.length) p.set("areas", f.areas.join(","));
+  if (f.amenities?.length) p.set("amenities", f.amenities.join(","));
+  if (f.budgetMin != null) p.set("bmin", String(f.budgetMin));
+  if (f.budgetMax != null) p.set("bmax", String(f.budgetMax));
+  if (f.negotiableOnly) p.set("negotiableOnly", "1");
+  if (f.readyToMove) p.set("readyToMove", "1");
+  if (f.newConstruction) p.set("newConstruction", "1");
+  if (f.verifiedOnly) p.set("verifiedOnly", "1");
+  for (const [k, v] of Object.entries(f.attrs ?? {})) if (v.length) p.set(`a.${k}`, v.join(","));
+  return p.toString();
 }
 
 /**
@@ -165,10 +197,13 @@ export async function notifyLaunchedCities(): Promise<{ cities: number; people: 
       if (r.profile_id) {
         await notify({
           profileId: r.profile_id,
-          type: "saved_search_match" as never,
-          title: `HomzList is now live in ${city.name}`,
+          // Its own type now — a launch is not a saved-search match, and the
+          // old cast made it render with the wrong icon and the wrong toggle.
+          type: "city_launched",
+          title: `HomzList is now live in **${city.name}**`,
           body: "You asked to be notified when we launched here. Start browsing properties now.",
-          data: { citySlug: city.slug },
+          href: `/search/results?q=${encodeURIComponent(city.name)}`,
+          data: { citySlug: city.slug, cityName: city.name },
         });
         people++;
       }

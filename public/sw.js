@@ -76,3 +76,50 @@ self.addEventListener("fetch", (event) => {
 self.addEventListener("message", (event) => {
   if (event.data === "SKIP_WAITING") self.skipWaiting();
 });
+
+/* ---------------------------------------------------------------------------
+ * Push (Module 10 — Doc2 §14).
+ *
+ * FCM delivers a web push as a standard `push` event whose payload carries the
+ * `notification` + `data` we sent server-side. Handling it here (rather than in
+ * a separate firebase-messaging-sw.js) keeps ONE service worker, so the PWA
+ * caching and the push handling can never disagree about which SW is in
+ * control — the token is registered against this exact registration.
+ *
+ * Device notes: Android and desktop show these directly; iOS only delivers to
+ * an INSTALLED (standalone) PWA, which is why registration records `standalone`.
+ * ------------------------------------------------------------------------- */
+
+self.addEventListener("push", (event) => {
+  let payload = {};
+  try { payload = event.data ? event.data.json() : {}; } catch { payload = { notification: { body: event.data && event.data.text() } }; }
+
+  const n = payload.notification || {};
+  const d = payload.data || {};
+  const title = n.title || d.title || "HomzList";
+  const options = {
+    body: n.body || d.body || "",
+    icon: "/icons/icon-192.png",
+    badge: "/icons/icon-192.png",
+    // Same tag = the phone REPLACES the old notification instead of stacking a
+    // second one, which is the shade-level half of Doc2 §14's grouping rule.
+    tag: d.threadId ? `thread:${d.threadId}` : d.type || "homzlist",
+    renotify: true,
+    data: { href: d.href || "/notifications", notificationId: d.notificationId || null },
+  };
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const href = (event.notification.data && event.notification.data.href) || "/notifications";
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
+      // Focus an open tab and route it, rather than opening a duplicate app.
+      for (const c of list) {
+        if ("focus" in c) { c.postMessage({ type: "NOTIFICATION_CLICK", href }); return c.focus(); }
+      }
+      return self.clients.openWindow(href);
+    }),
+  );
+});

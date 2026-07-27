@@ -86,7 +86,15 @@ export type IconName =
   | "type-plot-com"
   | "type-plot-agri"
   | "type-plot-farm"
-  | "type-pg";
+  | "type-pg"
+  // P11 S7 notifications: the six lead icons the design uses that no earlier
+  // screen needed (designs/P11 ICON map — same Lucide-style 1.5px family).
+  | "hourglass"
+  | "arrow-down"
+  | "users"
+  | "bulb"
+  | "chart"
+  | "device";
 
 interface IconProps extends React.SVGProps<SVGSVGElement> {
   name: IconName;
@@ -426,6 +434,45 @@ const PATHS: Record<IconName, (f: boolean) => React.ReactNode> = {
     <>
       <circle cx="12" cy="12" r="9" />
       <path d="m15 9-6 6m0-6 6 6" />
+    </>
+  ),
+  hourglass: () => (
+    <>
+      <path d="M6 3h12M6 21h12" />
+      <path d="M6 3c0 5 6 5 6 9s-6 4-6 9" />
+      <path d="M18 3c0 5-6 5-6 9s6 4 6 9" />
+    </>
+  ),
+  "arrow-down": () => (
+    <>
+      <path d="M12 5v14" />
+      <path d="m5 12 7 7 7-7" />
+    </>
+  ),
+  users: () => (
+    <>
+      <circle cx="9" cy="8" r="3.5" />
+      <path d="M2.5 20a6.5 6.5 0 0 1 13 0" />
+      <path d="M16 5a3.5 3.5 0 0 1 0 6.5" />
+      <path d="M17.5 20a6.5 6.5 0 0 0-3-5.5" />
+    </>
+  ),
+  bulb: () => (
+    <>
+      <path d="M9 18h6M10 21h4" />
+      <path d="M12 3a6 6 0 0 0-4 10.5c.7.8 1 1.5 1 2.5h6c0-1 .3-1.7 1-2.5A6 6 0 0 0 12 3z" />
+    </>
+  ),
+  chart: () => (
+    <>
+      <path d="M3 3v18h18" />
+      <path d="M7 15l3-4 3 2 4-6" />
+    </>
+  ),
+  device: () => (
+    <>
+      <rect x="5" y="2" width="14" height="20" rx="2" />
+      <path d="M12 18h.01" />
     </>
   ),
 };

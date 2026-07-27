@@ -3,6 +3,8 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { consumeQuota, releaseQuota, reserveSlot, transitionSlot } from "@/lib/billing/service";
 import { stopBoostsForSubject, pauseBoostsForSubject, resumeBoostsForSubject } from "@/lib/billing/boost";
 import { primaryAreaSqft } from "./validate";
+import { notify } from "@/lib/notifications/service";
+import { rupees } from "@/lib/notifications/subjects";
 
 /**
  * Listings persistence + state machine (Doc2 §5, Doc7 §4, Doc9 §11).
@@ -709,6 +711,19 @@ export async function updateListing(
 
   const { data } = await db().from("listings").update(next).eq("id", id).eq("profile_id", profileId).select("*").maybeSingle();
   if (!data) return null;
+
+  // "Track price drops so savers can be notified" — this is the notifying half
+  // (Doc2 §14 "price-drop (saved)"). It only fires on a real DROP, on a live
+  // listing, and only to people who saved it.
+  if (
+    wasLive && next.status !== "pending_review" &&
+    "price_paise" in patch &&
+    typeof patch.price_paise === "number" && typeof current.price_paise === "number" &&
+    patch.price_paise < current.price_paise
+  ) {
+    await notifySaversOfPriceDrop(id, current.price_paise, patch.price_paise);
+  }
+
   return { listing: data as ListingRow, reReview: isMajor && wasLive };
 }
 
@@ -780,6 +795,13 @@ export async function setListingStatus(id: string, profileId: string, action: St
   // Back in the feed → resume whatever the hide paused.
   if ((data as ListingRow).status === "live") {
     await resumeBoostsForSubject(id);
+  }
+
+  // Anyone who SAVED this listing asked to hear about exactly this (Doc2 §14
+  // "saved-listing status change"). Their preference for it is default-OFF, so
+  // the engine is what decides whether it actually reaches them.
+  if (["sold", "rented", "completed", "hide"].includes(action)) {
+    await notifySaversOfStatusChange(id, profileId, action === "hide" ? "hidden" : action);
   }
 
   return data as ListingRow;
@@ -966,4 +988,69 @@ export async function areaLabelFor(areaId: string | null, cityId: string | null)
 
   const { data: city } = await db().from("locations").select("name").eq("id", cityId!).maybeSingle();
   return (city as { name: string } | null)?.name ?? null;
+}
+
+// ---------------------------------------------------------------------------
+// Saved-listing fan-out (Doc2 §14: "price-drop (saved)", "saved-listing status
+// change"). Both walk `saves` — the people who asked to hear about this row.
+// ---------------------------------------------------------------------------
+
+/** Everyone who saved this listing, excluding its owner. */
+async function saversOf(listingId: string, ownerId: string): Promise<string[]> {
+  const { data } = await db().from("saves").select("profile_id").eq("listing_id", listingId).limit(1000);
+  return [...new Set(((data ?? []) as { profile_id: string }[]).map((s) => s.profile_id))].filter((p) => p !== ownerId);
+}
+
+async function notifySaversOfPriceDrop(listingId: string, oldPaise: number, newPaise: number) {
+  const { data } = await db()
+    .from("listings").select("id,profile_id,title,area_label,cover_url").eq("id", listingId).maybeSingle();
+  const l = data as { id: string; profile_id: string; title: string; area_label: string; cover_url: string | null } | null;
+  if (!l) return;
+  const name = [l.title, l.area_label].filter(Boolean).join(", ");
+  const drop = rupees(oldPaise - newPaise);
+  for (const saver of await saversOf(listingId, l.profile_id)) {
+    // designs/P11 S7: "Price dropped <b>₹5 Lakh</b> on a property you saved —
+    // 3 BHK, Raiya Road" + the listing thumbnail.
+    await notify({
+      profileId: saver,
+      type: "price_drop",
+      title: `Price dropped **${drop}** on a property you saved — ${name}`,
+      body: `Now ${rupees(newPaise)}.`,
+      thumbUrl: l.cover_url,
+      entityKind: "listing", entityId: l.id,
+      data: { listingId: l.id },
+    });
+  }
+}
+
+const SAVED_STATUS_COPY: Record<string, string> = {
+  sold: "is now marked **sold**",
+  rented: "is now marked **rented**",
+  completed: "is now marked **completed**",
+  hidden: "was **hidden** by the seller",
+  archived: "is **no longer listed**",
+};
+
+/**
+ * A saved listing changed state (Doc2 §14). Default-OFF in the design's prefs
+ * ("Status changes on saved"), which the engine enforces — this just emits it.
+ */
+async function notifySaversOfStatusChange(listingId: string, ownerId: string, stateKey: string) {
+  const copy = SAVED_STATUS_COPY[stateKey];
+  if (!copy) return;
+  const { data } = await db()
+    .from("listings").select("title,area_label,cover_url").eq("id", listingId).maybeSingle();
+  const l = data as { title: string; area_label: string; cover_url: string | null } | null;
+  const name = l ? [l.title, l.area_label].filter(Boolean).join(", ") : "A saved property";
+  for (const saver of await saversOf(listingId, ownerId)) {
+    await notify({
+      profileId: saver,
+      type: "saved_listing_status",
+      title: `${name} ${copy}`,
+      body: "It was on your saved list.",
+      thumbUrl: l?.cover_url ?? null,
+      entityKind: "listing", entityId: listingId,
+      data: { listingId },
+    });
+  }
 }

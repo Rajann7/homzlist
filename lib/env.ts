@@ -22,6 +22,13 @@ export const publicEnv = {
   supabaseAnonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "",
   fcmVapidKey: process.env.NEXT_PUBLIC_FCM_VAPID_KEY ?? "",
   fcmSenderId: process.env.NEXT_PUBLIC_FCM_SENDER_ID ?? "",
+  // The rest of the Firebase WEB config the messaging SDK needs to mint a
+  // device token (Module 10). All public by design — the private half is
+  // FCM_SERVICE_ACCOUNT_JSON, which is server-only. With any of these missing
+  // the client reports push as "unavailable" instead of pretending to register.
+  firebaseApiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY ?? "",
+  firebaseProjectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ?? "",
+  firebaseAppId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID ?? "",
 } as const;
 
 /**

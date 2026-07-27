@@ -74,8 +74,16 @@ export function FeedHome() {
   // Admin banner (P2 slot) — DB-driven; renders only when a row is active.
   useEffect(() => { feedApi.banner().then((r) => { if (r.ok) setBanner(r.data.banner); }); }, []);
 
-  // Header badge counts — real inquiry count; notifications stays null (Module 10).
-  useEffect(() => { feedApi.badges().then((r) => { if (r.ok) setBadges(r.data); }); }, []);
+  // Header badge counts — both are real server counts now (Module 10 owns the
+  // notifications one). Re-read on focus so the bell clears after the user has
+  // been through the notifications screen in another tab.
+  useEffect(() => {
+    const read = () => feedApi.badges().then((r) => { if (r.ok) setBadges(r.data); });
+    void read();
+    const onVis = () => document.visibilityState === "visible" && read();
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, []);
 
   // New-listings pill: poll new-count; only reveal after ≥30s on feed (Doc7 §83).
   useEffect(() => {

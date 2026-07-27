@@ -1,6 +1,8 @@
 import "server-only";
 import { createServiceClient } from "@/lib/supabase/server";
 import { resumeBoostsForSubject, stopBoostsForSubject } from "@/lib/billing/boost";
+import { notify } from "@/lib/notifications/service";
+import { listingBrief, projectBrief, requirementBrief } from "@/lib/notifications/subjects";
 
 /**
  * Moderation — the half of Module 4 that decides whether anything ever goes
@@ -80,12 +82,12 @@ export async function moderate(
 
   const { data: row } = await db()
     .from(table)
-    .select("id,status,reject_count,is_locked")
+    .select("id,status,reject_count,is_locked,profile_id")
     .eq("id", id)
     .maybeSingle();
   if (!row) return { ok: false, reason: "not_found" };
 
-  const current = row as { id: string; status: string; reject_count: number | null; is_locked: boolean | null };
+  const current = row as { id: string; status: string; reject_count: number | null; is_locked: boolean | null; profile_id: string };
   if (current.is_locked) return { ok: false, reason: "locked" };
   if (!REVIEWABLE.includes(current.status)) return { ok: false, reason: "bad_state" };
 
@@ -151,6 +153,19 @@ export async function moderate(
   // Pending-approval boosts are refunded by the same shared path.
   if (u.status === "rejected") await stopBoostsForSubject(id, "Not approved by moderation · boost stopped");
 
+  // Doc2 §5.4: "Approve: live + … + NOTIFICATION". Until now a decision changed
+  // a row and told nobody — the seller's listing went live, or was rejected,
+  // and the only way to find out was to go and look. designs/P11 S7 has all
+  // three rows; this is what writes them.
+  await notifyModerationDecision(subject, id, current.profile_id, input, u.status, Boolean(u.is_locked));
+
+  // A requirement going live is what brokers and builders in that city are
+  // waiting for (Doc2 §14 "matching requirement"). Capped at 3/day each.
+  if (subject === "requirement" && u.status === "live") {
+    const { notifyMatchingRequirement } = await import("@/lib/notifications/jobs");
+    await notifyMatchingRequirement(id);
+  }
+
   return { ok: true, status: u.status, locked: Boolean(u.is_locked), rejectCount: u.reject_count ?? 0 };
 }
 
@@ -181,4 +196,73 @@ export async function moderationHistory(subject: ModerationSubject, id: string) 
     .eq("subject_id", id)
     .order("created_at", { ascending: false });
   return data ?? [];
+}
+
+/**
+ * The notification half of a decision (Doc2 §5.4 / §14, designs/P11 S7).
+ *
+ * Approvals GROUP: a moderator clearing a queue produces "10 listings approved
+ * — tap to review", not ten rows (Doc2 §14 batch dedup). The group key is the
+ * owner's daily approval bucket, and the count comes back from the atomic
+ * upsert — a real count, never a client-side tally.
+ */
+async function notifyModerationDecision(
+  subject: ModerationSubject,
+  id: string,
+  ownerId: string,
+  input: ModerationInput,
+  status: string,
+  locked: boolean,
+) {
+  const brief =
+    subject === "project" ? await projectBrief(id)
+    : subject === "requirement" ? await requirementBrief(id)
+    : await listingBrief(id);
+  const noun = subject === "project" ? "project" : subject === "requirement" ? "requirement" : "listing";
+
+  if (status === "live") {
+    const res = await notify({
+      profileId: ownerId,
+      type: "listing_approved",
+      title: `Your ${noun} **${brief.title}** is now live`,
+      body: "It is visible in the feed and in search.",
+      thumbUrl: brief.thumbUrl,
+      groupKey: `approved:${subject}`,
+      entityKind: subject, entityId: id,
+      data: { listingId: id, subject },
+    });
+    if (res.grouped && res.groupCount > 1 && res.id) {
+      await db().from("notifications")
+        .update({ title: `**${res.groupCount} ${noun}s approved** — tap to review`, href: "/listings", thumb_url: null })
+        .eq("id", res.id);
+    }
+    return;
+  }
+
+  if (status === "changes_requested") {
+    // The per-field notes are what the seller has to act on, so the row says
+    // what to change rather than "changes requested".
+    const notes = Object.values(input.notes ?? {}).filter(Boolean).join(" · ").slice(0, 160);
+    await notify({
+      profileId: ownerId,
+      type: "listing_changes_requested",
+      title: `Changes requested on **${brief.title}**${notes ? ` — ${notes}` : ""}`,
+      body: notes || "Open the listing to see what needs changing.",
+      entityKind: subject, entityId: id,
+      data: { listingId: id, subject },
+    });
+    return;
+  }
+
+  if (status === "rejected") {
+    const reason = (input.reason ?? "").trim().slice(0, 160);
+    await notify({
+      profileId: ownerId,
+      type: "listing_rejected",
+      title: `Your ${noun} was rejected — **${reason || "does not meet our guidelines"}**`,
+      body: locked ? "This item is locked after three rejections. You can appeal." : "Fix the reason and re-submit.",
+      entityKind: subject, entityId: id,
+      data: { listingId: id, subject, rejectReason: reason },
+    });
+  }
 }

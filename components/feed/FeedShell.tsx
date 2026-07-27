@@ -21,7 +21,7 @@ export function FeedShell({
   cityName: string | null;
   selectedCityId: string | null;
   onCity: (c: CityRow) => void;
-  /** Header bell/message counts. `notifications: null` = no source yet → no badge. */
+  /** Header bell/message counts, both real server queries (Module 10). */
   badges?: { messages: number; notifications: number | null };
   /** Pull-to-refresh handler (P2). Returns a promise so the spinner can wait on it. */
   onRefresh?: () => void | Promise<void>;

@@ -99,9 +99,51 @@ export async function createRefreshSession(profileId: string, meta: Omit<Session
   const sid = randomUUID();
   const secret = randomBytes(32).toString("base64url");
   const record = { secretHash: hashSecret(secret), ...meta, createdAt: Date.now(), lastUsedAt: Date.now() };
+
+  // Doc2 §14 "new-device login". Decided BEFORE the new session is indexed, so
+  // the very first login on an account isn't reported as a suspicious device.
+  const known = await knownDevice(profileId, meta.ua);
+
   await kv.set(refreshKey(profileId, sid), JSON.stringify(record), REFRESH_TTL_SEC);
   await kv.sadd(sessionSetKey(profileId), sid);
+
+  if (!known.first && !known.seen) await notifyNewDevice(profileId, meta.ua);
   return `${profileId}.${sid}.${secret}`;
+}
+
+/** Have we seen this user-agent on a live session already? */
+async function knownDevice(profileId: string, ua: string): Promise<{ first: boolean; seen: boolean }> {
+  try {
+    const sids = await kv.smembers(sessionSetKey(profileId));
+    if (!sids.length) return { first: true, seen: false };
+    for (const sid of sids) {
+      const raw = await kv.get(refreshKey(profileId, sid));
+      if (raw && JSON.parse(raw).ua === ua) return { first: false, seen: true };
+    }
+    return { first: false, seen: false };
+  } catch {
+    // Never let a KV hiccup block a login.
+    return { first: true, seen: false };
+  }
+}
+
+async function notifyNewDevice(profileId: string, ua: string) {
+  try {
+    const { notify } = await import("@/lib/notifications/service");
+    const { describeUserAgent } = await import("@/lib/notifications/user-agent");
+    const d = describeUserAgent(ua);
+    // designs/P11 S7: "New login from <b>Chrome on Windows</b> · Rajkot" with a
+    // "Not you?" link that really does end every session.
+    await notify({
+      profileId,
+      type: "new_device_login",
+      title: `New login from **${d.label}**`,
+      body: "If this wasn't you, sign out of all devices and change nothing else until you do.",
+      data: { userAgent: ua.slice(0, 200) },
+    });
+  } catch {
+    // a notification must never break a login
+  }
 }
 
 export async function rotateRefreshSession(cookieValue: string): Promise<{ profileId: string; newCookie: string } | null> {

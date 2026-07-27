@@ -1677,14 +1677,12 @@ flagged instead of guessed.
 stories, in which case nothing further is needed; or (b) requirement boosts should
 generate a story card of some kind, which needs a design.
 
-## M9.3 — 🟡 Boost notifications are written; the SCREEN is Module 10
+## M9.3 — ✅ CLOSED by Module 10
 
 `boost_approved`, `boost_rejected`, `boost_expiring`, `boost_expired` and
-`boost_stopped` are real `notifications` rows (verified live), and the P11 boost
-screen's own renew banner works. But `/notifications` is still the Module 10
-placeholder, so the in-app list — including the design's inline "Renew — ₹1,499"
-button on the expiry notification — has nowhere to render yet. The rows are
-waiting for it; no boost work is outstanding.
+`boost_stopped` now render on the real P11 S7 screen, including the design's
+inline "Renew — ₹1,499" button (the price is server-computed and written into
+the row's `actions`, verified on screen). Nothing outstanding.
 
 ## M9.4 — Cron dependency
 
@@ -1722,3 +1720,160 @@ The sweep reseeds itself first, because it CONSUMES states (it approves, rejects
 pauses and sells). It needs a freshly started dev server: the OTP limiter is
 5/hour per number and dev uses an in-memory KV, so a second run against the same
 process is throttled and reports `[SKIP]` on the blocks that need a login.
+
+---
+
+# MODULE 10 — NOTIFICATIONS (P11 S7 + system-wide)
+
+## M10.1 — 🔴 FCM credentials are the only thing between us and real push
+
+The whole push path is built and wired: `public/sw.js` handles `push` +
+`notificationclick` (tag-based replace = the shade-level half of the grouping
+rule), `lib/notifications/push-client.ts` requests permission and mints a token
+through the Firebase messaging SDK against OUR service-worker registration,
+`/api/v1/push/register` stores it device-aware (browser / OS / standalone), and
+`lib/notifications/push.ts` fans out with firebase-admin and prunes dead tokens.
+
+What is missing is **only credentials**:
+
+| env | half | used by |
+|---|---|---|
+| `NEXT_PUBLIC_FIREBASE_API_KEY` | public | client SDK |
+| `NEXT_PUBLIC_FIREBASE_PROJECT_ID` | public | client SDK |
+| `NEXT_PUBLIC_FIREBASE_APP_ID` | public | client SDK |
+| `NEXT_PUBLIC_FCM_SENDER_ID` | public | client SDK |
+| `NEXT_PUBLIC_FCM_VAPID_KEY` | public | client SDK |
+| `FCM_SERVICE_ACCOUNT_JSON` | **server-only** | firebase-admin sender |
+
+Until they exist `pushState().configured` is false, the UI says "Push isn't
+configured on this environment yet" instead of pretending, and the delivery
+ledger records `skipped / no_credentials` rather than a fake success. **The
+in-app screen and email are unaffected** — this only gates the phone buzz.
+
+## M10.2 — 🔴 Resend key not set → transactional email is skipped, not sent
+
+`lib/notifications/email.ts` is a complete Resend sender with the DPDP-required
+"Manage notification preferences" footer, and the engine's channel-dedup logic
+around it is live and proven (see the `held → sent/skipped` ledger). It needs
+`RESEND_API_KEY` + `EMAIL_FROM`, plus SPF/DKIM/DMARC on the sending domain
+(Doc2 §14). Today every email delivery lands as `skipped / no_credentials`.
+
+Second gap: **most profiles have no `email` column value** (phone-first signup).
+Even with a key, `emailNotification` records `skipped / no_address` for those
+users. Collecting the address is the Settings > Account screen (P10, Module 11).
+
+## M10.3 — 🟡 WhatsApp Business is designed-for but not built
+
+Doc2 §14 lists WhatsApp for critical events only (approval, payment,
+number-allow) via pre-approved templates. The schema carries it —
+`notification_deliveries.channel` accepts `'whatsapp'` and
+`notification_prefs.whatsapp_enabled` exists, default **false** — but there is
+no provider integration and no template registration. Needs a WhatsApp Business
+API account + template approval before any code is worth writing.
+
+## M10.4 — 🟡 Three admin-triggered events have an API but no SCREEN
+
+`report_outcome`, `suspension_lifted` and `area_added` had no trigger anywhere:
+the transitions themselves did not exist. Module 10 built them —
+`lib/notifications/admin-events.ts` + the staff-gated
+`POST /api/v1/admin/account-action` (`resolve_report` / `lift_suspension` /
+`approve_area`) — so each state can now be entered and each notification really
+fires. What is still missing is the P13-15 dashboard UI that calls them. Same
+shape as M9.6: an API + payload that works, waiting on a rendering job.
+
+## M10.5 — 🟡 Appeals: the user's half is real, the resolution half is Module 13-15
+
+The design's rejected-listing row carries an "Appeal" button that, in the
+prototype, only toasted. It now writes a real `moderation_appeals` row (0044,
+one open appeal per item per user). **Nobody can resolve it yet** — there is no
+admin appeals queue, so `status` stays `'open'` forever. Doc7 §137
+(`POST /admin/appeal/:id/resolve`) is the missing half. Flagging it rather than
+leaving a button that silently files into a void.
+
+## M10.6 — 🟡 Cron dependency (inherits B2)
+
+`/api/v1/cron/notifications` is scheduled hourly at `:15` in `vercel.json` and
+runs: quiet-hours release · the "push seen → skip email" resolution · the 90-day
+purge · requirement expiry 5d/1d **and the actual expiry** · plan grace notices ·
+performance nudges · weekly digests. It fails **closed** without `CRON_SECRET`
+(401), so on a host without it none of the above ever runs. Verified working
+locally — one run released 6 held notifications and produced 8 digests.
+
+## M10.7 — ⚪ Found while wiring: requirements never expired at all
+
+Not a notification bug. `requirements.expires_at` was written at creation and
+**no code ever acted on it** — a "live" requirement stayed live and kept
+collecting proposals past its window forever. `expireRequirements()` in
+`lib/notifications/jobs.ts` now flips them and tells the owner. Recording it
+here because it belonged to Module 7, not Module 10.
+
+## M10.8 — ⚪ Found while wiring: moderation decisions told nobody
+
+Doc2 §5.4 says "Approve: live + story generated + **notification** + SEO ping".
+`lib/listings/moderation.ts` changed the row and notified no one — a seller's
+listing went live, or was rejected, and the only way to find out was to go and
+look. Now wired (approve / request_changes / reject), with approvals batching
+into "N listings approved — tap to review".
+
+## M10.9 — ⚪ Found while wiring: the plan-expiry promise wrote to `webhook_events`
+
+`deliverExpiryReminder` inserted an audit row into `webhook_events` and stopped.
+The My Plan screen's "we'll notify you 7 days and 1 day before expiry" reached
+nobody. It now goes through `notify()` like everything else, with trial copy for
+`is_trial` plans.
+
+## M10.10 — ⚪ Note: `city_launched` was firing as `saved_search_match`
+
+`lib/search/alerts.ts` sent the city-launch notice with
+`type: "saved_search_match" as never`. It rendered with the wrong icon and was
+governed by the wrong preference toggle. It has its own type now.
+
+## Regression suite — Module 10
+
+```bash
+node scripts/seed-module10.mjs
+```
+
+```bash
+node scripts/check-notifications-live.mjs http://seller.localhost:3000
+```
+
+39 assertions: unauthenticated sweep, IDOR probes on notification ids, the real
+number-request → notification → inline Allow → `number_requests.allowed` chain,
+action idempotency, chip counts vs the DB, every filter, the locked preference
+group, DPDP consent timestamping, mark-read / dismiss / mark-all, and the cron.
+`--reset` on the seeder wipes only its own rows (`data ? 'seed'`).
+
+## M10.11 — QA pass outcome (Doc6 §8)
+
+Four findings came back; two were real and are fixed, two were not defects.
+
+**Fixed**
+- **Dead "How to enable" on P10 S7.** The inbox banner opened a real
+  instructions sheet; the identical link on the preferences card only fired a
+  toast, so it read as a dead control. Both now open the SAME
+  `components/notifications/EnableSheet.tsx`. A denied permission cannot be
+  re-prompted by script, so the sheet — not a silent retry — is the honest
+  answer; "Try again" still covers the recoverable cases.
+- **Duplicate rows in the inbox.** Not a producer bug: `seed-module10.mjs` was
+  additive, and running it twice put a second copy of every row in the list,
+  which reads exactly like a double-firing job. The seeder now **clears its own
+  rows first by default** (`--keep` opts out); only rows tagged `data ? 'seed'`
+  are touched. Verified: 0 duplicate (profile, title) groups remain.
+
+**Not defects**
+- *"MARKETING and WEEKLY DIGEST are sections beyond the locked P10 §7 design."*
+  They are in the prototype. The reviewer read only the `NOTIF_GROUPS` array
+  and missed the sections hardcoded in the render body after it —
+  `<div class="section-hd">Marketing</div>` and
+  `<div class="section-hd">Weekly digest</div>` are both there, with the exact
+  labels and default states shipped. No design change was made or is needed.
+- *"A 'purge probe' notification appeared."* That was the throwaway row used to
+  prove `purge_old_notifications()` deletes past retention; it was consumed by
+  the purge it was testing. Nothing produces it. 0 rows remain.
+
+**Still unproven by QA tooling** (browser pane stopped compositing frames
+mid-session — environment, not app): the touch-only swipe-to-dismiss gesture and
+a live network-drop offline test. Both were exercised structurally, and the
+dismiss API path is covered by the regression suite; a visual pass is worth
+redoing when the pane is healthy.

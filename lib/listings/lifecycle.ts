@@ -1,6 +1,7 @@
 import "server-only";
 import { createServiceClient } from "@/lib/supabase/server";
 import { stopBoostsForSubject, pauseBoostsForSubject } from "@/lib/billing/boost";
+import { notify } from "@/lib/notifications/service";
 
 /**
  * Listing lifecycle crons (Doc2 §5.4, Doc7 §21 items 1-4, 18).
@@ -38,10 +39,25 @@ async function askStillAvailable(): Promise<number> {
     .eq("availability", "available")
     .lt("live_at", ago(60))
     .is("still_available_asked_at", null)
-    .select("id");
-  // The notification fan-out is the notifications module's job; it reads the
-  // same flag, so marking here is safe to run before that lands.
-  return (data ?? []).length;
+    .select("id,profile_id,title,area_label,cover_url");
+
+  const rows = (data ?? []) as { id: string; profile_id: string; title: string; area_label: string; cover_url: string | null }[];
+  // The ASK is the notification — designs/P11 S7 carries it with inline
+  // Yes / "No, it's sold". Setting the flag without telling anyone was a
+  // 15-day countdown to auto-hide that the owner never saw start.
+  for (const l of rows) {
+    const name = [l.title, l.area_label].filter(Boolean).join(", ") || "your listing";
+    await notify({
+      profileId: l.profile_id,
+      type: "still_available",
+      title: `Is **${name}** still available? Listings are checked every 2 months.`,
+      body: "Answer to keep it live — no answer hides it in 15 days.",
+      thumbUrl: l.cover_url,
+      entityKind: "listing", entityId: l.id,
+      data: { listingId: l.id },
+    });
+  }
+  return rows.length;
 }
 
 /** Step 2 — no answer within 15 days → auto-hide. */

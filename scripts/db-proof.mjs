@@ -59,8 +59,16 @@ const TABLES = [
   ["number_requests", "Module 7 · sealed number request/allow"],
   ["chat_blocks", "Module 7 · directional blocks"],
   ["chat_templates", "Module 7 · quick-reply templates"],
-  ["notifications", "Module 7 · in-app notification records"],
-  ["push_tokens", "Module 7 · FCM device tokens (push)"],
+  ["notifications", "Module 10 · every in-app notification row"],
+  ["notification_types", "Module 10 · the event catalog (icon/tone/link/actions)"],
+  ["notification_categories", "Module 10 · the chip bar's source"],
+  ["notification_pref_groups", "Module 10 · the P10 S7 toggle list"],
+  ["notification_pref_values", "Module 10 · a user's changed toggles"],
+  ["notification_deliveries", "Module 10 · per-channel ledger (sent/skipped/held/failed)"],
+  ["notification_sends", "Module 10 · idempotency claims for the scheduled notices"],
+  ["notification_settings", "Module 10 · retention + quiet-hours config"],
+  ["moderation_appeals", "Module 10 · appeals filed from a rejection notification"],
+  ["push_tokens", "Module 10 · device push tokens (browser/OS/standalone)"],
 ];
 
 console.log("TABLE                 ROWS   RLS  POLICIES   PURPOSE");

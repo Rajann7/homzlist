@@ -1,21 +1,15 @@
-import { AppShell, Header, Wordmark, EmptyState } from "@/components";
+import { redirect } from "next/navigation";
+import { publicEnv } from "@/lib/env";
 
 /**
- * Notifications is P11's notif screen — **Module 10**, not built yet. The feed
- * header's bell taps here (Module 6 wired the tap), so without this route the
- * bell 404'd. Shell + EmptyState, the accepted `/search` placeholder pattern —
- * no fabricated notification list (DB-lock: never fake rows).
+ * The public host is the GUEST surface (middleware.ts). Notifications are an
+ * authenticated surface, so this only exists to send anyone who lands here —
+ * an old link, a shared URL — to the same screen on seller.<host>, exactly
+ * where /messages goes. A guest never reaches this file: middleware redirects
+ * them to the seller login first.
  */
-export const metadata = { title: "Notifications" };
+export const dynamic = "force-dynamic";
 
-export default function NotificationsPlaceholderPage() {
-  return (
-    <AppShell header={<Header left={<Wordmark />} title="Notifications" centerTitle />}>
-      <EmptyState
-        title="Notifications are coming"
-        subtitle="Number requests, plan reminders and listing updates will land here."
-        cta={{ label: "Go to Home", href: "/" }}
-      />
-    </AppShell>
-  );
+export default function PublicNotificationsRedirect() {
+  redirect(`${publicEnv.sellerUrl.replace(/\/$/, "")}/notifications`);
 }

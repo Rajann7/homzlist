@@ -2,6 +2,8 @@ import "server-only";
 import { randomUUID } from "crypto";
 import { createServiceClient } from "@/lib/supabase/server";
 import { consumeQuota, releaseQuota } from "@/lib/billing/service";
+import { notify } from "@/lib/notifications/service";
+import { requirementBrief } from "@/lib/notifications/subjects";
 import { timeAgo } from "./matching";
 
 /**
@@ -367,9 +369,9 @@ async function actOnProposal(proposalId: string, posterId: string, status: "acce
     .eq("id", proposalId)
     .eq("poster_id", posterId)
     .eq("status", "pending")
-    .select("id, sender_id")
+    .select("id, sender_id, requirement_id")
     .maybeSingle();
-  return (data as { id: string; sender_id: string } | null) ?? null;
+  return (data as { id: string; sender_id: string; requirement_id: string } | null) ?? null;
 }
 
 /** Accept → chat opens (Module 6). Here we record the acceptance + reveal path. */
@@ -388,12 +390,29 @@ export async function acceptProposal(proposalId: string, posterId: string): Prom
     threadId = await ensureProposalThread(p as any);
     await db().from("chat_threads").update({ status: "accepted" }).eq("id", threadId);
   }
+  // Doc2 §14 catalog: "proposal received/accepted/declined/expired". The SENDER
+  // has been waiting on this answer; without a notification the only way to
+  // learn it was to keep re-opening the proposals screen.
+  await notify({
+    profileId: row.sender_id, type: "proposal_accepted", actorId: posterId, threadId,
+    title: `Your proposal was **accepted** — ${(await requirementBrief(row.requirement_id)).title}`,
+    body: "The chat is open. Reply to keep it moving.",
+    entityKind: "requirement", entityId: row.requirement_id,
+    data: { proposalId, requirementId: row.requirement_id, threadId },
+  });
   return { ok: true, status: "accepted", threadId };
 }
 
 export async function declineProposal(proposalId: string, posterId: string): Promise<ActResult> {
   const row = await actOnProposal(proposalId, posterId, "declined");
   if (!row) return { ok: false, reason: "not_found" };
+  await notify({
+    profileId: row.sender_id, type: "proposal_declined", actorId: posterId,
+    title: `Your proposal was **declined** — ${(await requirementBrief(row.requirement_id)).title}`,
+    body: "Your proposal count is not refunded for a declined proposal.",
+    entityKind: "requirement", entityId: row.requirement_id,
+    data: { proposalId, requirementId: row.requirement_id },
+  });
   return { ok: true, status: "declined" };
 }
 
@@ -443,7 +462,20 @@ export async function expireStaleProposals(): Promise<{ expired: number; fulfill
     .update({ status: "expired" })
     .eq("status", "pending")
     .lt("expires_at", now)
-    .select("id");
+    .select("id,sender_id,requirement_id");
+
+  // The sender spent a proposal count on this; 30 days of silence ending in a
+  // status flip nobody was told about is exactly the dead-end Doc2 §14 lists.
+  for (const p of (exp ?? []) as { id: string; sender_id: string; requirement_id: string }[]) {
+    await notify({
+      profileId: p.sender_id,
+      type: "proposal_expired",
+      title: `Your proposal **expired** — ${(await requirementBrief(p.requirement_id)).title}`,
+      body: "30 days with no response. The proposal count is not refunded.",
+      entityKind: "requirement", entityId: p.requirement_id,
+      data: { proposalId: p.id, requirementId: p.requirement_id },
+    });
+  }
 
   // Requirement fulfilled by someone else → its still-pending proposals become
   // `fulfilled` (the design's "fulfilled by someone else" row).

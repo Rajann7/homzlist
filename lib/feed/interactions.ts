@@ -108,8 +108,15 @@ export async function headerBadges(profileId: string): Promise<{ messages: numbe
   // Messages badge (Module 7) = pending requests awaiting me + accepted threads
   // with unread. Real counts, server-computed — never a fabricated number.
   const { unreadTotal, requestsSummary } = await import("@/lib/chat/service");
-  const [unread, requests] = await Promise.all([unreadTotal(profileId), requestsSummary(profileId)]);
-  return { messages: unread + requests.total, notifications: null };
+  const { unreadCount } = await import("@/lib/notifications/inbox");
+  const [unread, requests, notifications] = await Promise.all([
+    unreadTotal(profileId),
+    requestsSummary(profileId),
+    // Module 10 owns the notifications table now, so the bell badge is a real
+    // unread count instead of the `null` placeholder it shipped with.
+    unreadCount(profileId),
+  ]);
+  return { messages: unread + requests.total, notifications };
 }
 
 /** Down-rank a type or an area for this user (Doc7 §82). */

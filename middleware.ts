@@ -70,9 +70,10 @@ export async function middleware(request: NextRequest) {
       res.cookies.delete(REFRESH_COOKIE);
       return res;
     }
-    // /messages is a seller-only authenticated surface — it must not render
-    // its shell for an anonymous visitor on the public host (Doc9 §28 guest gate).
-    if (!user && pathname.startsWith("/messages")) {
+    // /messages and /notifications are seller-only authenticated surfaces — they
+    // must not render their shell for an anonymous visitor on the public host
+    // (Doc9 §28 guest gate).
+    if (!user && (pathname.startsWith("/messages") || pathname.startsWith("/notifications"))) {
       const to = new URL(request.url);
       to.host = `seller.${host}`;
       to.pathname = "/login";

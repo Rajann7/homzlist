@@ -50,3 +50,7 @@ export { Thread } from "./chat/Thread";
 export { Details as ChatDetails } from "./chat/Details";
 export { Archived as ArchivedChats } from "./chat/Archived";
 export { Blocked as BlockedUsers } from "./chat/Blocked";
+
+// Notifications (Module 10 — P11 S7 + P10 S7 prefs)
+export { Notifications } from "./notifications/Notifications";
+export { NotificationPrefs } from "./notifications/NotificationPrefs";
