@@ -195,15 +195,15 @@ export function ProfileMenuSheet({
         <Row icon="receipt" label="Payments" onClick={() => onNavigate("/payments")} />
         <Row icon="rocket" label="Boosts" onClick={() => onNavigate("/boost")} />
         <span className="my-1 h-px bg-divider" />
-        <Row icon="user" label="Settings" onClick={() => onPlaceholder("Settings")} />
-        <Row icon="bookmark" label="Saved" onClick={() => onPlaceholder("Saved")} />
-        <Row icon="home" label="Your activity" onClick={() => onPlaceholder("Your activity")} />
-        <Row icon="image" label="Drafts" onClick={() => onNavigate("/create/drafts")} />
-        <Row icon="bookmark" label="Archived" onClick={() => onPlaceholder("Archived")} />
-        <Row icon="alert" label="Account status" onClick={onAccountStatus} />
-        <Row icon="user" label="View as visitor" onClick={onViewAsVisitor} />
+        <Row icon="settings" label="Settings" onClick={() => onNavigate("/settings")} />
+        <Row icon="bookmark" label="Saved" onClick={() => onNavigate("/saved")} />
+        <Row icon="clock" label="Your activity" onClick={() => onNavigate("/activity")} />
+        <Row icon="file" label="Drafts" onClick={() => onNavigate("/create/drafts")} />
+        <Row icon="archive" label="Archived" onClick={() => onNavigate("/archived")} />
+        <Row icon="shield" label="Account status" onClick={onAccountStatus} />
+        <Row icon="eye" label="View as visitor" onClick={onViewAsVisitor} />
         <Row icon="qr-code" label="QR code" onClick={onQr} />
-        <Row icon="message" label="Help" onClick={() => onPlaceholder("Help")} />
+        <Row icon="help-circle" label="Help" onClick={() => onPlaceholder("Help")} />
       </div>
     </BottomSheet>
   );

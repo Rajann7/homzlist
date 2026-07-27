@@ -31,6 +31,7 @@ export type IconName =
   | "chevron-left"
   | "share"
   | "more"
+  | "menu"
   | "check"
   | "verified"
   | "phone"
@@ -101,7 +102,19 @@ export type IconName =
   | "log-out"
   | "bulb"
   | "chart"
-  | "device";
+  | "device"
+  // P10 Settings suite (S6) — Lucide-style 1.5px family, same as the rest.
+  | "settings"
+  | "globe"
+  | "moon"
+  | "archive"
+  | "flag"
+  | "headset"
+  | "star"
+  | "external"
+  | "shield-off"
+  | "help-circle"
+  | "eye";
 
 interface IconProps extends React.SVGProps<SVGSVGElement> {
   name: IconName;
@@ -162,6 +175,14 @@ const PATHS: Record<IconName, (f: boolean) => React.ReactNode> = {
       <circle cx="5" cy="12" r="1.4" />
       <circle cx="12" cy="12" r="1.4" />
       <circle cx="19" cy="12" r="1.4" />
+    </>
+  ),
+  // Hamburger menu (three horizontal lines). Same 1.5px outline family.
+  menu: () => (
+    <>
+      <path d="M4 7h16" />
+      <path d="M4 12h16" />
+      <path d="M4 17h16" />
     </>
   ),
   check: () => <path d="m5 12.5 4.5 4.5L19 7.5" />,
@@ -507,6 +528,68 @@ const PATHS: Record<IconName, (f: boolean) => React.ReactNode> = {
     <>
       <rect x="5" y="2" width="14" height="20" rx="2" />
       <path d="M12 18h.01" />
+    </>
+  ),
+  settings: () => (
+    <>
+      <circle cx="12" cy="12" r="3" />
+      <path d="M12 2.5v2.2M12 19.3v2.2M4.2 7l1.9 1.1M17.9 15.9l1.9 1.1M4.2 17l1.9-1.1M17.9 8.1l1.9-1.1" />
+    </>
+  ),
+  globe: () => (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M3 12h18" />
+      <path d="M12 3a14 14 0 0 1 0 18 14 14 0 0 1 0-18Z" />
+    </>
+  ),
+  moon: () => <path d="M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5Z" />,
+  archive: () => (
+    <>
+      <rect x="3" y="4" width="18" height="4" rx="1" />
+      <path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8" />
+      <path d="M10 12h4" />
+    </>
+  ),
+  flag: () => (
+    <>
+      <path d="M5 21V4" />
+      <path d="M5 4h11l-2 3 2 3H5" />
+    </>
+  ),
+  headset: () => (
+    <>
+      <path d="M4 13v-1a8 8 0 0 1 16 0v1" />
+      <path d="M4 13a2 2 0 0 1 2 2v2a2 2 0 0 1-4 0v-2a2 2 0 0 1 2-2ZM20 13a2 2 0 0 0-2 2v2a2 2 0 0 0 4 0v-2a2 2 0 0 0-2-2Z" />
+      <path d="M20 17v1a3 3 0 0 1-3 3h-3" />
+    </>
+  ),
+  star: () => <path d="m12 3 2.6 5.6 6.1.7-4.5 4.2 1.2 6-5.4-3-5.4 3 1.2-6L3.3 9.3l6.1-.7Z" />,
+  external: () => (
+    <>
+      <path d="M14 4h6v6" />
+      <path d="M20 4 11 13" />
+      <path d="M18 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4" />
+    </>
+  ),
+  "shield-off": () => (
+    <>
+      <path d="M20 12V5l-8-3-4.5 1.7M6.3 6.3 4 5v7c0 5 8 9 8 9a17 17 0 0 0 4.7-3.3" />
+      <path d="m3 3 18 18" />
+    </>
+  ),
+  "help-circle": () => (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M9.5 9.5a2.5 2.5 0 0 1 4.5 1.5c0 1.7-2.5 2-2.5 3.5" />
+      <path d="M12 17.5h.01" />
+    </>
+  ),
+  // "View as visitor" — the design's `eye`. The set only had `eye-off`.
+  eye: () => (
+    <>
+      <path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6-10-6-10-6Z" />
+      <circle cx="12" cy="12" r="3" />
     </>
   ),
 };

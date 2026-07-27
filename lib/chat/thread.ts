@@ -5,6 +5,7 @@ import { formatShortRupees } from "@/lib/billing/money";
 import { MESSAGE_MAX, NUMBER_PATTERN, PROFANITY, PAGE } from "./service";
 import { notify, threadMutedFor } from "@/lib/notifications/service";
 import { pingThread, pingInbox } from "./realtime";
+import { getUserPrefs } from "@/lib/settings/service";
 
 /**
  * Chat thread detail + every in-thread mutation (Doc7 §92-107).
@@ -151,6 +152,20 @@ export async function getThread(threadId: string, me: string, opts: { before?: s
   const { data: ver } = await db().from("verifications").select("level").eq("profile_id", otherId).eq("status", "approved");
   const verified = (ver as any[] ?? []).some((v) => rank[v.level]);
 
+  // P10 S6b Privacy, enforced HERE (Doc9 §4: a private field is stripped from
+  // the payload, never hidden with CSS). The OTHER person's own settings decide
+  // whether this thread may reveal their presence:
+  //   • show_activity  off → they never read as Online
+  //   • show_last_seen off → no "Last seen …" line at all
+  // Defaults match the design (both on) when they've never opened Privacy.
+  const otherPrefs = await getUserPrefs(otherId);
+  const isOnline =
+    otherPrefs.showActivity && other?.last_active_at
+      ? Date.now() - +new Date(other.last_active_at) < 5 * 60_000
+      : false;
+  const lastSeenLabel =
+    otherPrefs.showLastSeen && other?.last_active_at ? timeAgo(other.last_active_at) : null;
+
   const payload: any = {
     threadId: t.id,
     kind: t.kind,
@@ -158,7 +173,7 @@ export async function getThread(threadId: string, me: string, opts: { before?: s
     status: t.status,
     cooldownUntil: t.cooldown_until,
     person: other
-      ? { id: other.id, name: other.name ?? "HomzList user", photo: other.photo_url, role: other.role, roleTag: other.role === "broker" ? "Broker" : other.role === "builder" ? "Builder" : "Owner", verified, deleted: other.state === "deleted", online: other.last_active_at ? Date.now() - +new Date(other.last_active_at) < 5 * 60_000 : false, lastSeen: other.last_active_at ? timeAgo(other.last_active_at) : null, responseLabel: other.response_label }
+      ? { id: other.id, name: other.name ?? "HomzList user", photo: other.photo_url, role: other.role, roleTag: other.role === "broker" ? "Broker" : other.role === "builder" ? "Builder" : "Owner", verified, deleted: other.state === "deleted", online: isOnline, lastSeen: lastSeenLabel, responseLabel: other.response_label }
       : { id: "", name: "Deleted user", deleted: true },
     pinned,
     listingBanner,

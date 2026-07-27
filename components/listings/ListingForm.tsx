@@ -6,6 +6,7 @@ import { AppShell, BottomSheet, Button, Header, Icon, Skeleton, Toggle, useToast
 import { BackButton, SectionLabel } from "@/components/billing/primitives";
 import { ConfirmDialog } from "@/components/ui/Dialog";
 import { listingsApi, uploadDoc, formatIndianCommas, priceInWords, type TypeConfig, type LocationNode } from "@/lib/listings/client";
+import { settingsApi } from "@/lib/settings/client";
 import type { Amenity, FieldDef, FieldDefMap, FieldOption } from "./fields";
 import { cn } from "@/lib/utils";
 
@@ -76,6 +77,18 @@ export function ListingForm() {
         if (d.ok) {
           const found = d.data.items.find((x) => x.id === draftId);
           if (found?.payload) setValues(found.payload as Record<string, any>);
+        }
+      }
+
+      // A brand-new listing starts from the user's Privacy setting, "Show my
+      // number by default on new listings" (P10 S6b) — read from the server, not
+      // assumed. An edit or a resumed draft already carries its own value, so
+      // neither is touched. The server applies the same default if the payload
+      // omits `contactPublic`, so this only makes the toggle SHOW the truth.
+      if (!editId && !draftId) {
+        const p = await settingsApi.prefs();
+        if (p.ok && p.data.showNumberDefault) {
+          setValues((v) => (v.contactPublic === undefined ? { ...v, contactPublic: true } : v));
         }
       }
       setLoading(false);

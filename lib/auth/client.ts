@@ -48,7 +48,19 @@ export const authApi = {
     post<{ user: unknown; redirect: string }>("/register", input),
   logout: () => post<{ loggedOut: boolean; switchedTo: string | null }>("/logout"),
   refresh: () => post<{ refreshed: boolean }>("/refresh"),
+  /** P10 S9 Login activity — devices signed in on this account (current flagged). */
+  sessions: () => get<{ sessions: SessionRow[] }>("/sessions"),
+  revokeSession: (id: string) => post<{ revoked: boolean }>(`/sessions/${id}/revoke`),
 };
+
+/** One device row of the P10 S9 login-activity list (server-verified session). */
+export interface SessionRow {
+  id: string;
+  userAgent: string | null;
+  createdAt: string;
+  lastUsedAt: string;
+  current: boolean;
+}
 
 export async function fetchCities(q = ""): Promise<Array<{ id: string; name: string; state: string; propertyCount: number }>> {
   const res = await fetch(`/api/v1/locations/cities${q ? `?q=${encodeURIComponent(q)}` : ""}`);

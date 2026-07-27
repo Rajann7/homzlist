@@ -748,6 +748,24 @@ export async function listTrash(profileId: string) {
 }
 
 /**
+ * Archived (P10 S5) — the owner's sold/rented listings. Status is 'archived';
+ * `availability` says which. A rented one can be restored (reactivate → the same
+ * slot); a sold one is terminal, so `myListingDTO.canReactivate` is false for it
+ * and the screen shows no Restore — the honest behaviour, not the design's
+ * blanket "Restore anytime".
+ */
+export async function listArchived(profileId: string) {
+  const { data } = await db()
+    .from("listings")
+    .select("*")
+    .eq("profile_id", profileId)
+    .eq("status", "archived")
+    .order("archived_at", { ascending: false })
+    .limit(100);
+  return (data ?? []) as ListingRow[];
+}
+
+/**
  * "Similar properties" for the detail rail (designs/P4).
  *
  * Matched on the server so the rule is one place and can't be reverse-engineered

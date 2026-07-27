@@ -18,7 +18,7 @@ export async function toggleSave(profileId: string, listingId: string): Promise<
     return { saved: false };
   }
   // The listing must be a real live listing — never save an arbitrary id.
-  const { data: live } = await db().from("listings").select("id,profile_id").eq("id", listingId).eq("status", "live").maybeSingle();
+  const { data: live } = await db().from("listings").select("id,profile_id,price_paise").eq("id", listingId).eq("status", "live").maybeSingle();
   if (!live) return { saved: false };
   // You cannot save your own listing. The owner already has it on their profile
   // and in My Listings, and a self-save would inflate the Saves metric the
@@ -26,7 +26,13 @@ export async function toggleSave(profileId: string, listingId: string): Promise<
   // selected here and simply never compared — the UI hides the control, this is
   // the wall behind it.
   if ((live as { profile_id: string }).profile_id === profileId) return { saved: false };
-  await db().from("saves").insert({ profile_id: profileId, listing_id: listingId });
+  // Snapshot the price at save time so the P10 Saved screen can tell a real drop
+  // from the price simply being what it always was (migration 0053).
+  await db().from("saves").insert({
+    profile_id: profileId,
+    listing_id: listingId,
+    saved_price_paise: (live as { price_paise: number | null }).price_paise,
+  });
   return { saved: true };
 }
 

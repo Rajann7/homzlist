@@ -193,6 +193,8 @@ export const listingsApi = {
       filters: { key: string; label: string; count: number }[];
     }>("/listings/mine", "GET"),
   trash: () => req<{ items: MyListing[]; trashDays: number }>("/listings/trash", "GET"),
+  /** P10 S5 — archived (sold/rented) listings; rented ones carry canReactivate. */
+  archived: () => req<{ items: (MyListing & { archivedAt: string | null })[] }>("/listings/archived", "GET"),
   /** "Delete now" — permanent, and only for something already in trash. */
   purge: (id: string) => req<{ purged: boolean }>(`/listings/${id}/purge`, "POST"),
   /** Similar live listings for the detail rail — matched server-side. */

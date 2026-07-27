@@ -2400,3 +2400,253 @@ hidden) · self-save 200 with **0 rows written**.
 DB state after the sweep: 0 self-save rows · 2 project leads · 1 spent boost
 credit · 2 listing shares. No horizontal overflow at 375px on any screen
 touched (`scrollWidth === innerWidth === 375`).
+
+---
+
+## Module 11 — Settings suite (P10 S6/S6b/S8/S9), part 1
+
+Built and DB-verified: the ⋯ menu icon is now the hamburger `menu`; "Settings"
+opens a real, server-driven Settings home (`GET /settings/overview` — every
+count is a live query: Saved from `saves`, Blocked from `chat_blocks`, Login
+devices from the session store, Drafts from `listDrafts`, plan from
+`getActivePlans`, verification/account-status reused from P9). Leaf screens live:
+Account status (reuses the P9 component), Login activity (`/auth/sessions` +
+revoke), Language (persists `user_settings.locale`), Privacy (4 persisted
+toggles). Migration `0052_user_settings.sql` applied; RLS deny-all; upsert
+round-trip proven against a real profile row.
+
+### Not yet wired (tracked here so a real user doesn't find them first)
+
+- **Privacy toggles are stored but not yet ENFORCED at their effect points.**
+  `show_number_default` should seed the "share number" default on the create-
+  listing form; `show_last_seen` / `show_activity` should gate what the chat
+  header/thread reveals; `findable_by_phone` should gate phone lookup in search.
+  The source of truth (`user_settings`) exists and round-trips; the read at each
+  of those three call-sites is the remaining work.
+- **Settings rows that point at later modules of this same task** (Saved,
+  Your activity, Archived, Help centre / Contact support / Report a problem,
+  Terms / Privacy Policy / Refund / Grievance / About, Download-your-data,
+  Deactivate / Delete account) navigate to routes built in Modules 2–5 (Saved,
+  Activity, Archived, Help/Legal). Until each ships, those rows reach a
+  placeholder or 404.
+- **Login activity "Recent security alerts"** section from the design is omitted:
+  there is no security-event data source, and seeding fake alerts would violate
+  the DB-driven rule. Needs a real event feed before it can render.
+
+---
+
+## Module 11 — Saved / Activity / Archived (P10 S1, S2, S2b, S5), part 2
+
+Built and DB-verified. The ⋯ menu now has **no placeholder toasts left except
+Help** (P12 — deliberately out of scope, see below).
+
+- **Saved (S1)** — `GET /saved`. Private collections (migration `0053`), chip
+  counts as real GROUP BYs, and a genuine "changed" signal: `saves.saved_price_paise`
+  snapshots the price at save time, so a drop is `current < snapshot` rather than
+  a guess. `toggleSave` now writes that snapshot. Move/rename/delete/un-save all
+  persist and are ownership-scoped.
+- **Your activity (S2)** — `GET /activity`. Recently-viewed comes from
+  `listing_views` on the viewer side (signed-in views are keyed by profile id),
+  deduped per listing; Saved/Proposals/Visits/Saved-search counts are real
+  queries. "Clear recently viewed" deletes only the caller's own rows.
+- **Saved searches (S2b)** — reuses the existing `/search/saved` API; alerts
+  toggle round-trips, a row re-runs its stored filters via `filtersToQuery`.
+- **Archived (S5)** — `GET /listings/archived`, grid/list toggle, Restore wired
+  to the `reactivate` action.
+
+### Found while building (reported, not silently left)
+
+- **The design's "Restore anytime" is not what the backend does.** `reactivate`
+  only accepts `availability = 'rented'`; a **sold** listing is terminal. Every
+  archived row in the dev DB is sold, so a blanket Restore button would 400 on
+  every one of them. The screen therefore renders Restore only where the server
+  says `canReactivate`, and the info strip says "Restore a rented one anytime".
+  If sold should also be restorable, that is a backend rule change — flagging it
+  rather than faking the button.
+- **Login activity has no "Recent security alerts"** (design shows one): there is
+  no security-event source. Omitted rather than seeded with fake alerts.
+- **Privacy toggles still need enforcement at their effect points** (carried over
+  from part 1): create-listing default number, chat last-seen/activity,
+  find-by-phone.
+- **Help (P12) is intentionally NOT built** — the user scoped Module 5 out. The
+  ⋯ menu's "Help" row and the Settings Support/About/Danger-zone rows that point
+  at `/help/*` and `/legal/*` remain unbuilt destinations.
+
+### Verification actually run
+
+`tsc --noEmit` clean · `next lint` **0 errors** · `next build` succeeds (all 10
+new routes emitted) · migrations `0052`, `0053` applied to dev · production
+bundle free of `service_role`, `SUPABASE_SERVICE_ROLE_KEY`, `RAZORPAY_KEY_SECRET`,
+`R2_SECRET`.
+
+Unauthenticated sweep — 401 on every new endpoint (GET overview/prefs/saved/
+activity/archived; PATCH prefs; POST+PATCH+DELETE saved collections; PATCH+DELETE
+saved items; DELETE recently-viewed).
+
+Live all-role sweep (`scripts/check-profile-menu-live.mjs`) — owner, broker and
+builder each: overview 200 with integer counts, identity/plan/account-status from
+the DB, prefs PATCH persisted and re-read, overview language reflecting the stored
+locale, invalid locale **422**, saved/activity/archived 200, duplicate collection
+name **422**. IDOR probe: another user's collection PATCH **404**, DELETE **404**,
+a save that isn't yours **404**.
+
+Populated-state check (`scripts/check-profile-menu-populated.mjs`) — seeded real
+rows because a state with 0 rows has never run: 2 saved tiles, exactly one price
+drop computed from the snapshot (**↓ ₹25,000** = ₹90,000 − ₹65,000), changedCount
+1, collection filter narrowing 2→1, chip count falling to 0 after a move,
+recently-viewed reading back 2 tiles, and Restore on a rented listing returning
+200 → `pending_review` and leaving the archive. All seed rows deleted afterwards.
+
+### Menu icons corrected to the design's icon map
+
+The ⋯ button itself is now the hamburger `menu` (was the three-dot `more`);
+functionality is unchanged. Inside the sheet, four rows were drawing the wrong
+glyph against `designs/P9 → Sheets.profileMenu`: Drafts `image`→`file`, Account
+status `alert`→`shield`, View as visitor `user`→`eye` (icon added), Help
+`message`→`help-circle`. Settings/Saved/Activity/Archived took their correct
+`settings`/`bookmark`/`clock`/`archive` glyphs when they were wired.
+
+### Page-level auth gate + render proof
+
+Every new screen 307s to `/login` for a guest (the wall is on the page, not only
+the API): `/settings`, `/settings/privacy`, `/settings/language`,
+`/settings/login-activity`, `/settings/account-status`, `/saved`, `/activity`,
+`/activity/saved-searches`, `/archived`. Signed in, all nine render **200** with
+no error boundary and the correct `<title>`.
+
+One defect found and fixed during that check: `/settings/account-status` was a
+`"use client"` page, so it could not export metadata and the tab read
+"HomzList — Properties without spam calls". Split into a server page + client
+wrapper (`AccountStatusScreen`); it now reads "Account status · HomzList".
+
+### Not verified in this session
+
+Visual/pixel QA in a real browser. The in-app browser pane cannot resolve the
+`seller.localhost` host the seller zone requires, so design fidelity, the
+long-press sheets, scroll behaviour and 60fps were NOT eyeballed live — only
+HTTP-level rendering was proven. That check still needs to be run on a real
+device/browser before this ships.
+
+---
+
+## Module 11 — Privacy toggles now ENFORCED (part 3)
+
+The part-1/part-2 gap ("stored but not enforced") is closed for the two toggles
+that have a real effect point, and honestly reported for the one that does not.
+
+### 1. Chat presence — `show_last_seen` / `show_activity` (ENFORCED)
+
+`lib/chat/thread.ts` built `online` and `lastSeen` straight from the other
+person's `profiles.last_active_at`, so a user who switched their toggles off was
+still broadcasting presence to everyone they chatted with. The thread payload now
+reads the OTHER person's settings and strips the values server-side (Doc9 §4 —
+never a CSS hide):
+
+- `show_activity` off → `online: false`, always.
+- `show_last_seen` off → `lastSeen: null`, no value to render.
+
+Defaults (both on) apply when the user has never opened Privacy, matching the
+design. `last_active_at` is exposed nowhere else — the inbox list does not carry
+it — so this is the only leak point and it is closed.
+
+### 2. New-listing number default — `show_number_default` (ENFORCED)
+
+`POST /listings` hardcoded `contact_public: body.contactPublic === true`, so the
+setting was decorative: omitting the field always produced `false`. The route now
+falls back to the caller's stored preference, and the create form seeds its
+toggle from the same value for a brand-new listing (an edit or a resumed draft
+keeps its own). The server is the wall — a payload that omits the field gets the
+user's real setting, not a client guess.
+
+### 3. `findable_by_phone` — NO consumer exists (reported, not faked)
+
+Searched the whole codebase: the only phone lookup is `lib/auth/service.ts`
+(login by phone), which obviously must not be gated by a privacy toggle. There is
+no "find a user by phone number" feature, so there is nothing to enforce this
+against. The column stores the user's choice and is the source of truth for when
+that feature is built. The row stays in the UI because it is in the design
+(P10 S6b) — flagging it here rather than inventing a search to justify it, or
+quietly leaving it looking wired.
+
+### Live verification (`scripts/check-privacy-enforced.mjs`) — ALL PASS
+
+Against a real accepted thread, toggling the other person's settings in the DB
+and re-reading the live API each time:
+
+| Settings | `online` | `lastSeen` |
+|---|---|---|
+| both on (default) | `true` | `"Just now"` |
+| activity off | **`false`** | `"Just now"` |
+| last-seen off | `true` | **`null`** |
+| both off | **`false`** | **`null`** |
+
+The rest of the person payload (name, role, verified) is unaffected.
+
+New-listing default, proven with real rows by an account holding a paid slot
+(the payment-first gate was NOT bypassed): pref `true` → `contact_public=true`,
+pref `false` → `contact_public=false`, with the payload omitting `contactPublic`
+both times. The probe returned the consumed slot and deleted its listings.
+
+Regression after these changes: `tsc --noEmit` clean · `next lint` **0 errors** ·
+`next build` succeeds · bundle secret-grep clean · the full all-role + IDOR sweep
+still **ALL PASS**. Every test row created was deleted — `user_settings` and
+`save_collections` are both back to 0 rows.
+
+### Still not verified
+
+Visual/pixel QA in a browser (unchanged from part 2): the in-app browser pane
+cannot resolve the `seller.localhost` host the seller zone requires, so design
+fidelity, the long-press sheets and scroll/60fps still need a pass on a real
+device before shipping.
+
+---
+
+## Module 11 — MANUAL BROWSER VERIFICATION (done)
+
+The one item previously marked "not verified" is now closed. The blocker was that
+the seller zone routes by hostname (`seller.localhost`), which the browser could
+not resolve. Solved with `scripts/dev-seller-proxy.mjs` — a dev-only proxy on
+:3001 that forwards to the dev server with `Host: seller.localhost:3000`. It
+touches NO application code and is not part of the build.
+
+Zone proof (the login really did happen on the seller zone, not the public one):
+
+| Path | Public zone (`Host: localhost`) | Via proxy (`Host: seller.localhost:3000`) |
+|---|---|---|
+| `/login` | 307 → seller.localhost/login (refuses) | **200 — serves the form** |
+| `/settings` | **404** (not in that zone) | 307 → /login (exists, gated) |
+
+### Clicked through in a real browser at 375×812, signed in as a broker
+
+- **⋯ button** now renders the hamburger; sheet opens/closes correctly.
+- **All 18 rows** render with the corrected design icons (Settings=gear,
+  Saved=bookmark, Activity=clock, Drafts=file, Archived=archive,
+  Account status=shield, View as visitor=eye, Help=help-circle).
+- **Settings** — live data: name/phone/role, email, city Rajkot, verification
+  badge "ID ✓ · RERA ✓", account status "Needs attention", Saved **3**,
+  Drafts **3**, plan "Listing Plan", Login activity "1 device", Blocked "1".
+- **Login activity** — correctly identified "Chrome on Windows · Active now";
+  honest empty state for other sessions.
+- **Privacy** — flipping "Show last seen" in the browser wrote
+  `show_last_seen=false` to Supabase (verified by query), then restored.
+- **Language** — native scripts, check mark on the stored choice.
+- **Saved** — 3 real tiles with price chips; created a collection through the
+  sheet and confirmed the row in `save_collections`; chip appeared with count 0.
+- **Your activity** — 6 real inquiries with live status badges (Sent / Declined /
+  Accepted), 16 proposals, 8 visits, 1 saved search. "Recently viewed" correctly
+  absent (this user has no view rows) rather than an empty section.
+- **Saved searches** — real row "3 BHK in Mavdi under ₹1 Cr · 5 matches · alerts on".
+- **Archived** — 3 sold listings, **no Restore button on any** (sold is terminal,
+  as built); grid/list toggle works, photos dimmed with SOLD chips.
+- **Account status** — real moderation event, consistent with the "Needs
+  attention" label in Settings; `<title>` fix confirmed.
+- **QR code** — sheet renders with real name/role/city/handle.
+- **View as visitor** — strip appears; private stats (Requirements, Leads) and
+  the Edit/Share/QR buttons correctly disappear; Exit restores.
+- **Drafts** — renders.
+
+**Console errors: 0.** No horizontal overflow at 375px
+(`scrollWidth === innerWidth === 375`). All 10 routes fetched 200 while signed in.
+
+Every row created during this pass was deleted — `save_collections` and
+`user_settings` are both back to 0.

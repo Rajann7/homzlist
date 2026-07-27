@@ -6,6 +6,7 @@ import { rateLimit } from "@/lib/auth/rate-limit";
 import { createListing, getPropertyType, NoSlotError } from "@/lib/listings/service";
 import { validateListing } from "@/lib/listings/validate";
 import { listingCardDTO } from "@/lib/listings/dto";
+import { getUserPrefs } from "@/lib/settings/service";
 
 /**
  * POST /api/v1/listings (Doc7 §47) — submit a listing for review.
@@ -47,6 +48,13 @@ export async function POST(req: NextRequest) {
 
   const kind: "sell" | "rent" = body.kind === "rent" ? "rent" : "sell";
   const priceOnRequest = body.priceOnRequest === true;
+
+  // "Show my number by default on new listings" (P10 S6b Privacy). The default
+  // is the user's STORED preference, applied here rather than trusted from the
+  // client — a payload that omits `contactPublic` gets the setting the user
+  // actually chose, not a hardcoded false.
+  const prefs = await getUserPrefs(claims.sub);
+  const contactPublic = typeof body.contactPublic === "boolean" ? body.contactPublic : prefs.showNumberDefault;
   const pricePaise =
     typeof body.pricePaise === "number" && Number.isFinite(body.pricePaise) ? Math.trunc(body.pricePaise) : null;
 
@@ -61,7 +69,7 @@ export async function POST(req: NextRequest) {
     areaId: typeof body.areaId === "string" ? body.areaId : null,
     attributes: typeof body.attributes === "object" && body.attributes ? body.attributes : {},
     photoCount: typeof body.photoCount === "number" ? body.photoCount : 0,
-    contact: { public: body.contactPublic === true, number: typeof body.contactNumber === "string" ? body.contactNumber : null },
+    contact: { public: contactPublic, number: typeof body.contactNumber === "string" ? body.contactNumber : null },
   };
 
   const { errors, warnings, flaggedReason } = validateListing(input, type);

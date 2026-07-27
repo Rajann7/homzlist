@@ -54,3 +54,20 @@ export { Blocked as BlockedUsers } from "./chat/Blocked";
 // Notifications (Module 10 — P11 S7 + P10 S7 prefs)
 export { Notifications } from "./notifications/Notifications";
 export { NotificationPrefs } from "./notifications/NotificationPrefs";
+
+// Settings suite (P10 — S6 home + leaf screens)
+export { SettingsHome } from "./settings/SettingsHome";
+export { LoginActivity } from "./settings/LoginActivity";
+export { Language } from "./settings/Language";
+export { Privacy } from "./settings/Privacy";
+export { AccountStatusScreen } from "./settings/AccountStatusScreen";
+
+// Saved (P10 S1 — wishlist + private collections)
+export { Saved } from "./saved/Saved";
+
+// Your activity (P10 S2 + S2b saved searches)
+export { Activity } from "./activity/Activity";
+export { SavedSearches } from "./activity/SavedSearches";
+
+// Archived (P10 S5 — sold/rented listings)
+export { Archived } from "./archived/Archived";

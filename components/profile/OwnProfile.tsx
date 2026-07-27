@@ -229,7 +229,7 @@ export function OwnProfile() {
               <Icon name="plus" size={24} strokeWidth={1.9} />
             </button>
             <button aria-label="Menu" onClick={() => setMenuSheet(true)} className="grid h-11 w-11 place-items-center text-ink-primary">
-              <Icon name="more" size={24} strokeWidth={1.7} />
+              <Icon name="menu" size={24} strokeWidth={1.7} />
             </button>
           </div>
         )}
