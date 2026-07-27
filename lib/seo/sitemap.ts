@@ -87,8 +87,13 @@ export async function sitemapFor(type: SitemapType): Promise<UrlEntry[]> {
     const cityRows = ((cities ?? []) as { id: string; slug: string }[]);
     const citySlug = new Map(cityRows.map((c) => [c.id, c.slug]));
 
-    const { data: areas } = await db().from("locations")
-      .select("id,slug,parent_id").eq("level", "area").eq("is_active", true);
+    // Areas of LAUNCHED cities only. Unscoped this reads all 50,950 area rows
+    // (migration 0054) to then discard every one whose city isn't launched.
+    const { data: areas } = cityRows.length
+      ? await db().from("locations")
+          .select("id,slug,parent_id").eq("level", "area").eq("is_active", true)
+          .in("parent_id", cityRows.map((c) => c.id))
+      : { data: [] as { id: string; slug: string; parent_id: string | null }[] };
 
     const out: UrlEntry[] = cityRows.map((c) => ({ loc: `/${c.slug}`, changefreq: "daily" as const, priority: 0.9 }));
 

@@ -20,7 +20,7 @@ export interface FieldDef {
    * `multi` is a chip row that keeps an array (furnishing checklist);
    * `stepper` is a −/count/+ row for things you count (car parking).
    */
-  control: "chips" | "select" | "multi" | "stepper" | "toggle" | "number" | "text" | "area";
+  control: "chips" | "select" | "multi" | "stepper" | "toggle" | "number" | "text" | "area" | "date";
   options?: FieldOption[];
   // Nullable because these arrive straight from nullable DB columns.
   placeholder?: string | null;
@@ -35,6 +35,19 @@ export interface FieldDef {
    * 'built' shows sq ft/yard/m. Null falls back to the type's areaUnits flag.
    */
   units?: "land" | "built" | null;
+  /**
+   * Which titled block of the form the field belongs in (migration 0055). Every
+   * type lays its fields out in the same group order, so the form reads the same
+   * way whether you're listing a flat or a godown.
+   */
+  group?: string | null;
+}
+
+/** A form section, from `field_groups`. */
+export interface FieldGroup {
+  key: string;
+  label: string;
+  sort_order: number;
 }
 
 export interface Amenity {

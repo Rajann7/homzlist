@@ -49,7 +49,19 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   const exemptReason = typeof body.reraExemptReason === "string" ? body.reraExemptReason.trim() : "";
   if (!reraExempt && !reraNumber) return fail("VALIDATION_ERROR", { field: "reraNumber" });
   if (reraExempt && exemptReason.length < 5) return fail("VALIDATION_ERROR", { field: "reraExemptReason" });
-  if (!body.cityId) return fail("VALIDATION_ERROR", { field: "cityId" });
+  if (!body.cityId) return fail("VALIDATION_ERROR", { errors: { cityId: "Choose the project's city" } });
+
+  // Same shape check as the create path — these are FK columns.
+  for (const k of ["stateId", "districtId", "talukaId", "cityId", "areaId"] as const) {
+    const v = body[k];
+    if (v != null && !UUID_RE.test(String(v))) return fail("VALIDATION_ERROR", { field: k });
+  }
+
+  // Pincode is required on a project too — an edit may change it, never clear it.
+  const pincode = String(body.pincode ?? "").trim();
+  if (!/^[1-9]\d{5}$/.test(pincode)) {
+    return fail("VALIDATION_ERROR", { errors: { pincode: pincode ? "Enter a valid 6-digit pincode" : "Select a pincode" } });
+  }
 
   const project = await updateProject(params.id, claims.sub, {
     name,
@@ -66,10 +78,12 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     amenities: Array.isArray(body.amenities) ? body.amenities.filter((a: unknown) => typeof a === "string").slice(0, 40) : [],
     description: typeof body.description === "string" ? body.description.slice(0, 5000) : null,
     stateId: body.stateId ?? null,
+    districtId: body.districtId ?? null,
+    talukaId: body.talukaId ?? null,
     cityId: body.cityId,
     areaId: body.areaId ?? null,
     areaLabel: typeof body.areaLabel === "string" ? body.areaLabel.slice(0, 120) : null,
-    pincode: /^[1-9]\d{5}$/.test(String(body.pincode ?? "")) ? String(body.pincode) : null,
+    pincode,
     units: Array.isArray(body.units) ? body.units.slice(0, 40) : [],
   });
 

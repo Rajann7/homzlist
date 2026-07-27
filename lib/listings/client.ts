@@ -43,6 +43,8 @@ export interface TypeConfig {
   hidden: string[];
   /** Attribute keys the server refuses to accept empty, per type. */
   required: string[];
+  /** Extras a RENT listing asks for — per type, so an office gets lease terms. */
+  rentFields: string[];
   areaUnits: boolean;
 }
 
@@ -161,17 +163,33 @@ export const listingsApi = {
       role: string | null;
       types: TypeConfig[];
       /** Field definitions incl. every option list — server-owned (Doc2 §5.1). */
-      fieldDefs: Record<string, { key: string; label: string; control: any; options: { value: string; label: string }[]; placeholder: string | null; hint: string | null; showIf: { field: string; in: string[] } | null; units: "land" | "built" | null }>;
+      fieldDefs: Record<string, { key: string; label: string; control: any; options: { value: string; label: string }[]; placeholder: string | null; hint: string | null; showIf: { field: string; in: string[] } | null; units: "land" | "built" | null; group: string | null }>;
+      /** Titled blocks the form renders, in order (migration 0055). */
+      fieldGroups: { key: string; label: string; sort_order: number }[];
       amenities: { code: string; label: string; category: string; categories: string[] }[];
       categories: { key: string; label: string }[];
       areaUnits: string[];
     }>("/listings/config", "GET"),
 
-  locations: (level: string, parent?: string | null) =>
-    req<{ items: LocationNode[] }>(`/locations/children?level=${level}${parent ? `&parent=${parent}` : ""}`, "GET"),
+  /**
+   * One level of the cascade. `search` is passed through to the database — the
+   * master is the full India Post directory, so a district can return several
+   * hundred villages and the picker searches rather than scrolls.
+   */
+  locations: (level: string, parent?: string | null, search?: string | null) =>
+    req<{ items: LocationNode[]; truncated: boolean }>(
+      `/locations/children?level=${level}${parent ? `&parent=${parent}` : ""}${search ? `&q=${encodeURIComponent(search)}` : ""}`,
+      "GET",
+    ),
   /** Resolve nodes by id — used to redraw chips an edit form loaded as ids. */
   locationsByIds: (ids: string[]) =>
     req<{ items: LocationNode[] }>(`/locations/children?ids=${ids.join(",")}`, "GET"),
+  /** The pincodes a city (or, more precisely, an area) covers — Doc2 §5.1. */
+  pincodes: (cityId: string | null, areaId?: string | null) =>
+    req<{ pincodes: string[] }>(
+      `/locations/pincodes?${cityId ? `city=${cityId}` : ""}${areaId ? `&area=${areaId}` : ""}`,
+      "GET",
+    ),
   requestArea: (name: string, cityId: string | null) => req<{ requested: boolean }>("/locations/children", "POST", { name, cityId }),
 
   drafts: () => req<{ items: { id: string; title: string | null; updatedAt: string; expiresAt: string; payload: any }[]; max: number }>("/listings/drafts", "GET"),

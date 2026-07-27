@@ -1,7 +1,7 @@
 import { ok, fail } from "@/lib/api";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { getProfileById } from "@/lib/profile/service";
-import { getPropertyTypes, getFieldDefinitions, getAmenities } from "@/lib/listings/service";
+import { getPropertyTypes, getFieldDefinitions, getAmenities, getFieldGroups } from "@/lib/listings/service";
 import { typeConfigDTO } from "@/lib/listings/dto";
 import { AREA_UNITS } from "@/lib/listings/validate";
 
@@ -33,10 +33,11 @@ export async function GET() {
   const profile = await getProfileById(claims.sub);
   if (!profile) return fail("UNAUTHORIZED");
 
-  const [types, fields, amenities] = await Promise.all([
+  const [types, fields, amenities, groups] = await Promise.all([
     getPropertyTypes(profile.role),
     getFieldDefinitions(),
     getAmenities(),
+    getFieldGroups(),
   ]);
 
   return ok({
@@ -44,6 +45,9 @@ export async function GET() {
     types: types.map(typeConfigDTO),
     // Keyed by field name so the form can look up a definition directly.
     fieldDefs: Object.fromEntries(fields.map((f) => [f.key, f])),
+    // The titled blocks the form renders, in order (migration 0055). Data, so
+    // adding a section is a row rather than a component change.
+    fieldGroups: groups,
     amenities,
     // Derived from the types actually offered, so an empty category never shows.
     categories: [...new Set(types.map((t) => t.category))].map((key) => ({

@@ -78,8 +78,18 @@ export function Preview() {
       );
       return;
     }
-    toast.show(res.data.already ? "Already submitted" : "Submitted for review");
-    router.replace("/listings");
+    // P6 S3. The success screen has a `listing` variant with its own copy and
+    // review timeline, and projects and requirements both route to it — a
+    // listing dropped the seller straight onto the manager instead, so the one
+    // screen that explains "under review, usually 24 hours" was unreachable
+    // from the main flow. Re-submitting an already-queued listing skips it:
+    // nothing new happened, so a fresh "Submitted" screen would be a lie.
+    if (res.data.already) {
+      toast.show("Already submitted");
+      router.replace("/listings");
+      return;
+    }
+    router.replace("/create/success?kind=listing");
   };
 
   if (failed) {
@@ -250,19 +260,21 @@ export function Preview() {
 
             {/* Labels resolved server-side from field_definitions — the preview
                 must show what a buyer sees, not the raw attribute keys. */}
-            {!!(listing.attributeRows ?? []).length && (
-              <>
-                <div className="mb-3 mt-5 text-13 font-semibold leading-none text-ink-secondary">Details</div>
+            {/* Same titled blocks as the real detail screen — the preview's job
+                is to show what a buyer will see, so it groups identically. */}
+            {(listing.attributeGroups as { key: string; label: string; rows: { key: string; label: string; value: string }[] }[] ?? []).map((g) => (
+              <section key={g.key}>
+                <div className="mb-3 mt-5 text-13 font-semibold leading-none text-ink-secondary">{g.label}</div>
                 <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-                  {(listing.attributeRows as { key: string; label: string; value: string }[]).map((a) => (
+                  {g.rows.map((a) => (
                     <div key={a.key}>
                       <div className="text-11 leading-none text-ink-tertiary">{a.label}</div>
                       <div className="mt-[3px] text-15 leading-[1.3] text-ink-primary">{a.value}</div>
                     </div>
                   ))}
                 </div>
-              </>
-            )}
+              </section>
+            ))}
 
             {!!(listing.amenities ?? []).length && (
               <>

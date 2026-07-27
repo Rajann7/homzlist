@@ -45,7 +45,7 @@ function attributeRows(
   // config (a retired field keeps showing rather than silently disappearing).
   const keys = [...order.filter((k) => k in attrs), ...Object.keys(attrs).filter((k) => !order.includes(k))];
 
-  const rows: { key: string; label: string; value: string }[] = [];
+  const rows: { key: string; label: string; value: string; group: string | null }[] = [];
   for (const key of keys) {
     const raw = attrs[key];
     if (raw === null || raw === undefined || raw === "") continue;
@@ -70,9 +70,35 @@ function attributeRows(
     } else {
       value = optLabel(raw);
     }
-    rows.push({ key, label, value });
+    // The same grouping the creation form uses (migration 0055), so a seller
+    // sees their listing described in the order they described it — and a
+    // twenty-row "Details" list becomes four short, titled blocks.
+    rows.push({ key, label, value, group: def?.group ?? null });
   }
   return rows;
+}
+
+/**
+ * Attribute rows → the form's titled blocks.
+ *
+ * Group order is the group list's order, and a row whose group is unknown (an
+ * older field, or one an admin hasn't filed yet) lands in a trailing "More
+ * details" block rather than vanishing.
+ */
+function groupRows(
+  rows: { key: string; label: string; value: string; group: string | null }[],
+  groups: { key: string; label: string }[] | undefined,
+) {
+  if (!rows.length) return [];
+  const known = groups ?? [];
+  const out: { key: string; label: string; rows: typeof rows }[] = [];
+  for (const g of known) {
+    const items = rows.filter((r) => r.group === g.key);
+    if (items.length) out.push({ key: g.key, label: g.label, rows: items });
+  }
+  const rest = rows.filter((r) => !r.group || !known.some((g) => g.key === r.group));
+  if (rest.length) out.push({ key: "other", label: "More details", rows: rest });
+  return out;
 }
 
 /** The numeric part of an `area` attribute, in sq ft, or null. */
@@ -193,10 +219,13 @@ export function listingDetailDTO(
     stats?: { views: number; saves: number | null; leads: number | null } | null;
     /** Amenity code → label (service.getAmenityLabels); raw codes otherwise. */
     amenityLabels?: Map<string, string>;
+    /** Form sections, in order (service.getFieldGroups) — used to block the details. */
+    fieldGroups?: { key: string; label: string }[];
   },
 ) {
   const attrs = (l.attributes ?? {}) as Record<string, unknown>;
   const { keySpecs, highlights } = detailBlocks(attrs, type, opts.fieldDefs);
+  const rows = attributeRows(attrs, type, opts.fieldDefs);
 
   // ₹/sqft is computed HERE, from the same figures the row holds — the client
   // must never derive a price (CLAUDE.md §6).
@@ -242,7 +271,15 @@ export function listingDetailDTO(
     // Raw map stays for the owner's edit form; `attributeRows` is what any
     // screen should actually render.
     attributes: l.attributes,
-    attributeRows: attributeRows(l.attributes ?? {}, type, opts.fieldDefs),
+    attributeRows: rows,
+    /**
+     * The same rows, in the same titled blocks the creation form used
+     * (migration 0055). The detail screen printed one flat "Details" list —
+     * fine at eight rows, unreadable at the twenty-seven a Flat now carries.
+     * Grouped here rather than in the component so the projects screen, the
+     * preview and the public detail can't drift apart.
+     */
+    attributeGroups: groupRows(rows, opts.fieldGroups),
     // Labels, not codes — "power_backup" is a storage detail, not UI copy.
     amenities: (l.amenities ?? []).map((a) => opts.amenityLabels?.get(a) ?? a),
     postedOn: ist(l.live_at ?? l.created_at),
@@ -397,6 +434,13 @@ export function typeConfigDTO(t: PropertyTypeRow) {
     fields: t.field_config.fields ?? [],
     hidden: t.field_config.hidden ?? [],
     required: t.field_config.required ?? [],
+    /**
+     * The extras a RENT listing asks for on top of `fields`. The form used to
+     * hardcode deposit/available-from/maintenance/tenant-preference, which was
+     * both a client-side business rule and wrong for commercial rent — an
+     * office needs its lease duration and lock-in, not a tenant preference.
+     */
+    rentFields: t.field_config.rent_fields ?? [],
     areaUnits: Boolean(t.field_config.area_units),
   };
 }

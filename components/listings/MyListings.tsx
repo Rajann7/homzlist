@@ -163,6 +163,29 @@ export function MyListings() {
               </button>
             </div>
 
+            {/* An unfinished draft. It has ALREADY drawn a paid slot — the slot
+                is reserved at creation — so leaving it with no way back into
+                the flow strands something the user paid for. Edit reopens the
+                form and then exits to the detail screen, which is a different
+                journey; this resumes the creation flow where it stopped. */}
+            {l.status === "draft" && (
+              <div className="border-t border-divider bg-surface-2 px-3 py-2.5">
+                <div className="text-13 font-semibold text-ink-primary">Not submitted yet</div>
+                <div className="mt-0.5 text-11 text-ink-tertiary">
+                  {l.photoCount
+                    ? `${l.photoCount} photo${l.photoCount > 1 ? "s" : ""} added — review it and send it for approval.`
+                    : "Add photos and send it for review to go live."}
+                </div>
+                <Button
+                  size="small"
+                  className="mt-2"
+                  onClick={() => router.push(l.photoCount ? `/create/preview?listing=${l.id}` : `/create/photos?listing=${l.id}`)}
+                >
+                  {l.photoCount ? "Review and submit" : "Continue — add photos"}
+                </Button>
+              </div>
+            )}
+
             {/* The 2-month check-in. The lifecycle cron sets the flag and
                 auto-hides 15 days later — so this is where the owner is
                 actually asked, rather than the listing quietly disappearing. */}

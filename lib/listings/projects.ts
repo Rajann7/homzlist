@@ -49,6 +49,8 @@ export async function createProject(
     amenities: string[];
     description: string | null;
     stateId: string | null;
+    districtId: string | null;
+    talukaId: string | null;
     cityId: string;
     areaId: string | null;
     areaLabel: string | null;
@@ -86,6 +88,8 @@ export async function createProject(
       amenities: input.amenities,
       description: input.description,
       state_id: input.stateId,
+      district_id: input.districtId,
+      taluka_id: input.talukaId,
       city_id: input.cityId,
       area_id: input.areaId,
       area_label: input.areaLabel,
@@ -168,6 +172,8 @@ export async function updateProject(
       amenities: input.amenities,
       description: input.description,
       state_id: input.stateId,
+      district_id: input.districtId,
+      taluka_id: input.talukaId,
       city_id: input.cityId,
       area_id: input.areaId,
       area_label: input.areaLabel,
@@ -335,6 +341,8 @@ export async function getProject(id: string, viewerId: string | null) {
             reraExempt: p.rera_exempt,
             reraExemptReason: p.rera_exempt_reason,
             stateId: p.state_id,
+            districtId: p.district_id,
+            talukaId: p.taluka_id,
             cityId: p.city_id,
             areaId: p.area_id,
           },

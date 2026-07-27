@@ -5,9 +5,10 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { AppShell, BottomSheet, Button, Header, Icon, Skeleton, Toggle, useToast } from "@/components/billing/ui";
 import { BackButton, SectionLabel } from "@/components/billing/primitives";
 import { ConfirmDialog } from "@/components/ui/Dialog";
-import { listingsApi, uploadDoc, formatIndianCommas, priceInWords, type TypeConfig, type LocationNode } from "@/lib/listings/client";
+import { listingsApi, uploadDoc, formatIndianCommas, priceInWords, type TypeConfig } from "@/lib/listings/client";
 import { settingsApi } from "@/lib/settings/client";
-import type { Amenity, FieldDef, FieldDefMap, FieldOption } from "./fields";
+import { LocationCascade, PincodeField } from "./LocationPicker";
+import type { Amenity, FieldDef, FieldDefMap, FieldGroup, FieldOption } from "./fields";
 import { cn } from "@/lib/utils";
 
 /**
@@ -46,6 +47,7 @@ export function ListingForm() {
   const [savedDraftId, setSavedDraftId] = useState<string | null>(draftId);
   // Field definitions + amenity list are DATA from the server, not constants.
   const [fieldDefs, setFieldDefs] = useState<FieldDefMap>({});
+  const [fieldGroups, setFieldGroups] = useState<FieldGroup[]>([]);
   const [amenities, setAmenities] = useState<Amenity[]>([]);
 
   const dirty = useRef(false);
@@ -70,6 +72,7 @@ export function ListingForm() {
       if (cfg.ok) {
         setType(cfg.data.types.find((t) => t.code === code) ?? null);
         setFieldDefs(cfg.data.fieldDefs ?? {});
+        setFieldGroups(cfg.data.fieldGroups ?? []);
         setAmenities(cfg.data.amenities ?? []);
       }
       if (draftId) {
@@ -195,32 +198,48 @@ export function ListingForm() {
   // furnished flat (Doc2 §5.1: the rule is data, not a branch in here).
   const visible = (f: FieldDef) => !f.showIf || f.showIf.in.includes(String(values[f.showIf.field] ?? ""));
   const fields = (type.fields.map((f) => fieldDefs[f]).filter(Boolean) as FieldDef[]).filter(visible);
-  // Rent-only extras, minus anything the type already lists for itself — a PG
-  // declares `tenant_preference` in its own config, and adding it here again
-  // rendered the same field twice, in two sections, writing one key.
+  // Rent-only extras. WHICH ones is per-type config (`rent_fields`), not a list
+  // in here: a flat wants deposit and tenant preference, an office wants its
+  // lease duration and lock-in. Anything the type already lists for itself is
+  // dropped, or the same field renders twice in two sections writing one key.
   const rentFields = (kind === "rent"
-    ? (["deposit", "available_from", "maintenance_included", "tenant_preference"]
-        .filter((f) => !type.fields.includes(f))
-        .map((f) => fieldDefs[f])
-        .filter(Boolean) as FieldDef[])
+    ? (type.rentFields.filter((f) => !type.fields.includes(f)).map((f) => fieldDefs[f]).filter(Boolean) as FieldDef[])
     : []).filter(visible);
 
-  const detailSection = !!fields.length && (
-    <section className="flex flex-col gap-4">
-      <SectionLabel>{type.label} details</SectionLabel>
-      {fields.map((f) => (
-        <DynamicField
-          key={f.key}
-          def={f}
-          value={values[f.key]}
-          onChange={(v) => set(f.key, v)}
-          error={errors[f.key]}
-          onOpenSheet={() => setSheet(f)}
-          landUnits={type.areaUnits}
-        />
-      ))}
-    </section>
+  const renderField = (f: FieldDef) => (
+    <DynamicField
+      key={f.key}
+      def={f}
+      value={values[f.key]}
+      onChange={(v) => set(f.key, v)}
+      error={errors[f.key]}
+      required={type.required.includes(f.key)}
+      onOpenSheet={() => setSheet(f)}
+      landUnits={type.areaUnits}
+    />
   );
+
+  /**
+   * The per-type detail fields, in titled blocks.
+   *
+   * Every type uses the SAME block order (`field_groups`, migration 0055), so
+   * the form reads the same way whether it's a flat or a godown. It used to be
+   * one flat column of up to thirty controls under a single heading, in
+   * whatever order the config array happened to hold.
+   */
+  const detailSections = fieldGroups
+    .map((g) => ({ group: g, items: fields.filter((f) => f.group === g.key) }))
+    .filter((s) => s.items.length)
+    .map(({ group, items }) => (
+      <section key={group.key} className="flex flex-col gap-4">
+        <SectionLabel>{group.label}</SectionLabel>
+        {items.map(renderField)}
+      </section>
+    ));
+
+  // A field whose group was never set still has to render — silently dropping
+  // it would lose data the type asks for.
+  const ungrouped = fields.filter((f) => !f.group || !fieldGroups.some((g) => g.key === f.group));
 
   return (
     <Shell
@@ -252,7 +271,13 @@ export function ListingForm() {
         </section>
 
         {/* ---- B. Property details (design puts these before price) ---- */}
-        {detailSection}
+        {detailSections}
+        {!!ungrouped.length && (
+          <section className="flex flex-col gap-4">
+            <SectionLabel>{type.label} details</SectionLabel>
+            {ungrouped.map(renderField)}
+          </section>
+        )}
 
         {/* ---- C. Price ---- */}
         <section className="flex flex-col gap-4">
@@ -290,7 +315,7 @@ export function ListingForm() {
         </section>
 
         {/* ---- D. Location ---- */}
-        <LocationSection values={values} set={set} error={errors.city} errors={errors} />
+        <LocationSection values={values} set={set} errors={errors} />
 
         {/* ---- E. Amenities (master list from the DB — Doc2 §5.1) ---- */}
         {!!amenities.length && (
@@ -480,10 +505,15 @@ const inputCls = (err?: string) =>
  * `errLine`): label 13/600 ink2 with 6px below, helper and error 11px at 6px
  * above, and the error carries the alert glyph the design draws.
  */
-function Field({ id, label, error, warning, hint, children }: { id?: string; label: string; error?: string; warning?: string; hint?: string; children: React.ReactNode }) {
+function Field({ id, label, required, error, warning, hint, children }: { id?: string; label: string; required?: boolean; error?: string; warning?: string; hint?: string; children: React.ReactNode }) {
   return (
     <div id={id} className="flex flex-col">
-      <label className="mb-1.5 text-13 font-semibold leading-none text-ink-secondary">{label}</label>
+      <label className="mb-1.5 text-13 font-semibold leading-none text-ink-secondary">
+        {label}
+        {/* The type's `required` list is server config, so the marker is too —
+            the form used to look identical whether a field blocked submit. */}
+        {required && <span className="ml-0.5 text-error">*</span>}
+      </label>
       {children}
       {/* Errors block; warnings are advice and never prevent submitting. */}
       {error && (
@@ -532,10 +562,10 @@ const AREA_UNITS_LAND = [
   { value: "acre", label: "Acre" },
 ];
 
-function DynamicField({ def, value, onChange, error, onOpenSheet, landUnits }: { def: FieldDef; value: any; onChange: (v: unknown | ((prev: any) => unknown)) => void; error?: string; onOpenSheet: () => void; landUnits?: boolean }) {
+function DynamicField({ def, value, onChange, error, required, onOpenSheet, landUnits }: { def: FieldDef; value: any; onChange: (v: unknown | ((prev: any) => unknown)) => void; error?: string; required?: boolean; onOpenSheet: () => void; landUnits?: boolean }) {
   if (def.control === "chips") {
     return (
-      <Field id={`f-${def.key}`} label={def.label} error={error}>
+      <Field id={`f-${def.key}`} label={def.label} required={required} error={error}>
         <div className="flex flex-wrap gap-2">
           {(def.options ?? []).map((o) => (
             <button
@@ -559,7 +589,7 @@ function DynamicField({ def, value, onChange, error, onOpenSheet, landUnits }: {
   if (def.control === "multi") {
     const picked: string[] = Array.isArray(value) ? value : [];
     return (
-      <Field id={`f-${def.key}`} label={def.label} error={error}>
+      <Field id={`f-${def.key}`} label={def.label} required={required} error={error}>
         <div className="flex flex-wrap gap-2">
           {(def.options ?? []).map((o) => {
             const on = picked.includes(o.value);
@@ -617,7 +647,7 @@ function DynamicField({ def, value, onChange, error, onOpenSheet, landUnits }: {
   if (def.control === "select") {
     const label = def.options?.find((o) => o.value === value)?.label;
     return (
-      <Field id={`f-${def.key}`} label={def.label} error={error}>
+      <Field id={`f-${def.key}`} label={def.label} required={required} error={error}>
         <button onClick={onOpenSheet} className={cn(inputCls(error), "flex items-center text-left")}>
           <span className={cn("flex-1", label ? "text-ink-primary" : "text-ink-tertiary")}>{label ?? `Select ${def.label.toLowerCase()}`}</span>
           <Icon name="chevron-down" size={18} className="text-ink-tertiary" />
@@ -637,7 +667,7 @@ function DynamicField({ def, value, onChange, error, onOpenSheet, landUnits }: {
     const useLand = def.units ? def.units === "land" : landUnits;
     const units = useLand ? AREA_UNITS_LAND : AREA_UNITS_BUILT;
     return (
-      <Field id={`f-${def.key}`} label={def.label} error={error} hint={def.hint ?? "Converted automatically for search"}>
+      <Field id={`f-${def.key}`} label={def.label} required={required} error={error} hint={def.hint ?? "Converted automatically for search"}>
         <div className="flex gap-2">
           <input
             inputMode="decimal"
@@ -658,9 +688,27 @@ function DynamicField({ def, value, onChange, error, onOpenSheet, landUnits }: {
     );
   }
 
+  // A real date picker. "Available from" was a text box with a YYYY-MM-DD
+  // placeholder, so it collected "next month" and "1/2/26" — neither of which
+  // the `available_from` DATE column can store, so the value was dropped on
+  // save and the listing showed no availability at all.
+  if (def.control === "date") {
+    return (
+      <Field id={`f-${def.key}`} label={def.label} required={required} error={error} hint={def.hint ?? undefined}>
+        <input
+          type="date"
+          value={typeof value === "string" ? value.slice(0, 10) : ""}
+          min={new Date().toISOString().slice(0, 10)}
+          onChange={(e) => onChange(e.target.value || null)}
+          className={inputCls(error)}
+        />
+      </Field>
+    );
+  }
+
   // number | text
   return (
-    <Field id={`f-${def.key}`} label={def.label} error={error} hint={def.hint ?? undefined}>
+    <Field id={`f-${def.key}`} label={def.label} required={required} error={error} hint={def.hint ?? undefined}>
       <input
         inputMode={def.control === "number" ? "numeric" : "text"}
         value={value ?? ""}
@@ -766,120 +814,25 @@ function OwnershipProofSection({
   );
 }
 
-/** Location cascade: each level loads from the server as the parent is chosen. */
-function LocationSection({ values, set, error, errors }: { values: Record<string, any>; set: (k: string, v: unknown) => void; error?: string; errors?: Record<string, string> }) {
-  const toast = useToast();
-  const [nodes, setNodes] = useState<Record<string, LocationNode[]>>({});
-  const [open, setOpen] = useState<string | null>(null);
-  const [requesting, setRequesting] = useState(false);
-
-  const levels = [
-    { level: "state", key: "stateId", label: "State", parent: null as string | null },
-    { level: "district", key: "districtId", label: "District", parent: values.stateId },
-    { level: "taluka", key: "talukaId", label: "Taluka", parent: values.districtId },
-    { level: "city", key: "cityId", label: "City / Village", parent: values.talukaId },
-    { level: "area", key: "areaId", label: "Area / Landmark", parent: values.cityId },
-  ];
-
-  const load = async (level: string, parent: string | null) => {
-    const r = await listingsApi.locations(level, parent);
-    if (r.ok) setNodes((n) => ({ ...n, [level]: r.data.items }));
-  };
-
-  // Load every level whose parent is already known, not just states. On a
-  // fresh form that IS just states; on an edit (or a resumed draft) the ids are
-  // already set, and without this each row rendered "Select district" over a
-  // value that was actually there — the location looked lost.
-  const levelKey = levels.map((l) => values[l.key] ?? "").join("|");
-  useEffect(() => {
-    void (async () => {
-      for (const l of levels) {
-        if (l.parent === null && l.level !== "state") continue;
-        if (nodes[l.level]?.length) continue;
-        await load(l.level, l.parent);
-      }
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [levelKey]);
-
+/**
+ * Location — the cascade plus the pincode, both from `LocationPicker` so the
+ * listing, project and requirement forms cannot drift apart. Pincode is
+ * REQUIRED and picked from the codes the chosen place actually covers.
+ */
+function LocationSection({ values, set, errors }: { values: Record<string, any>; set: (k: string, v: unknown) => void; errors?: Record<string, string> }) {
   return (
     <section className="flex flex-col gap-4">
       <SectionLabel>Location</SectionLabel>
-      {levels.map((l, i) => {
-        const disabled = i > 0 && !l.parent;
-        const chosen = nodes[l.level]?.find((n) => n.id === values[l.key]);
-        return (
-          <Field key={l.key} id={l.key === "cityId" ? "f-city" : undefined} label={l.label} error={l.key === "cityId" ? error : undefined}>
-            <button
-              disabled={disabled}
-              onClick={async () => { await load(l.level, l.parent); setOpen(l.level); }}
-              className={cn(inputCls(l.key === "cityId" ? error : undefined), "flex items-center text-left", disabled && "opacity-50")}
-            >
-              <span className={cn("flex-1", chosen ? "text-ink-primary" : "text-ink-tertiary")}>
-                {chosen?.name ?? (disabled ? `Choose ${levels[i - 1].label.toLowerCase()} first` : `Select ${l.label.toLowerCase()}`)}
-              </span>
-              <Icon name="chevron-down" size={18} className="text-ink-tertiary" />
-            </button>
-
-            <BottomSheet open={open === l.level} onClose={() => setOpen(null)} title={l.label}>
-              <div className="flex flex-col gap-2 pb-2">
-                {(nodes[l.level] ?? []).map((n) => (
-                  <button
-                    key={n.id}
-                    onClick={() => {
-                      set(l.key, n.id);
-                      if (l.key === "areaId") set("areaLabel", `${n.name}, ${nodes.city?.find((c) => c.id === values.cityId)?.name ?? ""}`.replace(/,\s*$/, ""));
-                      // Choosing a parent invalidates everything below it.
-                      levels.slice(i + 1).forEach((deeper) => set(deeper.key, null));
-                      setOpen(null);
-                    }}
-                    className={cn(
-                      "flex h-12 items-center rounded-8 px-4 text-left text-15",
-                      values[l.key] === n.id ? "bg-accent-soft font-semibold text-accent" : "bg-surface-2 text-ink-primary",
-                    )}
-                  >
-                    {n.name}
-                  </button>
-                ))}
-                {!(nodes[l.level] ?? []).length && (
-                  <p className="py-6 text-center text-13 text-ink-secondary">Nothing here yet.</p>
-                )}
-                {l.level === "area" && (
-                  <button
-                    disabled={requesting}
-                    onClick={async () => {
-                      const name = window.prompt("Which area is missing?");
-                      if (!name) return;
-                      setRequesting(true);
-                      const r = await listingsApi.requestArea(name, values.cityId ?? null);
-                      setRequesting(false);
-                      toast.show(r.ok ? "Requested — we'll notify you when it's added" : "Couldn't send that request");
-                      setOpen(null);
-                    }}
-                    className="tap44 mt-2 self-center text-13 font-semibold text-accent"
-                  >
-                    Can&apos;t find your area? Request it
-                  </button>
-                )}
-              </div>
-            </BottomSheet>
-          </Field>
-        );
-      })}
-
-      {/* Level 6. The column existed on `listings` and the create endpoint
-          already accepted it — there was simply no field, so it was always
-          null and area pages had no postal anchor. */}
-      <Field label="Pincode" error={error && !values.cityId ? undefined : errors?.pincode} hint="Optional — helps buyers filter by area">
-        <input
-          inputMode="numeric"
-          maxLength={6}
-          value={values.pincode ?? ""}
-          onChange={(e) => set("pincode", e.target.value.replace(/\D/g, "").slice(0, 6))}
-          placeholder="360004"
-          className={inputCls(errors?.pincode)}
-        />
-      </Field>
+      {/* The server names the city error `city`; the picker keys everything by
+          the value name it writes, so map it across rather than diverge. */}
+      <LocationCascade values={values} set={set} errors={{ ...errors, cityId: errors?.city ?? errors?.cityId ?? "" }} />
+      <PincodeField
+        cityId={values.cityId ?? null}
+        areaId={values.areaId ?? null}
+        value={values.pincode ?? null}
+        onChange={(v) => set("pincode", v)}
+        error={errors?.pincode}
+      />
     </section>
   );
 }
@@ -923,9 +876,21 @@ function listingToValues(l: any): Record<string, any> {
   };
 }
 
+/** Rent extras that have a dedicated COLUMN — they must not also land in `attributes`. */
+const RENT_COLUMNS = new Set(["deposit", "available_from", "maintenance_included"]);
+
 function buildPayload(v: Record<string, any>, typeCode: string, kind: string, type: TypeConfig | null) {
   const attrs: Record<string, unknown> = {};
-  for (const f of type?.fields ?? []) if (v[f] !== undefined && v[f] !== null && v[f] !== "") attrs[f] = v[f];
+  // The type's own fields PLUS the rent extras it asks for. Only `fields` was
+  // collected before, so a rented flat's tenant preference and notice period —
+  // and an office's lease duration and lock-in — were filled in on screen and
+  // then dropped on the floor, because neither key is in `fields` and neither
+  // has a column of its own.
+  const keys = [...(type?.fields ?? []), ...(kind === "rent" ? (type?.rentFields ?? []) : [])];
+  for (const f of keys) {
+    if (RENT_COLUMNS.has(f)) continue;
+    if (v[f] !== undefined && v[f] !== null && v[f] !== "") attrs[f] = v[f];
+  }
 
   return {
     typeCode,

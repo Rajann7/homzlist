@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
 import { Skeleton } from "@/components/billing/ui";
 import { PlanWall } from "@/components/billing/PlanWall";
 import { PostType } from "./PostType";
@@ -17,8 +16,6 @@ import { billingApi } from "@/lib/billing/client";
  * (Doc9 §11).
  */
 export function CreateEntry() {
-  const params = useSearchParams();
-  const forceWall = params.get("wall") === "1";
   const [slots, setSlots] = useState<number | null>(null);
 
   useEffect(() => {
@@ -33,5 +30,9 @@ export function CreateEntry() {
     );
   }
 
-  return forceWall || slots <= 0 ? <PlanWall /> : <PostType slotsLeft={slots} />;
+  // `?wall=1` is a HINT from the form's PLAN_REQUIRED bounce, not an override:
+  // it used to force the wall unconditionally, so backing into this URL after
+  // buying a plan showed "Choose a plan" to someone who already had slots and
+  // invited them to pay twice. The server's slot count decides.
+  return slots <= 0 ? <PlanWall /> : <PostType slotsLeft={slots} />;
 }

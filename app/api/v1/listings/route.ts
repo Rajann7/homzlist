@@ -67,6 +67,7 @@ export async function POST(req: NextRequest) {
     priceOnRequest,
     cityId: typeof body.cityId === "string" ? body.cityId : null,
     areaId: typeof body.areaId === "string" ? body.areaId : null,
+    pincode: typeof body.pincode === "string" ? body.pincode.trim() : null,
     attributes: typeof body.attributes === "object" && body.attributes ? body.attributes : {},
     photoCount: typeof body.photoCount === "number" ? body.photoCount : 0,
     contact: { public: contactPublic, number: typeof body.contactNumber === "string" ? body.contactNumber : null },

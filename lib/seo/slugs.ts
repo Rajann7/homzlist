@@ -263,8 +263,14 @@ export async function enumerateLandings(): Promise<MatrixEntry[]> {
   const rows = ((data ?? []) as any[]);
   if (!rows.length) return [];
 
+  // Only the locations the live inventory actually points at. Reading every
+  // city and area used to be five rows; since migration 0054 it is 155k, and
+  // none of the ones nobody has listed in can contribute a landing page.
+  const referenced = [...new Set(rows.flatMap((l) => [l.city_id, l.area_id]).filter(Boolean) as string[])];
   const [{ data: locs }, typeRows] = await Promise.all([
-    db().from("locations").select("id,name,slug,level,parent_id,is_launched").in("level", ["city", "area"]).eq("is_active", true),
+    referenced.length
+      ? db().from("locations").select("id,name,slug,level,parent_id,is_launched").in("id", referenced).eq("is_active", true)
+      : Promise.resolve({ data: [] as any[] }),
     types(),
   ]);
   const locMap = new Map<string, any>(((locs ?? []) as any[]).map((l) => [l.id, l]));

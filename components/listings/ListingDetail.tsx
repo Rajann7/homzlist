@@ -17,6 +17,9 @@ import { cn } from "@/lib/utils";
  * contains no number at all, so the only thing this screen can offer is
  * "Request number". There is no client-side branch that could leak it.
  */
+/** One titled block of the detail screen, as the server groups it. */
+interface AttrGroup { key: string; label: string; rows: { key: string; label: string; value: string }[] }
+
 export function ListingDetail({ id, isGuest = false }: { id: string; isGuest?: boolean }) {
   const router = useRouter();
   const toast = useToast();
@@ -293,18 +296,27 @@ export function ListingDetail({ id, isGuest = false }: { id: string; isGuest?: b
         {/* Labels and values are resolved server-side from field_definitions —
             this used to print the raw map, so a buyer read "Bhk 3" and
             "Furnishing semi". */}
-        {!!(listing.attributeRows ?? []).length && (
-          <>
-            <div className="mb-3 mt-6 text-13 font-semibold leading-none text-ink-secondary">Property Details</div>
-            <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-              {(listing.attributeRows as { key: string; label: string; value: string }[]).map((a) => (
-                <div key={a.key}>
-                  <div className="text-11 leading-none text-ink-tertiary">{a.label}</div>
-                  <div className="mt-[3px] text-15 leading-[1.3] text-ink-primary">{a.value}</div>
+        {/* Grouped exactly as the creation form asked for them (migration 0055).
+            A Flat carries twenty-seven details now; one flat two-column list of
+            that length is a wall, and the seller filled it in as four short
+            sections. The grouping is computed server-side so the preview, this
+            screen and the public page cannot disagree. */}
+        {!!(listing.attributeGroups ?? []).length && (
+          <div className="mt-6 flex flex-col gap-5">
+            {(listing.attributeGroups as AttrGroup[]).map((g) => (
+              <section key={g.key}>
+                <div className="mb-3 text-13 font-semibold leading-none text-ink-secondary">{g.label}</div>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+                  {g.rows.map((a) => (
+                    <div key={a.key}>
+                      <div className="text-11 leading-none text-ink-tertiary">{a.label}</div>
+                      <div className="mt-[3px] text-15 leading-[1.3] text-ink-primary">{a.value}</div>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          </>
+              </section>
+            ))}
+          </div>
         )}
         <div className="flex flex-col gap-5 pt-5">
 

@@ -2,6 +2,7 @@ import type { NextRequest } from "next/server";
 import { ok, fail } from "@/lib/api";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { getLocationChildren, getLocationsByIds, requestArea } from "@/lib/listings/service";
+
 import { rateLimit } from "@/lib/auth/rate-limit";
 
 /**
@@ -38,7 +39,12 @@ export async function GET(req: NextRequest) {
   if (!LEVELS.includes(level)) return fail("VALIDATION_ERROR", { field: "level" });
   if (parent && !UUID_RE.test(parent)) return fail("VALIDATION_ERROR", { field: "parent" });
 
-  return ok({ items: await getLocationChildren(parent, level) });
+  // `?q=` is answered by the database. The master now holds the whole India
+  // Post directory, so a district's children can run to several hundred and the
+  // picker pages through them by search rather than by scrolling.
+  const q = (url.searchParams.get("q") ?? "").slice(0, 60);
+  const items = await getLocationChildren(parent, level, q);
+  return ok({ items, truncated: items.length >= 100 });
 }
 
 export async function POST(req: NextRequest) {

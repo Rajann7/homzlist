@@ -3,6 +3,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { consumeQuota, releaseQuota, reserveSlot, transitionSlot } from "@/lib/billing/service";
 import { stopBoostsForSubject, pauseBoostsForSubject, resumeBoostsForSubject } from "@/lib/billing/boost";
 import { primaryAreaSqft } from "./validate";
+import { pgrstSafe } from "@/lib/search/parse";
 import { notify } from "@/lib/notifications/service";
 import { rupees } from "@/lib/notifications/subjects";
 
@@ -79,7 +80,12 @@ export interface PropertyTypeRow {
   category: "residential" | "commercial" | "plot" | "pg";
   roles: string[];
   kinds: ("sell" | "rent")[];
-  field_config: { fields?: string[]; hidden?: string[]; required?: string[]; area_units?: boolean };
+  field_config: {
+    fields?: string[]; hidden?: string[]; required?: string[];
+    /** Rent-only extras (deposit, lease duration…) — per type, not per client. */
+    rent_fields?: string[];
+    area_units?: boolean;
+  };
   sort_order: number;
 }
 
@@ -93,7 +99,7 @@ export async function getPropertyTypes(role: string | null): Promise<PropertyTyp
 export interface FieldDefinitionRow {
   key: string;
   label: string;
-  control: "chips" | "select" | "multi" | "stepper" | "toggle" | "number" | "text" | "area";
+  control: "chips" | "select" | "multi" | "stepper" | "toggle" | "number" | "text" | "area" | "date";
   options: { value: string; label: string }[];
   placeholder: string | null;
   hint: string | null;
@@ -101,6 +107,28 @@ export interface FieldDefinitionRow {
   showIf: { field: string; in: string[] } | null;
   /** Area unit set: 'land' (Vigha/Guntha) | 'built' (metric) | null (type flag). */
   units: "land" | "built" | null;
+  /**
+   * Which titled block of the form this field belongs in (migration 0055).
+   * Every type lays its fields out in the same group order, so a seller who has
+   * listed a flat knows where to look when they list a shop.
+   */
+  group: string | null;
+}
+
+export interface FieldGroupRow {
+  key: string;
+  label: string;
+  sort_order: number;
+}
+
+/** The form's section order — data, so a new group is a row (Doc2 §5.1). */
+export async function getFieldGroups(): Promise<FieldGroupRow[]> {
+  const { data } = await db()
+    .from("field_groups")
+    .select("key,label,sort_order")
+    .eq("is_active", true)
+    .order("sort_order");
+  return (data ?? []) as FieldGroupRow[];
 }
 
 /**
@@ -113,13 +141,13 @@ export interface FieldDefinitionRow {
 export async function getFieldDefinitions(): Promise<FieldDefinitionRow[]> {
   const { data } = await db()
     .from("field_definitions")
-    .select("key,label,control,options,placeholder,hint,show_if,units")
+    .select("key,label,control,options,placeholder,hint,show_if,units,group")
     .eq("is_active", true)
     .order("sort_order");
   // show_if is snake_case in Postgres; the form reads camelCase like every
   // other DTO field, so normalise here rather than in the component.
   return ((data ?? []) as (Omit<FieldDefinitionRow, "showIf"> & { show_if: FieldDefinitionRow["showIf"] })[])
-    .map(({ show_if, ...f }) => ({ ...f, showIf: show_if ?? null }));
+    .map(({ show_if, ...f }) => ({ ...f, showIf: show_if ?? null, group: f.group ?? null }));
 }
 
 export async function getAmenities(category?: string) {
@@ -1080,11 +1108,78 @@ export async function releaseSlotAndRefundQuota(slotId: string, profileId: strin
 // Locations (cascade + area request — Doc2 §5.1)
 // ---------------------------------------------------------------------------
 
-export async function getLocationChildren(parentId: string | null, level: string) {
-  let q = db().from("locations").select("id,name,name_gu,level,pincode").eq("level", level).eq("is_active", true).order("name");
+export interface LocationRow {
+  id: string; name: string; name_gu: string | null; level: string; pincode: string | null;
+}
+
+/**
+ * How many children one picker page returns.
+ *
+ * The master is the real India Post directory now (migration 0054): a district
+ * can have 500 villages and Jaipur has 508 areas. Sending all of them and
+ * letting the sheet scroll is what a search box exists to avoid, so the list is
+ * capped and `search` is answered by the database rather than by filtering an
+ * already-truncated array in the browser.
+ */
+const LOCATION_PAGE = 100;
+
+export async function getLocationChildren(parentId: string | null, level: string, search?: string | null) {
+  let q = db().from("locations").select("id,name,name_gu,level,pincode").eq("level", level).eq("is_active", true);
   q = parentId ? q.eq("parent_id", parentId) : q.is("parent_id", null);
-  const { data } = await q;
-  return (data ?? []) as { id: string; name: string; name_gu: string | null; level: string; pincode: string | null }[];
+
+  const term = (search ?? "").trim();
+  if (term) {
+    // `%term%` so "nagar" finds "Prahlad Nagar" — the trigram index (migration
+    // 0030) is what keeps that affordable across 155k rows.
+    //
+    // `pgrstSafe` rather than a local denylist: `.or()` takes a filter string in
+    // PostgREST's own mini-language, so a stray comma or bracket becomes an
+    // extra CLAUSE, not a search term. That helper is the codebase's single
+    // vetted sanitizer for this exact hazard — a second, narrower copy here is
+    // how the two drift apart.
+    const safe = pgrstSafe(term);
+    if (safe) q = q.or(`name.ilike.%${safe}%,name_gu.ilike.%${safe}%`);
+  }
+
+  const { data } = await q.order("name").limit(LOCATION_PAGE);
+  const rows = (data ?? []) as LocationRow[];
+  // Exact and prefix matches first — typing "Rajkot" under a taluka that also
+  // holds "Rajkot Marketing Yard" should not bury the plain one.
+  if (!term) return rows;
+  const t = term.toLowerCase();
+  return rows.sort((a, b) => rank(a.name, t) - rank(b.name, t) || a.name.localeCompare(b.name));
+}
+
+function rank(name: string, term: string) {
+  const n = name.toLowerCase();
+  return n === term ? 0 : n.startsWith(term) ? 1 : 2;
+}
+
+/**
+ * Every pincode a location covers, most specific first.
+ *
+ * Pincode is a REQUIRED field on a listing and is chosen from this list, never
+ * typed: a city has many (Rajkot has fourteen, Bengaluru a hundred and six) and
+ * a free-text box produced typos and nulls. Asking for the area narrows it to
+ * that locality's own codes; asking for the city returns the whole set.
+ */
+export async function getPincodesFor(cityId: string | null, areaId: string | null): Promise<string[]> {
+  const id = areaId || cityId;
+  if (!id) return [];
+
+  const read = async (locationId: string) => {
+    const { data } = await db().from("location_pincodes").select("pincode").eq("location_id", locationId);
+    return [...new Set(((data ?? []) as { pincode: string }[]).map((r) => r.pincode))].sort();
+  };
+
+  // An area usually has exactly one code — that is the whole point of picking
+  // one. When the area has none recorded, the city's set is the honest answer
+  // rather than an empty dropdown the user cannot get past.
+  if (areaId) {
+    const own = await read(areaId);
+    if (own.length) return own;
+  }
+  return cityId ? read(cityId) : [];
 }
 
 /**

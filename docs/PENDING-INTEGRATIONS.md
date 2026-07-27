@@ -2774,3 +2774,59 @@ invented for an empty bio (CLAUDE.md §7).
 
 Console errors: 0. `tsc` clean · lint **0 errors** · build succeeds · bundle
 secret-free.
+
+---
+
+## Sell/Buy creation-flow audit (28 Jul 2026) — out-of-scope gaps found
+
+Everything below was found while repairing the create flow (migrations 0054-0059).
+None of it belongs to that module, so it is recorded here instead of being
+discovered by a real user.
+
+### 1. 104,608 cities are selectable but not "launched" — ADMIN-BLOCKED
+
+The location master is now the whole India Post directory (36 states, 658
+districts, 7,168 talukas, 104,612 cities/villages, 50,950 areas, 19,238
+pincodes). A seller can list anywhere in the country, and that works.
+
+`locations.is_launched` is still **true for only four cities** (Ahmedabad,
+Rajkot, Surat, Vadodara) — deliberately: the flag gates SEO landing pages, the
+sitemap and the "we're not in your city yet" screen, and flipping 104k rows to
+launched would advertise thin pages for villages with no inventory.
+
+The gap: there is **no admin control to launch a city**. Until Module 11 ships
+one, launching Pune or Jaipur is a manual `update locations set is_launched`.
+The seller-side flow does not depend on it; the buyer-side SEO surface does.
+
+### 2. Desktop and tablet are still the mobile column
+
+`AppShell` centres a 470px column at every viewport, so the create flow, the
+photo grid and the detail screen render as a phone-width strip on a 1280px
+screen. Verified there is **no horizontal overflow or clipping** at 360 / 375 /
+414 / 768 / 1024 / 1280, so nothing is broken — but CLAUDE.md rule 2 asks for
+separate native desktop/tablet layouts on the user side, and those do not exist
+for these screens. That is its own piece of work; changing `AppShell` would move
+every screen in the app at once.
+
+### 3. The photo guide's example shots are grey boxes
+
+`designs/P5 S5` draws four example photos (Exterior / Living room / Kitchen /
+Bedroom) in the first-run dialog. There are no image assets for them, so the
+dialog renders four empty `surface-2` rectangles with captions. The labels and
+the checklist are real; only the sample imagery is missing.
+
+### 4. Admin moderation screens have not been checked against the new fields
+
+Migration 0055 took a Flat from 21 fields to 27 and a Godown from 8 to 22, and
+grouped all of them. The seller form, the preview, the detail screen and the
+search facets were all updated and verified. The **admin review queue**
+(P13-14-15) was not looked at — if it prints attributes from its own list rather
+than from `field_definitions`, the new fields will be invisible to a moderator.
+
+### 5. Legacy rows still have a broken mid-chain
+
+Listings created before the cascade existed have `district_id`/`taluka_id` null
+(`resolveLocationChain` rebuilds them on read, so the edit form is fine). The
+projects table was backfilled by migration 0056; `listings` was not, because
+migration 0021 already tried and these rows predate the ids it needed. Harmless
+today — a district-level filter on the buy side would miss them.

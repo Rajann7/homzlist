@@ -47,6 +47,7 @@ export interface ListingInput {
   priceOnRequest?: boolean;
   cityId?: string | null;
   areaId?: string | null;
+  pincode?: string | null;
   attributes?: Record<string, unknown>;
   photoCount?: number;
   contact?: { public?: boolean; number?: string | null };
@@ -61,6 +62,15 @@ export function validateListing(input: ListingInput, type: PropertyTypeRow): Val
     errors.kind = `${type.label} can't be listed for ${input.kind === "rent" ? "rent" : "sale"}`;
   }
   if (!input.cityId) errors.city = "Select a city";
+
+  // Pincode is REQUIRED (it was an optional free-text box, so the column was
+  // null on most rows and area pages had no postal anchor). It is picked from
+  // the chosen place's real codes now — migration 0054 seeded 19,238 of them —
+  // so the only thing left to check here is that we were handed one, and that
+  // it is a real Indian pincode rather than six arbitrary digits.
+  const pin = (input.pincode ?? "").trim();
+  if (!pin) errors.pincode = "Select a pincode";
+  else if (!/^[1-9][0-9]{5}$/.test(pin)) errors.pincode = "Enter a valid 6-digit pincode";
 
   // Price is required UNLESS explicitly "on request" (Doc2 §5.1).
   if (!input.priceOnRequest) {
@@ -105,6 +115,27 @@ export function validateListing(input: ListingInput, type: PropertyTypeRow): Val
     const empty = v === undefined || v === null || v === ""
       || (typeof v === "object" && !(v as { value?: unknown }).value);
     if (empty) errors[key] = REQUIRED_MSG[key] ?? `This field is required`;
+  }
+
+  /**
+   * An `area` attribute's magnitude has to be a NUMBER.
+   *
+   * The form only ever sends digits, so this is about a hand-made payload: the
+   * value is stored verbatim and later cast to numeric inside the search RPC,
+   * across every live row at once. One listing carrying `{value: "12x34"}` was
+   * therefore enough to make area-filtered search raise for every buyer. The
+   * SQL guard was fixed too (migration 0059) — this stops the bad value being
+   * stored in the first place, which is the layer that should catch it.
+   */
+  for (const [key, raw] of Object.entries(attrs)) {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) continue;
+    const v = (raw as { value?: unknown }).value;
+    if (v === undefined || v === null || v === "") continue;
+    if (!/^\d+(\.\d+)?$/.test(String(v))) {
+      errors[key] = "Enter a number";
+    } else if (Number(v) <= 0) {
+      errors[key] = "Enter a value greater than zero";
+    }
   }
 
   // ---- warnings (never block — Doc2 §5.3) ---------------------------------

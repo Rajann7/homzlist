@@ -29,7 +29,11 @@ export async function photoCapacity(profileId: string, listingId: string) {
     db().from("listing_photos").select("id", { count: "exact", head: true }).eq("listing_id", listingId),
   ]);
   const role = (profile as { role: string | null } | null)?.role ?? "owner";
-  const max = ROLE_CAPS[role] ?? 10;
+  // `ROLE_CAPS[role] ?? 10` looked right and was wrong: a Builder's cap IS
+  // null, and `null ?? 10` is 10 — so the one role Doc2 §5.2 gives unlimited
+  // photos to was silently held to the same ten as everyone else, both in the
+  // "6 / 10" counter and at presign. Ask whether the role is known instead.
+  const max = role in ROLE_CAPS ? ROLE_CAPS[role] : 10;
   const used = count ?? 0;
   return { max, used, remaining: max === null ? null : Math.max(0, max - used) };
 }

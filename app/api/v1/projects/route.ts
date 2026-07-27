@@ -17,6 +17,8 @@ import { createProject, listMyProjects, NoProjectSlotError } from "@/lib/listing
  */
 export const dynamic = "force-dynamic";
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export async function GET() {
   const claims = await getCurrentUser();
   if (!claims) return fail("UNAUTHORIZED");
@@ -51,7 +53,23 @@ export async function POST(req: NextRequest) {
   if (!reraExempt && !reraNumber) return fail("VALIDATION_ERROR", { field: "reraNumber" });
   if (reraExempt && exemptReason.length < 5) return fail("VALIDATION_ERROR", { field: "reraExemptReason" });
 
-  if (!body.cityId) return fail("VALIDATION_ERROR", { field: "cityId" });
+  if (!body.cityId) return fail("VALIDATION_ERROR", { errors: { cityId: "Choose the project's city" } });
+
+  // The location ids go straight into FK columns. Without a shape check a
+  // malformed one is a 500 from Postgres rather than a 400 from us.
+  for (const k of ["stateId", "districtId", "talukaId", "cityId", "areaId"] as const) {
+    const v = body[k];
+    if (v != null && !UUID_RE.test(String(v))) return fail("VALIDATION_ERROR", { field: k });
+  }
+
+  // Pincode is REQUIRED here for the same reason it is on a listing: it used to
+  // be silently coerced to null when it didn't match, so most projects had none
+  // and their area pages had no postal anchor. It is picked from the place's
+  // real codes now, so a bad one means the payload was hand-made.
+  const pincode = String(body.pincode ?? "").trim();
+  if (!/^[1-9]\d{5}$/.test(pincode)) {
+    return fail("VALIDATION_ERROR", { errors: { pincode: pincode ? "Enter a valid 6-digit pincode" : "Select a pincode" } });
+  }
 
   try {
     const project = await createProject(claims.sub, {
@@ -69,10 +87,12 @@ export async function POST(req: NextRequest) {
       amenities: Array.isArray(body.amenities) ? body.amenities.filter((a: unknown) => typeof a === "string").slice(0, 40) : [],
       description: typeof body.description === "string" ? body.description.slice(0, 5000) : null,
       stateId: body.stateId ?? null,
+      districtId: body.districtId ?? null,
+      talukaId: body.talukaId ?? null,
       cityId: body.cityId,
       areaId: body.areaId ?? null,
       areaLabel: typeof body.areaLabel === "string" ? body.areaLabel.slice(0, 120) : null,
-      pincode: /^[1-9]\d{5}$/.test(String(body.pincode ?? "")) ? String(body.pincode) : null,
+      pincode,
       units: Array.isArray(body.units) ? body.units.slice(0, 40) : [],
     });
     return ok({ project });

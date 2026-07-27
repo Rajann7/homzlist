@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AppShell, Button, Header, Icon, Spinner, useToast } from "@/components/billing/ui";
-import { BackButton } from "@/components/billing/primitives";
 import { listingsApi, uploadPhotos, type Photo } from "@/lib/listings/client";
 import { PhotoEditorSheet, PhotoTileSheet } from "./PhotoEditor";
 import { cn } from "@/lib/utils";
@@ -67,9 +66,29 @@ export function Photos() {
 
   const pick = async (files: FileList | null) => {
     if (!files?.length) return;
+
+    // Take as many as still fit and say what was left out. Sending the whole
+    // selection meant that picking 7 photos with 6 slots free was refused
+    // wholesale at presign — the user got "you've reached the photo limit" and
+    // NONE of the seven uploaded. The cap itself stays the server's (it re-checks
+    // at presign and again at commit); this only stops us asking for the
+    // impossible.
+    let chosen = Array.from(files);
+    const room = capacity?.remaining ?? null;
+    if (room !== null && chosen.length > room) {
+      const dropped = chosen.length - room;
+      chosen = chosen.slice(0, room);
+      toast.show(
+        room === 0
+          ? `You've already added the maximum of ${capacity?.max} photos`
+          : `Only ${room} more photo${room > 1 ? "s" : ""} fit — ${dropped} weren't added`,
+      );
+      if (!room) return;
+    }
+
     setBusy(true);
-    setProgress({ done: 0, total: files.length });
-    const res = await uploadPhotos(listingId, Array.from(files), (done, total) => setProgress({ done, total }));
+    setProgress({ done: 0, total: chosen.length });
+    const res = await uploadPhotos(listingId, chosen, (done, total) => setProgress({ done, total }));
     setBusy(false);
     setProgress(null);
     if (res.photos) setPhotos(res.photos);
@@ -141,6 +160,8 @@ export function Photos() {
   };
 
   const ready = photos.filter((p) => p.status !== "failed").length;
+  // A builder is uncapped, so `max: null` is "never full" — not "full at null".
+  const full = capacity?.max != null && photos.length >= capacity.max;
   // designs/P5 S5 puts "6 / 10" at the top-right; a builder is uncapped, so the
   // server sends max: null and the counter shows the count alone.
   const counter = capacity
@@ -155,7 +176,21 @@ export function Photos() {
       className="flex flex-col"
       header={
         <Header
-          left={<BackButton fallback="/create" />}
+          // Not `router.back()`: by the time you reach this step the listing
+          // EXISTS and has drawn a slot, and the entry before it was the form —
+          // or, after a PLAN_REQUIRED bounce, the plan wall, which is how
+          // backing out of the photo step offered a paying customer the plan
+          // wall again. The manager is where the half-finished draft is, with a
+          // Continue on it, so leaving the step lands somewhere it resumes.
+          left={
+            <button
+              aria-label="Back"
+              onClick={() => router.push("/listings")}
+              className="chrome grid h-11 w-11 place-items-center rounded-full text-ink-primary active:bg-surface-2"
+            >
+              <Icon name="arrow-left" size={22} strokeWidth={1.9} />
+            </button>
+          }
           title="Add photos"
           centerTitle
           right={<span className="px-2 text-13 leading-none text-ink-tertiary">{counter}</span>}
@@ -197,12 +232,18 @@ export function Photos() {
                 </span>
               )}
               {p.status === "failed" && (
-                <span className="absolute inset-0 z-[3] grid place-items-center bg-error-soft">
+                <span className="absolute inset-0 z-[3] flex flex-col items-center justify-center gap-1.5 bg-error-soft px-1 text-center">
+                  <span className="text-11 leading-[1.2] text-error">Couldn&apos;t process</span>
+                  {/* This used to say "Retry" and open the file picker, which
+                      uploads a DIFFERENT file and leaves the broken row on the
+                      grid forever — a tile nothing can clear. The bytes are
+                      gone, so the honest action is to remove it and add another
+                      from the tile next door. */}
                   <button
-                    onClick={() => fileRef.current?.click()}
+                    onClick={() => void remove(p.id)}
                     className="h-[26px] rounded-full bg-accent px-2.5 text-11 font-semibold leading-none text-white"
                   >
-                    Retry
+                    Remove
                   </button>
                 </span>
               )}
@@ -230,14 +271,23 @@ export function Photos() {
             </div>
           ))}
 
-          <button
-            onClick={() => fileRef.current?.click()}
-            disabled={busy}
-            className="flex aspect-square flex-col items-center justify-center gap-1.5 rounded-8 border-[1.5px] border-dashed border-border text-ink-tertiary active:bg-surface-2"
-          >
-            {busy ? <Spinner size={22} /> : <Icon name="plus" size={24} />}
-            <span className="text-11 leading-none">Add photos</span>
-          </button>
+          {/* At the cap the tile goes away rather than opening a picker whose
+              every choice would be refused. */}
+          {full ? (
+            <div className="flex aspect-square flex-col items-center justify-center gap-1.5 rounded-8 border-[1.5px] border-dashed border-border px-2 text-center text-ink-tertiary">
+              <Icon name="check" size={20} className="text-accent" />
+              <span className="text-11 leading-[1.2]">All {capacity?.max} added</span>
+            </div>
+          ) : (
+            <button
+              onClick={() => fileRef.current?.click()}
+              disabled={busy}
+              className="flex aspect-square flex-col items-center justify-center gap-1.5 rounded-8 border-[1.5px] border-dashed border-border text-ink-tertiary active:bg-surface-2"
+            >
+              {busy ? <Spinner size={22} /> : <Icon name="plus" size={24} />}
+              <span className="text-11 leading-none">Add photos</span>
+            </button>
+          )}
         </div>
 
         {progress && (

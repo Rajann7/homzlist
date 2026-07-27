@@ -5,7 +5,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { AppShell, BottomSheet, Button, Chip, Header, Icon, Skeleton, Toggle, useToast } from "@/components/billing/ui";
 import { OfflineBanner, SectionLabel } from "@/components/billing/primitives";
 import { ConfirmDialog } from "@/components/ui/Dialog";
-import { listingsApi, uploadBrochure, uploadDoc, formatIndianCommas, priceInWords, type LocationNode } from "@/lib/listings/client";
+import { listingsApi, uploadBrochure, uploadDoc, formatIndianCommas, priceInWords } from "@/lib/listings/client";
+import { LocationCascade, PincodeField } from "./LocationPicker";
 import { cn } from "@/lib/utils";
 
 /**
@@ -62,6 +63,8 @@ export function ProjectForm() {
   const [loading, setLoading] = useState(true);
   const [offline, setOffline] = useState(false);
   const [amenityOptions, setAmenityOptions] = useState<{ code: string; label: string }[]>([]);
+  /** The caller's role, so a non-Builder is turned away before step 1, not after step 5. */
+  const [role, setRole] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [leaveOpen, setLeaveOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -96,11 +99,18 @@ export function ProjectForm() {
   const [amenities, setAmenities] = useState<string[]>([]);
   const [banks, setBanks] = useState<string[]>([]);
 
-  // ---- Step 5 ----
-  const [area, setArea] = useState<LocationNode | null>(null);
-  const [cityId, setCityId] = useState<string | null>(null);
-  const [pincode, setPincode] = useState("");
-  const [areaSheet, setAreaSheet] = useState(false);
+  /**
+   * ---- Step 5: location ----
+   *
+   * One bag of values, so the shared `LocationCascade` can drive it exactly as
+   * it drives the listing form. It used to be an AREA picker alone, scoped to
+   * whatever city sat on the builder's PROFILE — so a builder could only ever
+   * publish projects in one city, and there was no way to say which state,
+   * district or taluka the project was in. The pincode beside it was free text
+   * and optional, so it was usually blank.
+   */
+  const [place, setPlace] = useState<Record<string, any>>({});
+  const setPlaceField = (k: string, v: unknown) => setPlace((p) => ({ ...p, [k]: v }));
 
   const load = useCallback(async () => {
     const [cfg, me] = await Promise.all([
@@ -109,7 +119,11 @@ export function ProjectForm() {
     ]);
     if (cfg.ok) setAmenityOptions(cfg.data.amenities.map((a) => ({ code: a.code, label: a.label })));
     else setOffline(cfg.error.code === "OFFLINE");
-    setCityId(me?.data?.user?.cityId ?? null);
+    // The profile's city is a starting SUGGESTION now, not the only option —
+    // the cascade below can take the builder anywhere in the country.
+    setRole(me?.data?.user?.role ?? null);
+    const home = me?.data?.user?.cityId ?? null;
+    if (home) setPlace((p) => ({ ...p, cityId: p.cityId ?? home }));
 
     // Edit mode: re-open all five steps on the project's current values.
     if (editId) {
@@ -131,9 +145,17 @@ export function ProjectForm() {
         setExemptReason(o.reraExemptReason ?? "");
         setAmenities(p.amenities ?? []);
         setBanks(p.bankApprovals ?? []);
-        setCityId(o.cityId ?? null);
-        if (o.areaId) setArea({ id: o.areaId, name: p.areaLabel ?? "", name_gu: null, level: "area", pincode: null });
-        setPincode(p.pincode ?? "");
+        // The owner payload carries the whole chain, so an edit re-opens the
+        // cascade on the real place rather than on the builder's home city.
+        setPlace({
+          stateId: o.stateId ?? null,
+          districtId: o.districtId ?? null,
+          talukaId: o.talukaId ?? null,
+          cityId: o.cityId ?? null,
+          areaId: o.areaId ?? null,
+          areaLabel: p.areaLabel ?? null,
+          pincode: p.pincode ?? null,
+        });
         setUnits((p.units ?? []).map((u: any) => ({
           unitType: u.unitType ?? "",
           areaSqft: u.areaSqft != null ? String(u.areaSqft) : "",
@@ -149,7 +171,7 @@ export function ProjectForm() {
 
   useEffect(() => { void load(); }, [load]);
 
-  const dirty = Boolean(name || units.length || amenities.length || banks.length || area);
+  const dirty = Boolean(name || units.length || amenities.length || banks.length || place.areaId);
 
   // Per-step validation — the design shows "per-step validation states".
   function stepErrors(i: number): Record<string, string> {
@@ -164,8 +186,11 @@ export function ProjectForm() {
     }
     if (i === 1 && units.length === 0) e.units = "Add at least one unit type";
     if (i === 4) {
-      if (!area) e.area = "Choose the project area";
-      if (pincode && !/^[1-9]\d{5}$/.test(pincode)) e.pincode = "Enter a valid 6-digit pincode";
+      if (!place.cityId) e.cityId = "Choose the project's city";
+      // Required, like it is on a listing: an area page with no postal anchor
+      // is the reason it stopped being optional.
+      if (!place.pincode) e.pincode = "Select a pincode";
+      else if (!/^[1-9]\d{5}$/.test(String(place.pincode))) e.pincode = "Enter a valid 6-digit pincode";
     }
     return e;
   }
@@ -195,10 +220,13 @@ export function ProjectForm() {
       availableUnits: availableUnits ? Number(availableUnits) : null,
       bankApprovals: banks,
       amenities,
-      cityId,
-      areaId: area?.id ?? null,
-      areaLabel: area?.name ?? null,
-      pincode: pincode || null,
+      stateId: place.stateId ?? null,
+      districtId: place.districtId ?? null,
+      talukaId: place.talukaId ?? null,
+      cityId: place.cityId ?? null,
+      areaId: place.areaId ?? null,
+      areaLabel: place.areaLabel ?? null,
+      pincode: place.pincode || null,
       units: units.map((u) => ({
         unitType: u.unitType,
         areaSqft: u.areaSqft ? Number(u.areaSqft.replace(/\D/g, "")) : undefined,
@@ -249,6 +277,25 @@ export function ProjectForm() {
       <Shell step={0} onClose={() => router.back()}>
         <div className="flex flex-col gap-4 p-4">
           {[0, 1, 2].map((i) => <Skeleton key={i} className="h-[120px] w-full rounded-12" />)}
+        </div>
+      </Shell>
+    );
+  }
+
+  // Projects are Builder-only (Doc2 §6) and the server enforces it — but only
+  // at the very END, on POST. An Owner who reached this URL could fill five
+  // steps, upload a brochure and every floor plan, and be told "Projects are
+  // for Builder accounts" on the last tap. Say it on arrival instead.
+  if (role && role !== "builder") {
+    return (
+      <Shell step={0} onClose={() => router.push("/create")}>
+        <div className="flex flex-col items-center gap-3 px-6 py-12 text-center">
+          <Icon name="image" size={32} className="text-ink-tertiary" />
+          <p className="text-15 font-semibold text-ink-primary">Projects are for Builder accounts</p>
+          <p className="max-w-[280px] text-13 leading-[1.45] text-ink-secondary">
+            You can still list individual properties for sale or rent.
+          </p>
+          <Button variant="outline" onClick={() => router.push("/create")}>Back to Create</Button>
         </div>
       </Shell>
     );
@@ -428,13 +475,16 @@ export function ProjectForm() {
 
         {step === 4 && (
           <>
-            <section className="flex flex-col gap-3">
+            <section className="flex flex-col gap-4">
               <SectionLabel>Location</SectionLabel>
-              <RowButton label="Area" value={area?.name ?? null} placeholder="Choose area" onClick={() => setAreaSheet(true)} />
-              {errors.area && <FieldError msg={errors.area} />}
-              <Field label="Pincode" error={errors.pincode}>
-                <TextInput value={pincode} onChange={(v) => setPincode(v.replace(/\D/g, "").slice(0, 6))} numeric placeholder="360004" />
-              </Field>
+              <LocationCascade values={place} set={setPlaceField} errors={errors} />
+              <PincodeField
+                cityId={place.cityId ?? null}
+                areaId={place.areaId ?? null}
+                value={place.pincode ?? null}
+                onChange={(v) => setPlaceField("pincode", v)}
+                error={errors.pincode}
+              />
             </section>
 
             <section className="flex flex-col gap-3">
@@ -446,7 +496,7 @@ export function ProjectForm() {
                 <ReviewRow label="Unit types" value={`${units.length} added`} onEdit={() => setStep(1)} />
                 <ReviewRow label="Amenities" value={amenities.length ? `${amenities.length} selected` : "None"} onEdit={() => setStep(3)} />
                 <ReviewRow label="Banks" value={banks.length ? banks.join(", ") : "None"} onEdit={() => setStep(3)} />
-                <ReviewRow label="Area" value={area?.name ?? "—"} onEdit={() => setStep(4)} last />
+                <ReviewRow label="Location" value={place.areaLabel ?? "—"} onEdit={() => setStep(4)} last />
               </div>
             </section>
 
@@ -505,8 +555,6 @@ export function ProjectForm() {
           toast.show("Unit added");
         }}
       />
-
-      <AreaPickSheet open={areaSheet} cityId={cityId} selected={area} onClose={() => setAreaSheet(false)} onPick={(a) => { setArea(a); setAreaSheet(false); }} />
 
       <ConfirmDialog
         open={confirmOpen}
@@ -776,87 +824,6 @@ function UnitSheet({
           ))}
         </div>
       </BottomSheet>
-    </BottomSheet>
-  );
-}
-
-/**
- * Area picker with the design's request-area escape hatch (P6 S5 Step 5:
- * "location cascade … + request-area"). Without it a builder in a city whose
- * areas aren't seeded yet simply cannot finish the form.
- */
-function AreaPickSheet({
-  open, cityId, selected, onClose, onPick,
-}: { open: boolean; cityId: string | null; selected: LocationNode | null; onClose: () => void; onPick: (a: LocationNode) => void }) {
-  const toast = useToast();
-  const [items, setItems] = useState<LocationNode[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [requesting, setRequesting] = useState(false);
-  const [requestName, setRequestName] = useState("");
-  const [sent, setSent] = useState(false);
-
-  useEffect(() => {
-    if (!open) return;
-    setLoading(true);
-    setSent(false);
-    setRequesting(false);
-    listingsApi.locations("area", cityId).then((r) => {
-      if (r.ok) setItems(r.data.items);
-      setLoading(false);
-    });
-  }, [open, cityId]);
-
-  async function sendRequest() {
-    const name = requestName.trim();
-    if (name.length < 2) return;
-    const res = await listingsApi.requestArea(name, cityId);
-    if (res.ok) {
-      setSent(true);
-      setRequestName("");
-      toast.show("Request sent");
-    } else {
-      toast.show("Couldn't send that request");
-    }
-  }
-
-  return (
-    <BottomSheet open={open} onClose={onClose} title="Project area">
-      <div className="max-h-[50vh] overflow-y-auto pb-2">
-        {loading ? (
-          <div className="flex flex-col gap-2 p-4">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-11 w-full rounded-8" />)}</div>
-        ) : items.length === 0 ? (
-          <p className="px-6 pb-2 pt-6 text-center text-13 text-ink-secondary">
-            No areas listed for your city yet — request one below.
-          </p>
-        ) : (
-          items.map((a) => (
-            <button key={a.id} onClick={() => onPick(a)} className="flex h-12 w-full items-center justify-between px-4 text-left active:bg-surface-2">
-              <span className="text-15 text-ink-primary">{a.name}</span>
-              {selected?.id === a.id && <Icon name="check" size={20} className="text-accent" />}
-            </button>
-          ))
-        )}
-      </div>
-
-      <div className="border-t border-border p-4">
-        {sent ? (
-          <p className="text-13 text-accent">
-            Thanks — we&apos;ll add it shortly. Pick another area for now.
-          </p>
-        ) : requesting ? (
-          <div className="flex flex-col gap-2">
-            <TextInput value={requestName} onChange={setRequestName} placeholder="Area name" />
-            <div className="flex gap-2">
-              <Button variant="outline" className="flex-1" onClick={() => setRequesting(false)}>Cancel</Button>
-              <Button className="flex-1" disabled={requestName.trim().length < 2} onClick={() => void sendRequest()}>Send request</Button>
-            </div>
-          </div>
-        ) : (
-          <button onClick={() => setRequesting(true)} className="text-13 font-semibold text-accent">
-            Can&apos;t find your area? Request it
-          </button>
-        )}
-      </div>
     </BottomSheet>
   );
 }

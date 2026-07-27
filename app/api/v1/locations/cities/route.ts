@@ -3,59 +3,101 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { kv } from "@/lib/kv";
 
 /**
- * GET /api/v1/locations/cities (Doc7 §11 public read) — cities for the city
- * sheet. Guest-usable, cached (Doc8 §5). Backend-driven, never hardcoded.
- * Optional `?q=` filters by name.
+ * GET /api/v1/locations/cities (Doc7 §11 public read) — the city sheet's list.
+ * Guest-usable and backend-driven. Optional `?q=` searches by name.
+ *
+ * With no `q` this answers "popular cities": the launched ones, with a live
+ * listing count. It used to answer with EVERY city, which was fine while the
+ * master held five of them — migration 0054 seeded the whole India Post
+ * directory (104,612 cities and villages), so an unfiltered list is now a
+ * payload nobody can scroll. Search is therefore resolved by the database, not
+ * by filtering a cached array in the browser.
  */
 export const dynamic = "force-dynamic";
-// v2: cities now come from `locations` (migration 0014), so the v1 payload —
-// built from the deprecated `cities` table with its own ids — must not be served.
-const CACHE_KEY = "cache:cities:v2";
+// v3: `q` is resolved server-side and the default list is launched cities only.
+const CACHE_KEY = "cache:cities:popular:v3";
 const CACHE_TTL = 300;
+const LIMIT = 40;
+
+interface CityDTO { id: string; name: string; state: string; slug: string; propertyCount: number }
+interface CityRow { id: string; name: string; slug: string; parent_id: string | null; is_launched: boolean }
 
 export async function GET(req: Request) {
-  const q = new URL(req.url).searchParams.get("q")?.trim().toLowerCase() ?? "";
+  const q = new URL(req.url).searchParams.get("q")?.trim() ?? "";
+  const db = createServiceClient();
 
-  let cities: Array<{ id: string; name: string; state: string; slug: string; propertyCount: number }>;
-  const cached = await kv.get(CACHE_KEY).catch(() => null);
-  if (cached) {
-    cities = JSON.parse(cached);
-  } else {
-    const db = createServiceClient();
-    // The city master is `locations` at level 'city'; the state comes from
-    // walking up the cascade, so the picker and a listing agree on ids.
-    const { data } = await db
-      .from("locations")
-      .select("id,name,parent_id")
-      .eq("level", "city")
-      .eq("is_active", true)
-      .order("name", { ascending: true });
-
-    const rows = (data ?? []) as { id: string; name: string; parent_id: string | null }[];
-    const stateByCity = await resolveStates(db, rows);
-
-    cities = rows.map((c) => ({
-      id: c.id,
-      name: c.name,
-      state: stateByCity[c.id] ?? "",
-      slug: c.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""),
-      // Live count of what's actually listed there — never a stored guess.
-      propertyCount: 0,
-    }));
-
-    const { data: counts } = await db
-      .from("listings")
-      .select("city_id")
-      .eq("status", "live");
-    for (const row of (counts ?? []) as { city_id: string | null }[]) {
-      const hit = cities.find((c) => c.id === row.city_id);
-      if (hit) hit.propertyCount++;
-    }
+  if (!q) {
+    const cached = await kv.get(CACHE_KEY).catch(() => null);
+    if (cached) return ok({ cities: JSON.parse(cached) as CityDTO[] });
+    const cities = await decorate(db, await launchedCities(db));
     await kv.set(CACHE_KEY, JSON.stringify(cities), CACHE_TTL).catch(() => {});
+    return ok({ cities });
   }
 
-  const filtered = q ? cities.filter((c) => c.name.toLowerCase().includes(q)) : cities;
-  return ok({ cities: filtered });
+  // Searching reaches the whole master, launched or not: a seller in a town we
+  // haven't launched still has to be able to name it, and the coming-soon
+  // screen is what handles the rest (Doc2 §12).
+  const safe = q.replace(/[%_,]/g, " ").slice(0, 60);
+  const { data } = await db
+    .from("locations")
+    .select("id,name,slug,parent_id,is_launched")
+    .eq("level", "city")
+    .eq("is_active", true)
+    .ilike("name", `%${safe}%`)
+    .order("name")
+    .limit(LIMIT * 4);
+
+  const rows = (data ?? []) as CityRow[];
+  const term = safe.toLowerCase();
+  // Launched first, then exact/prefix matches — typing "raj" should surface
+  // Rajkot before a hamlet called Rajapur.
+  rows.sort((a, b) =>
+    Number(b.is_launched) - Number(a.is_launched) ||
+    rank(a.name, term) - rank(b.name, term) ||
+    a.name.localeCompare(b.name));
+
+  return ok({ cities: await decorate(db, rows.slice(0, LIMIT)) });
+}
+
+function rank(name: string, term: string) {
+  const n = name.toLowerCase();
+  return n === term ? 0 : n.startsWith(term) ? 1 : 2;
+}
+
+async function launchedCities(db: ReturnType<typeof createServiceClient>) {
+  const { data } = await db
+    .from("locations")
+    .select("id,name,slug,parent_id,is_launched")
+    .eq("level", "city")
+    .eq("is_active", true)
+    .eq("is_launched", true)
+    .order("name")
+    .limit(LIMIT);
+  return (data ?? []) as CityRow[];
+}
+
+/** Attach the state name and a live listing count to one page of cities. */
+async function decorate(db: ReturnType<typeof createServiceClient>, rows: CityRow[]): Promise<CityDTO[]> {
+  if (!rows.length) return [];
+  const [states, counts] = await Promise.all([resolveStates(db, rows), listingCounts(db, rows.map((r) => r.id))]);
+  return rows.map((c) => ({
+    id: c.id,
+    name: c.name,
+    state: states[c.id] ?? "",
+    slug: c.slug,
+    // Live count of what's actually listed there — never a stored guess.
+    propertyCount: counts[c.id] ?? 0,
+  }));
+}
+
+/** Live listings per city, for the page being returned only. */
+async function listingCounts(db: ReturnType<typeof createServiceClient>, cityIds: string[]) {
+  const out: Record<string, number> = {};
+  const { data } = await db.from("listings").select("city_id").eq("status", "live").in("city_id", cityIds);
+  for (const row of (data ?? []) as { city_id: string | null }[]) {
+    if (row.city_id) out[row.city_id] = (out[row.city_id] ?? 0) + 1;
+  }
+  return out;
 }
 
 /**
@@ -69,21 +111,24 @@ async function resolveStates(
   const out: Record<string, string> = {};
   if (!cities.length) return out;
 
-  const climb = async (ids: string[]) => {
-    const clean = [...new Set(ids.filter(Boolean))];
+  const climb = async (ids: (string | null)[]) => {
+    const clean = [...new Set(ids.filter(Boolean))] as string[];
     if (!clean.length) return [] as { id: string; name: string; level: string; parent_id: string | null }[];
     const { data } = await db.from("locations").select("id,name,level,parent_id").in("id", clean);
     return (data ?? []) as { id: string; name: string; level: string; parent_id: string | null }[];
   };
 
-  const talukas = await climb(cities.map((c) => c.parent_id ?? ""));
-  const districts = await climb(talukas.map((t) => t.parent_id ?? ""));
-  const states = await climb(districts.map((d) => d.parent_id ?? ""));
+  const talukas = await climb(cities.map((c) => c.parent_id));
+  const districts = await climb(talukas.map((t) => t.parent_id));
+  const states = await climb(districts.map((d) => d.parent_id));
+
+  const byId = <T extends { id: string }>(rows: T[]) => new Map(rows.map((r) => [r.id, r]));
+  const tMap = byId(talukas), dMap = byId(districts), sMap = byId(states);
 
   for (const c of cities) {
-    const t = talukas.find((x) => x.id === c.parent_id);
-    const d = districts.find((x) => x.id === t?.parent_id);
-    const s = states.find((x) => x.id === d?.parent_id);
+    const t = c.parent_id ? tMap.get(c.parent_id) : null;
+    const d = t?.parent_id ? dMap.get(t.parent_id) : null;
+    const s = d?.parent_id ? sMap.get(d.parent_id) : null;
     if (s) out[c.id] = s.name;
   }
   return out;

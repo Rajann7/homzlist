@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 import { ok, fail } from "@/lib/api";
 import { getCurrentUser } from "@/lib/auth/current-user";
-import { getListingForViewer, getPropertyType, getFieldDefinitions, updateListing, softDeleteListing, recordListingView, resolveLocationChain, isPromoted, ownerListingStats, getAmenityLabels } from "@/lib/listings/service";
+import { getListingForViewer, getPropertyType, getFieldDefinitions, getFieldGroups, updateListing, softDeleteListing, recordListingView, resolveLocationChain, isPromoted, ownerListingStats, getAmenityLabels } from "@/lib/listings/service";
 import { rateLimit, clientIp, hashIp } from "@/lib/auth/rate-limit";
 import { listingDetailDTO } from "@/lib/listings/dto";
 
@@ -35,7 +35,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   }
 
   const isOwner = claims?.sub === listing.profile_id;
-  const [type, fieldDefs, promoted, stats, amenityLabels] = await Promise.all([
+  const [type, fieldDefs, promoted, stats, amenityLabels, fieldGroups] = await Promise.all([
     getPropertyType(listing.type_code),
     // Needed to turn stored codes ("semi", "1-5") into the labels the design
     // shows ("Semi-furnished", "1–5 years") — resolved server-side.
@@ -46,8 +46,11 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     isOwner ? ownerListingStats(listing.id) : Promise.resolve(null),
     // Amenity codes -> the labels the design shows.
     getAmenityLabels(),
+    // The detail screen renders its attributes in the same titled blocks the
+    // creation form used, so the section list has to come along.
+    getFieldGroups(),
   ]);
-  const dto = listingDetailDTO(listing, type, { isOwner, fieldDefs, promoted, stats, amenityLabels });
+  const dto = listingDetailDTO(listing, type, { isOwner, fieldDefs, promoted, stats, amenityLabels, fieldGroups });
 
   // For the owner's edit form, hand back a COMPLETE location chain even if the
   // row stored a broken one — the cascade needs every ancestor to unlock.
@@ -105,8 +108,15 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (typeof body.districtId === "string") patch.district_id = body.districtId;
   if (typeof body.talukaId === "string") patch.taluka_id = body.talukaId;
   if (typeof body.areaLabel === "string") patch.area_label = body.areaLabel.slice(0, 120);
-  if (typeof body.pincode === "string" || body.pincode === null) {
-    patch.pincode = /^[1-9]\d{5}$/.test(String(body.pincode ?? "")) ? String(body.pincode) : null;
+  // Pincode is required on a listing, so an edit may CHANGE it but never clear
+  // it. This used to silently null anything that didn't match, which turned
+  // "the user typed five digits" into "this listing has no postal anchor".
+  if (body.pincode !== undefined) {
+    const pin = String(body.pincode ?? "").trim();
+    if (!/^[1-9]\d{5}$/.test(pin)) {
+      return fail("VALIDATION_ERROR", { errors: { pincode: pin ? "Enter a valid 6-digit pincode" : "Select a pincode" } });
+    }
+    patch.pincode = pin;
   }
   // The rest of what the edit form can change. Everything here is a field the
   // create endpoint already accepts; status/slot/reject_count stay server-owned.

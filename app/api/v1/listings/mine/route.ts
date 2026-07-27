@@ -35,6 +35,10 @@ export async function GET() {
     // still shows an honest 0 rather than being hidden.
     filters: [
       { key: "all", label: "All", count: rows.length },
+      // Drafts have already drawn a paid slot, so they must be findable — they
+      // were only reachable under "All", which is how a paid-for listing could
+      // sit unfinished without the seller ever seeing it again.
+      { key: "draft", label: "Draft", count: by((r) => r.status === "draft") },
       { key: "live", label: "Live", count: by((r) => r.status === "live") },
       { key: "pending_review", label: "Pending", count: by((r) => r.status === "pending_review") },
       { key: "changes_requested", label: "Changes requested", count: by((r) => r.status === "changes_requested") },
