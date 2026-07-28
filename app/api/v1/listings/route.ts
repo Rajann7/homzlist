@@ -3,7 +3,7 @@ import { ok, fail } from "@/lib/api";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { getProfileById } from "@/lib/profile/service";
 import { rateLimit } from "@/lib/auth/rate-limit";
-import { createListing, getPropertyType, NoSlotError } from "@/lib/listings/service";
+import { createListing, getPropertyType, sanitizeAttributes, NoSlotError } from "@/lib/listings/service";
 import { validateListing } from "@/lib/listings/validate";
 import { listingCardDTO } from "@/lib/listings/dto";
 import { getUserPrefs } from "@/lib/settings/service";
@@ -58,6 +58,15 @@ export async function POST(req: NextRequest) {
   const pricePaise =
     typeof body.pricePaise === "number" && Number.isFinite(body.pricePaise) ? Math.trunc(body.pricePaise) : null;
 
+  // Attributes are filtered to what this type + kind actually asks for, and to
+  // what was VISIBLE given the rest of the answers, before anything is checked
+  // or stored — see `sanitizeAttributes`.
+  const { attributes, visible } = await sanitizeAttributes(
+    typeof body.attributes === "object" && body.attributes ? body.attributes : {},
+    type,
+    kind,
+  );
+
   const input = {
     typeCode,
     kind,
@@ -68,12 +77,12 @@ export async function POST(req: NextRequest) {
     cityId: typeof body.cityId === "string" ? body.cityId : null,
     areaId: typeof body.areaId === "string" ? body.areaId : null,
     pincode: typeof body.pincode === "string" ? body.pincode.trim() : null,
-    attributes: typeof body.attributes === "object" && body.attributes ? body.attributes : {},
+    attributes,
     photoCount: typeof body.photoCount === "number" ? body.photoCount : 0,
     contact: { public: contactPublic, number: typeof body.contactNumber === "string" ? body.contactNumber : null },
   };
 
-  const { errors, warnings, flaggedReason } = validateListing(input, type);
+  const { errors, warnings, flaggedReason } = validateListing(input, type, visible);
   if (Object.keys(errors).length) return fail("VALIDATION_ERROR", { errors, warnings });
 
   try {

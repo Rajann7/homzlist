@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 import { ok, fail } from "@/lib/api";
 import { getCurrentUser } from "@/lib/auth/current-user";
-import { getListingForViewer, getPropertyType, getFieldDefinitions, getFieldGroups, updateListing, softDeleteListing, recordListingView, resolveLocationChain, isPromoted, ownerListingStats, getAmenityLabels } from "@/lib/listings/service";
+import { getListingForViewer, getPropertyType, getFieldDefinitions, getFieldGroups, updateListing, softDeleteListing, recordListingView, resolveLocationChain, isPromoted, ownerListingStats, getAmenityLabels, sanitizeAttributes } from "@/lib/listings/service";
 import { rateLimit, clientIp, hashIp } from "@/lib/auth/rate-limit";
 import { listingDetailDTO } from "@/lib/listings/dto";
 
@@ -101,7 +101,18 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     patch.contact_number = body.contactNumber.replace(/\D/g, "").slice(-10) || null;
   }
   if (Array.isArray(body.amenities)) patch.amenities = body.amenities.filter((a: unknown) => typeof a === "string").slice(0, 40);
-  if (body.attributes && typeof body.attributes === "object") patch.attributes = body.attributes;
+  // Same filter the create path runs: only keys THIS type asks for, and only
+  // the ones still visible given the rest of the answers. An edit was the
+  // easier way in — it took the attributes blob verbatim, so switching a flat
+  // back to ready-to-move left its possession date on the row.
+  if (body.attributes && typeof body.attributes === "object") {
+    const existing = await getListingForViewer(params.id, claims.sub);
+    if (!existing || existing.profile_id !== claims.sub) return fail("NOT_FOUND");
+    const editType = await getPropertyType(existing.type_code);
+    if (!editType) return fail("VALIDATION_ERROR", { field: "typeCode" });
+    const { attributes } = await sanitizeAttributes(body.attributes, editType, existing.kind);
+    patch.attributes = attributes;
+  }
   if (typeof body.areaId === "string") patch.area_id = body.areaId;
   if (typeof body.cityId === "string") patch.city_id = body.cityId;
   if (typeof body.stateId === "string") patch.state_id = body.stateId;

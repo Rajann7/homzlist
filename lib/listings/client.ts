@@ -1,5 +1,7 @@
 "use client";
 
+import type { ShowIf } from "./visibility";
+
 /**
  * Client-side listings API. Same discipline as billing: this file asks the
  * server questions and renders answers. It holds no entitlement logic, no photo
@@ -45,8 +47,31 @@ export interface TypeConfig {
   required: string[];
   /** Extras a RENT listing asks for — per type, so an office gets lease terms. */
   rentFields: string[];
+  /** Extras a SELL listing asks for — the ownership document, the loan flag. */
+  sellFields: string[];
   areaUnits: boolean;
 }
+
+/** A kind of builder scheme (migration 0062) — apartment, plotting, shops… */
+export interface ProjectTypeConfig {
+  code: string;
+  label: string;
+  category: "residential" | "commercial" | "plot" | "mixed";
+  /** Unit names this scheme's "Add unit type" sheet offers. */
+  unitTypes: string[];
+  fields: string[];
+  required: string[];
+}
+
+/** Field definitions keyed by name — the same shape `components/listings/fields` declares. */
+export type FieldDefMap = Record<string, {
+  key: string; label: string; control: any;
+  options: { value: string; label: string }[];
+  placeholder: string | null; hint: string | null;
+  showIf: ShowIf | null;
+  units: "land" | "built" | null;
+  group: string | null;
+}>;
 
 export interface LocationNode {
   id: string;
@@ -163,9 +188,11 @@ export const listingsApi = {
       role: string | null;
       types: TypeConfig[];
       /** Field definitions incl. every option list — server-owned (Doc2 §5.1). */
-      fieldDefs: Record<string, { key: string; label: string; control: any; options: { value: string; label: string }[]; placeholder: string | null; hint: string | null; showIf: { field: string; in: string[] } | null; units: "land" | "built" | null; group: string | null }>;
+      fieldDefs: FieldDefMap;
       /** Titled blocks the form renders, in order (migration 0055). */
       fieldGroups: { key: string; label: string; sort_order: number }[];
+      /** Builder-only: the kinds of scheme, and the fields each one asks for. */
+      projectTypes: ProjectTypeConfig[];
       amenities: { code: string; label: string; category: string; categories: string[] }[];
       categories: { key: string; label: string }[];
       areaUnits: string[];

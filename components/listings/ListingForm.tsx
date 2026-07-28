@@ -2,13 +2,15 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { AppShell, BottomSheet, Button, Header, Icon, Skeleton, Toggle, useToast } from "@/components/billing/ui";
-import { BackButton, SectionLabel } from "@/components/billing/primitives";
+import { AppShell, BottomSheet, Button, Header, Icon, Skeleton, useToast } from "@/components/billing/ui";
+import { SectionLabel } from "@/components/billing/primitives";
 import { ConfirmDialog } from "@/components/ui/Dialog";
 import { listingsApi, uploadDoc, formatIndianCommas, priceInWords, type TypeConfig } from "@/lib/listings/client";
 import { settingsApi } from "@/lib/settings/client";
 import { LocationCascade, PincodeField } from "./LocationPicker";
-import type { Amenity, FieldDef, FieldDefMap, FieldGroup, FieldOption } from "./fields";
+import type { Amenity, FieldDefMap, FieldGroup, FieldOption } from "./fields";
+import { DynamicSections, Field, ToggleRow, inputCls } from "./FormControls";
+import { keysForKind, visibleKeys } from "@/lib/listings/visibility";
 import { cn } from "@/lib/utils";
 
 /**
@@ -43,7 +45,6 @@ export function ListingForm() {
   const [warnings, setWarnings] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [unsavedOpen, setUnsavedOpen] = useState(false);
-  const [sheet, setSheet] = useState<FieldDef | null>(null);
   const [savedDraftId, setSavedDraftId] = useState<string | null>(draftId);
   // Field definitions + amenity list are DATA from the server, not constants.
   const [fieldDefs, setFieldDefs] = useState<FieldDefMap>({});
@@ -132,7 +133,7 @@ export function ListingForm() {
 
   const submit = async () => {
     setSubmitting(true);
-    const payload = buildPayload(values, typeCode, kind, type);
+    const payload = buildPayload(values, typeCode, kind, type, fieldDefs);
     // Editing PATCHes the existing row — creating a second listing here would
     // spend another paid slot for what the user experienced as "fix a typo".
     const res = editId ? await listingsApi.update(editId, payload) : await listingsApi.create(payload);
@@ -191,55 +192,16 @@ export function ListingForm() {
     );
   }
 
-  // The server names the fields; we render them in config order.
-  // Both the field list AND every option inside it come from the server.
-  // A field with `showIf` only appears once its controlling field matches —
-  // possession under "under construction", the furnishing checklist under a
-  // furnished flat (Doc2 §5.1: the rule is data, not a branch in here).
-  const visible = (f: FieldDef) => !f.showIf || f.showIf.in.includes(String(values[f.showIf.field] ?? ""));
-  const fields = (type.fields.map((f) => fieldDefs[f]).filter(Boolean) as FieldDef[]).filter(visible);
-  // Rent-only extras. WHICH ones is per-type config (`rent_fields`), not a list
-  // in here: a flat wants deposit and tenant preference, an office wants its
-  // lease duration and lock-in. Anything the type already lists for itself is
-  // dropped, or the same field renders twice in two sections writing one key.
-  const rentFields = (kind === "rent"
-    ? (type.rentFields.filter((f) => !type.fields.includes(f)).map((f) => fieldDefs[f]).filter(Boolean) as FieldDef[])
-    : []).filter(visible);
-
-  const renderField = (f: FieldDef) => (
-    <DynamicField
-      key={f.key}
-      def={f}
-      value={values[f.key]}
-      onChange={(v) => set(f.key, v)}
-      error={errors[f.key]}
-      required={type.required.includes(f.key)}
-      onOpenSheet={() => setSheet(f)}
-      landUnits={type.areaUnits}
-    />
-  );
-
-  /**
-   * The per-type detail fields, in titled blocks.
-   *
-   * Every type uses the SAME block order (`field_groups`, migration 0055), so
-   * the form reads the same way whether it's a flat or a godown. It used to be
-   * one flat column of up to thirty controls under a single heading, in
-   * whatever order the config array happened to hold.
-   */
-  const detailSections = fieldGroups
-    .map((g) => ({ group: g, items: fields.filter((f) => f.group === g.key) }))
-    .filter((s) => s.items.length)
-    .map(({ group, items }) => (
-      <section key={group.key} className="flex flex-col gap-4">
-        <SectionLabel>{group.label}</SectionLabel>
-        {items.map(renderField)}
-      </section>
-    ));
-
-  // A field whose group was never set still has to render — silently dropping
-  // it would lose data the type asks for.
-  const ungrouped = fields.filter((f) => !f.group || !fieldGroups.some((g) => g.key === f.group));
+  // The server names the fields; every option inside them comes from the server
+  // too (Doc2 §5.1). `keysForKind` picks up the per-kind extras — a rented flat
+  // is asked for its deposit and tenant preference, a sold one for its
+  // ownership document, and neither is shown the other's questions.
+  // `DynamicSections` then drops anything whose condition doesn't hold and lays
+  // the rest out in the shared collapsible blocks.
+  const askedKeys = keysForKind(
+    { fields: type.fields, sell_fields: type.sellFields, rent_fields: type.rentFields },
+    kind,
+  ).filter((k) => fieldDefs[k]);
 
   return (
     <Shell
@@ -271,13 +233,17 @@ export function ListingForm() {
         </section>
 
         {/* ---- B. Property details (design puts these before price) ---- */}
-        {detailSections}
-        {!!ungrouped.length && (
-          <section className="flex flex-col gap-4">
-            <SectionLabel>{type.label} details</SectionLabel>
-            {ungrouped.map(renderField)}
-          </section>
-        )}
+        <DynamicSections
+          keys={askedKeys}
+          defs={fieldDefs}
+          groups={fieldGroups}
+          values={values}
+          errors={errors}
+          required={type.required}
+          landUnits={type.areaUnits}
+          onChange={set}
+          fallbackLabel={`${type.label} details`}
+        />
 
         {/* ---- C. Price ---- */}
         <section className="flex flex-col gap-4">
@@ -285,7 +251,7 @@ export function ListingForm() {
 
           {!values.priceOnRequest && (
             <Field id="f-price" label={kind === "rent" ? "Monthly rent" : "Price"} error={errors.price} warning={warnings.price}>
-              <div className={cn("flex items-center rounded-8 border bg-surface-2", errors.price ? "border-error" : "border-border")}>
+              <div className={cn("flex items-center rounded-6 border bg-surface-2", errors.price ? "border-error" : "border-border")}>
                 <span className="pl-3 text-15 font-semibold text-ink-secondary">₹</span>
                 <input
                   inputMode="numeric"
@@ -308,10 +274,10 @@ export function ListingForm() {
             checked={!!values.priceOnRequest}
             onChange={(v) => set("priceOnRequest", v)}
           />
-
-          {rentFields.map((f) => (
-            <DynamicField key={f.key} def={f} value={values[f.key]} onChange={(v) => set(f.key, v)} error={errors[f.key]} onOpenSheet={() => setSheet(f)} />
-          ))}
+          {/* Deposit, lease duration, lock-in and the rest of the rent terms are
+              NOT stapled on here any more. They carry a `group` like every other
+              field, so they render inside "Rental terms" with the same heading,
+              ordering and collapse behaviour as everything else. */}
         </section>
 
         {/* ---- D. Location ---- */}
@@ -343,7 +309,7 @@ export function ListingForm() {
                         })
                       }
                       className={cn(
-                        "h-9 rounded-full px-3.5 text-13 font-semibold",
+                        "h-9 rounded-6 px-3.5 text-13 font-semibold",
                         on ? "bg-ink-primary text-page" : "bg-surface-2 text-ink-secondary",
                       )}
                     >
@@ -438,23 +404,6 @@ export function ListingForm() {
         </Button>
       </div>
 
-      {/* Selector sheets for chip/option fields */}
-      <BottomSheet open={!!sheet} onClose={() => setSheet(null)} title={sheet?.label ?? ""}>
-        <div className="flex flex-col gap-2 pb-2">
-          {(sheet?.options ?? []).map((o) => (
-            <button
-              key={o.value}
-              onClick={() => { set(sheet!.key, o.value); setSheet(null); }}
-              className={cn(
-                "flex h-12 items-center rounded-8 px-4 text-left text-15",
-                values[sheet?.key ?? ""] === o.value ? "bg-accent-soft font-semibold text-accent" : "bg-surface-2 text-ink-primary",
-              )}
-            >
-              {o.label}
-            </button>
-          ))}
-        </div>
-      </BottomSheet>
 
       <ConfirmDialog
         open={unsavedOpen}
@@ -494,231 +443,6 @@ function Shell({ children, onClose, onSaveDraft, title = "Add details" }: { chil
   );
 }
 
-const inputCls = (err?: string) =>
-  cn(
-    "h-11 w-full rounded-8 border bg-surface-2 px-3 text-15 text-ink-primary outline-none focus:border-accent",
-    err ? "border-error" : "border-border",
-  );
-
-/**
- * One labelled field. Metrics are the design's (`fLabel` / `helper` /
- * `errLine`): label 13/600 ink2 with 6px below, helper and error 11px at 6px
- * above, and the error carries the alert glyph the design draws.
- */
-function Field({ id, label, required, error, warning, hint, children }: { id?: string; label: string; required?: boolean; error?: string; warning?: string; hint?: string; children: React.ReactNode }) {
-  return (
-    <div id={id} className="flex flex-col">
-      <label className="mb-1.5 text-13 font-semibold leading-none text-ink-secondary">
-        {label}
-        {/* The type's `required` list is server config, so the marker is too —
-            the form used to look identical whether a field blocked submit. */}
-        {required && <span className="ml-0.5 text-error">*</span>}
-      </label>
-      {children}
-      {/* Errors block; warnings are advice and never prevent submitting. */}
-      {error && (
-        <div className="mt-1.5 flex items-center gap-1.5 text-11 leading-none text-error">
-          <Icon name="alert" size={14} className="shrink-0" />
-          {error}
-        </div>
-      )}
-      {!error && warning && (
-        <div className="mt-1.5 flex items-center gap-1.5 text-11 leading-none text-warning">
-          <Icon name="alert" size={14} className="shrink-0" />
-          {warning}
-        </div>
-      )}
-      {!error && !warning && hint && (
-        <div className="mt-1.5 text-11 leading-[1.3] text-ink-tertiary">{hint}</div>
-      )}
-    </div>
-  );
-}
-
-function ToggleRow({ label, sub, checked, onChange }: { label: string; sub?: string; checked: boolean; onChange: (v: boolean) => void }) {
-  return (
-    <div className="flex items-center gap-3 rounded-8 bg-surface-2 px-3.5 py-3">
-      <div className="flex-1">
-        <div className="text-15 text-ink-primary">{label}</div>
-        {sub && <div className="mt-0.5 text-11 text-ink-tertiary">{sub}</div>}
-      </div>
-      <Toggle checked={checked} onChange={onChange} label={label} />
-    </div>
-  );
-}
-
-/** designs/P5: a built structure is measured in sq ft/yard/m; land adds the
- *  Gujarat land units. Labels are the design's, values the server's. */
-const AREA_UNITS_BUILT = [
-  { value: "sqft", label: "sq ft" },
-  { value: "sqyd", label: "sq yard" },
-  { value: "sqm", label: "sq m" },
-];
-const AREA_UNITS_LAND = [
-  { value: "sqft", label: "sq ft" },
-  { value: "sqyd", label: "sq yard" },
-  { value: "vigha", label: "Vigha" },
-  { value: "guntha", label: "Guntha" },
-  { value: "acre", label: "Acre" },
-];
-
-function DynamicField({ def, value, onChange, error, required, onOpenSheet, landUnits }: { def: FieldDef; value: any; onChange: (v: unknown | ((prev: any) => unknown)) => void; error?: string; required?: boolean; onOpenSheet: () => void; landUnits?: boolean }) {
-  if (def.control === "chips") {
-    return (
-      <Field id={`f-${def.key}`} label={def.label} required={required} error={error}>
-        <div className="flex flex-wrap gap-2">
-          {(def.options ?? []).map((o) => (
-            <button
-              key={o.value}
-              onClick={() => onChange(value === o.value ? null : o.value)}
-              className={cn(
-                "h-9 rounded-full px-3.5 text-13 font-semibold",
-                value === o.value ? "bg-ink-primary text-page" : "bg-surface-2 text-ink-secondary",
-              )}
-            >
-              {o.label}
-            </button>
-          ))}
-        </div>
-      </Field>
-    );
-  }
-
-  // Multi-pick chips: the furnishing checklist is a LIST of what's included,
-  // not one item. Toggled inside the updater so two fast taps can't collide.
-  if (def.control === "multi") {
-    const picked: string[] = Array.isArray(value) ? value : [];
-    return (
-      <Field id={`f-${def.key}`} label={def.label} required={required} error={error}>
-        <div className="flex flex-wrap gap-2">
-          {(def.options ?? []).map((o) => {
-            const on = picked.includes(o.value);
-            return (
-              <button
-                key={o.value}
-                // Updater form — see `set` above for why this must not read
-                // `picked` from the closure.
-                onClick={() =>
-                  onChange((prev: unknown) => {
-                    const cur: string[] = Array.isArray(prev) ? prev : [];
-                    return cur.includes(o.value) ? cur.filter((x) => x !== o.value) : [...cur, o.value];
-                  })
-                }
-                className={cn(
-                  "h-9 rounded-full px-3.5 text-13 font-semibold",
-                  on ? "bg-ink-primary text-page" : "bg-surface-2 text-ink-secondary",
-                )}
-              >
-                {o.label}
-              </button>
-            );
-          })}
-        </div>
-      </Field>
-    );
-  }
-
-  if (def.control === "stepper") {
-    const n = Number(value ?? 0) || 0;
-    return (
-      <div className="flex items-center gap-3 rounded-8 bg-surface-2 px-3.5 py-2.5">
-        <div className="flex-1 text-15 text-ink-primary">{def.label}</div>
-        <button
-          aria-label={`Decrease ${def.label}`}
-          disabled={n <= 0}
-          onClick={() => onChange((p: unknown) => Math.max(0, (Number(p ?? 0) || 0) - 1))}
-          className="chrome grid h-9 w-9 place-items-center rounded-full bg-surface-3 text-ink-primary disabled:opacity-40"
-        >
-          <Icon name="minus" size={16} />
-        </button>
-        <span className="w-6 text-center text-15 font-semibold tabular-nums text-ink-primary">{n}</span>
-        <button
-          aria-label={`Increase ${def.label}`}
-          disabled={n >= 9}
-          onClick={() => onChange((p: unknown) => Math.min(9, (Number(p ?? 0) || 0) + 1))}
-          className="chrome grid h-9 w-9 place-items-center rounded-full bg-surface-3 text-ink-primary disabled:opacity-40"
-        >
-          <Icon name="plus" size={16} />
-        </button>
-      </div>
-    );
-  }
-
-  if (def.control === "select") {
-    const label = def.options?.find((o) => o.value === value)?.label;
-    return (
-      <Field id={`f-${def.key}`} label={def.label} required={required} error={error}>
-        <button onClick={onOpenSheet} className={cn(inputCls(error), "flex items-center text-left")}>
-          <span className={cn("flex-1", label ? "text-ink-primary" : "text-ink-tertiary")}>{label ?? `Select ${def.label.toLowerCase()}`}</span>
-          <Icon name="chevron-down" size={18} className="text-ink-tertiary" />
-        </button>
-      </Field>
-    );
-  }
-
-  if (def.control === "toggle") {
-    return <ToggleRow label={def.label} checked={!!value} onChange={onChange} />;
-  }
-
-  if (def.control === "area") {
-    // Units are per-FIELD first (a farmhouse's land row is Vigha while its
-    // construction row is sq ft), falling back to the type flag. Offering
-    // "3 acre" as a flat's built-up area was never in the design.
-    const useLand = def.units ? def.units === "land" : landUnits;
-    const units = useLand ? AREA_UNITS_LAND : AREA_UNITS_BUILT;
-    return (
-      <Field id={`f-${def.key}`} label={def.label} required={required} error={error} hint={def.hint ?? "Converted automatically for search"}>
-        <div className="flex gap-2">
-          <input
-            inputMode="decimal"
-            value={value?.value ?? ""}
-            onChange={(e) => { const v = e.target.value.replace(/[^\d.]/g, ""); onChange((prev: any) => ({ ...(prev ?? {}), value: v })); }}
-            placeholder="0"
-            className={inputCls(error)}
-          />
-          <select
-            value={value?.unit ?? "sqft"}
-            onChange={(e) => { const u = e.target.value; onChange((prev: any) => ({ ...(prev ?? {}), unit: u })); }}
-            className="h-11 shrink-0 rounded-8 border border-border bg-surface-2 px-2 text-15 text-ink-primary outline-none"
-          >
-            {units.map((u) => <option key={u.value} value={u.value}>{u.label}</option>)}
-          </select>
-        </div>
-      </Field>
-    );
-  }
-
-  // A real date picker. "Available from" was a text box with a YYYY-MM-DD
-  // placeholder, so it collected "next month" and "1/2/26" — neither of which
-  // the `available_from` DATE column can store, so the value was dropped on
-  // save and the listing showed no availability at all.
-  if (def.control === "date") {
-    return (
-      <Field id={`f-${def.key}`} label={def.label} required={required} error={error} hint={def.hint ?? undefined}>
-        <input
-          type="date"
-          value={typeof value === "string" ? value.slice(0, 10) : ""}
-          min={new Date().toISOString().slice(0, 10)}
-          onChange={(e) => onChange(e.target.value || null)}
-          className={inputCls(error)}
-        />
-      </Field>
-    );
-  }
-
-  // number | text
-  return (
-    <Field id={`f-${def.key}`} label={def.label} required={required} error={error} hint={def.hint ?? undefined}>
-      <input
-        inputMode={def.control === "number" ? "numeric" : "text"}
-        value={value ?? ""}
-        onChange={(e) => onChange(def.control === "number" ? e.target.value.replace(/\D/g, "") : e.target.value)}
-        placeholder={def.placeholder ?? undefined}
-        className={inputCls(error)}
-      />
-    </Field>
-  );
-}
 
 /**
  * P5 section H — "Add ownership proof (optional)".
@@ -783,7 +507,7 @@ function OwnershipProofSection({
           <button
             onClick={() => fileRef.current?.click()}
             disabled={busy}
-            className="flex flex-col items-center gap-1.5 rounded-8 border-[1.5px] border-dashed border-border p-5 disabled:opacity-50"
+            className="flex flex-col items-center gap-1.5 rounded-6 border-[1.5px] border-dashed border-border p-5 disabled:opacity-50"
           >
             <Icon name="upload" size={24} className="text-ink-tertiary" />
             <span className="text-13 text-ink-tertiary">
@@ -801,7 +525,7 @@ function OwnershipProofSection({
               key={o.value}
               onClick={() => { set("ownershipProofType", o.value); setTypeSheet(false); }}
               className={cn(
-                "flex h-12 items-center rounded-8 px-4 text-left text-15",
+                "flex h-12 items-center rounded-6 px-4 text-left text-15",
                 values.ownershipProofType === o.value ? "bg-accent-soft font-semibold text-accent" : "bg-surface-2 text-ink-primary",
               )}
             >
@@ -879,14 +603,23 @@ function listingToValues(l: any): Record<string, any> {
 /** Rent extras that have a dedicated COLUMN — they must not also land in `attributes`. */
 const RENT_COLUMNS = new Set(["deposit", "available_from", "maintenance_included"]);
 
-function buildPayload(v: Record<string, any>, typeCode: string, kind: string, type: TypeConfig | null) {
+function buildPayload(
+  v: Record<string, any>,
+  typeCode: string,
+  kind: string,
+  type: TypeConfig | null,
+  defs: FieldDefMap = {},
+) {
   const attrs: Record<string, unknown> = {};
-  // The type's own fields PLUS the rent extras it asks for. Only `fields` was
-  // collected before, so a rented flat's tenant preference and notice period —
-  // and an office's lease duration and lock-in — were filled in on screen and
-  // then dropped on the floor, because neither key is in `fields` and neither
-  // has a column of its own.
-  const keys = [...(type?.fields ?? []), ...(kind === "rent" ? (type?.rentFields ?? []) : [])];
+  // The type's own fields plus the per-kind extras, minus anything currently
+  // HIDDEN. Sending a hidden value would put a possession date on a
+  // ready-to-move flat; the server strips it too, but the preview screen reads
+  // this payload, so it has to be honest before the round trip.
+  const keys = visibleKeys(
+    keysForKind({ fields: type?.fields, sell_fields: type?.sellFields, rent_fields: type?.rentFields }, kind),
+    defs,
+    v,
+  );
   for (const f of keys) {
     if (RENT_COLUMNS.has(f)) continue;
     if (v[f] !== undefined && v[f] !== null && v[f] !== "") attrs[f] = v[f];

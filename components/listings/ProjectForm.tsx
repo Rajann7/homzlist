@@ -2,11 +2,14 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { AppShell, BottomSheet, Button, Chip, Header, Icon, Skeleton, Toggle, useToast } from "@/components/billing/ui";
+import { AppShell, BottomSheet, Button, Header, Icon, Skeleton, Toggle, useToast } from "@/components/billing/ui";
 import { OfflineBanner, SectionLabel } from "@/components/billing/primitives";
 import { ConfirmDialog } from "@/components/ui/Dialog";
 import { listingsApi, uploadBrochure, uploadDoc, formatIndianCommas, priceInWords } from "@/lib/listings/client";
 import { LocationCascade, PincodeField } from "./LocationPicker";
+import { DynamicSections, OptionChip, hasValue } from "./FormControls";
+import type { FieldDefMap, ProjectTypeConfig } from "@/lib/listings/client";
+import { visibleKeys } from "@/lib/listings/visibility";
 import { cn } from "@/lib/utils";
 
 /**
@@ -26,22 +29,18 @@ import { cn } from "@/lib/utils";
 
 const STEPS = ["Basics", "Unit types", "Media", "Amenities & Banks", "Location & Review"] as const;
 
-const BUILD_STATUS = [
-  { value: "booking_open", label: "Booking open" },
-  { value: "under_construction", label: "Under construction" },
-  { value: "ready", label: "Ready to move" },
-] as const;
+/**
+ * Nothing here is a constant any more.
+ *
+ * This file used to hold four option lists: BUILD_STATUS, EXEMPT_REASONS,
+ * UNIT_NAMES and BANKS. Between them they decided the three statuses a scheme
+ * could have, the seven unit names a builder could choose from (a row-house
+ * scheme had to call its units "1 BHK" or "Shop"), and which lenders existed.
+ * All four are `field_definitions` rows or `project_types.unit_types` now
+ * (migrations 0062/0063) — CLAUDE.md rule 7.
+ */
 
-const EXEMPT_REASONS = [
-  "Plot scheme below threshold",
-  "Completed before RERA",
-  "Other",
-];
-
-/** Unit names the add-unit sheet offers (design S5 Step 2). */
-const UNIT_NAMES = ["1 BHK", "2 BHK", "3 BHK", "3 BHK Premium", "4 BHK", "Shop", "Office"];
-
-const BANKS = ["SBI", "HDFC", "ICICI", "Axis", "Kotak", "LIC HFL", "Bajaj"];
+const BLANK_UNIT: UnitDraft = { unitType: "", areaSqft: "", carpetSqft: "", priceFrom: "", unitsAvailable: "", floorPlanUrl: null };
 
 export interface UnitDraft {
   unitType: string;
@@ -63,6 +62,19 @@ export function ProjectForm() {
   const [loading, setLoading] = useState(true);
   const [offline, setOffline] = useState(false);
   const [amenityOptions, setAmenityOptions] = useState<{ code: string; label: string }[]>([]);
+  // Everything the form used to hardcode, now server data.
+  const [projectTypes, setProjectTypes] = useState<ProjectTypeConfig[]>([]);
+  const [fieldDefs, setFieldDefs] = useState<FieldDefMap>({});
+  const [fieldGroups, setFieldGroups] = useState<{ key: string; label: string }[]>([]);
+  /** Which kind of scheme this is — it decides every extra field below. */
+  const [projectType, setProjectType] = useState<string>("");
+  /** The chosen scheme's type-specific answers (site area, OC, land zone…). */
+  const [attrs, setAttrs] = useState<Record<string, any>>({});
+  const setAttr = (k: string, v: unknown | ((p: any) => unknown)) =>
+    setAttrs((s) => ({ ...s, [k]: typeof v === "function" ? (v as (p: any) => unknown)(s[k]) : v }));
+
+  const chosenType = projectTypes.find((t) => t.code === projectType) ?? null;
+  const optionsOf = (key: string) => fieldDefs[key]?.options ?? [];
   /** The caller's role, so a non-Builder is turned away before step 1, not after step 5. */
   const [role, setRole] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -117,8 +129,12 @@ export function ProjectForm() {
       listingsApi.config(),
       fetch("/api/v1/auth/me").then((r) => r.json()).catch(() => null),
     ]);
-    if (cfg.ok) setAmenityOptions(cfg.data.amenities.map((a) => ({ code: a.code, label: a.label })));
-    else setOffline(cfg.error.code === "OFFLINE");
+    if (cfg.ok) {
+      setAmenityOptions(cfg.data.amenities.map((a) => ({ code: a.code, label: a.label })));
+      setProjectTypes(cfg.data.projectTypes ?? []);
+      setFieldDefs(cfg.data.fieldDefs ?? {});
+      setFieldGroups(cfg.data.fieldGroups ?? []);
+    } else setOffline(cfg.error.code === "OFFLINE");
     // The profile's city is a starting SUGGESTION now, not the only option —
     // the cascade below can take the builder anywhere in the country.
     setRole(me?.data?.user?.role ?? null);
@@ -131,6 +147,8 @@ export function ProjectForm() {
       if (r.ok) {
         const p = r.data.project;
         setName(p.name ?? "");
+        setProjectType(p.projectType ?? "");
+        setAttrs((p.attributes as Record<string, any>) ?? {});
         setBuildStatus(p.buildStatus ?? "under_construction");
         setPossession(p.possessionDate ?? null);
         setTowers(p.towers != null ? String(p.towers) : "");
@@ -177,9 +195,15 @@ export function ProjectForm() {
   function stepErrors(i: number): Record<string, string> {
     const e: Record<string, string> = {};
     if (i === 0) {
+      // The scheme kind gates everything else on this step, so it is checked first.
+      if (!projectType) e.projectType = "Choose the project type";
       if (name.trim().length < 3) e.name = "Enter the project name";
       if (!reraExempt && !reraNumber.trim()) e.reraNumber = "RERA number is required";
-      if (reraExempt && exemptReason.trim().length < 5) e.exemptReason = "Choose an exemption reason";
+      if (reraExempt && !exemptReason) e.exemptReason = "Choose an exemption reason";
+      // Whatever the chosen scheme marks as required, from its own config.
+      for (const k of chosenType?.required ?? []) {
+        if (!hasValue(attrs[k])) e[k] = `${fieldDefs[k]?.label ?? "This field"} is required`;
+      }
       if (totalUnits && availableUnits && Number(availableUnits) > Number(totalUnits)) {
         e.availableUnits = "Available units can't exceed total units";
       }
@@ -209,11 +233,23 @@ export function ProjectForm() {
 
     const payload = {
       name: name.trim(),
+      projectType,
+      // Only what the chosen scheme asks for, and only what is still visible —
+      // the server re-runs the same filter, so this just keeps the request
+      // honest rather than being the control.
+      attributes: Object.fromEntries(
+        visibleKeys(
+          (chosenType?.fields ?? []).filter((k) => fieldDefs[k]),
+          fieldDefs,
+          { ...attrs, build_status: buildStatus },
+        ).map((k) => [k, attrs[k]]).filter(([, v]) => v !== undefined && v !== null && v !== ""),
+      ),
       reraNumber: reraExempt ? null : reraNumber.trim(),
       reraExempt,
       reraExemptReason: reraExempt ? exemptReason : null,
       buildStatus,
-      possessionDate: possession,
+      // Mirrors the server: a finished scheme carries no possession date.
+      possessionDate: buildStatus === "ready" ? null : possession,
       towers: towers ? Number(towers) : null,
       floors: floors ? Number(floors) : null,
       totalUnits: totalUnits ? Number(totalUnits) : null,
@@ -308,6 +344,27 @@ export function ProjectForm() {
       <div className="flex flex-col gap-6 p-4 pb-32">
         {step === 0 && (
           <>
+            {/* The scheme kind comes FIRST — it decides every field below it.
+                There was no such choice at all: a plotting scheme and an
+                apartment tower filled in the identical form. */}
+            <section className="flex flex-col gap-3">
+              <SectionLabel>Project type</SectionLabel>
+              <div className="flex flex-wrap gap-2">
+                {projectTypes.map((t) => (
+                  <OptionChip
+                    key={t.code}
+                    selected={projectType === t.code}
+                    // Switching the scheme kind changes which extras apply, so
+                    // the previous kind's answers must not ride along.
+                    onClick={() => { setProjectType(t.code); setAttrs({}); }}
+                  >
+                    {t.label}
+                  </OptionChip>
+                ))}
+              </div>
+              {errors.projectType && <FieldError msg={errors.projectType} />}
+            </section>
+
             <Field label="Project name" error={errors.name}>
               <TextInput value={name} onChange={setName} placeholder="Shivalik Heights" />
             </Field>
@@ -315,20 +372,25 @@ export function ProjectForm() {
             <section className="flex flex-col gap-3">
               <SectionLabel>Status</SectionLabel>
               <div className="flex flex-wrap gap-2">
-                {BUILD_STATUS.map((s) => (
-                  <Chip key={s.value} selected={buildStatus === s.value} onClick={() => setBuildStatus(s.value)}>
+                {optionsOf("build_status").map((s) => (
+                  <OptionChip key={s.value} selected={buildStatus === s.value} onClick={() => setBuildStatus(s.value)}>
                     {s.label}
-                  </Chip>
+                  </OptionChip>
                 ))}
               </div>
             </section>
 
-            <RowButton
-              label="Possession"
-              value={possession ? formatMonth(possession) : null}
-              placeholder="Choose month"
-              onClick={() => setMonthSheet(true)}
-            />
+            {/* A finished scheme has nothing to possess LATER. The row was
+                unconditional, so "Ready to move" was still asked for a
+                possession month and the server stored whatever was picked. */}
+            {buildStatus !== "ready" && (
+              <RowButton
+                label="Possession"
+                value={possession ? formatMonth(possession) : null}
+                placeholder="Choose month"
+                onClick={() => setMonthSheet(true)}
+              />
+            )}
 
             <div className="flex gap-3">
               <Field label="Towers"><TextInput value={towers} onChange={(v) => setTowers(v.replace(/\D/g, ""))} numeric /></Field>
@@ -357,13 +419,29 @@ export function ProjectForm() {
                     className="flex h-11 items-center justify-between rounded-8 border border-border bg-surface-1 px-3 text-left"
                   >
                     <span className={cn("text-15", exemptReason ? "text-ink-primary" : "text-ink-tertiary")}>
-                      {exemptReason || "Choose a reason"}
+                      {optionsOf("rera_exempt_reason").find((o) => o.value === exemptReason)?.label ?? "Choose a reason"}
                     </span>
                     <Icon name="chevron-right" size={20} className="text-ink-tertiary" />
                   </button>
                 </Field>
               )}
             </section>
+
+            {/* The chosen scheme's own questions — the site area, the permitted
+                floors on a plotting scheme, the Occupancy Certificate on a
+                finished one. Rendered by the SAME component the listing form
+                uses, so the two screens cannot drift apart again. */}
+            <DynamicSections
+              keys={chosenType?.fields ?? []}
+              defs={fieldDefs}
+              groups={fieldGroups}
+              values={{ ...attrs, build_status: buildStatus }}
+              errors={errors}
+              required={chosenType?.required ?? []}
+              landUnits
+              onChange={setAttr}
+              fallbackLabel={`${chosenType?.label ?? "Project"} details`}
+            />
           </>
         )}
 
@@ -448,9 +526,9 @@ export function ProjectForm() {
                 {amenityOptions.map((a) => {
                   const on = amenities.includes(a.label);
                   return (
-                    <Chip key={a.code} selected={on} onClick={() => setAmenities((c) => on ? c.filter((x) => x !== a.label) : [...c, a.label])}>
+                    <OptionChip key={a.code} selected={on} onClick={() => setAmenities((c) => on ? c.filter((x) => x !== a.label) : [...c, a.label])}>
                       {a.label}
-                    </Chip>
+                    </OptionChip>
                   );
                 })}
               </div>
@@ -459,12 +537,12 @@ export function ProjectForm() {
             <section className="flex flex-col gap-3">
               <SectionLabel>Bank approvals</SectionLabel>
               <div className="flex flex-wrap gap-2">
-                {BANKS.map((b) => {
-                  const on = banks.includes(b);
+                {optionsOf("bank_approvals").map((b) => {
+                  const on = banks.includes(b.value);
                   return (
-                    <Chip key={b} selected={on} onClick={() => setBanks((c) => on ? c.filter((x) => x !== b) : [...c, b])}>
-                      {b}
-                    </Chip>
+                    <OptionChip key={b.value} selected={on} onClick={() => setBanks((c) => on ? c.filter((x) => x !== b.value) : [...c, b.value])}>
+                      {b.label}
+                    </OptionChip>
                   );
                 })}
               </div>
@@ -491,8 +569,9 @@ export function ProjectForm() {
               <SectionLabel>Review</SectionLabel>
               <div className="flex flex-col rounded-12 border border-border bg-surface-1">
                 <ReviewRow label="Project" value={name} onEdit={() => setStep(0)} />
-                <ReviewRow label="Status" value={BUILD_STATUS.find((b) => b.value === buildStatus)?.label ?? ""} onEdit={() => setStep(0)} />
-                <ReviewRow label="RERA" value={reraExempt ? `Exempt — ${exemptReason}` : reraNumber} onEdit={() => setStep(0)} />
+                <ReviewRow label="Type" value={chosenType?.label ?? ""} onEdit={() => setStep(0)} />
+                <ReviewRow label="Status" value={optionsOf("build_status").find((b) => b.value === buildStatus)?.label ?? ""} onEdit={() => setStep(0)} />
+                <ReviewRow label="RERA" value={reraExempt ? `Exempt — ${optionsOf("rera_exempt_reason").find((o) => o.value === exemptReason)?.label ?? exemptReason}` : reraNumber} onEdit={() => setStep(0)} />
                 <ReviewRow label="Unit types" value={`${units.length} added`} onEdit={() => setStep(1)} />
                 <ReviewRow label="Amenities" value={amenities.length ? `${amenities.length} selected` : "None"} onEdit={() => setStep(3)} />
                 <ReviewRow label="Banks" value={banks.length ? banks.join(", ") : "None"} onEdit={() => setStep(3)} />
@@ -531,16 +610,17 @@ export function ProjectForm() {
 
       <BottomSheet open={reasonSheet} onClose={() => setReasonSheet(false)} title="Exemption reason">
         <div className="flex flex-col pb-2">
-          {EXEMPT_REASONS.map((r) => (
-            <button key={r} onClick={() => { setExemptReason(r); setReasonSheet(false); }} className="flex h-12 items-center justify-between px-4 text-left active:bg-surface-2">
-              <span className="text-15 text-ink-primary">{r}</span>
-              {exemptReason === r && <Icon name="check" size={20} className="text-accent" />}
+          {optionsOf("rera_exempt_reason").map((r) => (
+            <button key={r.value} onClick={() => { setExemptReason(r.value); setReasonSheet(false); }} className="flex h-12 items-center justify-between px-4 text-left active:bg-surface-2">
+              <span className="text-15 text-ink-primary">{r.label}</span>
+              {exemptReason === r.value && <Icon name="check" size={20} className="text-accent" />}
             </button>
           ))}
         </div>
       </BottomSheet>
 
       <UnitSheet
+        unitNames={chosenType?.unitTypes ?? []}
         open={Boolean(unitSheet)}
         initial={unitSheet?.index !== null && unitSheet?.index !== undefined ? units[unitSheet.index] : null}
         onClose={() => setUnitSheet(null)}
@@ -732,16 +812,22 @@ function BrochureTile({
 }
 
 function UnitSheet({
-  open, initial, onClose, onSave,
-}: { open: boolean; initial: UnitDraft | null; onClose: () => void; onSave: (u: UnitDraft) => void }) {
-  const blank: UnitDraft = { unitType: "", areaSqft: "", carpetSqft: "", priceFrom: "", unitsAvailable: "", floorPlanUrl: null };
-  const [u, setU] = useState<UnitDraft>(blank);
+  open, initial, onClose, onSave, unitNames,
+}: { open: boolean; initial: UnitDraft | null; onClose: () => void; onSave: (u: UnitDraft) => void;
+     /** The chosen scheme's own unit names — a row-house scheme no longer has
+      *  to call its units "1 BHK" or "Shop" (migration 0062). */
+     unitNames: string[] }) {
+  // Module scope, not a fresh object every render — as a local it was a new
+  // identity each time, which is what the exhaustive-deps warning below was
+  // really about and why the disable comment (placed on the wrong line, so it
+  // never applied) was there.
+  const [u, setU] = useState<UnitDraft>(BLANK_UNIT);
   const [nameSheet, setNameSheet] = useState(false);
   const [planBusy, setPlanBusy] = useState(false);
   const planRef = useRef<HTMLInputElement>(null);
   const toast = useToast();
 
-  useEffect(() => { if (open) setU(initial ?? blank); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [open, initial]);
+  useEffect(() => { if (open) setU(initial ?? BLANK_UNIT); }, [open, initial]);
 
   const set = (k: keyof UnitDraft, v: string | null) => setU((c) => ({ ...c, [k]: v }));
   const bump = (delta: number) =>
@@ -816,7 +902,7 @@ function UnitSheet({
 
       <BottomSheet open={nameSheet} onClose={() => setNameSheet(false)} title="Unit name">
         <div className="flex flex-col pb-2">
-          {UNIT_NAMES.map((n) => (
+          {unitNames.map((n) => (
             <button key={n} onClick={() => { set("unitType", n); setNameSheet(false); }} className="flex h-12 items-center justify-between px-4 text-left active:bg-surface-2">
               <span className="text-15 text-ink-primary">{n}</span>
               {u.unitType === n && <Icon name="check" size={20} className="text-accent" />}

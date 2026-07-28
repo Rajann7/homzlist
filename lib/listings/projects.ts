@@ -2,7 +2,8 @@ import "server-only";
 import { createServiceClient } from "@/lib/supabase/server";
 import { consumeQuota, reserveSlot, transitionSlot } from "@/lib/billing/service";
 import { formatShortRupees } from "@/lib/billing/money";
-import { getAmenityLabels } from "./service";
+import { getAmenityLabels, getFieldDefinitions, getFieldGroups, type FieldDefinitionRow } from "./service";
+import { visibleKeys } from "./visibility";
 import { STATUS_BADGE } from "./dto";
 
 /**
@@ -21,6 +22,129 @@ export class NoProjectSlotError extends Error {
   constructor() {
     super("PLAN_REQUIRED");
   }
+}
+
+export interface ProjectTypeRow {
+  code: string;
+  label: string;
+  category: "residential" | "commercial" | "plot" | "mixed";
+  /** Unit names this kind of scheme offers in its "Add unit type" sheet. */
+  unit_types: string[];
+  field_config: { fields?: string[]; required?: string[] };
+  sort_order: number;
+}
+
+/**
+ * The project types a builder can post (migration 0062).
+ *
+ * There was no such thing before: a plotting scheme, a shopping complex and an
+ * apartment tower all filled in one identical five-step form, which asked all
+ * of them for towers and floors and none of them for the site area.
+ */
+export async function getProjectTypes(): Promise<ProjectTypeRow[]> {
+  const { data } = await db().from("project_types").select("*").eq("is_active", true).order("sort_order");
+  return (data ?? []) as ProjectTypeRow[];
+}
+
+export async function getProjectType(code: string | null): Promise<ProjectTypeRow | null> {
+  if (!code) return null;
+  const { data } = await db().from("project_types").select("*").eq("code", code).eq("is_active", true).maybeSingle();
+  return (data as ProjectTypeRow) ?? null;
+}
+
+/**
+ * The project mirror of `sanitizeAttributes` — same two jobs, same evaluator.
+ * A key the chosen scheme never asks for is dropped (mass assignment), and so
+ * is one whose condition doesn't hold: no Occupancy Certificate on a scheme
+ * that is still under construction, no launch date on a finished one.
+ */
+export async function sanitizeProjectAttributes(
+  raw: Record<string, unknown>,
+  type: ProjectTypeRow | null,
+  /**
+   * Values that drive visibility but live in COLUMNS, not in the attribute bag
+   * — `build_status` is the only one today. It must be handed in rather than
+   * read out of `raw`: it was briefly both a column and a scheme field, and the
+   * duplicate inside `attributes` is what the rules ended up reading, so a
+   * ready-to-move scheme lost its Occupancy Certificate (migration 0064).
+   */
+  context: Record<string, unknown> = {},
+): Promise<Record<string, unknown>> {
+  if (!type) return {};
+  const defs = await getFieldDefinitions();
+  const byKey = Object.fromEntries(defs.map((d) => [d.key, d]));
+  const asked = (type.field_config.fields ?? []).filter((k) => byKey[k]);
+  const out: Record<string, unknown> = {};
+  // Context LAST: a hand-made payload must not be able to smuggle its own
+  // `build_status` into the bag and unlock a field the real column forbids.
+  for (const k of visibleKeys(asked, byKey, { ...(raw ?? {}), ...context })) {
+    const v = (raw ?? {})[k];
+    if (v === undefined || v === null || v === "") continue;
+    if (typeof v === "object" && !Array.isArray(v) && !(v as { value?: unknown }).value) continue;
+    if (Array.isArray(v) && !v.length) continue;
+    out[k] = v;
+  }
+  return out;
+}
+
+/**
+ * Everything `projectDTO` needs to turn stored codes into labels: the field
+ * definitions, the section list, and the type map. Loaded once per call site
+ * rather than per project, so a builder's 60-project tab is still three
+ * queries and not three per row.
+ */
+async function projectContext() {
+  const [defs, groups, types] = await Promise.all([getFieldDefinitions(), getFieldGroups(), getProjectTypes()]);
+  const byCode = new Map(types.map((t) => [t.code, t]));
+  return { defs, groups, forRow: (p: { project_type?: string | null }) => byCode.get(p.project_type ?? "") ?? null };
+}
+
+/** A stored option CODE rendered through its own definition's label. */
+function optionLabel(defs: FieldDefinitionRow[] | undefined, key: string, value: string | null): string | null {
+  if (!value) return null;
+  const def = defs?.find((d) => d.key === key);
+  return def?.options?.find((o) => o.value === value)?.label ?? value;
+}
+
+/** Project attributes → the detail screen's titled blocks, like a listing's. */
+function projectAttributeGroups(
+  attrs: Record<string, unknown>,
+  type: ProjectTypeRow | null,
+  defs: FieldDefinitionRow[] | undefined,
+  groups: { key: string; label: string }[] | undefined,
+) {
+  if (!defs?.length || !type) return [];
+  const byKey = new Map(defs.map((d) => [d.key, d]));
+  const order = (type.field_config.fields ?? []).filter((k) => k in attrs);
+  const keys = [...order, ...Object.keys(attrs).filter((k) => !order.includes(k))];
+
+  const rows: { key: string; label: string; value: string; group: string | null }[] = [];
+  for (const key of keys) {
+    const raw = attrs[key];
+    if (raw === null || raw === undefined || raw === "") continue;
+    const def = byKey.get(key);
+    const label = def?.label ?? key.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
+    const opt = (v: unknown) => def?.options?.find((o) => o.value === String(v))?.label ?? String(v);
+    let value: string;
+    if (typeof raw === "boolean") { if (!raw) continue; value = "Yes"; }
+    else if (Array.isArray(raw)) { if (!raw.length) continue; value = raw.map(opt).join(", "); }
+    else if (raw && typeof raw === "object" && "value" in (raw as Record<string, unknown>)) {
+      const a = raw as { value: string; unit?: string };
+      if (!a.value) continue;
+      value = `${Number(a.value).toLocaleString("en-IN")} ${a.unit ?? "sq ft"}`;
+    } else value = opt(raw);
+    rows.push({ key, label, value, group: def?.group ?? null });
+  }
+
+  const known = groups ?? [];
+  const out: { key: string; label: string; rows: typeof rows }[] = [];
+  for (const g of known) {
+    const items = rows.filter((r) => r.group === g.key);
+    if (items.length) out.push({ key: g.key, label: g.label, rows: items });
+  }
+  const rest = rows.filter((r) => !r.group || !known.some((g) => g.key === r.group));
+  if (rest.length) out.push({ key: "other", label: "More details", rows: rest });
+  return out;
 }
 
 export interface ProjectUnitInput {
@@ -55,6 +179,8 @@ export async function createProject(
     areaId: string | null;
     areaLabel: string | null;
     pincode: string | null;
+    projectType: string | null;
+    attributes: Record<string, unknown>;
     units: ProjectUnitInput[];
   },
 ) {
@@ -94,6 +220,8 @@ export async function createProject(
       area_id: input.areaId,
       area_label: input.areaLabel,
       pincode: input.pincode,
+      project_type: input.projectType,
+      attributes: input.attributes,
       expires_at: expires,
     })
     .select("*")
@@ -123,7 +251,8 @@ export async function createProject(
   if (units.length) await db().from("project_units").insert(units);
 
   await db().from("listing_slots").update({ listing_id: project.id }).eq("id", slotId);
-  return projectDTO(data, units);
+  const ctx = await projectContext();
+  return projectDTO(data, units, undefined, { defs: ctx.defs, groups: ctx.groups, type: ctx.forRow(data as any) });
 }
 
 /**
@@ -178,6 +307,8 @@ export async function updateProject(
       area_id: input.areaId,
       area_label: input.areaLabel,
       pincode: input.pincode,
+      project_type: input.projectType,
+      attributes: input.attributes,
     })
     .eq("id", projectId)
     .eq("profile_id", profileId)
@@ -201,7 +332,8 @@ export async function updateProject(
   await db().from("project_units").delete().eq("project_id", projectId);
   if (units.length) await db().from("project_units").insert(units);
 
-  return projectDTO(data, units);
+  const ctx = await projectContext();
+  return projectDTO(data, units, undefined, { defs: ctx.defs, groups: ctx.groups, type: ctx.forRow(data as any) });
 }
 
 /**
@@ -268,8 +400,9 @@ export async function listMyProjects(profileId: string) {
     .eq("profile_id", profileId)
     .is("deleted_at", null)
     .order("created_at", { ascending: false });
-  const amenityLabels = await getAmenityLabels();
-  return ((data ?? []) as any[]).map((p) => projectDTO(p, p.project_units ?? [], amenityLabels));
+  const [amenityLabels, ctx] = await Promise.all([getAmenityLabels(), projectContext()]);
+  return ((data ?? []) as any[]).map((p) =>
+    projectDTO(p, p.project_units ?? [], amenityLabels, { defs: ctx.defs, groups: ctx.groups, type: ctx.forRow(p) }));
 }
 
 /**
@@ -293,8 +426,9 @@ export async function listPublicProjectsByProfile(profileId: string) {
     .is("deleted_at", null)
     .order("created_at", { ascending: false })
     .limit(60);
-  const amenityLabels = await getAmenityLabels();
-  return ((data ?? []) as any[]).map((p) => projectDTO(p, p.project_units ?? [], amenityLabels));
+  const [amenityLabels, ctx] = await Promise.all([getAmenityLabels(), projectContext()]);
+  return ((data ?? []) as any[]).map((p) =>
+    projectDTO(p, p.project_units ?? [], amenityLabels, { defs: ctx.defs, groups: ctx.groups, type: ctx.forRow(p) }));
 }
 
 /**
@@ -319,9 +453,9 @@ export async function getProject(id: string, viewerId: string | null) {
     .eq("id", p.profile_id)
     .maybeSingle();
 
-  const amenityLabels = await getAmenityLabels();
+  const [amenityLabels, ctx] = await Promise.all([getAmenityLabels(), projectContext()]);
   return {
-    ...projectDTO(p, p.project_units ?? [], amenityLabels),
+    ...projectDTO(p, p.project_units ?? [], amenityLabels, { defs: ctx.defs, groups: ctx.groups, type: ctx.forRow(p) }),
     isOwner,
     // The builder's profile id. Needed to write a lead against them when a
     // viewer taps Call/WhatsApp, and no more sensitive than the poster id the
@@ -361,13 +495,12 @@ export async function updateProjectUnits(projectId: string, profileId: string, u
   return true;
 }
 
-const BUILD_STATUS_LABEL: Record<string, string> = {
-  booking_open: "Booking open",
-  under_construction: "Under Construction",
-  ready: "Ready to move",
-};
-
-function projectDTO(p: any, units: any[], amenityLabels?: Map<string, string>) {
+function projectDTO(
+  p: any,
+  units: any[],
+  amenityLabels?: Map<string, string>,
+  extra?: { defs?: FieldDefinitionRow[]; groups?: { key: string; label: string }[]; type?: ProjectTypeRow | null },
+) {
   // Cheapest unit — what a project card shows where a listing shows its price.
   const from = (units ?? [])
     .map((u) => u.price_from_paise)
@@ -379,14 +512,29 @@ function projectDTO(p: any, units: any[], amenityLabels?: Map<string, string>) {
     // the same badge rather than a parallel one (designs/P9 S1 Projects tab).
     badge: STATUS_BADGE[p.status] ?? { kind: "expired", label: p.status },
     priceFrom: from ? formatShortRupees(from) : null,
-    buildStatusLabel: p.build_status ? BUILD_STATUS_LABEL[p.build_status] ?? p.build_status : null,
+    // The label comes from `field_definitions.build_status` options — the same
+    // row the form renders its chips from. It used to be a second copy of those
+    // three strings in here, so renaming one renamed it in only one place.
+    buildStatusLabel: p.build_status
+      ? optionLabel(extra?.defs, "build_status", p.build_status)
+      : null,
     possessionLabel: p.possession_date
       ? new Date(p.possession_date).toLocaleDateString("en-IN", { month: "short", year: "numeric" })
       : null,
     id: p.id,
     name: p.name,
     status: p.status,
-    rera: p.rera_exempt ? { exempt: true as const, reason: p.rera_exempt_reason } : { exempt: false as const, number: p.rera_number },
+    // Same rule for the exemption reason: a stored code, rendered through its
+    // option label. It used to be free text typed into the row.
+    rera: p.rera_exempt
+      ? { exempt: true as const, reason: optionLabel(extra?.defs, "rera_exempt_reason", p.rera_exempt_reason) }
+      : { exempt: false as const, number: p.rera_number },
+    projectType: p.project_type ?? null,
+    projectTypeLabel: extra?.type?.label ?? null,
+    /** Type-specific answers, rendered in the same titled blocks a listing uses. */
+    attributeGroups: projectAttributeGroups(p.attributes ?? {}, extra?.type ?? null, extra?.defs, extra?.groups),
+    /** The raw map, so the edit form can re-open its controls on real values. */
+    attributes: (p.attributes ?? {}) as Record<string, unknown>,
     buildStatus: p.build_status,
     possessionDate: p.possession_date,
     towers: p.towers,

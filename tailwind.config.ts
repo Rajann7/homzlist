@@ -42,6 +42,7 @@ const config: Config = {
     borderRadius: {
       none: "0px",
       "4": "4px", // badges, tiny
+      "6": "6px", // form controls — inputs, option chips, toggle rows
       "8": "8px", // cards, inputs, buttons (standard)
       "12": "12px", // sheet top corners, large cards
       "16": "16px", // modals/dialogs

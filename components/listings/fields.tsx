@@ -8,6 +8,8 @@
  * a code change.
  */
 
+import type { ShowIf } from "@/lib/listings/visibility";
+
 export interface FieldOption {
   value: string;
   label: string;
@@ -27,9 +29,12 @@ export interface FieldDef {
   hint?: string | null;
   /**
    * Conditional visibility, from the DB. Possession only exists while the
-   * build is unfinished; the furnishing checklist only once furnishing is set.
+   * build is unfinished; the furnishing checklist only once furnishing is set;
+   * road width only once the plot is road-touching. The grammar and the single
+   * evaluator both live in `lib/listings/visibility` — the server runs the same
+   * one to strip a hidden field's value before it can be stored.
    */
-  showIf?: { field: string; in: string[] } | null;
+  showIf?: ShowIf | null;
   /**
    * Area unit set for an `area` control: 'land' shows Vigha/Guntha/Acre,
    * 'built' shows sq ft/yard/m. Null falls back to the type's areaUnits flag.

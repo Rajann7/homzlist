@@ -3,6 +3,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { consumeQuota, releaseQuota, reserveSlot, transitionSlot } from "@/lib/billing/service";
 import { stopBoostsForSubject, pauseBoostsForSubject, resumeBoostsForSubject } from "@/lib/billing/boost";
 import { primaryAreaSqft } from "./validate";
+import { keysForKind, visibleKeys, type ShowIf } from "./visibility";
 import { pgrstSafe } from "@/lib/search/parse";
 import { notify } from "@/lib/notifications/service";
 import { rupees } from "@/lib/notifications/subjects";
@@ -82,6 +83,8 @@ export interface PropertyTypeRow {
   kinds: ("sell" | "rent")[];
   field_config: {
     fields?: string[]; hidden?: string[]; required?: string[];
+    /** Sell-only extras (ownership document, bank-loan flag) — never asked of a landlord. */
+    sell_fields?: string[];
     /** Rent-only extras (deposit, lease duration…) — per type, not per client. */
     rent_fields?: string[];
     area_units?: boolean;
@@ -103,8 +106,8 @@ export interface FieldDefinitionRow {
   options: { value: string; label: string }[];
   placeholder: string | null;
   hint: string | null;
-  /** Show this field only while another field holds one of these values. */
-  showIf: { field: string; in: string[] } | null;
+  /** Show this field only while its condition holds — see lib/listings/visibility. */
+  showIf: ShowIf | null;
   /** Area unit set: 'land' (Vigha/Guntha) | 'built' (metric) | null (type flag). */
   units: "land" | "built" | null;
   /**
@@ -148,6 +151,48 @@ export async function getFieldDefinitions(): Promise<FieldDefinitionRow[]> {
   // other DTO field, so normalise here rather than in the component.
   return ((data ?? []) as (Omit<FieldDefinitionRow, "showIf"> & { show_if: FieldDefinitionRow["showIf"] })[])
     .map(({ show_if, ...f }) => ({ ...f, showIf: show_if ?? null, group: f.group ?? null }));
+}
+
+/**
+ * The attributes a listing is ALLOWED to store, for this type and this kind.
+ *
+ * Two separate holes closed here, both of which the client alone could not fix:
+ *
+ * 1. MASS ASSIGNMENT. Whatever `attributes` the payload carried was written
+ *    verbatim, so a hand-made request could hang arbitrary keys — including a
+ *    key belonging to another type, which then rendered on the detail screen —
+ *    off any listing. Only keys the type actually asks for survive now.
+ *
+ * 2. STALE HIDDEN VALUES. Fill in "Possession by", then switch the property to
+ *    ready-to-move: the control disappears but its value stayed in state and
+ *    was saved, so a finished flat advertised a possession date. The same held
+ *    for a road width with no road touch and a furnishing checklist on a bare
+ *    shell. A field that is not visible has no value, and the server is where
+ *    that has to be decided.
+ *
+ * Returns the visible key set too, so validation only demands the required
+ * fields the seller could actually see.
+ */
+export async function sanitizeAttributes(
+  raw: Record<string, unknown>,
+  type: PropertyTypeRow,
+  kind: string,
+): Promise<{ attributes: Record<string, unknown>; visible: Set<string> }> {
+  const defs = await getFieldDefinitions();
+  const byKey: Record<string, FieldDefinitionRow> = Object.fromEntries(defs.map((d) => [d.key, d]));
+  const asked = keysForKind(type.field_config, kind).filter((k) => byKey[k]);
+  const visible = visibleKeys(asked, byKey, raw ?? {});
+
+  const attributes: Record<string, unknown> = {};
+  for (const k of visible) {
+    const v = (raw ?? {})[k];
+    if (v === undefined || v === null || v === "") continue;
+    // An `area` control's {value, unit} with a blank magnitude is not an answer.
+    if (typeof v === "object" && !Array.isArray(v) && !(v as { value?: unknown }).value) continue;
+    if (Array.isArray(v) && !v.length) continue;
+    attributes[k] = v;
+  }
+  return { attributes, visible: new Set(visible) };
 }
 
 export async function getAmenities(category?: string) {

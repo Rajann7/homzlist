@@ -3,7 +3,20 @@ import { ok, fail } from "@/lib/api";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { getProfileById } from "@/lib/profile/service";
 import { rateLimit } from "@/lib/auth/rate-limit";
-import { getProject, updateProject } from "@/lib/listings/projects";
+import { getProject, updateProject, getProjectType, sanitizeProjectAttributes } from "@/lib/listings/projects";
+import { getFieldDefinitions } from "@/lib/listings/service";
+
+/** Option lists live in the database (migration 0062) — see the create route. */
+async function optionValues(key: string): Promise<string[]> {
+  const defs = await getFieldDefinitions();
+  return (defs.find((d) => d.key === key)?.options ?? []).map((o) => o.value);
+}
+async function isExemptReason(code: string): Promise<boolean> {
+  return Boolean(code) && (await optionValues("rera_exempt_reason")).includes(code);
+}
+async function validBuildStatus(v: unknown): Promise<string | null> {
+  return typeof v === "string" && (await optionValues("build_status")).includes(v) ? v : null;
+}
 
 /**
  * GET   /api/v1/projects/:id (Doc7 §60) — project detail. Numbers are always
@@ -44,11 +57,27 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   const name = typeof body.name === "string" ? body.name.trim() : "";
   if (name.length < 3 || name.length > 120) return fail("VALIDATION_ERROR", { field: "name" });
 
+  // Same as the create path: the scheme kind decides which extras it may carry.
+  const projectType = await getProjectType(typeof body.projectType === "string" ? body.projectType : null);
+  if (!projectType) return fail("VALIDATION_ERROR", { errors: { projectType: "Choose the project type" } });
+  const buildStatus = await validBuildStatus(body.buildStatus);
+  const allowedBanks = await optionValues("bank_approvals");
+  const attributes = await sanitizeProjectAttributes(
+    typeof body.attributes === "object" && body.attributes ? body.attributes : {},
+    projectType,
+    { build_status: buildStatus },
+    );
+  if (Number.isInteger(body.totalUnits) && Number.isInteger(body.availableUnits) && body.availableUnits > body.totalUnits) {
+    return fail("VALIDATION_ERROR", { errors: { availableUnits: "Available units can't exceed total units" } });
+  }
+
   const reraExempt = body.reraExempt === true;
   const reraNumber = typeof body.reraNumber === "string" ? body.reraNumber.trim() : "";
   const exemptReason = typeof body.reraExemptReason === "string" ? body.reraExemptReason.trim() : "";
   if (!reraExempt && !reraNumber) return fail("VALIDATION_ERROR", { field: "reraNumber" });
-  if (reraExempt && exemptReason.length < 5) return fail("VALIDATION_ERROR", { field: "reraExemptReason" });
+  if (reraExempt && !(await isExemptReason(exemptReason))) {
+    return fail("VALIDATION_ERROR", { errors: { reraExemptReason: "Choose an exemption reason" } });
+  }
   if (!body.cityId) return fail("VALIDATION_ERROR", { errors: { cityId: "Choose the project's city" } });
 
   // Same shape check as the create path — these are FK columns.
@@ -68,13 +97,17 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     reraNumber: reraExempt ? null : reraNumber,
     reraExempt,
     reraExemptReason: reraExempt ? exemptReason : null,
-    buildStatus: ["booking_open", "under_construction", "ready"].includes(body.buildStatus) ? body.buildStatus : null,
-    possessionDate: typeof body.possessionDate === "string" ? body.possessionDate : null,
+    buildStatus,
+    possessionDate: buildStatus === "ready" ? null : (typeof body.possessionDate === "string" ? body.possessionDate : null),
     towers: Number.isInteger(body.towers) ? body.towers : null,
     floors: Number.isInteger(body.floors) ? body.floors : null,
     totalUnits: Number.isInteger(body.totalUnits) ? body.totalUnits : null,
     availableUnits: Number.isInteger(body.availableUnits) ? body.availableUnits : null,
-    bankApprovals: Array.isArray(body.bankApprovals) ? body.bankApprovals.filter((b: unknown) => typeof b === "string").slice(0, 20) : [],
+    // Checked against the option list, not just "is a string" — the chips are
+      // database rows now, so an unknown lender is a hand-made payload.
+      bankApprovals: Array.isArray(body.bankApprovals)
+        ? body.bankApprovals.filter((b: unknown) => typeof b === "string" && allowedBanks.includes(b)).slice(0, 20)
+        : [],
     amenities: Array.isArray(body.amenities) ? body.amenities.filter((a: unknown) => typeof a === "string").slice(0, 40) : [],
     description: typeof body.description === "string" ? body.description.slice(0, 5000) : null,
     stateId: body.stateId ?? null,
@@ -84,6 +117,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     areaId: body.areaId ?? null,
     areaLabel: typeof body.areaLabel === "string" ? body.areaLabel.slice(0, 120) : null,
     pincode,
+    projectType: projectType.code,
+    attributes,
     units: Array.isArray(body.units) ? body.units.slice(0, 40) : [],
   });
 

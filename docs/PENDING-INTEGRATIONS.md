@@ -2830,3 +2830,45 @@ Listings created before the cascade existed have `district_id`/`taluka_id` null
 projects table was backfilled by migration 0056; `listings` was not, because
 migration 0021 already tried and these rows predate the ids it needed. Harmless
 today — a district-level filter on the buy side would miss them.
+
+### 6. The preview screen has not been re-checked against the new field set
+
+Deliberately out of scope this round (Rajan is taking it in the next prompt).
+`components/listings/Preview.tsx` renders what the create flow collected, and
+the create flow now collects 15 new field types, per-kind extras (`sell_fields`
+/ `rent_fields`) and conditional fields. Two things to look at when it comes
+up: whether the preview reads `attributeGroups` (which is correct and already
+per-kind ordered) or re-derives its own list from `type.fields` (which would
+now be missing the sell/rent extras), and whether it hides the same fields the
+form hid.
+
+### 7. Admin moderation has not been checked against project types
+
+Item 4 above, for the other form. `project_types` (migration 0062) is new: a
+project now carries a `project_type` and an `attributes` blob, and the admin
+review queue was not looked at. A moderator approving a plotting scheme
+probably cannot see its land-use zone, permitted floors or plot count.
+
+### 8. No project facets on the buy side
+
+Listings got facets for all 15 new fields (migration 0061). Projects have no
+filter sheet of their own at all, so `project_type` — the single most obvious
+thing to filter a project list by — is collected and stored but not searchable.
+Needs a project search surface first; not a gap inside the create flow.
+
+### 9. `possession` and `age` moved vocabulary; old rows were migrated, old
+saved searches were not
+
+Migration 0060 replaced `construction_status` new/resale with
+ready_to_move/under_construction/new_launch and dropped the two non-age values
+from `age`. Listing rows were rewritten in the same migration. A SAVED SEARCH
+that filtered on `construction_status=resale` still holds the old code and
+would now match nothing — it was not rewritten because the mapping for a
+*filter* is not the mapping for a row (a user who asked for "resale" meant
+"not new", which is not one new value).
+
+Checked, and nothing is broken TODAY: `select count(*) filter (where
+params::text like '%construction_status%' or params::text like '%age%') from
+saved_searches` returns 0 of 1. This is only a hazard if the same vocabulary is
+changed again once real users have saved searches — at which point the change
+needs a params rewrite in the same migration.

@@ -2,6 +2,7 @@ import { ok, fail } from "@/lib/api";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { getProfileById } from "@/lib/profile/service";
 import { getPropertyTypes, getFieldDefinitions, getAmenities, getFieldGroups } from "@/lib/listings/service";
+import { getProjectTypes } from "@/lib/listings/projects";
 import { typeConfigDTO } from "@/lib/listings/dto";
 import { AREA_UNITS } from "@/lib/listings/validate";
 
@@ -33,16 +34,31 @@ export async function GET() {
   const profile = await getProfileById(claims.sub);
   if (!profile) return fail("UNAUTHORIZED");
 
-  const [types, fields, amenities, groups] = await Promise.all([
+  const [types, fields, amenities, groups, projectTypes] = await Promise.all([
     getPropertyTypes(profile.role),
     getFieldDefinitions(),
     getAmenities(),
     getFieldGroups(),
+    // Projects are Builder-only, so nobody else needs the list (Doc2 §6).
+    profile.role === "builder" ? getProjectTypes() : Promise.resolve([]),
   ]);
 
   return ok({
     role: profile.role,
     types: types.map(typeConfigDTO),
+    /**
+     * The kinds of scheme a builder can post, and what each one asks for
+     * (migration 0062). The project form used to hardcode its status chips, its
+     * RERA exemption reasons and its seven unit names in the component.
+     */
+    projectTypes: projectTypes.map((t) => ({
+      code: t.code,
+      label: t.label,
+      category: t.category,
+      unitTypes: t.unit_types ?? [],
+      fields: t.field_config?.fields ?? [],
+      required: t.field_config?.required ?? [],
+    })),
     // Keyed by field name so the form can look up a definition directly.
     fieldDefs: Object.fromEntries(fields.map((f) => [f.key, f])),
     // The titled blocks the form renders, in order (migration 0055). Data, so

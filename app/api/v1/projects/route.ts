@@ -3,7 +3,25 @@ import { ok, fail } from "@/lib/api";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { getProfileById } from "@/lib/profile/service";
 import { rateLimit } from "@/lib/auth/rate-limit";
-import { createProject, listMyProjects, NoProjectSlotError } from "@/lib/listings/projects";
+import { createProject, listMyProjects, getProjectType, sanitizeProjectAttributes, NoProjectSlotError } from "@/lib/listings/projects";
+import { getFieldDefinitions } from "@/lib/listings/service";
+
+/**
+ * The exemption reasons and the build statuses are `field_definitions` option
+ * lists, not constants. Both used to be arrays of strings — one in the form
+ * component and a second copy in this route — so the two could disagree and
+ * the second one silently won.
+ */
+async function optionValues(key: string): Promise<string[]> {
+  const defs = await getFieldDefinitions();
+  return (defs.find((d) => d.key === key)?.options ?? []).map((o) => o.value);
+}
+async function isExemptReason(code: string): Promise<boolean> {
+  return Boolean(code) && (await optionValues("rera_exempt_reason")).includes(code);
+}
+async function validBuildStatus(v: unknown): Promise<string | null> {
+  return typeof v === "string" && (await optionValues("build_status")).includes(v) ? v : null;
+}
 
 /**
  * POST /api/v1/projects (Doc7 §59) — create a Builder project (₹9,999 slot).
@@ -47,11 +65,36 @@ export async function POST(req: NextRequest) {
   const name = typeof body.name === "string" ? body.name.trim() : "";
   if (name.length < 3 || name.length > 120) return fail("VALIDATION_ERROR", { field: "name" });
 
+  // A project now declares WHAT KIND of scheme it is (migration 0062), and that
+  // choice decides which extra fields it may carry. Without it the form had one
+  // shape for a plotting scheme and a shopping complex alike.
+  const projectType = await getProjectType(typeof body.projectType === "string" ? body.projectType : null);
+  if (!projectType) return fail("VALIDATION_ERROR", { errors: { projectType: "Choose the project type" } });
+
   const reraExempt = body.reraExempt === true;
   const reraNumber = typeof body.reraNumber === "string" ? body.reraNumber.trim() : "";
   const exemptReason = typeof body.reraExemptReason === "string" ? body.reraExemptReason.trim() : "";
   if (!reraExempt && !reraNumber) return fail("VALIDATION_ERROR", { field: "reraNumber" });
-  if (reraExempt && exemptReason.length < 5) return fail("VALIDATION_ERROR", { field: "reraExemptReason" });
+  // The reason is an option CODE now, not free text, so check it against the
+  // definition rather than against a length.
+  if (reraExempt && !(await isExemptReason(exemptReason))) {
+    return fail("VALIDATION_ERROR", { errors: { reraExemptReason: "Choose an exemption reason" } });
+  }
+
+  // Also an option list in the database now, so a fourth status is a row.
+  const buildStatus = await validBuildStatus(body.buildStatus);
+  const allowedBanks = await optionValues("bank_approvals");
+
+  const attributes = await sanitizeProjectAttributes(
+    typeof body.attributes === "object" && body.attributes ? body.attributes : {},
+    projectType,
+    { build_status: buildStatus },
+    );
+
+  // Available can never exceed total — the client checked it, nothing else did.
+  if (Number.isInteger(body.totalUnits) && Number.isInteger(body.availableUnits) && body.availableUnits > body.totalUnits) {
+    return fail("VALIDATION_ERROR", { errors: { availableUnits: "Available units can't exceed total units" } });
+  }
 
   if (!body.cityId) return fail("VALIDATION_ERROR", { errors: { cityId: "Choose the project's city" } });
 
@@ -77,13 +120,19 @@ export async function POST(req: NextRequest) {
       reraNumber: reraExempt ? null : reraNumber,
       reraExempt,
       reraExemptReason: reraExempt ? exemptReason : null,
-      buildStatus: ["booking_open", "under_construction", "ready"].includes(body.buildStatus) ? body.buildStatus : null,
-      possessionDate: typeof body.possessionDate === "string" ? body.possessionDate : null,
+      buildStatus,
+      // A finished scheme has no possession date to give — the form used to ask
+      // for one on "Ready to move" and store whatever was picked.
+      possessionDate: buildStatus === "ready" ? null : (typeof body.possessionDate === "string" ? body.possessionDate : null),
       towers: Number.isInteger(body.towers) ? body.towers : null,
       floors: Number.isInteger(body.floors) ? body.floors : null,
       totalUnits: Number.isInteger(body.totalUnits) ? body.totalUnits : null,
       availableUnits: Number.isInteger(body.availableUnits) ? body.availableUnits : null,
-      bankApprovals: Array.isArray(body.bankApprovals) ? body.bankApprovals.filter((b: unknown) => typeof b === "string").slice(0, 20) : [],
+      // Checked against the option list, not just "is a string" — the chips are
+      // database rows now, so an unknown lender is a hand-made payload.
+      bankApprovals: Array.isArray(body.bankApprovals)
+        ? body.bankApprovals.filter((b: unknown) => typeof b === "string" && allowedBanks.includes(b)).slice(0, 20)
+        : [],
       amenities: Array.isArray(body.amenities) ? body.amenities.filter((a: unknown) => typeof a === "string").slice(0, 40) : [],
       description: typeof body.description === "string" ? body.description.slice(0, 5000) : null,
       stateId: body.stateId ?? null,
@@ -93,6 +142,8 @@ export async function POST(req: NextRequest) {
       areaId: body.areaId ?? null,
       areaLabel: typeof body.areaLabel === "string" ? body.areaLabel.slice(0, 120) : null,
       pincode,
+      projectType: projectType.code,
+      attributes,
       units: Array.isArray(body.units) ? body.units.slice(0, 40) : [],
     });
     return ok({ project });

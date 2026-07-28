@@ -1,6 +1,7 @@
 import "server-only";
 import { createServiceClient } from "@/lib/supabase/server";
 import type { FilterConfig, FilterFacet, SearchFilters } from "./types";
+import { keysForKind } from "@/lib/listings/visibility";
 
 /**
  * The filter sheet's schema, built entirely from master data (CLAUDE.md rule 12).
@@ -58,7 +59,7 @@ async function buildBase(): Promise<FilterConfig> {
   ]);
 
   const fields = new Map<string, FieldDefRow>(((fieldRows ?? []) as FieldDefRow[]).map((f) => [f.key, f]));
-  const types = ((typeRows ?? []) as { code: string; label: string; category: string; field_config: { fields?: string[] } }[]);
+  const types = ((typeRows ?? []) as { code: string; label: string; category: string; field_config: { fields?: string[]; sell_fields?: string[]; rent_fields?: string[] } }[]);
 
   // Which types reveal each facet — the inverse of field_config.fields. This is
   // exactly the design's "selecting Flat reveals BHK…, selecting Plot hides
@@ -73,7 +74,13 @@ async function buildBase(): Promise<FilterConfig> {
       label: f.label ?? def?.label ?? f.field_key,
       control: f.control,
       options,
-      forTypes: types.filter((t) => (t.field_config?.fields ?? []).includes(f.field_key)).map((t) => t.code),
+      // Per-kind extras count too. Ownership and the bank-loan flag moved into
+      // `sell_fields` and the rent terms into `rent_fields` (migration 0060);
+      // reading only `fields` silently dropped those facets out of the sheet.
+      forTypes: types
+        .filter((t) => keysForKind(t.field_config, "sell").includes(f.field_key)
+          || keysForKind(t.field_config, "rent").includes(f.field_key))
+        .map((t) => t.code),
     };
   })
     // A chips facet with no options would render an empty section — drop it

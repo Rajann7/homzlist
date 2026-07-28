@@ -2,6 +2,7 @@ import "server-only";
 import { formatShortRupees } from "@/lib/billing/money";
 import type { FieldDefinitionRow, ListingRow, PropertyTypeRow } from "./service";
 import type { RequirementRow } from "./requirements";
+import { keysForKind } from "./visibility";
 
 /**
  * Listing DTOs (Doc9 §17 — explicit fields only).
@@ -37,10 +38,13 @@ function attributeRows(
   attrs: Record<string, unknown>,
   type: PropertyTypeRow | null,
   defs: FieldDefinitionRow[] | undefined,
+  kind = "sell",
 ) {
   if (!defs?.length) return [];
   const byKey = new Map(defs.map((d) => [d.key, d]));
-  const order = type?.field_config.fields ?? [];
+  // The per-kind extras are part of the order too — reading only `fields` put a
+  // rented office's lease duration and lock-in in the unordered tail.
+  const order = keysForKind(type?.field_config, kind);
   // Config order first, then anything the row still carries from an older
   // config (a retired field keeps showing rather than silently disappearing).
   const keys = [...order.filter((k) => k in attrs), ...Object.keys(attrs).filter((k) => !order.includes(k))];
@@ -225,7 +229,7 @@ export function listingDetailDTO(
 ) {
   const attrs = (l.attributes ?? {}) as Record<string, unknown>;
   const { keySpecs, highlights } = detailBlocks(attrs, type, opts.fieldDefs);
-  const rows = attributeRows(attrs, type, opts.fieldDefs);
+  const rows = attributeRows(attrs, type, opts.fieldDefs, l.kind);
 
   // ₹/sqft is computed HERE, from the same figures the row holds — the client
   // must never derive a price (CLAUDE.md §6).
@@ -441,6 +445,12 @@ export function typeConfigDTO(t: PropertyTypeRow) {
      * office needs its lease duration and lock-in, not a tenant preference.
      */
     rentFields: t.field_config.rent_fields ?? [],
+    /**
+     * The mirror image — asked only when the place is being SOLD. A landlord
+     * was being asked to state the ownership document and whether the property
+     * is approved for a bank loan, neither of which a tenant can use.
+     */
+    sellFields: t.field_config.sell_fields ?? [],
     areaUnits: Boolean(t.field_config.area_units),
   };
 }

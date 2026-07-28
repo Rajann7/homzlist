@@ -116,7 +116,15 @@ const USERS = [
   { role: "builder", phone: "+919825000002" },
 ];
 
-for (const u of USERS) {
+/**
+ * The conditional-field and validation phases post ~20 more listings, and
+ * `listing-create` is capped at 30 per hour per user (a real control, not a
+ * test nuisance — it must NOT be raised to make this file pass). They run as a
+ * fourth owner whose create budget is untouched by the 13-type walk above.
+ */
+const PROBE = { role: "owner", phone: "+919999000001" };
+
+for (const u of [...USERS, PROBE]) {
   const p = await one(`select id, role from profiles where phone=$1`, [u.phone]);
   if (!p) { console.error(`no profile for ${u.phone}`); process.exit(1); }
   u.id = p.id;
@@ -161,8 +169,45 @@ function valueFor(def, landUnits) {
   }
 }
 
-/** Fields whose visibility depends on another field's current value. */
-const visible = (def, values) => !def.showIf || def.showIf.in.includes(String(values[def.showIf.field] ?? ""));
+/**
+ * A SECOND, independent implementation of the show_if grammar.
+ *
+ * Deliberately not imported from lib/listings/visibility: the whole point of
+ * this file is to disagree with the server when the server is wrong. If both
+ * sides ran the same function, a bug in it would pass every check here.
+ */
+function matches(cond, values) {
+  if (!cond) return true;
+  if (cond.all) return cond.all.every((c) => matches(c, values));
+  if (cond.any) return cond.any.some((c) => matches(c, values));
+  const raw = values[cond.field];
+  if (cond.eq !== undefined) return (raw === true || raw === "true" || (typeof raw === "number" && raw !== 0)) === cond.eq;
+  if (cond.gt !== undefined) return (Number(raw) || 0) > cond.gt;
+  const v = raw === undefined || raw === null ? "" : String(raw);
+  if (cond.in && !cond.in.includes(v)) return false;
+  if (cond.not_in && cond.not_in.includes(v)) return false;
+  return true;
+}
+
+/** Keys a type asks for, for this kind — `fields` plus the per-kind extras. */
+function askedKeys(type, kind) {
+  const extra = (kind === "rent" ? type.rentFields : type.sellFields) ?? [];
+  return [...type.fields, ...extra.filter((k) => !type.fields.includes(k))];
+}
+
+/** Which of `keys` survive their conditions, given the values chosen. */
+function visibleKeys(keys, fieldDefs, values) {
+  const asked = new Set(keys);
+  let cur = new Set(keys);
+  for (let pass = 0; pass < 5; pass++) {
+    const seen = {};
+    for (const [k, v] of Object.entries(values)) if (!asked.has(k) || cur.has(k)) seen[k] = v;
+    const next = new Set(keys.filter((k) => matches(fieldDefs[k]?.showIf, seen)));
+    if (next.size === cur.size && [...next].every((k) => cur.has(k))) break;
+    cur = next;
+  }
+  return keys.filter((k) => cur.has(k));
+}
 
 const created = [];
 
@@ -188,22 +233,24 @@ for (const u of USERS) {
     for (const kind of type.kinds) {
       const label = `${u.role}/${type.code}/${kind}`;
 
-      // Fill every field the type names, plus the rent-only extras.
-      const keys = [...type.fields, ...(kind === "rent" ? type.rentFields : [])];
+      // Fill EVERY field the type names for this kind — INCLUDING the ones a
+      // real form would have hidden. Posting the hidden ones on purpose is the
+      // test: the server has to drop them, because the browser is where a stale
+      // possession date otherwise survives a switch to ready-to-move.
+      const keys = askedKeys(type, kind);
       const values = {};
-      // Two passes so a `showIf` field sees its controller's value.
-      for (let pass = 0; pass < 2; pass++) {
-        for (const k of keys) {
-          const def = fieldDefs[k];
-          if (!def || values[k] !== undefined) continue;
-          if (!visible(def, values)) continue;
-          values[k] = valueFor(def, type.areaUnits);
-        }
+      for (const k of keys) {
+        const def = fieldDefs[k];
+        if (def) values[k] = valueFor(def, type.areaUnits);
       }
+      const shownKeys = visibleKeys(keys, fieldDefs, values);
+      const hiddenKeys = keys.filter((k) => !shownKeys.includes(k));
 
-      const attrs = {};
       const RENT_COLUMNS = new Set(["deposit", "available_from", "maintenance_included"]);
+      const attrs = {};
       for (const [k, v] of Object.entries(values)) if (!RENT_COLUMNS.has(k)) attrs[k] = v;
+      // What must come back: the visible keys, minus those with their own column.
+      const expectAttrs = shownKeys.filter((k) => !RENT_COLUMNS.has(k));
 
       const payload = {
         typeCode: type.code,
@@ -251,11 +298,20 @@ for (const u of USERS) {
       check(row?.taluka_id === place.taluka_id && row?.district_id === place.district_id, `${label}: mid-chain stored`);
 
       const stored = row?.attributes ?? {};
-      const missing = Object.keys(attrs).filter((k) => stored[k] === undefined);
-      check(missing.length === 0, `${label}: all ${Object.keys(attrs).length} attributes persisted`, `missing: ${missing.join(", ")}`);
+      const missing = expectAttrs.filter((k) => stored[k] === undefined);
+      check(missing.length === 0, `${label}: all ${expectAttrs.length} visible attributes persisted`, `missing: ${missing.join(", ")}`);
+
+      // The other half of the same rule: a field the seller could not see has
+      // no value, no matter what the payload claimed.
+      const leaked = hiddenKeys.filter((k) => stored[k] !== undefined);
+      check(leaked.length === 0, `${label}: ${hiddenKeys.length} hidden field(s) stripped by the server`, `leaked: ${leaked.join(", ")}`);
+
+      // Nothing the type never asked for can be hung off the row either.
+      const foreign = Object.keys(stored).filter((k) => !keys.includes(k));
+      check(foreign.length === 0, `${label}: no attribute outside the type's config`, `extra: ${foreign.join(", ")}`);
 
       // Any type carrying an area field must end up comparable in sq ft.
-      const hasArea = keys.some((k) => fieldDefs[k]?.control === "area");
+      const hasArea = shownKeys.some((k) => fieldDefs[k]?.control === "area");
       if (hasArea) check(row?.area_sqft > 0, `${label}: area converted to sq ft`, `area_sqft=${row?.area_sqft}`);
 
       if (kind === "rent") {
@@ -282,10 +338,111 @@ for (const u of USERS) {
   }
 }
 
+// ---- conditional fields, both branches --------------------------------------
+// The walk above only exercises whichever branch `valueFor` happens to pick
+// (the first option of each chip row). These flip the drivers deliberately and
+// assert the OPPOSITE set survives — a rule that only ever runs one way is a
+// rule that has never been tested.
+head("CONDITIONAL FIELDS");
+{
+  const u = PROBE;
+  await login(u.phone);
+  const base = {
+    kind: "sell", cityId: place.city_id, areaId: place.area_id, stateId: place.state_id,
+    districtId: place.district_id, talukaId: place.taluka_id, pincode: PINCODE,
+    pricePaise: 5_000_000_00, description: "x".repeat(60), contactPublic: false, photoCount: 0,
+  };
+  const post = async (typeCode, attributes, title) => {
+    const r = await api(u.phone, "/api/v1/listings", { method: "POST", body: { ...base, typeCode, title, attributes } });
+    if (r.status !== 200) return { r, stored: null };
+    created.push(r.data.listing.id);
+    const row = await one(`select attributes from listings where id=$1`, [r.data.listing.id]);
+    return { r, stored: row?.attributes ?? {} };
+  };
+
+  const AREA = { value: "1200", unit: "sqft" };
+
+  // Rajan's own example: a tenement that is ready to move must not be asked —
+  // or allowed to state — when it will be ready.
+  let { stored } = await post("tenement", {
+    bhk: "3", plot_area: AREA, builtup_area: AREA,
+    construction_status: "ready_to_move", age: "1-5", possession: "2027-06", rera_id: "GJRERA123",
+  }, "Ready-to-move tenement");
+  check(stored?.age === "1-5", "ready-to-move keeps Age of property", JSON.stringify(stored?.age));
+  check(stored?.possession === undefined, "ready-to-move drops Possession by", JSON.stringify(stored?.possession));
+  check(stored?.rera_id === undefined, "ready-to-move drops the RERA number", JSON.stringify(stored?.rera_id));
+
+  // Flip it: under construction keeps possession + RERA and drops the age.
+  ({ stored } = await post("tenement", {
+    bhk: "3", plot_area: AREA, builtup_area: AREA,
+    construction_status: "under_construction", age: "1-5", possession: "2027-06", rera_id: "GJRERA123",
+  }, "Under-construction tenement"));
+  check(stored?.possession === "2027-06", "under construction keeps Possession by", JSON.stringify(stored?.possession));
+  check(stored?.rera_id === "GJRERA123", "under construction keeps the RERA number");
+  check(stored?.age === undefined, "under construction drops Age of property", JSON.stringify(stored?.age));
+
+  // Road width has no meaning without road touch.
+  ({ stored } = await post("plot_res", { land_area: AREA, road_touch: false, road_width: "30" }, "Interior plot"));
+  check(stored?.road_width === undefined, "no road touch drops Road width", JSON.stringify(stored?.road_width));
+  ({ stored } = await post("plot_res", { land_area: AREA, road_touch: true, road_width: "30" }, "Road-touch plot"));
+  check(stored?.road_width === "30", "road touch keeps Road width", JSON.stringify(stored?.road_width));
+
+  // Furnishing checklist: driven by `furnishing` on a home…
+  ({ stored } = await post("flat", {
+    bhk: "2", builtup_area: AREA, furnishing: "unfurnished", furnishing_details: ["AC", "Beds"],
+  }, "Unfurnished flat"));
+  check(stored?.furnishing_details === undefined, "unfurnished drops the furnishing checklist", JSON.stringify(stored?.furnishing_details));
+  // …and by `shell_state` on a shop, which has no `furnishing` field at all.
+  ({ stored } = await post("shop", {
+    carpet_area: AREA, shell_state: "fitted", furnishing_details: ["AC"],
+  }, "Fitted shop"));
+  check(Array.isArray(stored?.furnishing_details), "a fitted shell keeps the furnishing checklist", JSON.stringify(stored?.furnishing_details));
+
+  // Parking type only once there is parking to describe.
+  ({ stored } = await post("flat", {
+    bhk: "2", builtup_area: AREA, car_parking: 0, bike_parking: 0, parking_type: "covered",
+  }, "No-parking flat"));
+  check(stored?.parking_type === undefined, "zero parking drops Parking type", JSON.stringify(stored?.parking_type));
+
+  // Sell-only questions are not accepted on a rent listing, and vice versa.
+  const rent = await api(u.phone, "/api/v1/listings", {
+    method: "POST",
+    body: { ...base, kind: "rent", typeCode: "flat", title: "Rented flat",
+      attributes: { bhk: "2", builtup_area: AREA, loan_available: true, ownership_type: "Freehold", tenant_preference: "Family" } },
+  });
+  if (check(rent.status === 200, "rent listing created", `status ${rent.status}`)) {
+    created.push(rent.data.listing.id);
+    const s = (await one(`select attributes from listings where id=$1`, [rent.data.listing.id]))?.attributes ?? {};
+    check(s.loan_available === undefined, "a rent listing cannot carry the bank-loan flag", JSON.stringify(s.loan_available));
+    check(s.ownership_type === undefined, "a rent listing cannot carry the ownership document");
+    check(s.tenant_preference === "Family", "a rent listing keeps its tenant preference", JSON.stringify(s.tenant_preference));
+  }
+
+  // Mass assignment into `attributes` — a key no type asks for must not stick.
+  ({ stored } = await post("flat", { bhk: "2", builtup_area: AREA, is_admin: true, shutter_count: "9" }, "Foreign-key flat"));
+  check(stored?.is_admin === undefined, "an unknown attribute key is refused", JSON.stringify(stored?.is_admin));
+  check(stored?.shutter_count === undefined, "another type's field is refused on a flat", JSON.stringify(stored?.shutter_count));
+
+  // Cross-field sanity that only the server can enforce.
+  let r = await api(u.phone, "/api/v1/listings", {
+    method: "POST",
+    body: { ...base, kind: "rent", typeCode: "pg", title: "Impossible PG",
+      attributes: { pg_for: "boys", occupancy: "single", total_beds: "4", beds_available: "9" } },
+  });
+  check(r.status === 422 && r.error?.errors?.beds_available, "a PG cannot have more free beds than beds", JSON.stringify(r.error?.errors ?? {}).slice(0, 160));
+
+  r = await api(u.phone, "/api/v1/listings", {
+    method: "POST",
+    body: { ...base, typeCode: "flat", title: "Impossible floor",
+      attributes: { bhk: "2", builtup_area: AREA, floor: "9", total_floors: "4" } },
+  });
+  check(r.status === 422 && r.error?.errors?.floor, "a flat cannot be above its building's top floor", JSON.stringify(r.error?.errors ?? {}).slice(0, 160));
+}
+
 // ---- negative cases ---------------------------------------------------------
 head("VALIDATION");
 {
-  const u = USERS[0];
+  const u = PROBE;
   const base = {
     typeCode: "flat", kind: "sell", title: "Negative case", description: "x".repeat(60),
     pricePaise: 1_000_000_00, cityId: place.city_id, areaId: place.area_id,
@@ -312,6 +469,130 @@ head("VALIDATION");
 
   r = await api(u.phone, "/api/v1/listings", { method: "POST", body: { ...base, typeCode: "plot_res", kind: "rent", pincode: PINCODE, attributes: { land_area: { value: "5", unit: "guntha" } } } });
   check(r.status === 422 && r.error?.errors?.kind, "a plot cannot be listed for rent", JSON.stringify(r.error?.errors ?? {}).slice(0, 200));
+}
+
+// ---- projects: every scheme type, one by one --------------------------------
+// The project form had no type at all until migration 0062 — a plotting scheme
+// and an apartment tower filled in the identical five steps. This walks all
+// eight, fills what each one asks for, and reads the row back out of Postgres.
+head("PROJECT TYPES");
+const createdProjects = [];
+{
+  const b = USERS[2]; // builder — projects are Builder-only (Doc2 §6)
+  const cfg = await api(b.phone, "/api/v1/listings/config");
+  const { projectTypes, fieldDefs } = cfg.data ?? {};
+  check(projectTypes?.length === 8, "all 8 project types are served", `got ${projectTypes?.length}`);
+
+  // An Owner must not even receive the list.
+  const ownerCfg = await api(USERS[0].phone, "/api/v1/listings/config");
+  check((ownerCfg.data?.projectTypes ?? []).length === 0, "an owner is served no project types");
+
+  for (const t of projectTypes ?? []) {
+    const label = `project/${t.code}`;
+    check(t.unitTypes?.length > 0, `${label}: has its own unit names`, JSON.stringify(t.unitTypes));
+
+    // Fill everything the scheme asks for, hidden fields included — same trick
+    // as the listing walk: the server has to drop what isn't visible.
+    const values = {};
+    for (const k of t.fields) if (fieldDefs[k]) values[k] = valueFor(fieldDefs[k], true);
+    // `build_status` is a COLUMN, not a scheme field (migration 0064), so it
+    // drives visibility from OUTSIDE the attribute bag.
+    const buildStatus = "under_construction";
+    check(!t.fields.includes("build_status"), `${label}: build_status is not a scheme field`);
+    const shown = visibleKeys(t.fields.filter((k) => fieldDefs[k]), fieldDefs, { ...values, build_status: buildStatus });
+    const hidden = t.fields.filter((k) => fieldDefs[k] && !shown.includes(k));
+
+    const r = await api(b.phone, "/api/v1/projects", {
+      method: "POST",
+      body: {
+        name: `Test ${t.label}`,
+        projectType: t.code,
+        buildStatus,
+        possessionDate: "2027-06-01",
+        reraNumber: "PR/GJ/RAJKOT/TEST/001",
+        reraExempt: false,
+        towers: 3, floors: 12, totalUnits: 120, availableUnits: 40,
+        bankApprovals: ["SBI", "HDFC"],
+        amenities: ["security"],
+        description: "Automated project coverage check.",
+        stateId: place.state_id, districtId: place.district_id, talukaId: place.taluka_id,
+        cityId: place.city_id, areaId: place.area_id,
+        areaLabel: `${place.area_name}, ${place.city_name}`,
+        pincode: PINCODE,
+        attributes: values,
+        units: [{ unitType: t.unitTypes[0], areaSqft: 1200, carpetSqft: 950, priceFromPaise: 4_500_000_00, unitsAvailable: 10 }],
+      },
+    });
+    if (!check(r.status === 200, `${label}: created`, `status ${r.status} ${JSON.stringify(r.error ?? {}).slice(0, 240)}`)) continue;
+
+    const id = r.data.project.id;
+    createdProjects.push(id);
+
+    const row = await one(`select project_type, attributes, build_status, possession_date, pincode, city_id from projects where id=$1`, [id]);
+    check(row?.project_type === t.code, `${label}: type stored`, `got ${row?.project_type}`);
+    check(row?.pincode === PINCODE && row?.city_id === place.city_id, `${label}: location + pincode stored`);
+
+    const stored = row?.attributes ?? {};
+    // `build_status` lives on its own column, so it must NOT be duplicated here.
+    const expect = shown.filter((k) => k !== "build_status");
+    const missing = expect.filter((k) => stored[k] === undefined);
+    check(missing.length === 0, `${label}: ${expect.length} scheme fields persisted`, `missing: ${missing.join(", ")}`);
+    const leaked = hidden.filter((k) => stored[k] !== undefined);
+    check(leaked.length === 0, `${label}: ${hidden.length} hidden field(s) stripped`, `leaked: ${leaked.join(", ")}`);
+    const foreign = Object.keys(stored).filter((k) => !t.fields.includes(k));
+    check(foreign.length === 0, `${label}: no field outside this scheme's config`, `extra: ${foreign.join(", ")}`);
+
+    // The detail payload renders labels, not codes.
+    const detail = await api(b.phone, `/api/v1/projects/${id}`);
+    const groups = detail.data?.project?.attributeGroups ?? [];
+    const raw = groups.flatMap((g) => g.rows).filter((r) => /^[a-z0-9]+(_[a-z0-9]+)+$/.test(String(r.value)));
+    check(raw.length === 0, `${label}: detail shows labels, not codes`, raw.map((r) => `${r.key}=${r.value}`).join(", "));
+  }
+
+  // A ready-to-move scheme keeps no possession date and no launch date, and
+  // gains its two certificates — the same contradiction the listing form had.
+  const ready = await api(b.phone, "/api/v1/projects", {
+    method: "POST",
+    body: {
+      name: "Ready scheme", projectType: "apartment", buildStatus: "ready",
+      possessionDate: "2027-06-01", reraNumber: "PR/GJ/RAJKOT/TEST/002", reraExempt: false,
+      stateId: place.state_id, districtId: place.district_id, talukaId: place.taluka_id,
+      cityId: place.city_id, areaId: place.area_id, pincode: PINCODE,
+      attributes: { oc_received: true, bu_permission: true, launch_date: "2027-01-01" },
+      units: [{ unitType: "2 BHK", areaSqft: 1000 }],
+    },
+  });
+  if (check(ready.status === 200, "ready-to-move project created", `status ${ready.status} ${JSON.stringify(ready.error ?? {}).slice(0, 200)}`)) {
+    createdProjects.push(ready.data.project.id);
+    const row = await one(`select possession_date, attributes from projects where id=$1`, [ready.data.project.id]);
+    check(row?.possession_date === null, "a ready project stores no possession date", String(row?.possession_date));
+    check(row?.attributes?.oc_received === true, "a ready project keeps its Occupancy Certificate", JSON.stringify(row?.attributes));
+    check(row?.attributes?.launch_date === undefined, "a ready project drops the launch date", JSON.stringify(row?.attributes?.launch_date));
+  }
+
+  // Negative cases the server alone can enforce.
+  const baseProj = {
+    name: "Bad project", buildStatus: "under_construction", reraNumber: "X", reraExempt: false,
+    stateId: place.state_id, districtId: place.district_id, talukaId: place.taluka_id,
+    cityId: place.city_id, areaId: place.area_id, pincode: PINCODE, units: [],
+  };
+  let r = await api(b.phone, "/api/v1/projects", { method: "POST", body: { ...baseProj, projectType: null } });
+  check(r.status === 422 && r.error?.errors?.projectType, "project type is required", JSON.stringify(r.error ?? {}).slice(0, 160));
+
+  r = await api(b.phone, "/api/v1/projects", { method: "POST", body: { ...baseProj, projectType: "not_a_type" } });
+  check(r.status === 422, "an unknown project type is refused", `status ${r.status}`);
+
+  r = await api(b.phone, "/api/v1/projects", { method: "POST", body: { ...baseProj, projectType: "apartment", totalUnits: 10, availableUnits: 99 } });
+  check(r.status === 422 && r.error?.errors?.availableUnits, "available units cannot exceed total", JSON.stringify(r.error?.errors ?? {}).slice(0, 160));
+
+  r = await api(b.phone, "/api/v1/projects", { method: "POST", body: { ...baseProj, projectType: "apartment", reraExempt: true, reraNumber: "", reraExemptReason: "made up reason" } });
+  check(r.status === 422 && r.error?.errors?.reraExemptReason, "a free-text exemption reason is refused", JSON.stringify(r.error?.errors ?? {}).slice(0, 160));
+
+  // Owner/Broker are refused regardless of what the UI showed them.
+  r = await api(USERS[0].phone, "/api/v1/projects", { method: "POST", body: { ...baseProj, projectType: "apartment" } });
+  check(r.status === 403, "an owner cannot post a project", `status ${r.status}`);
+  r = await api(null, "/api/v1/projects", { method: "POST", body: { ...baseProj, projectType: "apartment" } });
+  check(r.status === 401, "posting a project requires a session", `status ${r.status}`);
 }
 
 // ---- photo cap --------------------------------------------------------------
@@ -401,10 +682,14 @@ head("SECURITY");
 if (!KEEP && created.length) {
   await pgc.query(`delete from listings where id = any($1::uuid[])`, [created]);
 }
+if (!KEEP && createdProjects.length) {
+  await pgc.query(`delete from project_units where project_id = any($1::uuid[])`, [createdProjects]);
+  await pgc.query(`delete from projects where id = any($1::uuid[])`, [createdProjects]);
+}
 await pgc.query(`delete from user_plans where name = 'Test grant'`);
 
 head("RESULT");
-console.log(`${checks - failures}/${checks} checks passed, ${created.length} listings created${KEEP ? " (kept)" : " (cleaned up)"}`);
+console.log(`${checks - failures}/${checks} checks passed, ${created.length} listings + ${createdProjects.length} projects created${KEEP ? " (kept)" : " (cleaned up)"}`);
 if (fails.length) {
   console.log("\nFAILURES:");
   for (const f of fails) console.log("  ✗ " + f);

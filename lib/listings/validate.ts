@@ -1,5 +1,6 @@
 import "server-only";
 import type { PropertyTypeRow } from "./service";
+import { keysForKind } from "./visibility";
 
 /**
  * Server-side listing validation (Doc2 §5.3, Doc9 §6 "never trust the browser").
@@ -53,7 +54,12 @@ export interface ListingInput {
   contact?: { public?: boolean; number?: string | null };
 }
 
-export function validateListing(input: ListingInput, type: PropertyTypeRow): ValidationResult {
+/**
+ * `visible` is the key set `sanitizeAttributes` resolved for this payload. A
+ * required field the seller could not see must not block the submit — a plot
+ * has no BHK, and a ready-to-move flat has no possession date to give.
+ */
+export function validateListing(input: ListingInput, type: PropertyTypeRow, visible?: Set<string>): ValidationResult {
   const errors: Record<string, string> = {};
   const warnings: Record<string, string> = {};
 
@@ -106,10 +112,10 @@ export function validateListing(input: ListingInput, type: PropertyTypeRow): Val
   // field_config), not a list of field names hardcoded here — a Flat needs its
   // built-up area, a Farmhouse needs neither BHK nor carpet, and a new type
   // states its own requirements without touching this file (Doc2 §5.1).
-  const fields = type.field_config.fields ?? [];
   const attrs = input.attributes ?? {};
+  const asked = visible ?? new Set(keysForKind(type.field_config, input.kind));
   for (const key of type.field_config.required ?? []) {
-    if (!fields.includes(key)) continue;
+    if (!asked.has(key)) continue;
     const v = attrs[key] as unknown;
     // An `area` control stores {value, unit}; everything else stores a scalar.
     const empty = v === undefined || v === null || v === ""
@@ -136,6 +142,21 @@ export function validateListing(input: ListingInput, type: PropertyTypeRow): Val
     } else if (Number(v) <= 0) {
       errors[key] = "Enter a value greater than zero";
     }
+  }
+
+  // A PG cannot have more free beds than beds. The two are separate number
+  // fields, so nothing stopped "4 total, 9 available" reaching the feed.
+  const totalBeds = Number(attrs.total_beds ?? 0);
+  const freeBeds = Number(attrs.beds_available ?? 0);
+  if (totalBeds > 0 && freeBeds > totalBeds) {
+    errors.beds_available = `Can't be more than the ${totalBeds} total beds`;
+  }
+
+  // Floor above the building's own height is a typo every time.
+  const floor = Number(attrs.floor ?? 0);
+  const totalFloors = Number(attrs.total_floors ?? 0);
+  if (totalFloors > 0 && floor > totalFloors) {
+    errors.floor = `Can't be above the building's ${totalFloors} floors`;
   }
 
   // ---- warnings (never block — Doc2 §5.3) ---------------------------------
