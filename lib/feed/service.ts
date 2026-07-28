@@ -402,6 +402,57 @@ export async function projectCardExtras(rows: any[]): Promise<Map<string, Partia
   return out;
 }
 
+/**
+ * ONE listing as the feed card renders it — for the owner's Preview screen
+ * (P6 S1, "this is how your listing appears in the feed").
+ *
+ * That screen used to hand-draw its own copy of the card: a 4:5 photo, a price
+ * with a For-Sale pill, a meta line and no title, which stopped being what the
+ * feed shows the moment the card changed. It now renders the SAME component off
+ * this payload, so the promise the screen makes is structurally true.
+ *
+ * Owner-only: the listing is not live yet, and the preview is part of its
+ * creation flow. Photos come from `listing_photos` exactly as the feed reads
+ * them, so a draft with three uploads previews all three.
+ */
+export async function previewCard(listingId: string, ownerId: string): Promise<FeedCard | null> {
+  const { data } = await db()
+    .from("listings")
+    .select("id,profile_id,type_code,kind,title,price_paise,price_on_request,is_negotiable,area_label,area_id,city_id,cover_url,attributes,area_sqft,created_at,live_at")
+    .eq("id", listingId)
+    .eq("profile_id", ownerId)
+    .maybeSingle();
+  const row = data as any | null;
+  if (!row) return null;
+
+  const [{ data: profs }, { data: vers }, photos, propTypes, fieldDefs, unitLabels] = await Promise.all([
+    db().from("profiles").select("id,name,username,role,photo_url,phone").eq("id", ownerId),
+    db().from("verifications").select("profile_id").eq("level", "phone").eq("status", "approved").eq("profile_id", ownerId),
+    photosFor([listingId]),
+    propertyTypeLabels(),
+    getFieldDefinitions(),
+    areaUnitLabelMap(),
+  ]);
+
+  const card = toCard(
+    { row, kind: "property" },
+    new Map<string, any>(((profs ?? []) as any[]).map((p) => [p.id, p])),
+    new Set(((vers ?? []) as { profile_id: string }[]).map((v) => v.profile_id)),
+    photos,
+    new Set<string>(),
+    new Map(),
+    new Map(),
+    propTypes,
+    fieldDefs,
+    unitLabels,
+    new Map(),
+    // NOT the owner's own id: `isOwn` would strip the Save control, and the
+    // preview exists to show what a BUYER sees.
+    null,
+  );
+  return { ...card, isOwn: false };
+}
+
 /** A stored option code rendered through its own field definition's label. */
 function defLabel(defs: FieldDefinitionRow[], key: string, value: unknown): string | null {
   if (value === null || value === undefined || value === "") return null;

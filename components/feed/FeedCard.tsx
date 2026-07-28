@@ -140,8 +140,11 @@ export function FeedCard({
             button it used to be. One <button> wrapping the text keeps it
             keyboard-reachable instead of an onClick on a bare <div>. */}
         <button type="button" onClick={onOpen} className="flex w-full flex-col gap-2 text-left">
+          {/* Two lines, then "…" — same rule as the project card. One line cut
+              "3 BHK Flat in Green Valley Heights, Mavdi" mid-society-name;
+              unclamped, a long title pushed the price out of the fold. */}
           {card.title && (
-            <span className="w-full truncate text-17 font-semibold leading-[1.25] text-ink-primary">{card.title}</span>
+            <span className="line-clamp-2 w-full text-17 font-semibold leading-[1.25] text-ink-primary">{card.title}</span>
           )}
 
           <span className="flex w-full items-baseline gap-2">

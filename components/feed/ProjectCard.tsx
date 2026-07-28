@@ -77,7 +77,10 @@ export function ProjectCard({
         <button type="button" onClick={onOpen} className="flex w-full flex-col gap-2 text-left">
           {/* Name + RERA */}
           <span className="flex w-full items-start gap-2">
-            <span className="min-w-0 flex-1 text-17 font-semibold leading-[1.25] text-ink-primary">{card.title}</span>
+            {/* Two lines, then "…". A scheme name can run long ("Shree Siddhi
+                Vinayak Residency Phase II Extension") and an unclamped title
+                pushed the price and the facts strip down the card. */}
+            <span className="line-clamp-2 min-w-0 flex-1 text-17 font-semibold leading-[1.25] text-ink-primary">{card.title}</span>
             {card.rera && (
               <MetaChip tone="accent" className="mt-0.5 shrink-0 uppercase tracking-[0.3px]">
                 <Icon name="shield" size={12} />

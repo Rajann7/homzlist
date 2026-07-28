@@ -3060,3 +3060,30 @@ STILL OPEN (out of scope, not broken by this change):
 - **Project cards are only in the unfiltered feed.** The Buy/Rent filters
   exclude them by design (`filter === "all"`), so a builder's boost is invisible
   to a viewer sitting on the Buy tab. Worth a decision, not a bug.
+
+### Follow-up (28 Jul 2026) — the pending items above, closed
+
+- **Area units are a TABLE now** (migration 0068). `area_units` carries the
+  label, the set (land/built/both) and the sq-ft factor; the form renders its
+  picker from `/listings/config`, `toSqft`/`fromSqft` convert from the same rows,
+  and the feed card labels from them. The three hardcoded copies are gone.
+  Proven live: a listing created with `land_area = 5 vigha` still stores
+  `area_sqft = 87120`.
+- **The area control writes its default unit.** It showed "sq ft" and stored no
+  `unit` at all until the seller touched the select, so every reader had to
+  assume one. The unit is now written with the value.
+- **`ProjectDetail`'s photo counter** compared an undefined `photoCount`; it is
+  explicit `?? 0` now. Projects still have exactly one image (`cover_url`) —
+  a project gallery is a module, not a fix, and stays on this list.
+- **The Preview screen's "Feed card" tab is the REAL card.** It used to
+  hand-draw its own copy (4:5 photo, no title, no facts, an action bar that no
+  longer exists) under the caption "This is how your listing appears in the
+  feed" — a promise that broke silently every time the card changed. It now
+  renders `components/feed/FeedCard` off `GET /api/v1/listings/:id/card`
+  (owner-only; 401 for a guest, NOT_FOUND for a stranger). The dead helpers it
+  needed (`metaLine`, its own `Avatar`, the slide/poster state) are removed.
+- **Long titles clamp to two lines with "…"** on both cards. Unclamped, a long
+  scheme name pushed the price and the facts strip down the card.
+
+STILL OPEN: project photo galleries (one cover only), and project cards being
+absent from the Buy/Rent tabs — the second is a product decision, not a defect.

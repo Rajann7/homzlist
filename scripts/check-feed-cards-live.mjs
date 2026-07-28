@@ -261,6 +261,37 @@ section("8 · IDOR / self-action");
   check(!builderSelf, "a builder's own project is not injected into their feed");
 }
 
+// ---------------------------------------------------------------------------
+section("9 · Preview card endpoint (the create flow's 'Feed card' tab)");
+
+{
+  const mine = await row1(
+    "select id, title from listings where profile_id = (select id from profiles where phone = $1) order by created_at desc limit 1",
+    [ACTOR_PHONE],
+  );
+  if (mine) {
+    const own = await api(ACTOR_PHONE, `/api/v1/listings/${mine.id}/card`);
+    const card = own.json?.data?.card;
+    check(own.status === 200 && card?.kind === "property", "owner gets their listing as a feed card",
+      card?.title ?? `status ${own.status}`);
+    // The whole point: the preview payload is the SAME shape the feed renders.
+    check(Array.isArray(card?.metaChips) && Array.isArray(card?.facts) && card !== undefined && "typeLabel" in card,
+      "…with the same chips/facts/type the feed card uses",
+      `${(card?.metaChips ?? []).join(", ")} | ${(card?.facts ?? []).map((f) => f.label).join(", ")}`);
+    check(card?.isOwn === false, "…and NOT flagged isOwn — the preview shows what a BUYER sees");
+
+    const guest = await api(null, `/api/v1/listings/${mine.id}/card`);
+    check(guest.status === 401, "guest → 401", `got ${guest.status}`);
+
+    const stranger = await api(BROKER, `/api/v1/listings/${mine.id}/card`);
+    check(stranger.json?.error?.code === "NOT_FOUND",
+      "another user → NOT_FOUND (never FORBIDDEN — no id confirmation)",
+      stranger.json?.error?.code ?? `status ${stranger.status}`);
+  } else {
+    check(false, "a listing of the actor's to preview");
+  }
+}
+
 console.log(`\n${fails === 0 ? "ALL PASS" : `${fails} FAILURE(S)`}`);
 await pgc.end();
 process.exit(fails === 0 ? 0 : 1);

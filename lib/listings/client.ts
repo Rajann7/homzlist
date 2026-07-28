@@ -285,6 +285,8 @@ export const listingsApi = {
   updateRequirement: (id: string, payload: Record<string, unknown>) =>
     req<{ requirement: RequirementCard }>(`/requirements/${id}`, "PATCH", payload),
 
+  /** This listing as the FEED CARD renders it — the Preview screen's card tab. */
+  previewCard: (id: string) => req<{ card: import("@/lib/feed/client").FeedCard }>(`/listings/${id}/card`, "GET"),
   getProject: (id: string) => req<{ project: any }>(`/projects/${id}`, "GET"),
   /** Builder-only project insights; 404 for anyone else's, same as a bad id. */
   projectInsights: (id: string) => req<{ project: ProjectInsights }>(`/projects/${id}/insights`, "GET"),

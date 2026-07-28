@@ -6,7 +6,8 @@ import { AppShell, Button, Header, Icon, Skeleton, StatusBadge, useToast } from 
 import { BackButton } from "@/components/billing/primitives";
 import { ConfirmDialog } from "@/components/ui/Dialog";
 import { listingsApi, type Photo } from "@/lib/listings/client";
-import { profileApi } from "@/lib/profile/client";
+import { FeedCard } from "@/components/feed/FeedCard";
+import type { FeedCard as CardData } from "@/lib/feed/client";
 import { cn } from "@/lib/utils";
 
 /**
@@ -29,31 +30,25 @@ export function Preview() {
   const [confirm, setConfirm] = useState(false);
   const [failed, setFailed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [slide, setSlide] = useState(0);
-  const [poster, setPoster] = useState<
-    { name: string | null; photoUrl: string | null; roleLabel: string | null; isVerified: boolean } | null
-  >(null);
+  /**
+   * The feed card, BUILT BY THE SERVER (`/listings/:id/card`) and rendered with
+   * the same component the feed uses. This screen used to hand-draw its own
+   * copy — a 4:5 photo, no title, no facts strip, an action bar that no longer
+   * exists — so "this is how your listing appears in the feed" quietly stopped
+   * being true every time the real card changed.
+   */
+  const [card, setCard] = useState<CardData | null>(null);
 
   useEffect(() => {
     (async () => {
-      const [l, p, me] = await Promise.all([
+      const [l, p, c] = await Promise.all([
         listingsApi.get(listingId),
         listingsApi.photos(listingId),
-        profileApi.me(),
+        listingsApi.previewCard(listingId),
       ]);
+      if (c.ok) setCard(c.data.card);
       if (l.ok) setListing(l.data.listing); else setFailed(true);
       if (p.ok) setPhotos(p.data.photos);
-      // The poster row shows the real account — same name, photo, role and
-      // verified tick a buyer would see on the feed card.
-      if (me.ok) {
-        const pr = me.data.profile;
-        setPoster({
-          name: pr.name,
-          photoUrl: pr.photoUrl,
-          roleLabel: pr.role ? pr.role[0].toUpperCase() + pr.role.slice(1) : null,
-          isVerified: Boolean(pr.badges?.id || pr.badges?.rera),
-        });
-      }
     })();
   }, [listingId]);
 
@@ -134,86 +129,28 @@ export function Preview() {
       {tab === "card" ? (
         /* Feed context: surface-2 page tint behind the card (design S1). */
         <div className="bg-surface-2 p-4">
-          <article className="overflow-hidden rounded-12 bg-surface-1 shadow-l1 dark:border dark:border-border dark:shadow-none">
-            {/* 4:5 carousel with dots + counter */}
-            <div className="relative aspect-[4/5] bg-surface-3">
-              {photos.length > 0 ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={photos[slide]?.url ?? cover ?? ""} alt="" className="h-full w-full object-cover" />
-              ) : (
-                <span className="grid h-full place-items-center text-ink-tertiary"><Icon name="image" size={40} /></span>
-              )}
-
-              {photos.length > 1 && (
-                <>
-                  <span className="absolute right-2 top-2 rounded-full bg-black/60 px-2 py-0.5 text-11 font-semibold text-white">
-                    {slide + 1}/{photos.length}
-                  </span>
-                  <div className="absolute inset-x-0 bottom-2 flex justify-center gap-1.5">
-                    {photos.map((p, i) => (
-                      <button
-                        key={p.id}
-                        aria-label={`Photo ${i + 1}`}
-                        onClick={() => setSlide(i)}
-                        className={cn("h-1.5 w-1.5 rounded-full", i === slide ? "bg-white" : "bg-white/50")}
-                      />
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
-
-            <div className="flex flex-col gap-2 p-3">
-              {/* Price + For Sale / For Rent badge */}
-              <div className="flex items-center gap-2">
-                <span className="text-17 font-bold text-ink-primary">{listing.price}</span>
-                <span
-                  className={cn(
-                    "rounded-4 px-1.5 py-0.5 text-11 font-semibold uppercase tracking-[0.3px]",
-                    listing.kind === "rent" ? "bg-warning-soft text-warning" : "bg-accent-soft text-accent",
-                  )}
-                >
-                  {listing.kind === "rent" ? "For Rent" : "For Sale"}
-                </span>
+          <div className="overflow-hidden rounded-12 bg-surface-1 shadow-l1 dark:border dark:border-border dark:shadow-none">
+            {card ? (
+              /* The REAL feed card, off the server's own card payload. Every
+                 control is inert here — this is a preview, not the feed — but
+                 the layout, the chips and the facts strip are the same code a
+                 buyer will scroll past. */
+              <FeedCard
+                card={card}
+                onOpen={() => {}}
+                onOpenPoster={() => {}}
+                onSave={() => toast.show("Buyers can save it once it's live")}
+                onInquiry={() => toast.show("Buyers can inquire once it's live")}
+                onMore={() => {}}
+              />
+            ) : (
+              <div className="flex flex-col gap-3 p-3">
+                <Skeleton className="aspect-[16/9] w-full rounded-8" />
+                <Skeleton className="h-5 w-40" />
+                <Skeleton className="h-4 w-24" />
               </div>
-
-              {/* Meta strip: specs · area · ₹/sqft — all derived from real values */}
-              <div className="text-13 text-ink-secondary">{metaLine(listing)}</div>
-
-              <div className="flex items-center gap-1 text-11 text-ink-tertiary">
-                <Icon name="pin" size={13} /> {listing.areaLabel ?? "—"}
-              </div>
-
-              {/* Poster row */}
-              <div className="mt-1 flex items-center gap-2 border-t border-divider pt-2.5">
-                <Avatar url={poster?.photoUrl ?? null} name={poster?.name ?? ""} />
-                <span className="truncate text-13 font-semibold text-ink-primary">{poster?.name ?? "You"}</span>
-                {poster?.isVerified && <Icon name="verified" size={14} className="shrink-0 text-accent" />}
-                {poster?.roleLabel && (
-                  <span className="shrink-0 rounded-4 bg-surface-2 px-1.5 py-0.5 text-11 text-ink-secondary">
-                    {poster.roleLabel}
-                  </span>
-                )}
-              </div>
-
-              {/* Action bar — inert in preview, rendered exactly as the feed
-                  shows it: 44px save box + View Property + Inquiry (designs/P6 S1). */}
-              <div className="mt-1 flex items-center gap-2">
-                <span
-                  className="grid h-11 w-11 shrink-0 place-items-center rounded-8 border border-border bg-surface-2 text-ink-primary"
-                  aria-hidden="true"
-                >
-                  <Icon name="bookmark" size={20} />
-                </span>
-                <span className="flex h-11 flex-1 items-center justify-center rounded-8 border border-border bg-surface-1 text-15 font-semibold text-ink-primary">
-                  View Property
-                </span>
-                <span className="flex h-11 flex-1 items-center justify-center rounded-8 bg-accent text-15 font-semibold text-white">
-                  Inquiry
-                </span>
-              </div>
-            </div>
-          </article>
+            )}
+          </div>
 
           <p className="mt-3 text-center text-11 text-ink-tertiary">
             This is how your listing appears in the feed.
@@ -386,40 +323,5 @@ function Shell({ children, onSubmit }: { children: React.ReactNode; onSubmit?: (
     >
       {children}
     </AppShell>
-  );
-}
-
-/**
- * Feed-card meta line: "3 BHK · 1,450 sqft · ₹5,862/sqft".
- *
- * Built from the SERVER's `keySpecs` / `pricePerSqft`, not by re-reading the
- * attribute map. The previous version looked up `built_up_area` and `floor_no`,
- * which are not the stored keys (`builtup_area`, `floor`) — so every card
- * silently fell through to the bare type label.
- */
-function metaLine(l: any): string {
-  const specs = (l.keySpecs ?? []) as { value: string; label: string }[];
-  const parts: string[] = [];
-
-  const bhk = specs.find((s) => s.label === "Bedrooms");
-  if (bhk) parts.push(bhk.value);
-
-  const area = specs.find((s) => s.label === "Sqft");
-  if (area) parts.push(`${area.value} sqft`);
-
-  if (l.pricePerSqft) parts.push(String(l.pricePerSqft).replace(/\s*\/\s*/, "/"));
-
-  return parts.length ? parts.join(" · ") : l.typeLabel;
-}
-
-function Avatar({ url, name }: { url: string | null; name: string }) {
-  if (url) {
-    // eslint-disable-next-line @next/next/no-img-element
-    return <img src={url} alt="" className="h-7 w-7 shrink-0 rounded-full object-cover" />;
-  }
-  return (
-    <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-surface-3 text-11 font-semibold text-ink-secondary">
-      {(name || "?").charAt(0).toUpperCase()}
-    </span>
   );
 }
