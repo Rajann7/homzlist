@@ -10,6 +10,7 @@ import { NewListingsPill, AdminBanner, type FeedBanner } from "./primitives";
 import { SortSheet } from "./sheets";
 import { Icon } from "@/components/ui/Icon";
 import { storiesApi, feedApi, type StoryCircle } from "@/lib/feed/client";
+import { apiFetch } from "@/lib/auth/api-fetch";
 import type { CityRow } from "./CitySheet";
 import { cn } from "@/lib/utils";
 
@@ -55,7 +56,13 @@ export function FeedHome() {
 
   const loadMe = useCallback(async () => {
     try {
-      const res = await fetch("/api/v1/profile/me", { credentials: "same-origin" });
+      // `apiFetch`, not the plain one. This single call decides `guest` for the
+      // WHOLE feed, and the plain fetch cannot refresh an expired access token
+      // (they live 15 minutes): open the app after a break and every card's
+      // Save, Inquiry and Call opened the login sheet at a signed-in user,
+      // because this 401'd once and nothing retried it. `no-store` for the
+      // other half — a cached copy of this answer re-guests the same session.
+      const res = await apiFetch("/api/v1/profile/me", { cache: "no-store" });
       if (res.ok) {
         const j = await res.json();
         const p = j.data?.profile;
@@ -99,7 +106,7 @@ export function FeedHome() {
   const onCity = async (c: CityRow) => {
     setMe((m) => (m ? { ...m, cityId: c.id, cityName: c.name } : m));
     if (me && !me.guest) {
-      await fetch("/api/v1/profile/me", { method: "PATCH", headers: { "Content-Type": "application/json" }, credentials: "same-origin", body: JSON.stringify({ cityId: c.id }) });
+      await apiFetch("/api/v1/profile/me", { method: "PATCH", headers: { "Content-Type": "application/json" }, cache: "no-store", body: JSON.stringify({ cityId: c.id }) });
     } else {
       writeGuestCity(c.id, c.name);
     }

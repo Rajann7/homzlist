@@ -477,12 +477,6 @@ export function ListingDetail({ id, isGuest = false }: { id: string; isGuest?: b
               onClose={() => setSheet(null)}
               onShare={() => setSheet("share")}
               onReport={() => setSheet(isGuest ? "login" : "report")}
-              onNotInterested={async () => {
-                setSheet(null);
-                if (isGuest) { setSheet("login"); return; }
-                await feedApi.notInterested({ typeCode: listing.typeCode });
-                toast.show("We'll show fewer like this");
-              }}
             />
             <ShareSheet open={sheet === "share"} onClose={() => setSheet(null)} card={card} />
             <ReportSheet open={sheet === "report"} onClose={() => setSheet(null)} card={card} />

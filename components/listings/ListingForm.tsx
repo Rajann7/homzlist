@@ -9,7 +9,7 @@ import { listingsApi, uploadDoc, formatIndianCommas, priceInWords, type TypeConf
 import { settingsApi } from "@/lib/settings/client";
 import { LocationCascade, PincodeField } from "./LocationPicker";
 import type { Amenity, FieldDefMap, FieldGroup, FieldOption } from "./fields";
-import { DynamicSections, Field, ToggleRow, inputCls } from "./FormControls";
+import { DynamicSections, Field, ToggleRow, inputCls, type AreaUnitOption } from "./FormControls";
 import { keysForKind, visibleKeys } from "@/lib/listings/visibility";
 import { cn } from "@/lib/utils";
 
@@ -49,6 +49,8 @@ export function ListingForm() {
   // Field definitions + amenity list are DATA from the server, not constants.
   const [fieldDefs, setFieldDefs] = useState<FieldDefMap>({});
   const [fieldGroups, setFieldGroups] = useState<FieldGroup[]>([]);
+  /** Area units, from the server (migration 0068) — never a list in here. */
+  const [areaUnits, setAreaUnits] = useState<AreaUnitOption[]>([]);
   const [amenities, setAmenities] = useState<Amenity[]>([]);
 
   const dirty = useRef(false);
@@ -74,6 +76,7 @@ export function ListingForm() {
         setType(cfg.data.types.find((t) => t.code === code) ?? null);
         setFieldDefs(cfg.data.fieldDefs ?? {});
         setFieldGroups(cfg.data.fieldGroups ?? []);
+        setAreaUnits(cfg.data.areaUnits ?? []);
         setAmenities(cfg.data.amenities ?? []);
       }
       if (draftId) {
@@ -242,6 +245,7 @@ export function ListingForm() {
           errors={errors}
           required={type.required}
           landUnits={type.areaUnits}
+          areaUnits={areaUnits}
           onChange={set}
           fallbackLabel={`${type.label} details`}
         />

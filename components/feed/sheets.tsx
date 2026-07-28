@@ -34,14 +34,17 @@ export function SortSheet({ open, onClose, value, onChange }: { open: boolean; o
 
 // ---- ⋯ sheet (Share / Report / Not-interested) -----------------------------
 export function MoreSheet({
-  open, onClose, onShare, onReport, onNotInterested,
-}: { open: boolean; onClose: () => void; onShare: () => void; onReport: () => void; onNotInterested: () => void }) {
+  open, onClose, onShare, onReport,
+}: { open: boolean; onClose: () => void; onShare: () => void; onReport: () => void }) {
   return (
     <BottomSheet open={open} onClose={onClose} title="Options">
       <div className="flex flex-col pb-2">
         <SheetOption icon={<Icon name="share" size={22} className="text-ink-secondary" />} label="Share" onClick={onShare} />
         <SheetOption icon={<Icon name="alert" size={22} className="text-error" />} label="Report" destructive onClick={onReport} />
-        <SheetOption icon={<Icon name="close" size={22} className="text-ink-secondary" />} label="Not interested" onClick={onNotInterested} />
+        {/* "Not interested" was removed on Rajan's instruction (28 Jul 2026).
+            It also never worked on a project card: `feed_not_interested.
+            type_code` points at property_types, so a project could persist
+            nothing and the card came straight back on the next refresh. */}
       </div>
     </BottomSheet>
   );
@@ -60,6 +63,15 @@ export function ShareSheet({ open, onClose, card }: { open: boolean; onClose: ()
     void listingsApi.recordShare(card.id, channel);
   };
   const copy = () => { void navigator.clipboard?.writeText(link); record("copy"); toast.show("Link copied"); };
+
+  // What actually gets sent on WhatsApp. It used to be the bare URL, which
+  // arrives as an unreadable link with no idea what it is (Rajan, 28 Jul 2026):
+  // the message now names the property/project and its price, then the link.
+  const shareText = card
+    ? `${card.title ?? card.meta ?? "This property"}${card.areaLabel ? ` at ${card.areaLabel}` : ""}${
+        card.price || card.priceBand || card.priceFrom ? ` — ${card.price ?? card.priceBand ?? card.priceFrom}` : ""
+      }. More details: ${link}`
+    : link;
   return (
     <BottomSheet open={open} onClose={onClose} title="Share">
       {card && (
@@ -68,7 +80,7 @@ export function ShareSheet({ open, onClose, card }: { open: boolean; onClose: ()
             <span className="h-12 w-12 overflow-hidden rounded-8 bg-surface-3">{card.coverUrl && <img src={card.coverUrl} alt="" className="h-full w-full object-cover" />}</span>
             <div className="min-w-0">
               <div className="truncate text-13 font-semibold text-ink-primary">{card.title ?? `${card.meta ?? ""}`}</div>
-              <div className="text-11 text-ink-tertiary">{card.price ?? card.priceFrom}</div>
+              <div className="text-11 text-ink-tertiary">{card.price ?? card.priceBand ?? card.priceFrom}</div>
             </div>
           </div>
           <div className="flex items-center gap-2 rounded-8 border border-border px-3 py-2.5">
@@ -76,9 +88,9 @@ export function ShareSheet({ open, onClose, card }: { open: boolean; onClose: ()
             <button onClick={copy} className="text-13 font-semibold text-accent">Copy</button>
           </div>
           <div className="flex justify-around">
-            <ShareDest icon="message" label="WhatsApp" onClick={() => { record("whatsapp"); window.open(`https://wa.me/?text=${encodeURIComponent(link)}`, "_blank"); }} />
+            <ShareDest icon="message" label="WhatsApp" onClick={() => { record("whatsapp"); window.open(`https://wa.me/?text=${encodeURIComponent(shareText)}`, "_blank"); }} />
             <ShareDest icon="copy" label="Copy Link" onClick={copy} />
-            <ShareDest icon="share" label="More" onClick={() => { if (navigator.share) { record("native"); void navigator.share({ url: link }); } else copy(); }} />
+            <ShareDest icon="share" label="More" onClick={() => { if (navigator.share) { record("native"); void navigator.share({ text: shareText, url: link }); } else copy(); }} />
           </div>
         </div>
       )}
@@ -150,7 +162,11 @@ export function InquirySheet({ open, onClose, card }: { open: boolean; onClose: 
   const [share, setShare] = useState(true);
   const [busy, setBusy] = useState(false);
 
-  const prefill = card ? `Hi, I'm interested in your ${card.title ?? card.meta ?? "property"} at ${card.areaLabel ?? "Rajkot"} (${card.price ?? card.priceFrom ?? ""}). Is it still available?` : "";
+  const prefill = card
+    ? `Hi, I'm interested in your ${card.title ?? card.meta ?? "property"}${card.areaLabel ? ` at ${card.areaLabel}` : ""}${
+        card.price ? ` (${card.price})` : ""
+      }. Could you share more details?`
+    : "";
 
   const send = async () => {
     if (!card) return;

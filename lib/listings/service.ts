@@ -124,6 +124,30 @@ export interface FieldGroupRow {
   sort_order: number;
 }
 
+export interface AreaUnitRow {
+  code: string;
+  label: string;
+  /** Which rows offer it: land/plot areas, built-up areas, or both. */
+  unitSet: "land" | "built" | "both";
+  sqftFactor: number;
+}
+
+/**
+ * The area-unit master (migration 0068). One row carries the label the form
+ * shows, the set it belongs to and the sq-ft factor every area comparison runs
+ * on — the three used to be three separate hardcoded copies (the form, the
+ * validator, the feed card).
+ */
+export async function getAreaUnits(): Promise<AreaUnitRow[]> {
+  const { data } = await db()
+    .from("area_units")
+    .select("code,label,unit_set,sqft_factor")
+    .eq("is_active", true)
+    .order("sort_order");
+  return ((data ?? []) as { code: string; label: string; unit_set: AreaUnitRow["unitSet"]; sqft_factor: number | string }[])
+    .map((r) => ({ code: r.code, label: r.label, unitSet: r.unit_set, sqftFactor: Number(r.sqft_factor) }));
+}
+
 /** The form's section order — data, so a new group is a row (Doc2 §5.1). */
 export async function getFieldGroups(): Promise<FieldGroupRow[]> {
   const { data } = await db()
@@ -416,7 +440,7 @@ export async function createListing(
       attributes: input.attributes,
       // Vigha/Guntha/acre → sq ft at write time (Doc2 §5.1). The seller's own
       // unit stays in `attributes`; this is the comparable figure.
-      area_sqft: primaryAreaSqft(input.attributes),
+      area_sqft: await primaryAreaSqft(input.attributes),
       amenities: input.amenities,
       contact_public: input.contact.public,
       contact_number: input.contact.number ?? null,
@@ -920,7 +944,7 @@ export async function updateListing(
   // Attributes changed → the canonical sq ft has to follow, or an edited plot
   // keeps the area it was first saved with.
   if ("attributes" in patch) {
-    next.area_sqft = primaryAreaSqft(patch.attributes as Record<string, unknown>);
+    next.area_sqft = await primaryAreaSqft(patch.attributes as Record<string, unknown>);
   }
   // A major edit on a live listing goes back for review; the live version stays
   // visible until the edit is approved (Doc2 §5.4).

@@ -17,13 +17,18 @@ export type ApiResult<T> =
   | { ok: true; data: T }
   | { ok: false; error: { code: string; message_key?: string; [k: string]: unknown } };
 
-async function req<T>(path: string, method: string, body?: unknown): Promise<ApiResult<T>> {
+async function req<T>(path: string, method: string, body?: unknown, opts?: { keepalive?: boolean }): Promise<ApiResult<T>> {
   try {
     const res = await apiFetch(`/api/v1${path}`, {
       method,
       headers: body ? { "Content-Type": "application/json" } : undefined,
       body: body ? JSON.stringify(body) : undefined,
       credentials: "same-origin",
+      // For a request fired as the page is leaving (Call → tel: hands off to the
+      // dialler). Without it the browser cancels the in-flight POST and the
+      // builder's lead is simply lost — caught by the click walk, which saw
+      // WhatsApp record a lead and Call record nothing.
+      ...(opts?.keepalive ? { keepalive: true } : {}),
       // Every screen here re-reads the same URL right after mutating it (hide a
       // listing → GET its insights again). Without this the browser's HTTP
       // cache answers the second GET from the first one's response, so the
@@ -197,7 +202,8 @@ export const listingsApi = {
       projectTypes: ProjectTypeConfig[];
       amenities: { code: string; label: string; category: string; categories: string[] }[];
       categories: { key: string; label: string }[];
-      areaUnits: string[];
+      /** The area-unit master (migration 0068): code, label, and which rows offer it. */
+      areaUnits: { code: string; label: string; unitSet: "land" | "built" | "both" }[];
     }>("/listings/config", "GET"),
 
   /**
@@ -284,7 +290,7 @@ export const listingsApi = {
   projectInsights: (id: string) => req<{ project: ProjectInsights }>(`/projects/${id}/insights`, "GET"),
   /** Tapping Call/WhatsApp on a project records a lead for the builder. */
   recordProjectContact: (id: string, channel: "call" | "whatsapp") =>
-    req<{ recorded: boolean }>(`/projects/${id}/contact`, "POST", { channel }),
+    req<{ recorded: boolean }>(`/projects/${id}/contact`, "POST", { channel }, { keepalive: true }),
   /** Per-unit sold-out toggle — the builder's most frequent update (Doc2 §6). */
   updateProjectUnits: (id: string, units: { id: string; available: boolean }[]) =>
     req<{ project: any }>(`/projects/${id}/units`, "PATCH", { units }),

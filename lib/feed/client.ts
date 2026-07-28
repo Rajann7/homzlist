@@ -32,9 +32,16 @@ export interface PosterInfo { id: string; name: string; username: string | null;
 export interface FeedCard {
   kind: "property" | "project";
   id: string; promoted: boolean; saved: boolean; isOwn?: boolean; coverUrl: string | null; photos: string[];
-  areaLabel: string | null; poster: PosterInfo; postedAgo: string;
+  areaLabel: string | null; areaId?: string | null; poster: PosterInfo; postedAgo: string;
   price?: string; saleLabel?: "For Sale" | "For Rent"; meta?: string; listingKind?: "sell" | "rent"; typeCode?: string;
+  typeLabel?: string | null; metaChips?: string[]; negotiable?: boolean;
   title?: string; priceFrom?: string; buildStatus?: string; rera?: boolean;
+  // project (the rest of the card — see lib/feed/service.ts FeedCard)
+  buildStatusCode?: string | null;
+  projectTypeLabel?: string | null; priceBand?: string | null; unitTypes?: string[];
+  possessionLabel?: string | null; reraExempt?: boolean;
+  facts?: { label: string; value: string }[];
+  contactNumber?: string | null;
 }
 export interface FeedResult { items: FeedCard[]; nextCursor: string | null; sections: { label: string | null; items: FeedCard[] }[]; }
 

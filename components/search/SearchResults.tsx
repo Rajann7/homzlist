@@ -8,6 +8,8 @@ import { Icon } from "@/components/ui/Icon";
 import { Avatar } from "@/components/ui/Avatar";
 import { useToast } from "@/components/ui/Toast";
 import { FeedCard as Card } from "@/components/feed/FeedCard";
+import { ProjectCard } from "@/components/feed/ProjectCard";
+import { contactBuilder } from "@/components/feed/contactBuilder";
 import { MoreSheet, ShareSheet, ReportSheet, InquirySheet, LoginSheet, SortSheet } from "@/components/feed/sheets";
 import { FilterSheet } from "./FilterSheet";
 import { OfflineBanner } from "./SearchHome";
@@ -119,6 +121,10 @@ export function SearchResults({ basePath = "", isGuest = false }: { basePath?: s
 
   // ---- card actions --------------------------------------------------------
   const gate = (fn: () => void) => () => { if (isGuest) setSheet("login"); else fn(); };
+
+  /** Project cards contact the builder directly — see components/feed/contactBuilder. */
+  const contactBuilderGated = (c: CardData, via: "call" | "whatsapp") =>
+    gate(() => contactBuilder(c, via, toast.show))();
 
   const onSave = (c: CardData) => gate(async () => {
     const r = await interactionsApi.toggleSave(c.id);
@@ -233,17 +239,26 @@ export function SearchResults({ basePath = "", isGuest = false }: { basePath?: s
                       <span className="text-11 font-semibold uppercase tracking-[0.3px] text-ink-tertiary">{section.label}</span>
                     </div>
                   )}
-                  {section.items.map((c) => (
+                  {section.items.map((c) => (c.kind === "project" ? (
+                    <ProjectCard
+                      key={c.id}
+                      card={c}
+                      onOpen={() => router.push(path(`/project/${c.id}`))}
+                      onOpenPoster={() => router.push(path(`/profile/${c.poster.username ?? c.poster.id}`))}
+                      onContact={(via) => contactBuilderGated(c, via)}
+                      onMore={() => { setActiveCard(c); setSheet("more"); }}
+                    />
+                  ) : (
                     <Card
                       key={c.id}
                       card={c}
-                      onOpen={() => router.push(path(`/${c.kind === "project" ? "project" : "property"}/${c.id}`))}
+                      onOpen={() => router.push(path(`/property/${c.id}`))}
                       onOpenPoster={() => router.push(path(`/profile/${c.poster.username ?? c.poster.id}`))}
                       onSave={() => onSave(c)}
                       onInquiry={gate(() => { setActiveCard(c); setSheet("inquiry"); })}
                       onMore={() => { setActiveCard(c); setSheet("more"); }}
                     />
-                  ))}
+                  )))}
                 </div>
               ))}
 
@@ -260,13 +275,12 @@ export function SearchResults({ basePath = "", isGuest = false }: { basePath?: s
           )}
 
           {tab === "projects" && projects?.map((c) => (
-            <Card
+            <ProjectCard
               key={c.id}
               card={c}
               onOpen={() => router.push(path(`/project/${c.id}`))}
               onOpenPoster={() => router.push(path(`/profile/${c.poster.username ?? c.poster.id}`))}
-              onSave={() => onSave(c)}
-              onInquiry={gate(() => { setActiveCard(c); setSheet("inquiry"); })}
+              onContact={(via) => contactBuilderGated(c, via)}
               onMore={() => { setActiveCard(c); setSheet("more"); }}
             />
           ))}
@@ -321,14 +335,6 @@ export function SearchResults({ basePath = "", isGuest = false }: { basePath?: s
         onClose={() => setSheet(null)}
         onShare={() => setSheet("share")}
         onReport={() => setSheet("report")}
-        onNotInterested={async () => {
-          setSheet(null);
-          if (!activeCard) return;
-          if (isGuest) { setSheet("login"); return; }
-          await feedApi.notInterested({ typeCode: activeCard.typeCode });
-          toast.show("We'll show fewer like this");
-          void load();
-        }}
       />
       <ShareSheet open={sheet === "share"} onClose={() => setSheet(null)} card={activeCard} />
       <ReportSheet open={sheet === "report"} onClose={() => setSheet(null)} card={activeCard} />

@@ -7,9 +7,11 @@ import { Skeleton } from "@/components/ui/Skeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { useToast } from "@/components/ui/Toast";
 import { FeedCard } from "./FeedCard";
+import { ProjectCard } from "./ProjectCard";
 import { CaughtUp } from "./primitives";
 import { InquirySheet, MoreSheet, ReportSheet, ShareSheet, LoginSheet } from "./sheets";
 import { feedApi, interactionsApi, type FeedCard as Card } from "@/lib/feed/client";
+import { contactBuilder } from "./contactBuilder";
 
 export interface PropertyFeedHandle { refresh: () => void; }
 
@@ -55,6 +57,16 @@ export const PropertyFeed = forwardRef<PropertyFeedHandle, { filter: string; sor
     }, [cursor, loadingMore, filter, sort]);
 
     const guard = (fn: () => void) => () => { if (guest) { setLoginSheet(true); return; } fn(); };
+    /** Same login gate, for a handler that takes an argument (Call/WhatsApp). */
+    const guard2 = <A,>(card: Card, fn: (card: Card, arg: A) => void) => (arg: A) => {
+      if (guest) { setLoginSheet(true); return; }
+      fn(card, arg);
+    };
+
+    const openPoster = (card: Card) => {
+      if (card.poster.username) router.push(`/profile/${card.poster.username}`);
+      else toast.show("This poster has no public profile yet");
+    };
 
     const save = async (card: Card) => {
       const res = await interactionsApi.toggleSave(card.id);
@@ -64,14 +76,7 @@ export const PropertyFeed = forwardRef<PropertyFeedHandle, { filter: string; sor
       } else if (res.error.code === "UNAUTHORIZED") setLoginSheet(true);
     };
 
-    const notInterested = async (card: Card) => {
-      setMoreFor(null);
-      if (guest) { setLoginSheet(true); return; }
-      const res = card.typeCode ? await feedApi.notInterested({ typeCode: card.typeCode }) : { ok: true as const };
-      if (!res.ok) { if (res.error.code === "UNAUTHORIZED") setLoginSheet(true); return; }
-      setCards((cs) => (cs ?? []).filter((c) => c.id !== card.id));
-      toast.show("We'll show fewer like this");
-    };
+    const contact = (card: Card, via: "call" | "whatsapp") => contactBuilder(card, via, toast.show);
 
     if (!cards) return <div className="flex flex-col gap-4 p-4">{[0, 1].map((i) => <Skeleton key={i} className="h-[420px] w-full rounded-12" />)}</div>;
 
@@ -91,20 +96,27 @@ export const PropertyFeed = forwardRef<PropertyFeedHandle, { filter: string; sor
       <div>
         {cards.map((card, i) => (
           <div key={`${card.kind}-${card.id}`}>
-            <FeedCard
-              card={card}
-              onOpen={() => router.push(`/${card.kind === "project" ? "project" : "property"}/${card.id}`)}
-              // Public profile routes by username (/profile/:username). A poster
-              // with no username can't be linked, so tell the user rather than
-              // pushing a URL that would 404.
-              onOpenPoster={() => {
-                if (card.poster.username) router.push(`/profile/${card.poster.username}`);
-                else toast.show("This poster has no public profile yet");
-              }}
-              onSave={guard(() => void save(card))}
-              onInquiry={guard(() => setInquiryFor(card))}
-              onMore={() => setMoreFor(card)}
-            />
+            {card.kind === "project" ? (
+              <ProjectCard
+                card={card}
+                onOpen={() => router.push(`/project/${card.id}`)}
+                onOpenPoster={() => openPoster(card)}
+                onContact={guard2(card, contact)}
+                onMore={() => setMoreFor(card)}
+              />
+            ) : (
+              <FeedCard
+                card={card}
+                onOpen={() => router.push(`/property/${card.id}`)}
+                // Public profile routes by username (/profile/:username). A poster
+                // with no username can't be linked, so tell the user rather than
+                // pushing a URL that would 404.
+                onOpenPoster={() => openPoster(card)}
+                onSave={guard(() => void save(card))}
+                onInquiry={guard(() => setInquiryFor(card))}
+                onMore={() => setMoreFor(card)}
+              />
+            )}
             {/* Suggested strip after the first card */}
             {i === 0 && suggested.length > 0 && (
               <div className="flex flex-col gap-2 border-b border-divider px-4 py-3">
@@ -136,7 +148,6 @@ export const PropertyFeed = forwardRef<PropertyFeedHandle, { filter: string; sor
           onClose={() => setMoreFor(null)}
           onShare={() => { const c = moreFor; setMoreFor(null); setShareFor(c); }}
           onReport={() => { const c = moreFor; setMoreFor(null); if (guest) { setLoginSheet(true); return; } setReportFor(c); }}
-          onNotInterested={() => { if (moreFor) void notInterested(moreFor); }}
         />
         <LoginSheet open={loginSheet} onClose={() => setLoginSheet(false)} />
       </div>

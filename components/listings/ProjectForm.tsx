@@ -7,7 +7,7 @@ import { OfflineBanner, SectionLabel } from "@/components/billing/primitives";
 import { ConfirmDialog } from "@/components/ui/Dialog";
 import { listingsApi, uploadBrochure, uploadDoc, formatIndianCommas, priceInWords } from "@/lib/listings/client";
 import { LocationCascade, PincodeField } from "./LocationPicker";
-import { DynamicSections, OptionChip, hasValue } from "./FormControls";
+import { DynamicSections, OptionChip, hasValue, type AreaUnitOption } from "./FormControls";
 import type { FieldDefMap, ProjectTypeConfig } from "@/lib/listings/client";
 import { visibleKeys } from "@/lib/listings/visibility";
 import { cn } from "@/lib/utils";
@@ -66,6 +66,8 @@ export function ProjectForm() {
   const [projectTypes, setProjectTypes] = useState<ProjectTypeConfig[]>([]);
   const [fieldDefs, setFieldDefs] = useState<FieldDefMap>({});
   const [fieldGroups, setFieldGroups] = useState<{ key: string; label: string }[]>([]);
+  /** Area units, from the server (migration 0068) — never a list in here. */
+  const [areaUnits, setAreaUnits] = useState<AreaUnitOption[]>([]);
   /** Which kind of scheme this is — it decides every extra field below. */
   const [projectType, setProjectType] = useState<string>("");
   /** The chosen scheme's type-specific answers (site area, OC, land zone…). */
@@ -134,6 +136,7 @@ export function ProjectForm() {
       setProjectTypes(cfg.data.projectTypes ?? []);
       setFieldDefs(cfg.data.fieldDefs ?? {});
       setFieldGroups(cfg.data.fieldGroups ?? []);
+      setAreaUnits(cfg.data.areaUnits ?? []);
     } else setOffline(cfg.error.code === "OFFLINE");
     // The profile's city is a starting SUGGESTION now, not the only option —
     // the cascade below can take the builder anywhere in the country.
@@ -439,6 +442,7 @@ export function ProjectForm() {
               errors={errors}
               required={chosenType?.required ?? []}
               landUnits
+              areaUnits={areaUnits}
               onChange={setAttr}
               fallbackLabel={`${chosenType?.label ?? "Project"} details`}
             />

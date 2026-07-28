@@ -2995,3 +2995,68 @@ Both are authorised departures from the locked design — recorded here so nobod
   "0 Listings". `OwnProfile` is deliberately UNTOUCHED — its Sell / Rent and
   Requirements tabs are where a builder still sees and manages the rows 0067
   hid, so removing them there would strand that content.
+
+## Feed cards redesigned (28 Jul 2026) — what was found, fixed, and left open
+
+The home feed's PROJECT card was redesigned on Rajan's instruction, and the
+property card was brought into the same visual language (`components/feed/
+cardChrome.tsx` holds the shared chip/facts primitives). The image is unchanged:
+still 16/9, still the same carousel. Everything the two cards now show is a real
+column — `project_types.label`, `project_units` (price band + unit chips),
+`possession_date`, `towers/floors/total_units/available_units`, `attributes`
+(total_plots, site area), `property_types.label` and the listing's own
+attributes for the property facts strip.
+
+FIXED here (all were live defects, not cosmetics):
+
+- **Save on a project card persisted nothing.** `saves.listing_id` is a FK to
+  `listings`, so `toggleSave` looked a project id up in the wrong table, found
+  nothing, and returned `{saved:false}` with a 200 — the UI toasted "Saved to
+  wishlist" over a write that never happened. The heart is gone from the project
+  card (same call the project detail already made) and Call / WhatsApp take its
+  place, which write a real `leads` row.
+- **Inquiry on a project card always failed.** Same root cause via
+  `inquiries.listing_id`; the sheet ended in "Couldn't send that inquiry" every
+  time. Projects have no chat pipeline (Doc2 §6) — contact is the builder's
+  number, exactly as on the project detail.
+- **"Promoted" and "New Project" drew on top of each other** (both at
+  `left-3 top-3`), so a boosted project showed one badge over the other.
+- **"Not interested" removed** (Rajan, 28 Jul 2026). It could never work on a
+  project anyway: `feed_not_interested.type_code` references `property_types`,
+  and a project's type lives in `project_types`.
+- **The not-interested AREA filter was never applied to projects** — hiding an
+  area still returned that area's project cards.
+- **A signed-in user was treated as a guest by the whole feed** once their
+  15-minute access token expired: `FeedHome.loadMe` used a plain `fetch`, which
+  cannot refresh, so one 401 turned every Save/Inquiry/Call on every card into a
+  login sheet. Now `apiFetch` + `no-store`.
+- **A project lead was lost when the viewer tapped Call.** `location.href =
+  tel:` starts unloading the page and the browser cancelled the in-flight POST;
+  `recordProjectContact` now sends `keepalive: true`. Caught by the click walk
+  (WhatsApp recorded a lead, Call did not).
+- **The WhatsApp share was a bare URL** — it now names the property/project and
+  its price and asks for more details.
+
+Verified live: `scripts/check-feed-cards-live.mjs` (cross-role API sweep, guest
++ owner + broker + builder, with the DB row behind every claim) and
+`scripts/check-feed-cards-ui.mjs` (a real browser clicking every control on both
+cards, then reading the row it wrote). Both ALL PASS.
+
+STILL OPEN (out of scope, not broken by this change):
+
+- **Area units are hardcoded in the component.** `AREA_UNITS_LAND` /
+  `AREA_UNITS_BUILT` live in `components/listings/FormControls.tsx` and the feed
+  now mirrors that list in `AREA_UNIT_LABEL` (lib/feed/service.ts). Two copies of
+  a vocabulary that CLAUDE.md rule 7 says belongs in a table. Needs an
+  `area_units` master table + one loader.
+- **The area control never persists its DEFAULT unit.** The `<select>` shows
+  "sq ft" but only writes `unit` once the seller touches it, so a stored
+  `{value: 50}` is ambiguous by luck rather than by design. Both readers assume
+  sq ft; the form should write the unit it displays.
+- **`ProjectDetail` reads `p.photoCount`, which the project DTO never returns**
+  — so the "1/N" counter on the project cover can never appear. Projects have no
+  photo table at all (only `projects.cover_url`), which is also why the feed's
+  project card shows a single image and no carousel.
+- **Project cards are only in the unfiltered feed.** The Buy/Rent filters
+  exclude them by design (`filter === "all"`), so a builder's boost is invisible
+  to a viewer sitting on the Buy tab. Worth a decision, not a bug.

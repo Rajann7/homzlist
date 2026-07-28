@@ -2,7 +2,7 @@ import "server-only";
 import { createServiceClient } from "@/lib/supabase/server";
 import { formatShortRupees } from "@/lib/billing/money";
 import { timeAgo } from "@/lib/listings/matching";
-import type { FeedCard } from "@/lib/feed/service";
+import { projectCardExtras, PROJECT_COLS, type FeedCard } from "@/lib/feed/service";
 import { placementsFor, viewerScope, type ViewerScope } from "@/lib/billing/placement";
 import { parseQuery, pgrstSafe, type ParsedQuery } from "./parse";
 import { bucketRange } from "./filters";
@@ -385,7 +385,7 @@ export async function hydrate(
       isOwn: viewerId !== null && l.profile_id === viewerId,
       coverUrl: l.cover_url,
       photos: photos.get(l.id) ?? (l.cover_url ? [l.cover_url] : []),
-      areaLabel: l.area_label,
+      areaLabel: l.area_label, areaId: l.area_id ?? null,
       poster: {
         id: l.profile_id, name: p.name ?? "HomzList user", username: p.username ?? null,
         role: p.role ?? null, verified: verified.has(l.profile_id), avatarUrl: p.photo_url ?? null,
@@ -443,7 +443,9 @@ export async function searchProjects(f: SearchFilters, viewerId: string | null, 
   const areaIds = [...new Set([...(f.areas ?? []), ...parsed.areaIds])];
 
   let q = db().from("projects")
-    .select("id,profile_id,name,build_status,rera_number,rera_exempt,area_label,area_id,city_id,cover_url,created_at,live_at", { count: "exact" })
+    // The SAME column set the feed's project card reads — search renders the
+    // same card, so a column missing here is a blank block on that card.
+    .select(PROJECT_COLS, { count: "exact" })
     .eq("status", "live")
     .order("live_at", { ascending: false })
     .limit(limit);
@@ -457,50 +459,39 @@ export async function searchProjects(f: SearchFilters, viewerId: string | null, 
   if (!rows.length) return { items: [], total: count ?? 0 };
 
   const posterIds = [...new Set(rows.map((r) => r.profile_id))];
-  const [{ data: profs }, { data: vers }, priceFrom] = await Promise.all([
-    db().from("profiles").select("id,name,username,role,photo_url").in("id", posterIds),
+  const [{ data: profs }, { data: vers }, extras] = await Promise.all([
+    // `phone` for the same reason the feed selects it: a project's Call and
+    // WhatsApp are real actions (Doc2 §6), and withheld from guests below.
+    db().from("profiles").select("id,name,username,role,photo_url,phone").in("id", posterIds),
     db().from("verifications").select("profile_id").eq("status", "approved").in("level", ["phone", "id", "rera"]).in("profile_id", posterIds),
-    priceFromFor(rows.map((r) => r.id)),
+    projectCardExtras(rows),
   ]);
   const profMap = new Map<string, any>(((profs ?? []) as any[]).map((p) => [p.id, p]));
   const verified = new Set(((vers ?? []) as { profile_id: string }[]).map((v) => v.profile_id));
 
   const items: FeedCard[] = rows.map((r) => {
     const p = profMap.get(r.profile_id) ?? {};
-    const pf = priceFrom.get(r.id);
     return {
+      ...extras.get(r.id),
       kind: "project", id: r.id, promoted: false, saved: false,
       // The query above already excludes the viewer's own projects
       // (`neq profile_id`), so this is false by construction — stated rather
       // than assumed, so it stays true if that filter ever changes.
       isOwn: viewerId !== null && r.profile_id === viewerId,
       coverUrl: r.cover_url, photos: r.cover_url ? [r.cover_url] : [],
-      areaLabel: r.area_label,
+      areaLabel: r.area_label, areaId: r.area_id ?? null,
       poster: {
         id: r.profile_id, name: p.name ?? "Builder", username: p.username ?? null,
         role: p.role ?? null, verified: verified.has(r.profile_id), avatarUrl: p.photo_url ?? null,
       },
       postedAgo: timeAgo(r.live_at ?? r.created_at),
       title: r.name,
-      priceFrom: pf?.from != null ? `${pf.types.slice(0, 2).join("/") || "Units"} from ${formatShortRupees(pf.from)}` : "Price on request",
       buildStatus: r.build_status === "ready" ? "Ready to move" : r.build_status === "under_construction" ? "Under construction" : "Booking open",
       rera: Boolean(r.rera_number) || r.rera_exempt,
+      contactNumber: viewerId && r.profile_id !== viewerId ? (p.phone ?? null) : null,
     };
   });
   return { items, total: count ?? items.length };
-}
-
-async function priceFromFor(projectIds: string[]): Promise<Map<string, { from: number | null; types: string[] }>> {
-  const map = new Map<string, { from: number | null; types: string[] }>();
-  if (!projectIds.length) return map;
-  const { data } = await db().from("project_units").select("project_id,unit_type,price_from_paise").in("project_id", projectIds);
-  for (const u of ((data ?? []) as { project_id: string; unit_type: string; price_from_paise: number | null }[])) {
-    const cur = map.get(u.project_id) ?? { from: null, types: [] };
-    if (u.price_from_paise != null) cur.from = cur.from === null ? u.price_from_paise : Math.min(cur.from, u.price_from_paise);
-    if (u.unit_type && !cur.types.includes(u.unit_type)) cur.types.push(u.unit_type);
-    map.set(u.project_id, cur);
-  }
-  return map;
 }
 
 // ---------------------------------------------------------------------------

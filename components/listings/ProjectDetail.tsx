@@ -110,7 +110,12 @@ export function ProjectDetail({ id }: { id: string }) {
         ) : (
           <span className="grid h-full place-items-center text-ink-tertiary"><Icon name="image" size={40} /></span>
         )}
-        {p.photoCount > 1 && (
+        {/* A project has ONE image — `projects.cover_url`; there is no project
+            photo table, so this counter read `p.photoCount`, which the project
+            DTO has never returned. `?? 0` makes that explicit instead of
+            comparing undefined and quietly rendering nothing (tracked in
+            docs/PENDING-INTEGRATIONS.md — project galleries are a module). */}
+        {(p.photoCount ?? 0) > 1 && (
           <span className="absolute right-3 top-14 rounded-full bg-black/60 px-2.5 py-1.5 text-11 font-semibold leading-none text-white">
             1/{p.photoCount}
           </span>

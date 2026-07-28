@@ -182,18 +182,22 @@ export function validateListing(input: ListingInput, type: PropertyTypeRow, visi
  * Area unit conversion (Doc2 §5.1). Stored canonically in sq ft so filters and
  * sorting work across units; the user's chosen unit is kept for display only.
  */
-const SQFT_PER: Record<string, number> = {
-  sqft: 1,
-  sqyd: 9,
-  sqm: 10.7639,
-  guntha: 1089,
-  vigha: 17424, // Gujarat vigha ≈ 16 guntha
-  acre: 43560,
-  hectare: 107639,
-};
+/**
+ * The factors come from `area_units` (migration 0068), loaded once per process.
+ * They used to be a constant here AND a label list in the form AND a third copy
+ * in the feed card; the table is now the only place a unit is defined.
+ */
+let factorCache: Record<string, number> | null = null;
+export async function areaFactors(): Promise<Record<string, number>> {
+  if (factorCache) return factorCache;
+  const { getAreaUnits } = await import("./service");
+  const rows = await getAreaUnits();
+  factorCache = Object.fromEntries(rows.map((u) => [u.code, u.sqftFactor]));
+  return factorCache;
+}
 
-export function toSqft(value: number, unit: string): number | null {
-  const f = SQFT_PER[unit];
+export async function toSqft(value: number, unit: string): Promise<number | null> {
+  const f = (await areaFactors())[unit];
   if (!f || !Number.isFinite(value) || value <= 0) return null;
   return Math.round(value * f);
 }
@@ -212,7 +216,7 @@ const PRIMARY_AREA_KEYS = ["builtup_area", "land_area", "plot_area", "carpet_are
  * area field (a PG, for instance). This is what makes the form's
  * "Converted automatically for search" hint true.
  */
-export function primaryAreaSqft(attributes: Record<string, unknown> | null | undefined): number | null {
+export async function primaryAreaSqft(attributes: Record<string, unknown> | null | undefined): Promise<number | null> {
   const attrs = attributes ?? {};
   for (const key of PRIMARY_AREA_KEYS) {
     const raw = attrs[key];
@@ -220,16 +224,16 @@ export function primaryAreaSqft(attributes: Record<string, unknown> | null | und
     const { value, unit } = raw as { value?: string | number; unit?: string };
     const n = Number(value);
     if (!Number.isFinite(n) || n <= 0) continue;
-    const sqft = toSqft(n, unit ?? "sqft");
+    // An untouched unit <select> shows sq ft, so a stored value without a unit
+    // IS sq ft — the form now writes it explicitly, this covers older rows.
+    const sqft = await toSqft(n, unit ?? "sqft");
     if (sqft) return sqft;
   }
   return null;
 }
 
-export function fromSqft(sqft: number, unit: string): number | null {
-  const f = SQFT_PER[unit];
+export async function fromSqft(sqft: number, unit: string): Promise<number | null> {
+  const f = (await areaFactors())[unit];
   if (!f) return null;
   return +(sqft / f).toFixed(2);
 }
-
-export const AREA_UNITS = Object.keys(SQFT_PER);

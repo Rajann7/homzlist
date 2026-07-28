@@ -124,22 +124,20 @@ export function ToggleRow({ label, sub, checked, onChange }: { label: string; su
   );
 }
 
-/** designs/P5: a built structure is measured in sq ft/yard/m; land adds the
- *  Gujarat land units. Labels are the design's, values the server's. */
-const AREA_UNITS_BUILT = [
-  { value: "sqft", label: "sq ft" },
-  { value: "sqyd", label: "sq yard" },
-  { value: "sqm", label: "sq m" },
-];
-const AREA_UNITS_LAND = [
-  { value: "sqft", label: "sq ft" },
-  { value: "sqyd", label: "sq yard" },
-  { value: "vigha", label: "Vigha" },
-  { value: "guntha", label: "Guntha" },
-  { value: "acre", label: "Acre" },
-];
+/**
+ * The unit list comes from the SERVER (`area_units`, migration 0068) — it used
+ * to be these two arrays, hardcoded here, with the conversion factors in a
+ * third place. `unitSet` decides which rows a field offers: a built structure
+ * is measured in sq ft/yard/m, land adds the Gujarat units.
+ *
+ * The fallback is deliberately just sq ft: if the config hasn't arrived the
+ * control must still be usable, and sq ft is the canonical unit everything is
+ * stored in — never a guess at the rest of the list.
+ */
+export interface AreaUnitOption { code: string; label: string; unitSet: "land" | "built" | "both" }
+const FALLBACK_UNITS: AreaUnitOption[] = [{ code: "sqft", label: "sq ft", unitSet: "both" }];
 
-export function DynamicField({ def, value, onChange, error, required, onOpenSheet, landUnits }: { def: FieldDef; value: any; onChange: (v: unknown | ((prev: any) => unknown)) => void; error?: string; required?: boolean; onOpenSheet: () => void; landUnits?: boolean }) {
+export function DynamicField({ def, value, onChange, error, required, onOpenSheet, landUnits, areaUnits }: { def: FieldDef; value: any; onChange: (v: unknown | ((prev: any) => unknown)) => void; error?: string; required?: boolean; onOpenSheet: () => void; landUnits?: boolean; areaUnits?: AreaUnitOption[] }) {
   if (def.control === "chips") {
     return (
       <Field id={`f-${def.key}`} label={def.label} required={required} error={error}>
@@ -242,23 +240,29 @@ export function DynamicField({ def, value, onChange, error, required, onOpenShee
     // construction row is sq ft), falling back to the type flag. Offering
     // "3 acre" as a flat's built-up area was never in the design.
     const useLand = def.units ? def.units === "land" : landUnits;
-    const units = useLand ? AREA_UNITS_LAND : AREA_UNITS_BUILT;
+    const all = areaUnits?.length ? areaUnits : FALLBACK_UNITS;
+    const units = all.filter((u) => u.unitSet === "both" || u.unitSet === (useLand ? "land" : "built"));
+    const defaultUnit = units[0]?.code ?? "sqft";
     return (
       <Field id={`f-${def.key}`} label={def.label} required={required} error={error} hint={def.hint ?? "Converted automatically for search"}>
         <div className="flex gap-2">
           <input
             inputMode="decimal"
             value={value?.value ?? ""}
-            onChange={(e) => { const v = e.target.value.replace(/[^\d.]/g, ""); onChange((prev: any) => ({ ...(prev ?? {}), value: v })); }}
+            // The unit is written with the value, not only when the <select> is
+            // touched. It defaulted to sq ft on screen but stored nothing, so
+            // "50" was saved with no unit at all and every reader had to assume
+            // one — a silent guess on the number a plot is judged by.
+            onChange={(e) => { const v = e.target.value.replace(/[^\d.]/g, ""); onChange((prev: any) => ({ ...(prev ?? {}), value: v, unit: prev?.unit ?? defaultUnit })); }}
             placeholder="0"
             className={inputCls(error)}
           />
           <select
-            value={value?.unit ?? "sqft"}
+            value={value?.unit ?? defaultUnit}
             onChange={(e) => { const u = e.target.value; onChange((prev: any) => ({ ...(prev ?? {}), unit: u })); }}
             className="h-11 shrink-0 rounded-6 border border-border bg-surface-2 px-2 text-15 text-ink-primary outline-none"
           >
-            {units.map((u) => <option key={u.value} value={u.value}>{u.label}</option>)}
+            {units.map((u) => <option key={u.code} value={u.code}>{u.label}</option>)}
           </select>
         </div>
       </Field>
@@ -307,7 +311,7 @@ export function DynamicField({ def, value, onChange, error, required, onOpenShee
  * that is submitted was on screen.
  */
 export function DynamicSections({
-  keys, defs, groups, values, errors = {}, required = [], landUnits, onChange, fallbackLabel = "Details",
+  keys, defs, groups, values, errors = {}, required = [], landUnits, areaUnits, onChange, fallbackLabel = "Details",
 }: {
   keys: string[];
   defs: FieldDefMap;
@@ -316,6 +320,8 @@ export function DynamicSections({
   errors?: Record<string, string>;
   required?: string[];
   landUnits?: boolean;
+  /** The area-unit master from /listings/config (migration 0068). */
+  areaUnits?: AreaUnitOption[];
   onChange: (key: string, v: unknown | ((prev: any) => unknown)) => void;
   /** Heading for fields whose group an admin hasn't filed yet. */
   fallbackLabel?: string;
@@ -369,6 +375,7 @@ export function DynamicSections({
                 required={required.includes(f.key)}
                 onOpenSheet={() => setSheet(f)}
                 landUnits={landUnits}
+                areaUnits={areaUnits}
               />
             ))}
           </CollapsibleSection>

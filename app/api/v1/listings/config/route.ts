@@ -1,10 +1,9 @@
 import { ok, fail } from "@/lib/api";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { getProfileById } from "@/lib/profile/service";
-import { getPropertyTypes, getFieldDefinitions, getAmenities, getFieldGroups } from "@/lib/listings/service";
+import { getPropertyTypes, getFieldDefinitions, getAmenities, getFieldGroups, getAreaUnits } from "@/lib/listings/service";
 import { getProjectTypes } from "@/lib/listings/projects";
 import { typeConfigDTO } from "@/lib/listings/dto";
-import { AREA_UNITS } from "@/lib/listings/validate";
 
 /**
  * GET /api/v1/listings/config (Doc7 §43) — the dynamic field config.
@@ -34,13 +33,14 @@ export async function GET() {
   const profile = await getProfileById(claims.sub);
   if (!profile) return fail("UNAUTHORIZED");
 
-  const [types, fields, amenities, groups, projectTypes] = await Promise.all([
+  const [types, fields, amenities, groups, projectTypes, areaUnits] = await Promise.all([
     getPropertyTypes(profile.role),
     getFieldDefinitions(),
     getAmenities(),
     getFieldGroups(),
     // Projects are Builder-only, so nobody else needs the list (Doc2 §6).
     profile.role === "builder" ? getProjectTypes() : Promise.resolve([]),
+    getAreaUnits(),
   ]);
 
   return ok({
@@ -70,6 +70,8 @@ export async function GET() {
       key,
       label: CATEGORY_LABELS[key] ?? key,
     })),
-    areaUnits: AREA_UNITS,
+    // The unit list itself (migration 0068): code + label + which rows offer
+    // it. The form used to hold two hardcoded arrays of these.
+    areaUnits,
   });
 }
