@@ -40,7 +40,15 @@ export async function GET() {
     plans: catalog.map(planCardDTO),
     addOns: topups.map(planCardDTO),
     activePlan: active.length
-      ? { name: formatPaise(active[0].terms.price_paise), isTrial: active[0].is_trial }
+      ? {
+          // A granted plan carries no price in its snapshot; `formatPaise` on
+          // that renders "₹NaN" as the active-plan label (same bug as My Plan).
+          name:
+            typeof active[0].terms?.price_paise === "number"
+              ? formatPaise(active[0].terms.price_paise)
+              : active[0].name,
+          isTrial: active[0].is_trial,
+        }
       : null,
     trial: active.find((p) => p.is_trial)
       ? {

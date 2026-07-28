@@ -2927,3 +2927,41 @@ Worth noting the UPI-collect "Payment processing… safe to close" screen
 (`phase === "pending"` in `components/billing/Checkout.tsx`) is therefore
 unreachable in production right now: nothing can produce a pending UPI order
 while UPI is off. It has never run against a real payment.
+
+## Create-flow sweep (28 Jul 2026) — observations left open
+
+Found while walking all 21 property type × kind combinations and all 8 project
+types live. Not bugs I fixed, because each is a product/config call:
+
+- **`plot_approval` offers "NA order" on Kheti land.** On Agriculture Land and
+  Farm Land the seller can set `na_kheti = Kheti` and still pick
+  `plot_approval = NA order`, which is self-contradictory (NA order is exactly
+  what converts Kheti to NA). The other four options (NA + TP, RERA, Gram
+  Panchayat, Not approved yet) are all legitimate for Kheti. Fix would be a
+  `show_if` on the option set, or a server cross-check — needs Rajan's call on
+  which is intended.
+- **"Shutters" sits under "Parking & utilities".** `field_definitions.shutter_count`
+  carries `group = utilities`, so a shop's shutter count is printed under a
+  heading about parking. Cosmetic; it's a config row, not code.
+- **Redis is not running in dev.** Every request logs
+  `ECONNREFUSED 127.0.0.1:6379`. Nothing in the create flow broke (the cache
+  path falls through), but the dev log is unreadable and any queue-backed
+  promise is not actually running locally.
+
+## Create-gate rework (28 Jul 2026) — RESOLVED
+
+A project used to spend a ₹999 LISTING slot: `createProject` called
+`consumeQuota(profileId, "listing", 1)`, so any plan holding a listing slot
+funded a builder scheme while the review step promised "₹9,999 · 6 months ·
+1 project". Proven on dev: eight projects went out against a single 50-slot
+₹999 grant.
+
+Fixed in migrations 0065/0066 — `project` is now a first-class
+`consumption_kind` with its own `project_quota` / `project_used` columns,
+p9999 sells one project and zero listings, and the p9999 plans that already
+existed (plus their consumption trace) were migrated rather than reset. The
+Create screen, the plan wall and the PLAN_REQUIRED bounce all gate New Project
+on that counter, and `POST /projects` refuses without it even when the account
+holds listing slots.
+
+Nothing left open here.

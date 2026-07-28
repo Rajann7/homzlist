@@ -16,6 +16,28 @@ import { keysForKind } from "./visibility";
 const ist = (iso: string | null) =>
   iso ? new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Kolkata" }) : null;
 
+/**
+ * Three rent answers live in COLUMNS, not in `attributes`: the security
+ * deposit, the availability date and whether maintenance is inside the rent
+ * (`ListingForm.RENT_COLUMNS` keeps them out of the blob so a filter can query
+ * them). Nothing put them back, so every screen that renders a listing from
+ * `attributeRows` — the preview AND the public detail — simply never showed
+ * them. The form asked a landlord for the deposit, the database stored it, and
+ * a tenant could not see the single figure they care about most.
+ *
+ * They are merged back here, keyed by the names `field_definitions` already
+ * carries, so they pick up their label, their group ("Rental terms") and their
+ * position from config exactly like every other field — no second code path.
+ */
+function withRentColumns(l: ListingRow): Record<string, unknown> {
+  const attrs = { ...((l.attributes ?? {}) as Record<string, unknown>) };
+  if (l.kind !== "rent") return attrs;
+  if (l.deposit_paise !== null && l.deposit_paise !== undefined) attrs.deposit = Math.round(l.deposit_paise / 100);
+  if (l.available_from) attrs.available_from = l.available_from;
+  if (l.maintenance_included) attrs.maintenance_included = true;
+  return attrs;
+}
+
 /** Display units for an `area` attribute — the design's labels, not the codes. */
 const UNIT_LABEL: Record<string, string> = {
   sqft: "sq ft", sqyd: "sq yard", sqm: "sq m",
@@ -68,6 +90,10 @@ function attributeRows(
       const a = raw as { value: string; unit?: string };
       if (!a.value) continue;
       value = `${Number(a.value).toLocaleString("en-IN")} ${UNIT_LABEL[a.unit ?? "sqft"] ?? a.unit ?? "sq ft"}`;
+    } else if (def?.control === "date") {
+      // A DATE column comes back as an ISO timestamp; "2026-08-31T18:30:00.000Z"
+      // under "Available from" is not a date a tenant reads.
+      value = ist(String(raw)) ?? String(raw);
     } else if (def?.control === "number" && /^\d{4,}$/.test(String(raw))) {
       // A bare "2500" under "Maintenance (₹/month)" reads as a typo.
       value = Number(raw).toLocaleString("en-IN");
@@ -227,7 +253,7 @@ export function listingDetailDTO(
     fieldGroups?: { key: string; label: string }[];
   },
 ) {
-  const attrs = (l.attributes ?? {}) as Record<string, unknown>;
+  const attrs = withRentColumns(l);
   const { keySpecs, highlights } = detailBlocks(attrs, type, opts.fieldDefs);
   const rows = attributeRows(attrs, type, opts.fieldDefs, l.kind);
 

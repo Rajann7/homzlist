@@ -1,5 +1,7 @@
 "use client";
 
+import { apiFetch } from "@/lib/auth/api-fetch";
+
 /**
  * Client-side billing API helpers.
  *
@@ -15,7 +17,7 @@ export type ApiResult<T> =
 
 async function req<T>(path: string, method: string, body?: unknown): Promise<ApiResult<T>> {
   try {
-    const res = await fetch(`/api/v1${path}`, {
+    const res = await apiFetch(`/api/v1${path}`, {
       method,
       headers: body ? { "Content-Type": "application/json" } : undefined,
       body: body ? JSON.stringify(body) : undefined,
@@ -44,6 +46,12 @@ export interface PlanCard {
   subLabel: string | null;
   features: string[];
   lifetime: boolean;
+  /** Listing slots the plan grants — 0 for Requirement Access and the top-ups. */
+  listingQuota: number;
+  /** Requirement posts the plan grants — 0 for Requirement Access, which sells proposals. */
+  requirementQuota: number;
+  /** Builder projects the plan grants — only p9999 sells one. */
+  projectQuota: number;
 }
 
 export interface UsageBar {
@@ -57,7 +65,16 @@ export interface UsageBar {
 export interface MyPlan {
   state: "none" | "active" | "grace" | "expired" | "trial";
   cards: { id: string; name: string; isTrial: boolean; meta: string; canRenew: boolean; bars: UsageBar[] }[];
-  pooled: { activePlans: number; proposalsLeft: number; unlimitedProposals: boolean; listingSlotsLeft: number };
+  pooled: {
+    activePlans: number;
+    proposalsLeft: number;
+    unlimitedProposals: boolean;
+    listingSlotsLeft: number;
+    requirementSlotsLeft: number;
+    unlimitedRequirements: boolean;
+    projectSlotsLeft: number;
+    unlimitedProjects: boolean;
+  };
   trace: { title: string; lines: string[] }[];
   /** Persisted preference from `notification_prefs`, not a client default. */
   expiryReminders: boolean;

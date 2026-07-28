@@ -299,7 +299,7 @@ export function ProjectForm() {
     setSubmitting(false);
     if (res.error.code === "PLAN_REQUIRED") {
       toast.show("A ₹9,999 project plan is needed");
-      router.push("/plans");
+      router.push("/create?wall=1&intent=project");
       return;
     }
     if (res.error.code === "FORBIDDEN") { toast.show("Projects are for Builder accounts"); return; }

@@ -98,8 +98,15 @@ export function Success() {
       </div>
 
       <div className="sticky bottom-0 border-t border-divider bg-page p-4 safe-bottom">
+        {/* The button follows `next`, so its label has to as well. Someone who
+            was interrupted mid-Create is carried back to Create — labelling
+            that "Go to My plan" described a screen they were not going to. */}
         <Button fullWidth onClick={() => router.replace(next)}>
-          {kind === "boost" ? "View boost status" : "Go to My plan"}
+          {kind === "boost"
+            ? "View boost status"
+            : next.startsWith("/create")
+              ? "Continue posting"
+              : "Go to My plan"}
         </Button>
         <button onClick={() => router.replace("/payments")} className="tap44 mx-auto mt-3 block text-15 font-semibold text-accent">
           View invoice

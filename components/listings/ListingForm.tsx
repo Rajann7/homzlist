@@ -150,8 +150,9 @@ export function ListingForm() {
     if (!res.ok) {
       const err = res.error as any;
       if (err.code === "PLAN_REQUIRED") {
-        // Payment-first: no slot → the plan wall, then back here.
-        router.push("/create?wall=1");
+        // Payment-first: no slot → the plan wall for the LISTING quota, which
+        // returns to Create once paid.
+        router.push("/create?wall=1&intent=listing");
         return;
       }
       if (err.errors) {

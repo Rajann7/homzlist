@@ -1,5 +1,7 @@
 "use client";
 
+import { apiFetch } from "@/lib/auth/api-fetch";
+
 /** Client-side Activity API (P10 S2). Renders the server's aggregation only. */
 
 export type ApiResult<T> =
@@ -8,7 +10,7 @@ export type ApiResult<T> =
 
 async function req<T>(path: string, method: string): Promise<ApiResult<T>> {
   try {
-    const res = await fetch(`/api/v1${path}`, { method, credentials: "same-origin", cache: "no-store" });
+    const res = await apiFetch(`/api/v1${path}`, { method, credentials: "same-origin", cache: "no-store" });
     return (await res.json()) as ApiResult<T>;
   } catch {
     return { ok: false, error: { code: "OFFLINE" } };

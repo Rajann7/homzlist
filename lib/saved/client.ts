@@ -1,5 +1,7 @@
 "use client";
 
+import { apiFetch } from "@/lib/auth/api-fetch";
+
 /**
  * Client-side Saved API (P10 S1). Asks the server; renders answers. No counts,
  * no "changed" logic and no collection membership are decided here — all of it
@@ -12,7 +14,7 @@ export type ApiResult<T> =
 
 async function req<T>(path: string, method: string, body?: unknown): Promise<ApiResult<T>> {
   try {
-    const res = await fetch(`/api/v1${path}`, {
+    const res = await apiFetch(`/api/v1${path}`, {
       method,
       headers: body !== undefined ? { "Content-Type": "application/json" } : undefined,
       body: body !== undefined ? JSON.stringify(body) : undefined,

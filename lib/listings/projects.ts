@@ -1,6 +1,6 @@
 import "server-only";
 import { createServiceClient } from "@/lib/supabase/server";
-import { consumeQuota, reserveSlot, transitionSlot } from "@/lib/billing/service";
+import { consumeQuota, releaseQuota, reserveSlot, transitionSlot } from "@/lib/billing/service";
 import { formatShortRupees } from "@/lib/billing/money";
 import { getAmenityLabels, getFieldDefinitions, getFieldGroups, type FieldDefinitionRow } from "./service";
 import { visibleKeys } from "./visibility";
@@ -185,7 +185,12 @@ export async function createProject(
   },
 ) {
   // Payment-first: draw the slot before writing anything.
-  const userPlanId = await consumeQuota(profileId, "listing", 1, { type: "project", note: "project submitted" });
+  //
+  // A PROJECT unit, not a listing one (migration 0065). Drawing "listing" here
+  // meant any ₹999 plan funded a builder project — eight of them went out
+  // against one 50-slot listing grant on dev while the review step promised
+  // "₹9,999 · 6 months · 1 project". Only the ₹9,999 plan carries this quota.
+  const userPlanId = await consumeQuota(profileId, "project", 1, { type: "project", note: "project submitted" });
   if (!userPlanId) throw new NoProjectSlotError();
   const slotId = await reserveSlot(profileId, userPlanId);
 
@@ -228,7 +233,12 @@ export async function createProject(
     .single();
 
   if (error) {
+    // Both halves, not just the slot. Releasing the slot alone left
+    // `project_used` incremented, so a builder whose insert failed was charged
+    // their one ₹9,999 project and had nothing to show for it — the exact
+    // separation of money and benefit migration 0024 exists to prevent.
     await transitionSlot(slotId, profileId, "released", "project insert failed");
+    await releaseQuota(profileId, userPlanId, "project", 1, "project insert failed");
     throw error;
   }
 

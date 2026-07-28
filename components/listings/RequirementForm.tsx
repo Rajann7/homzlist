@@ -180,8 +180,11 @@ export function RequirementForm() {
       return;
     }
     if (res.error.code === "PLAN_REQUIRED") {
+      // The plan wall for the REQUIREMENT quota, not the generic Plans screen:
+      // that one sells four things and left the user to work out which of them
+      // unblocks the form they were just thrown out of.
       toast.show("No requirement posts left");
-      router.push("/plans");
+      router.push("/create?wall=1&intent=requirement");
       return;
     }
     const fieldErrors = (res.error as { errors?: Record<string, string> }).errors;

@@ -27,6 +27,8 @@ export interface CatalogRow {
   roles: Role[];
   features: string[];
   listing_quota: number;
+  /** Builder projects the plan grants — only p9999 sells one (migration 0065). */
+  project_quota: number;
   requirement_quota: number;
   requirement_days: number | null;
   proposal_quota: number;
@@ -44,6 +46,8 @@ export interface UserPlanRow {
   terms: CatalogRow;
   listing_quota: number;
   listing_used: number;
+  project_quota: number;
+  project_used: number;
   requirement_quota: number;
   requirement_used: number;
   proposal_quota: number;
@@ -533,6 +537,9 @@ async function grantUserPlan(order: OrderRow): Promise<string> {
       name: t.name,
       terms: t,
       listing_quota: t.listing_quota,
+      // Snapshot-driven like every other counter: a ₹9,999 order grants a
+      // project unit and no listing unit (migration 0065).
+      project_quota: t.project_quota ?? 0,
       requirement_quota: t.requirement_quota,
       proposal_quota: t.proposal_quota,
       purchased_at: now.toISOString(),
@@ -747,7 +754,7 @@ export async function expirePlans(profileId?: string) {
 /** Draw from the pooled balance, oldest plan first. Returns null when empty. */
 export async function consumeQuota(
   profileId: string,
-  kind: "listing" | "requirement" | "proposal",
+  kind: "listing" | "requirement" | "proposal" | "project",
   qty = 1,
   ref?: { type: string; id?: string; note?: string },
 ): Promise<string | null> {
@@ -777,7 +784,7 @@ export async function consumeQuota(
 export async function releaseQuota(
   profileId: string,
   userPlanId: string,
-  kind: "listing" | "requirement" | "proposal",
+  kind: "listing" | "requirement" | "proposal" | "project",
   qty = 1,
   reason = "create failed",
 ): Promise<boolean> {

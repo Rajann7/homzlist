@@ -1,5 +1,7 @@
 "use client";
 
+import { apiFetch } from "@/lib/auth/api-fetch";
+
 /**
  * Client-side notifications API (Module 10). Asks the server; renders answers.
  * Holds NO business truth — counts, grouping, unread state, which inline
@@ -13,7 +15,7 @@ export type ApiResult<T> =
 
 async function req<T>(path: string, method: string, body?: unknown): Promise<ApiResult<T>> {
   try {
-    const res = await fetch(`/api/v1${path}`, {
+    const res = await apiFetch(`/api/v1${path}`, {
       method,
       headers: body ? { "Content-Type": "application/json" } : undefined,
       body: body ? JSON.stringify(body) : undefined,

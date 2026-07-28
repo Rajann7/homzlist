@@ -15,7 +15,18 @@ import { cn } from "@/lib/utils";
  * offered "New Project", because only a Builder can buy the ₹9,999 plan that
  * backs it (Doc2 §2 / §6).
  */
-export function PostType({ slotsLeft }: { slotsLeft?: number }) {
+/** What the SERVER says this account may still post (billing `pooled`). */
+export interface Entitlements {
+  listingSlotsLeft: number;
+  /** `Infinity` when the plan grants unlimited requirement posts. */
+  requirementSlotsLeft: number;
+  /** Builder projects left — its own counter, not the listing one (migration 0065). */
+  projectSlotsLeft: number;
+}
+
+export type Intent = "listing" | "requirement" | "project";
+
+export function PostType({ entitlements }: { entitlements?: Entitlements }) {
   const router = useRouter();
   const [role, setRole] = useState<string | null>(null);
   const [tip, setTip] = useState(false);
@@ -24,14 +35,34 @@ export function PostType({ slotsLeft }: { slotsLeft?: number }) {
     void listingsApi.config().then((r) => setRole(r.ok ? r.data.role : null));
   }, []);
 
+  const slotsLeft = entitlements?.listingSlotsLeft;
+
+  /**
+   * Each option spends a DIFFERENT quota, so each carries its own gate:
+   * `intent` names the quota, and a blocked option detours through the plan
+   * wall instead of walking the user into a form that refuses at the end.
+   */
   const options = [
-    { key: "sell", label: "Sell a property", sub: "List a property for sale", icon: "home" as const, href: "/create/type?kind=sell" },
-    { key: "rent", label: "Rent out a property", sub: "List a property to rent", icon: "key" as const, href: "/create/type?kind=rent" },
-    { key: "requirement", label: "Post a requirement", sub: "Tell sellers what you're looking for", icon: "search-list" as const, href: "/requirements/new" },
+    { key: "sell", label: "Sell a property", sub: "List a property for sale", icon: "home" as const, href: "/create/type?kind=sell", intent: "listing" as const },
+    { key: "rent", label: "Rent out a property", sub: "List a property to rent", icon: "key" as const, href: "/create/type?kind=rent", intent: "listing" as const },
+    { key: "requirement", label: "Post a requirement", sub: "Tell sellers what you're looking for", icon: "search-list" as const, href: "/requirements/new", intent: "requirement" as const },
     ...(role === "builder"
-      ? [{ key: "project", label: "New Project", sub: "Builder project with unit types", icon: "image" as const, href: "/projects/new" }]
+      ? [{ key: "project", label: "New Project", sub: "Builder project with unit types", icon: "image" as const, href: "/projects/new", intent: "project" as const }]
       : []),
   ];
+
+  const go = (href: string, intent: Intent) => {
+    // Entitlements missing (the fetch failed) → walk on and let the form's own
+    // PLAN_REQUIRED bounce handle it, rather than blocking on a guess.
+    const left = !entitlements
+      ? Infinity
+      : intent === "requirement"
+        ? entitlements.requirementSlotsLeft
+        : intent === "project"
+          ? entitlements.projectSlotsLeft
+          : entitlements.listingSlotsLeft;
+    router.push(left > 0 ? href : `/create?wall=1&intent=${intent}`);
+  };
 
   return (
     <AppShell showNav={false} header={<Header left={<BackButton icon="close" fallback="/" />} title="Create" centerTitle />}>
@@ -42,7 +73,7 @@ export function PostType({ slotsLeft }: { slotsLeft?: number }) {
           {options.map((o) => (
             <button
               key={o.key}
-              onClick={() => router.push(o.href)}
+              onClick={() => go(o.href, o.intent)}
               className={cn(
                 "flex items-center gap-3.5 rounded-8 border border-border bg-surface-1 p-3.5 text-left",
                 "transition-transform duration-150 ease-out-quart active:scale-[0.98]",

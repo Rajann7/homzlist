@@ -1,5 +1,7 @@
 "use client";
 
+import { apiFetch } from "@/lib/auth/api-fetch";
+
 import type { ShowIf } from "./visibility";
 
 /**
@@ -17,7 +19,7 @@ export type ApiResult<T> =
 
 async function req<T>(path: string, method: string, body?: unknown): Promise<ApiResult<T>> {
   try {
-    const res = await fetch(`/api/v1${path}`, {
+    const res = await apiFetch(`/api/v1${path}`, {
       method,
       headers: body ? { "Content-Type": "application/json" } : undefined,
       body: body ? JSON.stringify(body) : undefined,

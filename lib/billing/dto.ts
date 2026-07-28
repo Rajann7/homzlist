@@ -37,6 +37,19 @@ export function planCardDTO(c: CatalogRow) {
     subLabel: c.sub_label,
     features: c.features,
     lifetime: c.period_days === null,
+    /**
+     * How many listing slots this plan grants. The plan WALL is reached only
+     * from "post a listing", and it was offering — and badging "Recommended" —
+     * the ₹2,999 Requirement Access plan to brokers, which grants zero listing
+     * slots. Buying it took the money and returned the buyer to the same wall,
+     * still unable to post. The wall needs the server's number to know which
+     * cards can actually unblock the thing the buyer came to do.
+     */
+    listingQuota: c.listing_quota ?? 0,
+    /** Same job for the requirement wall — p2999 grants proposals, not posts. */
+    requirementQuota: c.requirement_quota ?? 0,
+    /** …and for the project wall, which only p9999 can unblock (migration 0065). */
+    projectQuota: c.project_quota ?? 0,
   };
 }
 
@@ -57,6 +70,19 @@ function bar(label: string, used: number, quota: number, helper: string | null =
   if (quota === 0) return null;
   if (quota < 0) return { label, value: "Unlimited", pct: 100, helper, helperHref: null, ...extra };
   return { label, value: `${used} / ${quota}`, pct: quota ? Math.round((used / quota) * 100) : 0, helper, helperHref: null, ...extra };
+}
+
+/**
+ * "₹999 Listing Plan" — but only when a price was actually snapshotted.
+ *
+ * `terms.price_paise` is absent on a plan an admin GRANTED (there was no
+ * payment) and on older rows whose snapshot predates the field. `formatPaise`
+ * divides it by 100 regardless, so those cards read "₹NaN Builder Project" on
+ * My Plan. A granted plan has no price to show, so it shows its name.
+ */
+function planTitle(p: UserPlanRow): string {
+  const paise = p.terms?.price_paise;
+  return typeof paise === "number" ? `${formatPaise(paise)} ${p.name}` : p.name;
 }
 
 export function myPlanDTO(
@@ -85,6 +111,11 @@ export function myPlanDTO(
     const listingBar = bar("Property listings", p.listing_used, p.listing_quota,
       opts.slotLabels[p.id] ? `Slot used by: ${opts.slotLabels[p.id]}` : null);
     if (listingBar) bars.push(listingBar);
+    // The ₹9,999 plan sells a project, not a listing (migration 0065), so its
+    // card has to show the counter the builder actually bought. `bar` returns
+    // null at quota 0, so nothing appears on the plans that grant none.
+    const projectBar = bar("Builder projects", p.project_used, p.project_quota);
+    if (projectBar) bars.push(projectBar);
     const reqBar = bar("Requirement posts", p.requirement_used, p.requirement_quota,
       opts.requirementDaysLeft !== null ? `${opts.requirementDaysLeft} days left on your active requirement` : null);
     if (reqBar) bars.push(reqBar);
@@ -99,7 +130,7 @@ export function myPlanDTO(
 
     return {
       id: p.id,
-      name: `${formatPaise(p.terms.price_paise)} ${p.name}`,
+      name: planTitle(p),
       isTrial: p.is_trial,
       status: "active" as const,
       meta: p.expires_at
@@ -116,6 +147,27 @@ export function myPlanDTO(
     proposalsLeft: active.reduce((n, p) => (p.proposal_quota < 0 ? n : n + (p.proposal_quota - p.proposal_used)), 0),
     unlimitedProposals: active.some((p) => p.proposal_quota < 0),
     listingSlotsLeft: active.reduce((n, p) => (p.listing_quota < 0 ? n : n + (p.listing_quota - p.listing_used)), 0),
+    /**
+     * Requirement posts left, pooled the same way. The Create screen gates each
+     * option on the quota that option actually spends, so it needs this
+     * separately: a seller can hold a ₹999 plan whose listing slot is gone while
+     * its requirement post is untouched, and "Post a requirement" must stay open
+     * for them (and vice versa).
+     *
+     * Projects have their own counter too (migration 0065) — a ₹999 listing
+     * slot is not a ₹9,999 project slot, so the Create screen must not offer
+     * New Project on the strength of one.
+     */
+    requirementSlotsLeft: active.reduce(
+      (n, p) => (p.requirement_quota < 0 ? n : n + Math.max(0, p.requirement_quota - p.requirement_used)),
+      0,
+    ),
+    unlimitedRequirements: active.some((p) => p.requirement_quota < 0),
+    projectSlotsLeft: active.reduce(
+      (n, p) => (p.project_quota < 0 ? n : n + Math.max(0, p.project_quota - p.project_used)),
+      0,
+    ),
+    unlimitedProjects: active.some((p) => p.project_quota < 0),
   };
 
   // Consumed trace: one group per plan, in purchase order. Each line names the
@@ -142,7 +194,13 @@ export function myPlanDTO(
       const lines = [...(byPlan.get(p.id) ?? [])];
       if (p.proposal_quota > 0) lines.push(`${p.proposal_used} of ${p.proposal_quota} proposals used`);
       else if (p.proposal_quota < 0) lines.push("Unlimited matching requirements");
-      return { title: `${formatPaise(p.terms.price_paise)} plan · ${ist(p.purchased_at)}`, lines };
+      const priced = typeof p.terms?.price_paise === "number";
+      return {
+        title: priced
+          ? `${formatPaise(p.terms.price_paise)} plan · ${ist(p.purchased_at)}`
+          : `${p.name} · ${ist(p.purchased_at)}`,
+        lines,
+      };
     })
     .filter((g) => g.lines.length > 0);
 
@@ -168,13 +226,13 @@ export function myPlanDTO(
       : null,
     grace: graced
       ? {
-          title: `Your ${formatPaise(graced.terms.price_paise)} plan expired ${hoursAgo(graced.expires_at!)}`,
+          title: `Your ${planTitle(graced)} expired ${hoursAgo(graced.expires_at!)}`,
           hoursLeft: Math.max(0, Math.ceil((new Date(graced.expires_at!).getTime() + graceMs - now) / 3_600_000)),
         }
       : null,
     expiredCard: !cards.length && expired.length && !graced
       ? {
-          name: `${formatPaise(expired[0].terms.price_paise)} ${expired[0].name}`,
+          name: planTitle(expired[0]),
           meta: `Expired on ${ist(expired[0].expires_at)}`,
         }
       : null,

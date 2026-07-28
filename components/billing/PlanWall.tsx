@@ -15,7 +15,25 @@ import { cn } from "@/lib/utils";
  * nothing (Doc9 §11 "payment-first bypass"). Cards are role-filtered by the
  * server exactly as on the Plans screen.
  */
-export function PlanWall({ onChosen }: { onChosen?: (code: string) => void }) {
+export function PlanWall({
+  onChosen,
+  /**
+   * Which quota the buyer is actually blocked on. The wall is reached from a
+   * specific unfinished action, and only the plans that unblock THAT action
+   * belong on it — offering the ₹2,999 Requirement Access plan (zero listing
+   * slots) to someone trying to post a listing took their money and returned
+   * them to this same wall.
+   */
+  intent = "listing",
+  /** Where checkout returns them — the screen they were interrupted on. */
+  next = "/create",
+  onBack,
+}: {
+  onChosen?: (code: string) => void;
+  intent?: "listing" | "requirement" | "project";
+  next?: string;
+  onBack?: () => void;
+}) {
   const router = useRouter();
 
   const [data, setData] = useState<Awaited<ReturnType<typeof billingApi.plans>> | null>(null);
@@ -30,7 +48,7 @@ export function PlanWall({ onChosen }: { onChosen?: (code: string) => void }) {
 
   const choose = (code: string) => {
     if (onChosen) return onChosen(code);
-    const qs = new URLSearchParams({ plan: code, next: "/create" });
+    const qs = new URLSearchParams({ plan: code, next });
     if (couponCode) qs.set("coupon", couponCode);
     router.push(`/checkout?${qs.toString()}`);
   };
@@ -53,11 +71,31 @@ export function PlanWall({ onChosen }: { onChosen?: (code: string) => void }) {
   return (
     <AppShell
       showNav={false}
-      header={<Header left={<BackButton icon="close" fallback="/" />} title="Choose a plan" centerTitle />}
+      header={
+        <Header
+          left={
+            onBack ? (
+              <BackButton icon="close" onClick={onBack} fallback="/create" />
+            ) : (
+              <BackButton icon="close" fallback="/" />
+            )
+          }
+          title="Choose a plan"
+          centerTitle
+        />
+      }
     >
       <div className="p-4 pb-8">
         <div className="mb-5 text-center">
-          <div className="text-15 leading-[1.4] text-ink-secondary">Buy a plan to post your listing</div>
+          {/* Same line, same metrics — it just has to name the thing the buyer
+              was actually blocked on, now that the wall serves both. */}
+          <div className="text-15 leading-[1.4] text-ink-secondary">
+            {intent === "requirement"
+              ? "Buy a plan to post your requirement"
+              : intent === "project"
+                ? "Buy a plan to post your project"
+                : "Buy a plan to post your listing"}
+          </div>
           <div className="mt-1 text-13 leading-[1.3] text-ink-tertiary">One-time payment · Lifetime listing</div>
         </div>
 
@@ -72,9 +110,27 @@ export function PlanWall({ onChosen }: { onChosen?: (code: string) => void }) {
             <Button variant="outline" onClick={() => void load()}>Retry</Button>
           </div>
         ) : (
-          orderPlans(d.plans, d.recommended).map((p) => (
-            <WallCard key={p.code} plan={p} recommended={p.code === d.recommended} onChoose={() => choose(p.code)} />
-          ))
+          (() => {
+            // Only plans that actually grant the blocked quota belong here, and
+            // the badge must sit on one of those. `d.recommended` is the role
+            // hint from the Plans screen — for a broker it is the ₹2,999
+            // Requirement Access plan, which grants neither a listing slot nor
+            // a requirement post (it sells proposals).
+            const usable = d.plans.filter((p) =>
+              intent === "requirement"
+                ? p.requirementQuota !== 0
+                : intent === "project"
+                  ? p.projectQuota !== 0
+                  : p.listingQuota !== 0,
+            );
+            const shown = usable.length ? usable : d.plans;
+            const rec = shown.some((p) => p.code === d.recommended)
+              ? d.recommended
+              : shown[0]?.code;
+            return orderPlans(shown, rec).map((p) => (
+              <WallCard key={p.code} plan={p} recommended={p.code === rec} onChoose={() => choose(p.code)} />
+            ));
+          })()
         )}
 
         <div className="mt-1">

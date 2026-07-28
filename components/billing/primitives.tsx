@@ -12,12 +12,22 @@ import { Icon } from "@/components/ui/Icon";
  */
 
 /* ---- Appbar back button: 44×44, browser-back with a safe fallback ------- */
-export function BackButton({ fallback = "/", icon = "arrow-left" }: { fallback?: string; icon?: "arrow-left" | "close" }) {
+export function BackButton({
+  fallback = "/",
+  icon = "arrow-left",
+  /**
+   * Overrides the history pop. Needed where "back" would land on a URL that
+   * re-renders the very screen being dismissed — the plan wall lives at
+   * `/create?wall=1`, so popping history returns to the wall, not out of it.
+   */
+  onClick,
+}: { fallback?: string; icon?: "arrow-left" | "close"; onClick?: () => void }) {
   const router = useRouter();
   return (
     <button
       aria-label="Back"
       onClick={() => {
+        if (onClick) return onClick();
         // Deep-linked entry (no history to pop) must not dead-end (Doc6 §5.2).
         if (window.history.length > 1) router.back();
         else router.push(fallback);
