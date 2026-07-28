@@ -2872,3 +2872,58 @@ params::text like '%construction_status%' or params::text like '%age%') from
 saved_searches` returns 0 of 1. This is only a hazard if the same vocabulary is
 changed again once real users have saved searches — at which point the change
 needs a params rewrite in the same migration.
+
+### 10. The double-payment guard warns AFTER the sheet has already opened
+
+`/billing/checkout` computes `duplicateWarning` (same user + same catalog code
+paid inside `double_pay_window_minutes`) and returns it in the checkout session.
+But `components/billing/Checkout.tsx` only reads it out of the *result* of
+`payWithRazorpay`, which resolves after the Razorpay sheet has been opened and
+possibly paid. The warning banner then renders in the `form` phase — i.e. the
+only way to see "you already paid for this 4 minutes ago" is to have cancelled
+the second payment yourself.
+
+Doc2 §4.3 wants the guard to warn *instead of* charging again. Fixing it means
+splitting the flow: ask the server whether this purchase is a duplicate before
+creating the order (or return the warning from `/billing/quote`, which the
+screen already calls on load), and gate the Pay button behind a confirm. That is
+a flow change on a locked design screen, so it needs Rajan's call on what the
+confirm looks like — not something to invent.
+
+Found while fixing the Razorpay verify/webhook bugs (2026-07-28); the guard is
+not wired to anything that can prevent a charge today.
+
+### 11. UPI is switched OFF on the Razorpay account (dashboard action, not code)
+
+Live check against the configured TEST key on 2026-07-28
+(`GET https://api.razorpay.com/v1/preferences?key_id=…`):
+
+```
+upi        = false
+upi_type   = { collect: 0, intent: 0 }
+upi_intent = true
+card       = true
+netbanking = 40 banks
+wallet     = airtelmoney, mobikwik, olamoney
+paylater   = 9 providers
+```
+
+So the account cannot take a UPI payment at all — neither collect nor intent.
+Confirmed in the browser: with UPI selected on our screen the Razorpay sheet
+opened listing only Cards / Netbanking / Wallet / Pay Later.
+
+The code side is now honest about it — `/billing/quote` returns the gateway's
+live method list and the checkout screen only renders methods that are actually
+chargeable, so UPI no longer appears. But **that is a workaround, not the fix**:
+UPI is the method most Indian buyers expect, and today every one of them is
+pushed onto a card.
+
+Action is Rajan's, in the Razorpay dashboard (Settings → Payment Methods → UPI),
+and it has to be done for the LIVE account too, not just test. Nothing in this
+repo can enable it. Once it is on, the UPI row reappears by itself — the list is
+read from `/preferences`, so no code change is needed.
+
+Worth noting the UPI-collect "Payment processing… safe to close" screen
+(`phase === "pending"` in `components/billing/Checkout.tsx`) is therefore
+unreachable in production right now: nothing can produce a pending UPI order
+while UPI is off. It has never run against a real payment.

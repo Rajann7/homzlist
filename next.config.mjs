@@ -18,18 +18,41 @@ const supabaseOrigin = (() => {
 })();
 const supabaseWs = supabaseOrigin ? supabaseOrigin.replace(/^http/, "ws") : "";
 
+// Razorpay Checkout.js (Doc9 §12). WITHOUT these the payment flow is dead: the
+// browser refuses to load checkout.js under `script-src 'self'`, our loader's
+// onerror fires, and every attempt lands on the "Payment failed" screen having
+// never reached Razorpay at all (zero payment attempts on the order).
+//
+// Explicit hosts, never a wildcard — this is the one third party allowed to run
+// script in our page, so the list stays exactly as long as Razorpay needs:
+//   checkout.razorpay.com  the SDK + the sheet's iframe
+//   cdn.razorpay.com       the risk-detection bundle checkout.js pulls in itself
+//   api.razorpay.com       the sheet's XHR and the bank/3DS redirect target
+//   lumberjack*            its telemetry beacons (blocked = console errors only)
+const RAZORPAY = {
+  script: "https://checkout.razorpay.com https://cdn.razorpay.com",
+  frame: "https://api.razorpay.com https://checkout.razorpay.com",
+  connect: "https://api.razorpay.com https://lumberjack.razorpay.com https://lumberjack-metrics.razorpay.com",
+  form: "https://api.razorpay.com",
+};
+
 const csp = [
   "default-src 'self'",
-  `script-src 'self' 'unsafe-inline'${isProd ? "" : " 'unsafe-eval'"}`,
+  `script-src 'self' 'unsafe-inline' ${RAZORPAY.script}${isProd ? "" : " 'unsafe-eval'"}`,
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob: https:", // R2 / Cloudflare CDN images + data/blob avatars
   "font-src 'self' data:",
-  `connect-src 'self' ${supabaseOrigin} ${supabaseWs}${isProd ? "" : " ws: wss:"}`.replace(/\s+/g, " ").trim(),
+  `connect-src 'self' ${supabaseOrigin} ${supabaseWs} ${RAZORPAY.connect}${isProd ? "" : " ws: wss:"}`.replace(/\s+/g, " ").trim(),
+  // The checkout sheet renders in an iframe. Absent, this fell back to
+  // `default-src 'self'` and the sheet could not be framed even once the SDK
+  // was allowed to load.
+  `frame-src 'self' ${RAZORPAY.frame}`,
   "worker-src 'self' blob:", // PWA service worker
   "manifest-src 'self'",
   "object-src 'none'",
   "base-uri 'self'",
-  "form-action 'self'",
+  // Net-banking / 3-D Secure hand off by POSTing the browser to the gateway.
+  `form-action 'self' ${RAZORPAY.form}`,
   "frame-ancestors 'none'", // mirrors X-Frame-Options: DENY
   ...(isProd ? ["upgrade-insecure-requests"] : []),
 ].join("; ");

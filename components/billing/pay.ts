@@ -51,15 +51,32 @@ function loadCheckoutScript(): Promise<boolean> {
   return scriptPromise;
 }
 
+/** Our method keys → the ids Razorpay Checkout understands for `prefill.method`. */
+const RZP_METHOD: Record<string, string> = {
+  upi: "upi",
+  card: "card",
+  net: "netbanking",
+  netbanking: "netbanking",
+  wallet: "wallet",
+};
+
 export async function payWithRazorpay({
   intent,
   prefill,
+  method,
   onFailure,
   /** Dev-only simulation branch when Razorpay keys aren't configured. */
   simulate,
 }: {
   intent: CheckoutIntent;
   prefill?: { name?: string; contact?: string; email?: string };
+  /**
+   * The method the user picked on our own checkout screen. Passed to Razorpay so
+   * the sheet opens on that tab — without it the radio group was decorative and
+   * picking "UPI" still landed the user on Cards. Preselects only: every other
+   * method stays available inside the sheet.
+   */
+  method?: string;
   onFailure?: (message: string) => void;
   simulate?: "success" | "pending" | "failed";
 }): Promise<PayResult> {
@@ -80,18 +97,34 @@ export async function payWithRazorpay({
   const session = created.data;
 
   // ---- Dev path: no keys configured → verify with a simulated outcome ------
+  // Every early return from here on carries the order id: the caller needs it to
+  // poll a pending order and to offer "Check status" after a failure.
   if (session.simulated || !session.keyId) {
     const res = await billingApi.verify({ orderId: session.orderId, simulate: simulate ?? "success" });
-    if (!res.ok) return { status: "failed", reason: res.error.code };
-    return { ...res.data, duplicateWarning: session.duplicateWarning };
+    if (!res.ok) return { status: "failed", orderId: session.orderId, reason: res.error.code };
+    return { ...res.data, orderId: res.data.orderId ?? session.orderId, duplicateWarning: session.duplicateWarning };
   }
 
   // ---- 2. Hosted checkout --------------------------------------------------
   const loaded = await loadCheckoutScript();
   if (!loaded || !window.Razorpay) {
     onFailure?.("Couldn't reach the payment gateway. Check your connection.");
-    return { status: "failed", reason: "SCRIPT_LOAD" };
+    return { status: "failed", orderId: session.orderId, reason: "SCRIPT_LOAD" };
   }
+
+  // Razorpay fires `payment.failed` for EVERY declined attempt but keeps its own
+  // sheet open with a "Retry payment with…" list, so one order can produce several
+  // failures before it succeeds. Resolving on that event ended the flow at the
+  // first decline: our screen jumped to "Payment failed — your money wasn't
+  // deducted" while the sheet was still up, and when the user then paid
+  // successfully in that same sheet the success callback resolved an
+  // already-settled promise and was silently dropped. Proven live on 2026-07-28:
+  // Razorpay captured pay_TIqDd2AvIZMP0I while the app showed "Payment failed".
+  //
+  // So: remember the reason, never resolve on it. The sheet closes itself on
+  // success (→ `handler`) or when the user gives up (→ `ondismiss`), and only
+  // then does the reason describe a real, final failure.
+  let lastFailure: string | undefined;
 
   const handler = await new Promise<{ paymentId?: string; signature?: string; dismissed?: boolean; failed?: string }>((resolve) => {
     const rzp = new window.Razorpay!({
@@ -102,12 +135,12 @@ export async function payWithRazorpay({
       amount: session.amount,
       currency: session.currency,
       name: "HomzList",
-      prefill,
+      prefill: { ...prefill, ...(method && RZP_METHOD[method] ? { method: RZP_METHOD[method] } : {}) },
       theme: { color: "#0F9D58" },
       handler: (r: any) => resolve({ paymentId: r.razorpay_payment_id, signature: r.razorpay_signature }),
-      modal: { ondismiss: () => resolve({ dismissed: true }) },
+      modal: { ondismiss: () => resolve({ dismissed: true, failed: lastFailure }) },
     });
-    rzp.on("payment.failed", (r: any) => resolve({ failed: r?.error?.description ?? "Payment failed" }));
+    rzp.on("payment.failed", (r: any) => { lastFailure = r?.error?.description ?? "Payment failed"; });
     rzp.open();
   });
 
@@ -115,8 +148,15 @@ export async function payWithRazorpay({
     // User closed the sheet. The order stays open; the webhook settles it if a
     // payment actually landed (UPI collect can complete after dismissal).
     const res = await billingApi.verify({ orderId: session.orderId });
-    if (res.ok && res.data.status === "success") return { ...res.data, duplicateWarning: session.duplicateWarning };
-    return { status: "cancelled" };
+    if (res.ok && res.data.status === "success") {
+      return { ...res.data, orderId: res.data.orderId ?? session.orderId, duplicateWarning: session.duplicateWarning };
+    }
+    // Closed AFTER a decline they chose not to retry — that is a failure the
+    // screen must name, not a silent trip back to the form.
+    if (handler.failed) return { status: "failed", orderId: session.orderId, reason: handler.failed };
+    // Still carries the order id: a dismissed UPI collect can land minutes later,
+    // and the screen needs something to poll.
+    return { status: "cancelled", orderId: session.orderId };
   }
 
   // ---- 3. Server-verified activation ---------------------------------------
@@ -128,9 +168,9 @@ export async function payWithRazorpay({
 
   if (!res.ok) {
     onFailure?.("We couldn't confirm that payment. If money was deducted it's refunded in 5–7 days.");
-    return { status: "failed", reason: res.error.code };
+    return { status: "failed", orderId: session.orderId, reason: res.error.code };
   }
-  return { ...res.data, duplicateWarning: session.duplicateWarning };
+  return { ...res.data, orderId: res.data.orderId ?? session.orderId, duplicateWarning: session.duplicateWarning };
 }
 
 /** Poll a pending (UPI-collect) order until it settles — "safe to close" screen. */

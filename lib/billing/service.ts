@@ -610,6 +610,17 @@ export async function getPaymentByRazorpayId(rzpId: string) {
   return data as { id: string; order_id: string; profile_id: string; status: string; amount_paise: number } | null;
 }
 
+/**
+ * Record a failed attempt. Never downgrades an order that is already `paid`.
+ *
+ * Razorpay allows several payment attempts against ONE order, and webhook
+ * delivery is not ordered — so a `payment.failed` for attempt 1 can legitimately
+ * arrive after the `payment.captured` for attempt 2. Unconditionally writing
+ * `status: "failed"` here flipped a genuinely paid order to failed (while the
+ * plan/boost it bought stayed granted) and pushed a "Payment failed" notice to
+ * someone whose money had gone through. The attempt row is still written — it
+ * really did fail — but the order and the notification are left alone.
+ */
 export async function recordFailedPayment(order: OrderRow, reason: string, rzpPaymentId?: string) {
   await db().from("payments").insert({
     order_id: order.id,
@@ -620,7 +631,19 @@ export async function recordFailedPayment(order: OrderRow, reason: string, rzpPa
     currency: order.currency,
     failure_reason: reason,
   });
-  await db().from("orders").update({ status: "failed" }).eq("id", order.id);
+  const { data: downgraded } = await db()
+    .from("orders")
+    .update({ status: "failed" })
+    .eq("id", order.id)
+    .neq("status", "paid")
+    .neq("status", "refunded")
+    .select("id");
+  if (!downgraded?.length) return; // already settled — nothing failed for the user
+
+  // Hand the coupon slot back. A dead order used to keep holding it for the full
+  // 30-minute window, so the retry below re-priced at full amount and rejected
+  // the very same code with "USED" (per-user limit already spent).
+  await releaseCouponSlot(order.id);
 
   // designs/P11 S7: "Payment failed — <b>₹499 top-up</b>" + a Retry button.
   // Retry re-opens the normal server-priced checkout; nothing here charges.

@@ -111,6 +111,68 @@ export function refundPayment(paymentId: string, amountPaise: number, notes: Rec
   });
 }
 
+/**
+ * Which methods this Razorpay account can actually take right now.
+ *
+ * The checkout screen used to hardcode "UPI / Card / Net Banking" and default to
+ * UPI. On 2026-07-28 the account had `upi: false, upi_type: {collect: 0, intent: 0}`,
+ * so every user landed on the default method, opened the sheet, and found no UPI
+ * in it at all. A method we cannot charge is a dead option, and which ones are
+ * live is the gateway's fact, not ours to guess (CLAUDE.md §7).
+ *
+ * `/preferences` is the same public endpoint Checkout.js itself reads, so this
+ * answers exactly what the sheet will offer. Cached briefly: it changes only when
+ * someone edits the Razorpay dashboard, and the quote screen calls it on load.
+ */
+export interface EnabledMethods {
+  upi: boolean;
+  card: boolean;
+  netbanking: boolean;
+  wallet: boolean;
+}
+
+const ALL_ON: EnabledMethods = { upi: true, card: true, netbanking: true, wallet: true };
+const METHODS_TTL_MS = 5 * 60_000;
+let methodsCache: { at: number; value: EnabledMethods } | null = null;
+
+export async function fetchEnabledMethods(): Promise<EnabledMethods> {
+  if (!isConfigured()) return ALL_ON; // dev simulation path — nothing is really charged
+  if (methodsCache && Date.now() - methodsCache.at < METHODS_TTL_MS) return methodsCache.value;
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  try {
+    const res = await fetch(`${API}/preferences?key_id=${encodeURIComponent(publicKeyId())}`, {
+      signal: controller.signal,
+      cache: "no-store",
+    });
+    if (!res.ok) throw new Error(`razorpay /preferences ${res.status}`);
+    const json = (await res.json()) as { methods?: Record<string, unknown> };
+    const m = json.methods ?? {};
+    // Razorpay answers `false` for off, and `true` or a populated map for on
+    // (netbanking is a bank list, wallet a wallet map). An empty map is off.
+    const on = (v: unknown) =>
+      v === true || (typeof v === "object" && v !== null && Object.keys(v).length > 0);
+    // UPI is special: `upi` can be false while `upi_intent` is true, and
+    // `upi_type` says which of collect/intent are actually live.
+    const upiType = (m.upi_type ?? {}) as Record<string, number>;
+    const value: EnabledMethods = {
+      upi: on(m.upi) || Object.values(upiType).some((v) => v === 1),
+      card: on(m.card),
+      netbanking: on(m.netbanking),
+      wallet: on(m.wallet),
+    };
+    methodsCache = { at: Date.now(), value };
+    return value;
+  } catch {
+    // Never block checkout on this call: if we cannot ask, show the full list
+    // rather than an empty "Payment method" section with nothing to pick.
+    return methodsCache?.value ?? ALL_ON;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /** Constant-time hex/utf8 compare — avoids leaking the signature via timing. */
 function safeEqual(a: string, b: string): boolean {
   const ba = Buffer.from(a, "utf8");

@@ -94,6 +94,21 @@ export interface QuoteView {
   couponError?: string | null;
 }
 
+/** What the gateway can actually charge right now — never assumed client-side. */
+export interface EnabledMethods {
+  upi: boolean;
+  card: boolean;
+  netbanking: boolean;
+  wallet: boolean;
+}
+
+/** Prefill for the Razorpay sheet, so it stops re-asking for what we already hold. */
+export interface PayerView {
+  name: string | null;
+  contact: string | null;
+  email: string | null;
+}
+
 export interface CheckoutSession {
   orderId: string;
   razorpayOrderId: string;
@@ -184,7 +199,9 @@ export const billingApi = {
 
   /** Price the checkout screen without creating an order (same maths as checkout). */
   quote: (planId: string, couponCode?: string | null) =>
-    req<{ quote: QuoteView }>("/billing/quote", "POST", { planId, couponCode: couponCode ?? null }),
+    req<{ quote: QuoteView; methods: EnabledMethods; payer: PayerView }>(
+      "/billing/quote", "POST", { planId, couponCode: couponCode ?? null },
+    ),
 
   checkout: (intent: CheckoutIntent) => req<CheckoutSession>("/billing/checkout", "POST", intent),
 

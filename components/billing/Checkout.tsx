@@ -3,7 +3,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AppShell, Button, Header, Icon, Skeleton, Spinner, useToast } from "./ui";
-import { billingApi, newIdempotencyKey, type CheckoutIntent, type QuoteView } from "@/lib/billing/client";
+import {
+  billingApi, newIdempotencyKey,
+  type CheckoutIntent, type EnabledMethods, type PayerView, type QuoteView,
+} from "@/lib/billing/client";
 import { GSTIN_RE } from "@/lib/billing/money";
 import { BackButton, CouponRow, Radio } from "./primitives";
 import { payWithRazorpay, pollOrder } from "./pay";
@@ -23,10 +26,17 @@ import { cn } from "@/lib/utils";
 
 type Phase = "form" | "paying" | "pending" | "failed" | "done";
 
-const METHODS = [
-  { key: "upi", title: "UPI · GPay, PhonePe, Paytm", sub: "Instant" },
-  { key: "card", title: "Credit / Debit Card", sub: "Visa, Mastercard, RuPay" },
-  { key: "net", title: "Net Banking", sub: "All major banks" },
+/**
+ * The rows designs/P6 S2 draws, keyed to the gateway flag that decides whether
+ * each one can actually be charged. The list is never rendered as-is: a method
+ * the Razorpay account has switched off is dropped, because offering it opens a
+ * sheet that doesn't contain it (found live 2026-07-28 — UPI was off account-side
+ * while this screen defaulted every user to it).
+ */
+const METHODS: { key: string; title: string; sub: string; flag: keyof EnabledMethods }[] = [
+  { key: "upi", title: "UPI · GPay, PhonePe, Paytm", sub: "Instant", flag: "upi" },
+  { key: "card", title: "Credit / Debit Card", sub: "Visa, Mastercard, RuPay", flag: "card" },
+  { key: "net", title: "Net Banking", sub: "All major banks", flag: "netbanking" },
 ];
 
 export function Checkout() {
@@ -44,6 +54,8 @@ export function Checkout() {
   const next = params.get("next") ?? undefined;
 
   const [quote, setQuote] = useState<QuoteView | null>(null);
+  const [enabled, setEnabled] = useState<EnabledMethods | null>(null);
+  const [payer, setPayer] = useState<PayerView | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [phase, setPhase] = useState<Phase>("form");
   const [failReason, setFailReason] = useState<string | null>(null);
@@ -58,7 +70,10 @@ export function Checkout() {
   const [gstinOpen, setGstinOpen] = useState(false);
   const [gstin, setGstin] = useState("");
   const [gstinError, setGstinError] = useState<string | null>(null);
-  const [method, setMethod] = useState("upi");
+  // No default until the server says what is live — picking "upi" up front is how
+  // the dead-method bug happened. `methodRows` seeds it from the first row that
+  // survives the gateway filter.
+  const [method, setMethod] = useState<string | null>(null);
 
   // One key per user-initiated attempt: a double-tap on Pay replays the same
   // order instead of creating a second one (Doc7 §0 idempotency).
@@ -86,11 +101,21 @@ export function Checkout() {
     }
     setLoadError(null);
     setQuote(res.data.quote);
+    setEnabled(res.data.methods);
+    setPayer(res.data.payer);
   }, [planId]);
 
   useEffect(() => {
     void loadQuote(couponCode);
   }, [loadQuote, couponCode]);
+
+  // Only the methods the gateway will actually accept. Until the quote lands we
+  // show none rather than guessing.
+  const methodRows = enabled ? METHODS.filter((m) => enabled[m.flag]) : [];
+
+  useEffect(() => {
+    if (!method && methodRows.length) setMethod(methodRows[0].key);
+  }, [method, methodRows]);
 
   // Auto-poll a pending (UPI-collect) order. The page is safe to close — the
   // webhook activates regardless — but polling gets the user there sooner.
@@ -156,7 +181,17 @@ export function Checkout() {
       idempotencyKey: idemKey.current,
     };
 
-    const res = await payWithRazorpay({ intent, onFailure: (m) => toast.show(m) });
+    const res = await payWithRazorpay({
+      intent,
+      method: method ?? undefined,
+      // Server-supplied, so the sheet doesn't re-ask for the phone/email we hold.
+      prefill: {
+        name: payer?.name ?? undefined,
+        contact: payer?.contact ?? undefined,
+        email: payer?.email ?? undefined,
+      },
+      onFailure: (m) => toast.show(m),
+    });
     setDuplicate(res.duplicateWarning ?? null);
     setOrderId(res.orderId ?? null);
 
@@ -326,7 +361,7 @@ export function Checkout() {
 
         <div className="mb-2 mt-5 text-13 font-semibold text-ink-secondary">Payment method</div>
         <div className="flex flex-col gap-2">
-          {METHODS.map((m) => (
+          {methodRows.map((m) => (
             <button
               key={m.key}
               onClick={() => setMethod(m.key)}
@@ -343,6 +378,11 @@ export function Checkout() {
             </button>
           ))}
         </div>
+        {!methodRows.length && (
+          <div className="rounded-8 bg-warning-soft px-3.5 py-3 text-13 leading-[1.35] text-ink-primary">
+            Online payments are temporarily unavailable. Please try again shortly.
+          </div>
+        )}
         <div className="mt-2.5 text-11 leading-[1.4] text-ink-tertiary">Payments are processed securely by Razorpay.</div>
         <div className="mt-4 text-11 leading-[1.4] text-ink-tertiary">
           By paying you agree to our <a href="/legal/terms" className="text-accent">Terms</a> and{" "}
@@ -351,7 +391,9 @@ export function Checkout() {
       </div>
 
       <div className="sticky bottom-0 z-sticky mt-auto border-t border-divider bg-page p-4 safe-bottom">
-        <Button fullWidth loading={phase === "paying"} onClick={() => void pay()}>
+        {/* No live method = nothing this order could be charged with, so the
+            button says so instead of opening an empty sheet. */}
+        <Button fullWidth loading={phase === "paying"} disabled={!method} onClick={() => void pay()}>
           Pay {quote.totalLabel}
         </Button>
       </div>

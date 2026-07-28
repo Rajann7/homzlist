@@ -51,9 +51,9 @@ export async function POST(req: NextRequest) {
     const simulate = typeof body.simulate === "string" ? body.simulate : "success";
     if (simulate === "failed") {
       await recordFailedPayment(order, "Payment declined by bank (simulated)");
-      return ok({ status: "failed" });
+      return ok({ status: "failed", orderId: order.id });
     }
-    if (simulate === "pending") return ok({ status: "pending" });
+    if (simulate === "pending") return ok({ status: "pending", orderId: order.id });
     const result = await activatePaidOrder(order, {
       paymentId: `pay_dev_${order.id.replace(/-/g, "").slice(0, 14)}`,
       razorpayOrderId: order.razorpay_order_id ?? "",
@@ -67,7 +67,10 @@ export async function POST(req: NextRequest) {
   }
 
   // ---- Real verification ---------------------------------------------------
-  if (!order.razorpay_order_id) return ok({ status: "pending" });
+  // Every branch below echoes `orderId`. The checkout screen keys its poller and
+  // its "Check status" button off it, so a pending/failed answer without one
+  // leaves a UPI-collect order with no way to ever settle on screen.
+  if (!order.razorpay_order_id) return ok({ status: "pending", orderId: order.id });
 
   // If the client passed back a Checkout handoff, its HMAC must be valid. This
   // is an early reject only — it is NOT what activation is based on.
@@ -83,13 +86,13 @@ export async function POST(req: NextRequest) {
   const { items } = await fetchOrderPayments(order.razorpay_order_id);
   const payment = items.find((p) => p.status === "captured") ?? items[0];
 
-  if (!payment) return ok({ status: "pending" });
+  if (!payment) return ok({ status: "pending", orderId: order.id });
 
   if (payment.status === "failed") {
     await recordFailedPayment(order, payment.error_description ?? "Payment failed", payment.id);
-    return ok({ status: "failed", reason: payment.error_description ?? null });
+    return ok({ status: "failed", orderId: order.id, reason: payment.error_description ?? null });
   }
-  if (payment.status !== "captured") return ok({ status: "pending" });
+  if (payment.status !== "captured") return ok({ status: "pending", orderId: order.id });
 
   const result = await activatePaidOrder(order, {
     paymentId: payment.id,

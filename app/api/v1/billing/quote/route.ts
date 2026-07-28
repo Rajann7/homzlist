@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/lib/auth/current-user";
 import { getProfileById } from "@/lib/profile/service";
 import { getCatalogItem, quote } from "@/lib/billing/service";
 import { quoteDTO } from "@/lib/billing/dto";
+import { fetchEnabledMethods } from "@/lib/billing/razorpay";
 
 /**
  * POST /api/v1/billing/quote — price the checkout screen, without creating an
@@ -47,5 +48,14 @@ export async function POST(req: NextRequest) {
     stateCode: null,
   });
 
-  return ok({ quote: quoteDTO(q) });
+  // The payment-method rows and the Razorpay prefill both come from the server:
+  // `methods` so we never offer a method the gateway has switched off, `payer`
+  // so the sheet doesn't ask again for a phone/name/email we already hold.
+  const methods = await fetchEnabledMethods();
+
+  return ok({
+    quote: quoteDTO(q),
+    methods,
+    payer: { name: profile.name, contact: profile.phone, email: profile.email },
+  });
 }
