@@ -287,6 +287,9 @@ export const listingsApi = {
 
   /** This listing as the FEED CARD renders it — the Preview screen's card tab. */
   previewCard: (id: string) => req<{ card: import("@/lib/feed/client").FeedCard }>(`/listings/${id}/card`, "GET"),
+  /** Same, for a project — the builder's Preview screen card tab. */
+  previewProjectCard: (id: string) =>
+    req<{ card: import("@/lib/feed/client").FeedCard }>(`/projects/${id}/card`, "GET"),
   getProject: (id: string) => req<{ project: any }>(`/projects/${id}`, "GET"),
   /** Builder-only project insights; 404 for anyone else's, same as a bad id. */
   projectInsights: (id: string) => req<{ project: ProjectInsights }>(`/projects/${id}/insights`, "GET"),
@@ -311,6 +314,20 @@ export const listingsApi = {
   labelPhoto: (id: string, photoId: string, altText: string) =>
     req<{ photos: Photo[] }>(`/listings/${id}/photos`, "PATCH", { photoId, altText }),
   deletePhoto: (id: string, photoId: string) => req<{ photos: Photo[] }>(`/listings/${id}/photos/${photoId}`, "DELETE"),
+
+  /**
+   * The project gallery (migration 0075). A project used to carry one
+   * `cover_url` and nothing else, so its detail hero could not be swiped.
+   */
+  projectPhotos: (id: string) =>
+    req<{ photos: Photo[]; capacity: { max: number | null; used: number; remaining: number | null } | null }>(
+      `/projects/${id}/photos`,
+      "GET",
+    ),
+  reorderProjectPhotos: (id: string, order: string[]) => req<{ photos: Photo[] }>(`/projects/${id}/photos`, "PATCH", { order }),
+  labelProjectPhoto: (id: string, photoId: string, altText: string) =>
+    req<{ photos: Photo[] }>(`/projects/${id}/photos`, "PATCH", { photoId, altText }),
+  deleteProjectPhoto: (id: string, photoId: string) => req<{ photos: Photo[] }>(`/projects/${id}/photos/${photoId}`, "DELETE"),
 };
 
 /**
@@ -325,6 +342,12 @@ export async function uploadPhotos(
   listingId: string,
   rawFiles: File[],
   onProgress?: (done: number, total: number) => void,
+  /**
+   * Which gallery — a listing's or a project's (migration 0075). The two flows
+   * are byte-for-byte the same (presign → PUT → commit); only the route differs,
+   * so they share this one function rather than a copy that drifts.
+   */
+  subject: "listings" | "projects" = "listings",
 ): Promise<{
   ok: boolean; photos?: Photo[]; failed: string[]; error?: string; rejected?: number;
   /** How many photos were auto-cropped into the allowed aspect band. */
@@ -339,7 +362,7 @@ export async function uploadPhotos(
   const autoCropped = normalized.filter((n) => n.reason === "cropped-tall" || n.reason === "cropped-wide").length;
 
   const presign = await req<{ grants: { url: string; key: string; headers: Record<string, string> }[] }>(
-    `/listings/${listingId}/photos/presign`,
+    `/${subject}/${listingId}/photos/presign`,
     "POST",
     { files: files.map((f) => ({ contentType: f.type, size: f.size })) },
   );
@@ -350,7 +373,7 @@ export async function uploadPhotos(
       failed: files.map((f) => f.name),
       error:
         code === "PHOTO_LIMIT" || (presign.error as any).code === "VALIDATION_ERROR"
-          ? `You've reached the photo limit for this listing`
+          ? `You've reached the photo limit for this ${subject === "projects" ? "project" : "listing"}`
           : code === "FILE_TOO_LARGE" ? "One of those files is over 25MB"
           : code === "FILE_TYPE_BLOCKED" ? "Only JPG, PNG, WebP or HEIC images are allowed"
           : "Couldn't start the upload",
@@ -380,7 +403,7 @@ export async function uploadPhotos(
   if (!uploaded.length) return { ok: false, failed, error: "Upload failed" };
 
   const commit = await req<{ photos: Photo[]; added: number; rejected: number }>(
-    `/listings/${listingId}/photos/commit`,
+    `/${subject}/${listingId}/photos/commit`,
     "POST",
     { keys: uploaded },
   );
@@ -506,6 +529,8 @@ export interface RequirementDetail {
   kind: "sell" | "rent";
   kindLabel: string;
   typeCode: string;
+  /** `property_types.label` — the code is storage, not something to print. */
+  typeLabel: string | null;
   bhk: number | null;
   areaLabel: string | null;
   urgency: string;

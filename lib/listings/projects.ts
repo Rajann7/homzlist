@@ -2,9 +2,10 @@ import "server-only";
 import { createServiceClient } from "@/lib/supabase/server";
 import { consumeQuota, releaseQuota, reserveSlot, transitionSlot } from "@/lib/billing/service";
 import { formatShortRupees } from "@/lib/billing/money";
-import { getAmenityLabels, getFieldDefinitions, getFieldGroups, type FieldDefinitionRow } from "./service";
+import { getAmenityLabels, getAmenityMeta, getFieldDefinitions, getFieldGroups, posterCard, type FieldDefinitionRow } from "./service";
 import { visibleKeys } from "./visibility";
-import { STATUS_BADGE } from "./dto";
+import { scopedGroups } from "./groupLabel";
+import { STATUS_BADGE, renderAttrValue, resolveKeySpecs, topUpSpecs, type KeySpecCandidate } from "./dto";
 
 /**
  * Builder projects (Doc2 §6, Doc7 §59-61).
@@ -30,7 +31,7 @@ export interface ProjectTypeRow {
   category: "residential" | "commercial" | "plot" | "mixed";
   /** Unit names this kind of scheme offers in its "Add unit type" sheet. */
   unit_types: string[];
-  field_config: { fields?: string[]; required?: string[] };
+  field_config: { fields?: string[]; required?: string[]; key_specs?: KeySpecCandidate[] };
   sort_order: number;
 }
 
@@ -94,9 +95,11 @@ export async function sanitizeProjectAttributes(
  * queries and not three per row.
  */
 async function projectContext() {
-  const [defs, groups, types] = await Promise.all([getFieldDefinitions(), getFieldGroups(), getProjectTypes()]);
+  const [defs, groups, types, amenityMeta] = await Promise.all([
+    getFieldDefinitions(), getFieldGroups(), getProjectTypes(), getAmenityMeta(),
+  ]);
   const byCode = new Map(types.map((t) => [t.code, t]));
-  return { defs, groups, forRow: (p: { project_type?: string | null }) => byCode.get(p.project_type ?? "") ?? null };
+  return { defs, groups, amenityMeta, forRow: (p: { project_type?: string | null }) => byCode.get(p.project_type ?? "") ?? null };
 }
 
 /** A stored option CODE rendered through its own definition's label. */
@@ -111,12 +114,14 @@ function projectAttributeGroups(
   attrs: Record<string, unknown>,
   type: ProjectTypeRow | null,
   defs: FieldDefinitionRow[] | undefined,
-  groups: { key: string; label: string }[] | undefined,
+  groups: { key: string; label: string; icon?: string | null; tone?: string | null }[] | undefined,
 ) {
   if (!defs?.length || !type) return [];
   const byKey = new Map(defs.map((d) => [d.key, d]));
-  const order = (type.field_config.fields ?? []).filter((k) => k in attrs);
-  const keys = [...order, ...Object.keys(attrs).filter((k) => !order.includes(k))];
+  // Only what this scheme type asks for — same rule as a listing's
+  // `attributeRows` (0073). A trailing "everything else" block put fields from
+  // a previously-chosen scheme type on the screen with no way to edit them.
+  const keys = (type.field_config.fields ?? []).filter((k) => k in attrs);
 
   const rows: { key: string; label: string; value: string; group: string | null }[] = [];
   for (const key of keys) {
@@ -124,26 +129,25 @@ function projectAttributeGroups(
     if (raw === null || raw === undefined || raw === "") continue;
     const def = byKey.get(key);
     const label = def?.label ?? key.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
-    const opt = (v: unknown) => def?.options?.find((o) => o.value === String(v))?.label ?? String(v);
-    let value: string;
-    if (typeof raw === "boolean") { if (!raw) continue; value = "Yes"; }
-    else if (Array.isArray(raw)) { if (!raw.length) continue; value = raw.map(opt).join(", "); }
-    else if (raw && typeof raw === "object" && "value" in (raw as Record<string, unknown>)) {
-      const a = raw as { value: string; unit?: string };
-      if (!a.value) continue;
-      value = `${Number(a.value).toLocaleString("en-IN")} ${a.unit ?? "sq ft"}`;
-    } else value = opt(raw);
+    // The SAME renderer a listing uses (dto.renderAttrValue). This branch used
+    // to be a second, thinner copy: it printed the raw unit code ("50 vigha"
+    // rather than "50 Vigha") and no thousands grouping ("150000" under
+    // "Booking amount (₹)"), so a scheme described its answers differently from
+    // a property describing the identical field.
+    const value = renderAttrValue(def, raw);
+    if (value === null) continue;
     rows.push({ key, label, value, group: def?.group ?? null });
   }
 
   const known = groups ?? [];
-  const out: { key: string; label: string; rows: typeof rows }[] = [];
+  // Icon + tone travel with the block, exactly as they do for a listing.
+  const out: { key: string; label: string; icon: string | null; tone: string | null; rows: typeof rows }[] = [];
   for (const g of known) {
     const items = rows.filter((r) => r.group === g.key);
-    if (items.length) out.push({ key: g.key, label: g.label, rows: items });
+    if (items.length) out.push({ key: g.key, label: g.label, icon: g.icon ?? null, tone: g.tone ?? null, rows: items });
   }
   const rest = rows.filter((r) => !r.group || !known.some((g) => g.key === r.group));
-  if (rest.length) out.push({ key: "other", label: "More details", rows: rest });
+  if (rest.length) out.push({ key: "other", label: "Scheme details", icon: "list", tone: "neutral", rows: rest });
   return out;
 }
 
@@ -262,7 +266,7 @@ export async function createProject(
 
   await db().from("listing_slots").update({ listing_id: project.id }).eq("id", slotId);
   const ctx = await projectContext();
-  return projectDTO(data, units, undefined, { defs: ctx.defs, groups: ctx.groups, type: ctx.forRow(data as any) });
+  return projectDTO(data, units, undefined, { defs: ctx.defs, groups: ctx.groups, type: ctx.forRow(data as any), amenityMeta: ctx.amenityMeta });
 }
 
 /**
@@ -343,7 +347,7 @@ export async function updateProject(
   if (units.length) await db().from("project_units").insert(units);
 
   const ctx = await projectContext();
-  return projectDTO(data, units, undefined, { defs: ctx.defs, groups: ctx.groups, type: ctx.forRow(data as any) });
+  return projectDTO(data, units, undefined, { defs: ctx.defs, groups: ctx.groups, type: ctx.forRow(data as any), amenityMeta: ctx.amenityMeta });
 }
 
 /**
@@ -412,7 +416,7 @@ export async function listMyProjects(profileId: string) {
     .order("created_at", { ascending: false });
   const [amenityLabels, ctx] = await Promise.all([getAmenityLabels(), projectContext()]);
   return ((data ?? []) as any[]).map((p) =>
-    projectDTO(p, p.project_units ?? [], amenityLabels, { defs: ctx.defs, groups: ctx.groups, type: ctx.forRow(p) }));
+    projectDTO(p, p.project_units ?? [], amenityLabels, { defs: ctx.defs, groups: ctx.groups, type: ctx.forRow(p), amenityMeta: ctx.amenityMeta }));
 }
 
 /**
@@ -438,7 +442,7 @@ export async function listPublicProjectsByProfile(profileId: string) {
     .limit(60);
   const [amenityLabels, ctx] = await Promise.all([getAmenityLabels(), projectContext()]);
   return ((data ?? []) as any[]).map((p) =>
-    projectDTO(p, p.project_units ?? [], amenityLabels, { defs: ctx.defs, groups: ctx.groups, type: ctx.forRow(p) }));
+    projectDTO(p, p.project_units ?? [], amenityLabels, { defs: ctx.defs, groups: ctx.groups, type: ctx.forRow(p), amenityMeta: ctx.amenityMeta }));
 }
 
 /**
@@ -463,10 +467,18 @@ export async function getProject(id: string, viewerId: string | null) {
     .eq("id", p.profile_id)
     .maybeSingle();
 
-  const [amenityLabels, ctx] = await Promise.all([getAmenityLabels(), projectContext()]);
+  const [amenityLabels, ctx, builder] = await Promise.all([getAmenityLabels(), projectContext(), posterCard(p.profile_id)]);
   return {
-    ...projectDTO(p, p.project_units ?? [], amenityLabels, { defs: ctx.defs, groups: ctx.groups, type: ctx.forRow(p) }),
+    ...projectDTO(p, p.project_units ?? [], amenityLabels, { defs: ctx.defs, groups: ctx.groups, type: ctx.forRow(p), amenityMeta: ctx.amenityMeta }),
     isOwner,
+    /**
+     * The builder, as the feed card already names them. `builderName` was read
+     * by the detail screen from the first day and has never been in this
+     * payload, so "by <builder>" simply never rendered — the one line that
+     * tells a buyer whose scheme this is.
+     */
+    builder,
+    builderName: builder?.name ?? null,
     // The builder's profile id. Needed to write a lead against them when a
     // viewer taps Call/WhatsApp, and no more sensitive than the poster id the
     // feed already publishes on every card.
@@ -481,6 +493,14 @@ export async function getProject(id: string, viewerId: string | null) {
     ...(isOwner
       ? {
           owner: {
+            // The moderator's words, and the counters behind the lock. Same
+            // owner-only treatment a listing gives them — a visitor never sees
+            // why a project was sent back.
+            reviewNotes: p.review_notes,
+            rejectReason: p.reject_reason,
+            rejectCount: p.reject_count,
+            isLocked: p.is_locked,
+            editedSinceApproval: p.edited_since_approval,
             reraNumber: p.rera_number,
             reraExempt: p.rera_exempt,
             reraExemptReason: p.rera_exempt_reason,
@@ -509,8 +529,21 @@ function projectDTO(
   p: any,
   units: any[],
   amenityLabels?: Map<string, string>,
-  extra?: { defs?: FieldDefinitionRow[]; groups?: { key: string; label: string }[]; type?: ProjectTypeRow | null },
+  extra?: {
+    defs?: FieldDefinitionRow[];
+    groups?: { key: string; label: string; icon?: string | null; tone?: string | null }[];
+    type?: ProjectTypeRow | null;
+    amenityMeta?: Map<string, { label: string; icon: string | null; category: string | null }>;
+  },
 ) {
+  // Titled for a SCHEME, not for a flat (0072): a project's launch date + OC +
+  // BU permission are "Approvals & timeline", and its booking amount is its own
+  // "Booking & payment" section rather than a building fact.
+  const attrGroups = projectAttributeGroups(
+    p.attributes ?? {}, extra?.type ?? null, extra?.defs,
+    scopedGroups(extra?.groups, { kind: "project", category: extra?.type?.category }),
+  );
+
   // Cheapest unit — what a project card shows where a listing shows its price.
   const from = (units ?? [])
     .map((u) => u.price_from_paise)
@@ -542,7 +575,32 @@ function projectDTO(
     projectType: p.project_type ?? null,
     projectTypeLabel: extra?.type?.label ?? null,
     /** Type-specific answers, rendered in the same titled blocks a listing uses. */
-    attributeGroups: projectAttributeGroups(p.attributes ?? {}, extra?.type ?? null, extra?.defs, extra?.groups),
+    attributeGroups: attrGroups,
+    /**
+     * The facts strip, from `project_types.field_config.key_specs` (0071).
+     *
+     * It used to be computed inside the detail COMPONENT — four hardcoded
+     * facts (towers / floors / total units / available), which is the client
+     * deriving business values CLAUDE.md rule 7 bans, and which drew empty
+     * tiles on a plotting scheme that has no towers and no floors. The four
+     * `source: 'column'` candidates are merged in so a config entry can name a
+     * column or an attribute without the screen knowing the difference.
+     */
+    keySpecs: topUpSpecs(
+      resolveKeySpecs(
+        extra?.type?.field_config?.key_specs,
+        {
+          ...((p.attributes ?? {}) as Record<string, unknown>),
+          towers: p.towers,
+          floors: p.floors,
+          total_units: p.total_units,
+          available_units: p.available_units,
+        },
+        extra?.defs,
+      ),
+      attrGroups.flatMap((g) => g.rows),
+      extra?.groups,
+    ),
     /** The raw map, so the edit form can re-open its controls on real values. */
     attributes: (p.attributes ?? {}) as Record<string, unknown>,
     buildStatus: p.build_status,
@@ -554,9 +612,23 @@ function projectDTO(
     bankApprovals: p.bank_approvals ?? [],
     // Labels, not stored codes — same rule as the listing detail DTO.
     amenities: (p.amenities ?? []).map((a: string) => amenityLabels?.get(a) ?? a),
+    /** The same list with icons (migration 0070), for the tile grid. */
+    amenityItems: (p.amenities ?? []).map((a: string) => ({
+      code: a,
+      label: extra?.amenityMeta?.get(a)?.label ?? amenityLabels?.get(a) ?? a,
+      icon: extra?.amenityMeta?.get(a)?.icon ?? null,
+      category: extra?.amenityMeta?.get(a)?.category ?? null,
+    })),
     description: p.description,
     areaLabel: p.area_label,
+    pincode: p.pincode ?? null,
     coverUrl: p.cover_url,
+    /** "12 Jul 2026" — the detail screen prints when the scheme was posted. */
+    postedOn: p.live_at || p.created_at
+      ? new Date(p.live_at ?? p.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Kolkata" })
+      : null,
+    /** Whether a brochure is attached at all — the URL is signed separately. */
+    hasBrochure: Boolean(p.brochure_key),
     units: (units ?? [])
       .slice()
       .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))

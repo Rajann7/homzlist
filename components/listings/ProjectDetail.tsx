@@ -2,20 +2,28 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AppShell, BottomSheet, Button, Header, Icon, Skeleton, Toggle, useToast } from "@/components/billing/ui";
-import { BackButton, OfflineBanner } from "@/components/billing/primitives";
-import { listingsApi } from "@/lib/listings/client";
+import { AppShell, BottomSheet, Button, Icon, Skeleton, StatusBadge, Toggle, useToast } from "@/components/billing/ui";
+import { OfflineBanner, SheetOption } from "@/components/billing/primitives";
+import { listingsApi, type Photo } from "@/lib/listings/client";
+import { ReportSheet, ShareSheet } from "@/components/feed/sheets";
+import type { FeedCard } from "@/lib/feed/client";
+import { DETAIL_PAD, DetailHero, DetailSection, DetailSeparator, ProjectDetailBody } from "./detailBody";
+import { PhotoViewer, useScrolledPastHero } from "./ListingDetail";
 import { cn } from "@/lib/utils";
 
 /**
- * P4 S3 — project detail.
+ * P4 S3 — project detail (redesigned, Rajan 28 Jul 2026).
  *
  * Builder numbers are always public for projects (Doc2 §6), which is why the
  * sticky bar shows Call/WhatsApp unconditionally rather than the request-number
  * flow a normal listing uses.
  *
- * Every figure here — towers, floors, units, unit types, banks, amenities —
- * comes from the project row and `project_units`. Nothing is illustrative.
+ * Every figure here — towers, floors, units, unit types, banks, amenities, the
+ * scheme's own answers and its description — comes from the project row and
+ * `project_units`. Nothing is illustrative. The last two of those were computed
+ * by the server and rendered by nobody until this redesign: a plotting scheme
+ * stored its land zone, NA/kheti status, plot approval, permissible floors,
+ * total plots and booking amount, and the screen showed none of them.
  */
 export function ProjectDetail({ id }: { id: string }) {
   const router = useRouter();
@@ -27,21 +35,32 @@ export function ProjectDetail({ id }: { id: string }) {
   const [notFound, setNotFound] = useState(false);
   const [offline, setOffline] = useState(false);
   const [openUnit, setOpenUnit] = useState<string | null>(null);
-  // "Update Units" was a toast. The PATCH endpoint has existed since Module 4's
-  // first pass — this is the sheet that finally reaches it.
-  const [unitsOpen, setUnitsOpen] = useState(false);
+  // The gallery (migration 0075). A project used to carry one `cover_url`, so
+  // this screen handed its hero `photos={[]}` and a buyer had nothing to swipe.
+  const [photos, setPhotos] = useState<Photo[]>([]);
+  const [idx, setIdx] = useState(0);
+  const [viewer, setViewer] = useState(false);
+  const [sheet, setSheet] = useState<null | "more" | "manage" | "share" | "report" | "units">(null);
   const [unitsBusy, setUnitsBusy] = useState(false);
 
   const load = useCallback(async () => {
-    const res = await fetch(`/api/v1/projects/${id}`, { credentials: "same-origin" })
+    const res = await fetch(`/api/v1/projects/${id}`, { credentials: "same-origin", cache: "no-store" })
       .then((r) => r.json())
       .catch(() => null);
 
     if (!res) { setOffline(true); setLoading(false); return; }
     if (!res.ok) { setNotFound(true); setLoading(false); return; }
 
-    setP(res.data.project);
-    if (res.data.project?.isOwner) {
+    const project = res.data.project;
+    setP(project);
+    // The brochure is a signed, short-lived URL. A LIVE project's brochure is
+    // readable by anyone (it is the builder's own marketing PDF and the rest of
+    // the payload is already public); anything not yet live stays owner-only,
+    // and the endpoint — not this screen — is what enforces that.
+    const ph = await listingsApi.projectPhotos(id);
+    if (ph.ok) setPhotos(ph.data.photos);
+
+    if (project?.hasBrochure) {
       const b = await listingsApi.brochure(id);
       if (b.ok) setBrochure(b.data.brochure);
     }
@@ -53,10 +72,12 @@ export function ProjectDetail({ id }: { id: string }) {
   if (loading) {
     return (
       <Shell>
-        <div className="flex flex-col gap-4 p-4">
-          <Skeleton className="aspect-[4/3] w-full rounded-12" />
-          <Skeleton className="h-8 w-48" />
-          <Skeleton className="h-[120px] w-full rounded-12" />
+        <Skeleton className="aspect-[4/3] w-full" />
+        <div className="flex flex-col gap-2 p-4">
+          <Skeleton className="h-8 w-48 rounded-4" />
+          <Skeleton className="h-5 w-40 rounded-4" />
+          <Skeleton className="mt-2 h-20 w-full rounded-4" />
+          <Skeleton className="h-40 w-full rounded-4" />
         </div>
       </Shell>
     );
@@ -66,16 +87,16 @@ export function ProjectDetail({ id }: { id: string }) {
     return (
       <Shell>
         <div className="flex flex-col items-center gap-3 px-6 py-16 text-center">
+          <Icon name="building" size={80} className="text-ink-tertiary" />
           <h2 className="text-20 font-bold text-ink-primary">Project not found</h2>
-          <p className="text-15 text-ink-secondary">It may have been removed or is not yet approved.</p>
-          <Button className="mt-2" onClick={() => router.push("/listings")}>Go to My Listings</Button>
+          <p className="text-15 text-ink-secondary">It may have been removed, or it isn&apos;t approved yet.</p>
+          <Button className="mt-2" onClick={() => router.push("/search")}>Browse projects</Button>
         </div>
       </Shell>
     );
   }
 
-  const units: any[] = p.units ?? [];
-  const priceBand = bandOf(units);
+  const live = p.status === "live";
 
   // A builder's number is always public for a project (Doc2 §6), so contact is
   // direct: Call dials it, WhatsApp/Enquire opens a prefilled chat. No inquiry
@@ -83,243 +104,143 @@ export function ProjectDetail({ id }: { id: string }) {
   const contactBuilder = (via: "call" | "whatsapp", unitType?: string) => {
     const number = p.contact?.number ? String(p.contact.number).replace(/\D/g, "") : "";
     if (!number) { toast.show("The builder hasn't shared a contact number"); return; }
-    // Record the lead (migration 0051). Both buttons used to leave no trace at
-    // all, which is why a builder's insights had nothing to count.
-    // Fire-and-forget: the call must connect whether or not this write lands,
-    // and the server drops it for a guest, the builder's own project, or a
-    // non-live one.
+    // Record the lead (migration 0051) — fire-and-forget, because the call must
+    // connect whether or not this write lands. The server drops it for a guest,
+    // the builder's own project, or a non-live one.
     void listingsApi.recordProjectContact(id, via);
     if (via === "call") { window.location.href = `tel:${p.contact.number}`; return; }
     const msg = unitType
       ? `Hi, I'm interested in the ${unitType} at ${p.name}. Could you share more details?`
       : `Hi, I'm interested in ${p.name}. Could you share more details?`;
-    window.open(`https://wa.me/${number}?text=${encodeURIComponent(msg)}`, "_blank");
+    window.open(`https://wa.me/91${number.slice(-10)}?text=${encodeURIComponent(msg)}`, "_blank");
   };
 
-  // Share only on a live project — any other status is owner-only, so the
-  // shared link would 404 for whoever receives it.
+  const share = () => {
+    const url = window.location.href;
+    if (navigator.share) void navigator.share({ title: p.name ?? "", url });
+    else { void navigator.clipboard?.writeText(url); toast.show("Link copied"); }
+  };
+
+  // The sheets are the feed's own, so they need a card-shaped view. They read
+  // id/kind/title/price/area only.
+  const card = {
+    kind: "project",
+    id: p.id,
+    promoted: false,
+    saved: false,
+    coverUrl: p.coverUrl ?? null,
+    photos: [],
+    areaLabel: p.areaLabel ?? null,
+    poster: { id: "", name: p.builderName ?? "", username: p.builder?.username ?? null, role: "builder", verified: Boolean(p.builder?.verified), avatarUrl: p.builder?.avatarUrl ?? null },
+    postedAgo: "",
+    title: p.name,
+    meta: p.projectTypeLabel,
+    priceFrom: p.priceFrom,
+  } as unknown as FeedCard;
+
   return (
-    <Shell overlayTitle={p.name ?? ""} canShare={p.status === "live"}>
+    <Shell>
+      <OverlayHeader
+        title={p.name ?? ""}
+        canShare={live}
+        onShare={share}
+        onMore={() => setSheet(p.isOwner ? "manage" : "more")}
+      />
       {offline && <OfflineBanner />}
 
-      {/* Cover — full-bleed 4:3 on black with the counter over it (designs/P4 S3) */}
-      <div className="relative aspect-[4/3] w-full shrink-0 overflow-hidden bg-black">
-        {p.coverUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={p.coverUrl} alt="" data-protected="true" className="h-full w-full object-cover" />
-        ) : (
-          <span className="grid h-full place-items-center text-ink-tertiary"><Icon name="image" size={40} /></span>
-        )}
-        {/* A project has ONE image — `projects.cover_url`; there is no project
-            photo table, so this counter read `p.photoCount`, which the project
-            DTO has never returned. `?? 0` makes that explicit instead of
-            comparing undefined and quietly rendering nothing (tracked in
-            docs/PENDING-INTEGRATIONS.md — project galleries are a module). */}
-        {(p.photoCount ?? 0) > 1 && (
-          <span className="absolute right-3 top-14 rounded-full bg-black/60 px-2.5 py-1.5 text-11 font-semibold leading-none text-white">
-            1/{p.photoCount}
-          </span>
-        )}
-      </div>
+      {/* The scheme's gallery — a real carousel since migration 0075, off
+          `project_photos`. Photo #1 IS the cover, same rule a listing uses. */}
+      <DetailHero
+        photos={photos}
+        cover={photos[idx]?.url ?? p.coverUrl}
+        alt={photos[idx]?.altText ?? p.name ?? ""}
+        idx={idx}
+        onIdx={setIdx}
+        onOpenPhoto={photos.length ? () => setViewer(true) : undefined}
+      />
 
-      <div className="p-4 pb-32">
-        {/* Title block */}
-        <div className="flex flex-wrap items-center gap-2">
-          <h1 className="text-24 font-bold leading-[1.15] text-ink-primary">{p.name}</h1>
-          <span className="rounded-4 bg-info-soft px-2 py-1.5 text-11 font-semibold uppercase leading-none tracking-[0.3px] text-info">
-            New Project
-          </span>
-        </div>
-        {p.builderName && (
-          <div className="mt-[5px] text-13 leading-[1.3] text-ink-secondary">by {p.builderName}</div>
-        )}
-        {priceBand && <div className="mt-2.5 text-17 font-semibold leading-[1.2] text-ink-primary">{priceBand}</div>}
-
-        {/* Status chips — a horizontal rail, not a wrapping row */}
-        <div className="hz-x -mx-4 mt-3.5 flex gap-2 px-4">
-          {p.buildStatusLabel && (
-            <span className="inline-flex h-[30px] shrink-0 items-center whitespace-nowrap rounded-full bg-warning-soft px-3 text-11 font-semibold uppercase leading-none tracking-[0.3px] text-warning">
-              {p.buildStatusLabel}
-            </span>
-          )}
-          {p.possessionLabel && (
-            <span className="inline-flex h-[30px] shrink-0 items-center whitespace-nowrap rounded-full bg-surface-2 px-3 text-11 font-semibold uppercase leading-none tracking-[0.3px] text-ink-secondary">
-              Possession {p.possessionLabel}
-            </span>
-          )}
-          {(p.rera?.number || p.rera?.exempt) && (
-            <span className="inline-flex h-[30px] shrink-0 items-center whitespace-nowrap rounded-full bg-accent-soft px-3 text-11 font-semibold uppercase leading-none tracking-[0.3px] text-accent">
-              {p.rera.exempt ? "RERA Exempt" : "RERA Approved"}
-            </span>
-          )}
-        </div>
-
-        {/* RERA number — the design puts it in a surface-2 strip with a shield */}
-        {p.rera?.number && (
-          <div className="mt-3.5 flex items-center gap-2 rounded-8 bg-surface-2 px-3 py-2.5">
-            <Icon name="shield" size={15} className="shrink-0 text-ink-tertiary" />
-            <span className="selectable text-11 leading-[1.4] text-ink-tertiary">RERA No: {p.rera.number}</span>
-          </div>
-        )}
-        {p.rera?.exempt && p.rera?.reason && (
-          <div className="mt-3.5 flex items-center gap-2 rounded-8 bg-surface-2 px-3 py-2.5">
-            <Icon name="shield" size={15} className="shrink-0 text-ink-tertiary" />
-            <span className="text-11 leading-[1.4] text-ink-tertiary">RERA exempt — {p.rera.reason}</span>
-          </div>
-        )}
-
-        {/* Facts strip — only the facts that exist */}
-        {facts(p).length > 0 && (
-          <div className="mt-4 grid grid-cols-4 gap-0.5 rounded-12 bg-surface-2 px-2 py-3.5">
-            {facts(p).map((f) => (
-              <div key={f.label} className="text-center">
-                <div className="text-15 font-semibold leading-[1.1] text-ink-primary">{f.value}</div>
-                <div className="mt-[3px] text-11 leading-[1.2] text-ink-tertiary">{f.label}</div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Unit types — expandable rows */}
-        {units.length > 0 && (
-          <section className="flex flex-col gap-2">
-            <ProjectSection>Available Units</ProjectSection>
-            {units.map((u) => {
-              const open = openUnit === u.id;
-              return (
-                <div key={u.id} className="overflow-hidden rounded-8 border border-border">
-                  <button
-                    onClick={() => setOpenUnit(open ? null : u.id)}
-                    className="flex w-full items-center gap-3 p-3 text-left"
-                  >
-                    <span className="min-w-0 flex-1 text-15 font-semibold text-ink-primary">
-                      {[u.unitType, u.areaSqft && `${u.areaSqft.toLocaleString("en-IN")} sqft`, u.priceFrom && `${u.priceFrom} onwards`]
-                        .filter(Boolean).join(" — ")}
-                    </span>
-                    <Icon name={open ? "chevron-down" : "chevron-right"} size={18} className="shrink-0 text-ink-tertiary" />
-                  </button>
-
-                  {/* design: floor-plan thumb on the LEFT, facts stacked beside it */}
-                  {open && (
-                    <div className="flex gap-3 px-3 pb-3">
-                      {u.floorPlanUrl && (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={u.floorPlanUrl}
-                          alt="Floor plan"
-                          data-protected="true"
-                          className="h-[88px] w-[88px] shrink-0 rounded-8 object-cover"
-                        />
-                      )}
-                      <div className="flex-1">
-                        {u.carpetSqft && (
-                          <div className="text-13 leading-[1.5] text-ink-secondary">
-                            Carpet area: {u.carpetSqft.toLocaleString("en-IN")} sqft
-                          </div>
-                        )}
-                        {u.unitsAvailable !== null && u.unitsAvailable !== undefined && (
-                          <div className="text-13 leading-[1.5] text-ink-secondary">
-                            {u.unitsAvailable} units available
-                          </div>
-                        )}
-                        <button
-                          onClick={() => contactBuilder("whatsapp", u.unitType)}
-                          className="mt-1 text-13 font-semibold leading-none text-accent"
-                        >
-                          Enquire about this unit
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </section>
-        )}
-
-        {/* Banks */}
-        {!!(p.bankApprovals ?? []).length && (
-          <section className="flex flex-col gap-2">
-            <ProjectSection>Bank approvals</ProjectSection>
-            <div className="flex flex-wrap gap-2">
-              {p.bankApprovals.map((b: string) => (
-                <span key={b} className="rounded-full bg-accent-soft px-3 py-1.5 text-13 font-semibold text-accent">{b}</span>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* Amenities */}
-        {!!(p.amenities ?? []).length && (
-          <section className="flex flex-col gap-2">
-            <ProjectSection>Amenities</ProjectSection>
-            <div className="grid grid-cols-3 gap-3">
-              {p.amenities.map((a: string) => (
-                <div key={a} className="flex flex-col items-center gap-1.5 rounded-8 bg-surface-2 p-3 text-center">
-                  <Icon name="check" size={18} className="text-accent" />
-                  <span className="text-11 leading-tight text-ink-secondary">{a}</span>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* Brochure — owner sees a signed link; scanned state comes from the DB */}
-        {p.isOwner && brochure?.url && (
-          <a
-            href={brochure.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex h-14 items-center gap-3 rounded-8 bg-surface-2 px-4"
-          >
-            <Icon name="file" size={20} className="text-ink-secondary" />
-            <div className="flex-1">
-              <div className="text-15 font-semibold text-ink-primary">Project Brochure</div>
-              <div className="text-11 text-ink-tertiary">{brochure.scanned ? "Scanned ✓" : "Pending scan"}</div>
-            </div>
-            <Icon name="download" size={20} className="text-ink-secondary" />
-          </a>
-        )}
-
-        {/* Location */}
-        {(p.areaLabel || p.pincode) && (
-          <div className="flex items-center gap-1.5 text-13 text-ink-secondary">
-            <Icon name="pin" size={15} />
-            {[p.areaLabel, p.pincode].filter(Boolean).join(" – ")}
-          </div>
-        )}
-      </div>
+      {/* The body is shared with the builder's Preview screen (detailBody), so
+          "this is what a buyer sees" cannot drift away from what a buyer sees. */}
+      <ProjectDetailBody
+        project={p}
+        openUnit={openUnit}
+        onToggleUnit={setOpenUnit}
+        onEnquireUnit={(unitType) => contactBuilder("whatsapp", unitType)}
+        brochure={brochure}
+        onOpenProfile={(username) => router.push(`/profile/${username}`)}
+        notice={p.isOwner ? <OwnerNotice project={p} /> : null}
+      />
 
       {/* Sticky bar — projects always expose the builder's number (Doc2 §6) */}
-      <div className="sticky bottom-0 flex items-center gap-2 border-t border-border bg-surface-1 p-4">
+      <div className="sticky bottom-0 z-sticky mt-auto flex items-center gap-2 border-t border-border bg-surface-1 px-3 py-2.5 safe-bottom">
         {p.isOwner ? (
           <>
-            <Button variant="outline" className="flex-1" onClick={() => router.push(`/projects/new?edit=${p.id}`)}>Edit</Button>
-            <Button variant="outline" className="flex-1" onClick={() => setUnitsOpen(true)}>
-              Update Units
-            </Button>
+            <Button variant="outline" className="flex-1 px-0" onClick={() => router.push(`/projects/new?edit=${p.id}`)}>Edit</Button>
+            <Button variant="outline" className="flex-1 px-0" onClick={() => setSheet("units")}>Update units</Button>
+            <Button className="flex-1 px-0" onClick={() => router.push(`/projects/${p.id}/insights`)}>Insights</Button>
+            <button
+              aria-label="More options"
+              onClick={() => setSheet("manage")}
+              className="grid h-11 w-11 shrink-0 place-items-center rounded-4 border border-border text-ink-primary"
+            >
+              <Icon name="more" size={20} />
+            </button>
           </>
         ) : (
           <>
-            <Button variant="outline" onClick={() => contactBuilder("call")} aria-label="Call">
-              <Icon name="phone" size={18} />
-            </Button>
-            <Button variant="outline" onClick={() => contactBuilder("whatsapp")} aria-label="WhatsApp">
-              <Icon name="whatsapp" size={18} />
-            </Button>
-            <Button className="flex-1" onClick={() => contactBuilder("whatsapp")}>
-              Send Inquiry
-            </Button>
+            <button
+              aria-label="Call"
+              onClick={() => contactBuilder("call")}
+              className="grid h-11 w-[52px] shrink-0 place-items-center rounded-4 border border-border bg-surface-1 text-ink-primary"
+            >
+              <Icon name="phone" size={20} />
+            </button>
+            <a
+              aria-label="WhatsApp"
+              onClick={(e) => { e.preventDefault(); contactBuilder("whatsapp"); }}
+              href="#"
+              className="grid h-11 w-[52px] shrink-0 place-items-center rounded-4 border border-accent bg-accent-soft text-accent"
+            >
+              <Icon name="whatsapp" size={20} />
+            </a>
+            <Button fullWidth onClick={() => contactBuilder("whatsapp")}>Contact builder</Button>
           </>
         )}
       </div>
 
+      {/* ---- Sheets ---------------------------------------------------- */}
+      <BottomSheet open={sheet === "more"} onClose={() => setSheet(null)} title="Options">
+        <div className="flex flex-col pb-2">
+          <SheetOption icon={<Icon name="share" size={22} className="text-ink-secondary" />} label="Share" onClick={() => setSheet("share")} />
+          <SheetOption icon={<Icon name="alert" size={22} className="text-error" />} label="Report" destructive onClick={() => setSheet("report")} />
+        </div>
+      </BottomSheet>
+
+      <BottomSheet open={sheet === "manage"} onClose={() => setSheet(null)} title="Manage project">
+        <div className="flex flex-col pb-2">
+          <SheetOption icon={<Icon name="edit" size={22} className="text-ink-secondary" />} label="Edit project" onClick={() => { setSheet(null); router.push(`/projects/new?edit=${p.id}`); }} />
+          <SheetOption icon={<Icon name="camera" size={22} className="text-ink-secondary" />} label="Manage photos" onClick={() => { setSheet(null); router.push(`/create/photos?project=${p.id}`); }} />
+          <SheetOption icon={<Icon name="layers" size={22} className="text-ink-secondary" />} label="Update unit availability" onClick={() => setSheet("units")} />
+          <SheetOption icon={<Icon name="eye" size={22} className="text-ink-secondary" />} label="Preview as a buyer" onClick={() => { setSheet(null); router.push(`/create/preview?project=${p.id}`); }} />
+          <SheetOption icon={<Icon name="chart" size={22} className="text-ink-secondary" />} label="Insights" onClick={() => { setSheet(null); router.push(`/projects/${p.id}/insights`); }} />
+          {live && (
+            <SheetOption icon={<Icon name="share" size={22} className="text-ink-secondary" />} label="Share" onClick={() => setSheet("share")} />
+          )}
+          {/* A builder's projects are listed on their own profile (OwnProfile's
+              Projects tab) — there is no /projects index route to send them to. */}
+          <SheetOption icon={<Icon name="user" size={22} className="text-ink-secondary" />} label="All my projects" onClick={() => { setSheet(null); router.push("/profile"); }} />
+        </div>
+      </BottomSheet>
+
+      <ShareSheet open={sheet === "share"} onClose={() => setSheet(null)} card={card} />
+      <ReportSheet open={sheet === "report"} onClose={() => setSheet(null)} card={card} />
+
       {/* Per-unit availability. A sold-out 2 BHK is the update a builder makes
-          most often, and it was a toast until now. */}
-      <BottomSheet open={unitsOpen} onClose={() => setUnitsOpen(false)} title="Update units">
+          most often, and it was a toast until Module 4's second pass. */}
+      <BottomSheet open={sheet === "units"} onClose={() => setSheet(null)} title="Update units">
         <div className="flex flex-col gap-2 p-4 pb-2">
           {(p.units ?? []).map((u: any) => (
-            <div key={u.id} className="flex items-center gap-3 rounded-8 bg-surface-2 px-3.5 py-3">
+            <div key={u.id} className="flex items-center gap-3 rounded-4 border border-border px-3.5 py-3">
               <div className="min-w-0 flex-1">
                 <div className="truncate text-15 text-ink-primary">{u.unitType}</div>
                 <div className="mt-0.5 text-11 text-ink-tertiary">
@@ -335,7 +256,7 @@ export function ProjectDetail({ id }: { id: string }) {
                   setUnitsBusy(true);
                   const r = await listingsApi.updateProjectUnits(p.id, [{ id: u.id, available: on }]);
                   setUnitsBusy(false);
-                  if (r.ok) { setP(r.data.project); toast.show(on ? "Marked available" : "Marked sold out"); }
+                  if (r.ok) { setP((prev: any) => ({ ...r.data.project, ...ownerKeys(prev) })); toast.show(on ? "Marked available" : "Marked sold out"); }
                   else toast.show("Couldn't update that unit");
                 }}
               />
@@ -346,40 +267,93 @@ export function ProjectDetail({ id }: { id: string }) {
           )}
         </div>
       </BottomSheet>
+      {viewer && photos.length > 0 && (
+        <PhotoViewer
+          photos={photos}
+          index={idx}
+          onIndex={setIdx}
+          onClose={() => setViewer(false)}
+          onShare={share}
+        />
+      )}
     </Shell>
   );
 }
 
-function Shell({
-  children, overlayTitle, canShare = false,
-}: { children: React.ReactNode; overlayTitle?: string; canShare?: boolean }) {
+/**
+ * `PATCH /projects/:id/units` answers with the plain project DTO — it has no
+ * `isOwner`, `contact` or `builder` on it, because those are assembled by
+ * `getProject` for a specific viewer. Splicing the response in wholesale
+ * therefore logged the builder out of their own screen: the owner bar became
+ * the buyer bar and Call had no number behind it. These keys are carried over.
+ */
+function ownerKeys(prev: any) {
+  return {
+    isOwner: prev?.isOwner,
+    contact: prev?.contact,
+    builder: prev?.builder,
+    builderName: prev?.builderName,
+    profileId: prev?.profileId,
+    owner: prev?.owner,
+    hasBrochure: prev?.hasBrochure,
+    postedOn: prev?.postedOn,
+  };
+}
+
+/** The builder's own status block — the badge and the review team's words. */
+function OwnerNotice({ project }: { project: any }) {
+  // Owner-only keys — a visitor's payload has no `owner` block at all.
+  const notes = project.owner?.rejectReason || project.owner?.reviewNotes;
+  return (
+    <>
+      <DetailSeparator />
+      <DetailSection
+        icon="lock"
+        tone={project.status === "live" ? "accent" : "warning"}
+        title="Only you can see this"
+      >
+        <div className={cn("flex items-center justify-between gap-3 py-2.5", DETAIL_PAD)}>
+          <span className="text-13 leading-none text-ink-tertiary">Status</span>
+          <StatusBadge kind={project.badge?.kind ?? "pending"} label={project.badge?.label} />
+        </div>
+        {project.status !== "live" && (
+          <div className={cn("border-t border-divider py-3 text-13 leading-[1.45] text-ink-secondary", DETAIL_PAD)}>
+            {project.status === "pending_review"
+              ? "This project is under review. Only you can see it until it's approved."
+              : "Only you can see this project right now."}
+          </div>
+        )}
+        {notes && (
+          <div className={cn("border-t border-divider py-3", DETAIL_PAD)}>
+            <div className="text-11 uppercase leading-none tracking-[0.4px] text-ink-tertiary">From the review team</div>
+            <p className="mt-1.5 text-13 leading-[1.45] text-ink-secondary">{notes}</p>
+          </div>
+        )}
+      </DetailSection>
+    </>
+  );
+}
+
+function Shell({ children }: { children: React.ReactNode }) {
   return (
     <AppShell showNav={false} className="flex flex-col">
-      {overlayTitle === undefined ? (
-        <Header left={<BackButton fallback="/listings" />} title="Project" />
-      ) : (
-        <OverlayHeader title={overlayTitle} canShare={canShare} />
-      )}
       {children}
     </AppShell>
   );
 }
 
 /**
- * designs/P4 S3 uses the same "morphing" bar as the property detail:
- * transparent over the cover, solid with the project name once scrolled.
+ * The same morphing bar as the property detail: transparent over the cover,
+ * solid with the project name once scrolled. It shares
+ * `useScrolledPastHero`, so the two headers cannot behave differently — and,
+ * like that one, it no longer listens to a `window` scroll event that AppShell
+ * never fires.
  */
-function OverlayHeader({ title, canShare }: { title: string; canShare: boolean }) {
+function OverlayHeader({
+  title, canShare, onShare, onMore,
+}: { title: string; canShare: boolean; onShare: () => void; onMore: () => void }) {
   const router = useRouter();
-  const toast = useToast();
-  const [solid, setSolid] = useState(false);
-
-  useEffect(() => {
-    const onScroll = () => setSolid(window.scrollY > 160);
-    window.addEventListener("scroll", onScroll, { passive: true });
-    onScroll();
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
+  const solid = useScrolledPastHero();
 
   const btn = cn(
     "grid h-11 w-11 shrink-0 place-items-center",
@@ -389,7 +363,7 @@ function OverlayHeader({ title, canShare }: { title: string; canShare: boolean }
   return (
     <div
       className={cn(
-        "fixed inset-x-0 top-0 z-header flex h-[52px] items-center gap-0.5 px-1.5 safe-top transition-colors duration-200",
+        "fixed inset-x-0 top-0 z-header mx-auto flex h-[52px] max-w-column items-center gap-0.5 px-1.5 safe-top transition-colors duration-200",
         solid
           ? "border-b border-border bg-surface-1"
           : "border-b border-transparent bg-gradient-to-b from-black/35 to-transparent",
@@ -407,60 +381,19 @@ function OverlayHeader({ title, canShare }: { title: string; canShare: boolean }
         {title}
       </span>
       {/* The Save control that used to sit here was a `useState` toggle with a
-          "Saved lists arrive with the Saved suite" toast — it persisted
-          nothing, and `saves` is keyed to `listings`, so a project has never
-          been savable. A control that only pretends is worse than no control,
-          so it is gone; project saves are recorded in
-          docs/PENDING-INTEGRATIONS.md rather than faked here. */}
+          "Saved lists arrive with the Saved suite" toast — it persisted nothing,
+          and `saves` is keyed to `listings`, so a project has never been
+          savable. A control that only pretends is worse than no control, so it
+          is gone; project saves are recorded in docs/PENDING-INTEGRATIONS.md
+          rather than faked here. */}
       {canShare && (
-        <button
-          aria-label="Share"
-          onClick={() => {
-            const url = window.location.href;
-            if (navigator.share) void navigator.share({ title, url });
-            else { void navigator.clipboard?.writeText(url); toast.show("Link copied"); }
-          }}
-          className={btn}
-        >
+        <button aria-label="Share" onClick={onShare} className={btn}>
           <Icon name="share" size={21} />
         </button>
       )}
+      <button aria-label="More" onClick={onMore} className={btn}>
+        <Icon name="more" size={21} />
+      </button>
     </div>
   );
-}
-
-/**
- * Section heading on the project detail: 13/600 ink2 in sentence case, with
- * the design's 24px above / 12px below. `SectionLabel` renders an uppercase
- * chrome label, which is a different thing (designs/P4 S3).
- */
-function ProjectSection({ children }: { children: React.ReactNode }) {
-  return <div className="mb-3 mt-6 text-13 font-semibold leading-none text-ink-secondary">{children}</div>;
-}
-
-/** "₹45 Lakh – ₹78 Lakh" from the actual unit prices. */
-function bandOf(units: any[]): string | null {
-  const prices = units.map((u) => u.priceFromPaise).filter((n: unknown): n is number => typeof n === "number" && n > 0);
-  if (!prices.length) return null;
-  const lo = Math.min(...prices);
-  const hi = Math.max(...prices);
-  const fmt = (paise: number) => {
-    const n = paise / 100;
-    if (n >= 1_00_00_000) return `₹${+(n / 1_00_00_000).toFixed(2)} Cr`;
-    if (n >= 1_00_000) return `₹${+(n / 1_00_000).toFixed(2)} Lakh`;
-    return `₹${n.toLocaleString("en-IN")}`;
-  };
-  return lo === hi ? fmt(lo) : `${fmt(lo)} – ${fmt(hi)}`;
-}
-
-/** The 4-column facts strip, skipping anything the builder didn't fill in. */
-function facts(p: any): { label: string; value: string }[] {
-  const out: { label: string; value: string }[] = [];
-  if (p.towers) out.push({ label: "Towers", value: String(p.towers) });
-  if (p.floors) out.push({ label: "Floors", value: `G+${p.floors}` });
-  if (p.totalUnits) out.push({ label: "Units", value: String(p.totalUnits) });
-  if (p.availableUnits !== null && p.availableUnits !== undefined) {
-    out.push({ label: "Available", value: String(p.availableUnits) });
-  }
-  return out;
 }

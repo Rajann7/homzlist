@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 import { ok, fail } from "@/lib/api";
 import { getCurrentUser } from "@/lib/auth/current-user";
-import { getListingForViewer, getPropertyType, getFieldDefinitions, getFieldGroups, updateListing, softDeleteListing, recordListingView, resolveLocationChain, isPromoted, ownerListingStats, getAmenityLabels, sanitizeAttributes } from "@/lib/listings/service";
+import { getListingForViewer, getPropertyType, getFieldDefinitions, getFieldGroups, updateListing, softDeleteListing, recordListingView, resolveLocationChain, isPromoted, ownerListingStats, getAmenityMeta, posterCard, isListingSaved, sanitizeAttributes } from "@/lib/listings/service";
 import { rateLimit, clientIp, hashIp } from "@/lib/auth/rate-limit";
 import { listingDetailDTO } from "@/lib/listings/dto";
 
@@ -35,7 +35,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   }
 
   const isOwner = claims?.sub === listing.profile_id;
-  const [type, fieldDefs, promoted, stats, amenityLabels, fieldGroups] = await Promise.all([
+  const [type, fieldDefs, promoted, stats, amenityMeta, fieldGroups, poster, saved] = await Promise.all([
     getPropertyType(listing.type_code),
     // Needed to turn stored codes ("semi", "1-5") into the labels the design
     // shows ("Semi-furnished", "1–5 years") — resolved server-side.
@@ -44,13 +44,17 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     // client is never told to assume either (designs/P4 S1).
     isPromoted(listing.id),
     isOwner ? ownerListingStats(listing.id) : Promise.resolve(null),
-    // Amenity codes -> the labels the design shows.
-    getAmenityLabels(),
+    // Amenity codes -> the label AND icon the tile grid shows (0070).
+    getAmenityMeta(),
     // The detail screen renders its attributes in the same titled blocks the
     // creation form used, so the section list has to come along.
     getFieldGroups(),
+    // Who posted it — the same name/role/tick the feed card already shows.
+    posterCard(listing.profile_id),
+    // Whether THIS viewer has it saved, so the bookmark opens in the right state.
+    isListingSaved(listing.id, claims?.sub ?? null),
   ]);
-  const dto = listingDetailDTO(listing, type, { isOwner, fieldDefs, promoted, stats, amenityLabels, fieldGroups });
+  const dto = listingDetailDTO(listing, type, { isOwner, fieldDefs, promoted, stats, amenityMeta, fieldGroups, poster, saved });
 
   // For the owner's edit form, hand back a COMPLETE location chain even if the
   // row stored a broken one — the cascade needs every ancestor to unlock.

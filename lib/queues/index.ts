@@ -54,6 +54,11 @@ export interface ImageJob {
   sourceKey: string; // R2 key of the uploaded original
   ownerId: string;
   listingId?: string;
+  projectId?: string;
+  /** The row to write the variants back to — the worker had no way to find it. */
+  photoId?: string;
+  /** Which table that row is in (migration 0075 added project_photos). */
+  table?: "listing_photos" | "project_photos";
   isCover?: boolean;
 }
 

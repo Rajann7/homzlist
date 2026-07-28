@@ -1,25 +1,34 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AppShell, Button, Header, Icon, Skeleton, StatusBadge, useToast } from "@/components/billing/ui";
-import { BackButton } from "@/components/billing/primitives";
+import { AppShell, BottomSheet, Button, Icon, Skeleton, StatusBadge, useToast } from "@/components/billing/ui";
+import { SheetOption } from "@/components/billing/primitives";
+import { ConfirmDialog } from "@/components/ui/Dialog";
 import { listingsApi, type Photo, type MyListing } from "@/lib/listings/client";
 import { InquirySheet, MoreSheet, ShareSheet, ReportSheet, LoginSheet } from "@/components/feed/sheets";
-import { interactionsApi, feedApi, type FeedCard } from "@/lib/feed/client";
+import { interactionsApi, type FeedCard } from "@/lib/feed/client";
+import { DETAIL_PAD, DetailHero, DetailRow, DetailSection, DetailSeparator, PropertyDetailBody } from "./detailBody";
 import { cn } from "@/lib/utils";
 
 /**
- * P4 — Property detail.
+ * P4 — Property detail (redesigned, Rajan 28 Jul 2026).
  *
- * The sticky bottom bar changes with the CONTACT MODE, and that mode is the
- * server's (Doc2 §5.1): if the owner didn't publish their number, the payload
- * contains no number at all, so the only thing this screen can offer is
- * "Request number". There is no client-side branch that could leak it.
+ * Two rules this screen exists to keep.
+ *
+ * 1. The CONTACT MODE is the server's (Doc2 §5.1): if the owner didn't publish
+ *    their number, the payload contains no number at all, so the only thing
+ *    this screen can offer is "Request number". There is no client-side branch
+ *    that could leak it.
+ *
+ * 2. Every owner control does what it says, through a real endpoint. Edit and
+ *    "Mark as Sold" both used to `router.push('/listings/:id')` — this screen's
+ *    own URL — so the two headline owner actions navigated to themselves and
+ *    the status state machine (`POST /listings/:id/status`) was unreachable
+ *    from the detail. They now open the edit form and drive the endpoint, with
+ *    the same confirmation copy the manager uses, because the consequences
+ *    (archive, boost stops, no refund) are the same ones.
  */
-/** One titled block of the detail screen, as the server groups it. */
-interface AttrGroup { key: string; label: string; rows: { key: string; label: string; value: string }[] }
-
 export function ListingDetail({ id, isGuest = false }: { id: string; isGuest?: boolean }) {
   const router = useRouter();
   const toast = useToast();
@@ -34,16 +43,38 @@ export function ListingDetail({ id, isGuest = false }: { id: string; isGuest?: b
   // Which contact/action sheet is open. On the public host the viewer is always
   // a guest (middleware strips the session), so any action that writes to the
   // DB opens the login sheet instead of hitting a 401.
-  const [sheet, setSheet] = useState<null | "inquiry" | "more" | "share" | "report" | "login">(null);
+  const [sheet, setSheet] = useState<null | "inquiry" | "more" | "share" | "report" | "login" | "manage">(null);
   const [reqBusy, setReqBusy] = useState(false);
+  /** The owner action awaiting confirmation — every one of them writes. */
+  const [confirm, setConfirm] = useState<null | { action: OwnerAction; title: string; body: string; label: string; destructive?: boolean }>(null);
+  const [busy, setBusy] = useState(false);
 
-  // Persist the wishlist heart for real (Module 6 `saves`), gated for guests.
+  const load = useCallback(async () => {
+    const l = await listingsApi.get(id);
+    if (!l.ok) { setNotFound(true); return; }
+    setListing(l.data.listing);
+    // Saved-state comes from the `saves` table, not from a fresh `useState`.
+    setSaved(Boolean(l.data.listing.saved));
+    const [p, s] = await Promise.all([listingsApi.photos(id), listingsApi.similar(id)]);
+    if (p.ok) setPhotos(p.data.photos);
+    if (s.ok) setSimilar(s.data.items);
+  }, [id]);
+
+  useEffect(() => { void load(); }, [load]);
+
+  // Persist the wishlist bookmark for real (Module 6 `saves`), gated for guests.
   const toggleSave = async () => {
     if (isGuest) { setSheet("login"); return; }
     setSaved((s) => !s); // optimistic
     const res = await interactionsApi.toggleSave(id);
     if (res.ok) { setSaved(res.data.saved); toast.show(res.data.saved ? "Saved" : "Removed from saved"); }
     else { setSaved((s) => !s); toast.show("Couldn't save that"); }
+  };
+
+  const share = () => {
+    const url = window.location.href;
+    if (navigator.share) void navigator.share({ title: listing?.title ?? "", url });
+    else { void navigator.clipboard?.writeText(url); toast.show("Link copied"); }
   };
 
   // "Request Number" (owner withheld their number): the only way to reach them
@@ -63,26 +94,40 @@ export function ListingDetail({ id, isGuest = false }: { id: string; isGuest?: b
     else toast.show("Couldn't send that request");
   };
 
-  useEffect(() => {
-    (async () => {
-      const l = await listingsApi.get(id);
-      if (!l.ok) { setNotFound(true); return; }
-      setListing(l.data.listing);
-      const p = await listingsApi.photos(id);
-      if (p.ok) setPhotos(p.data.photos);
-      const s = await listingsApi.similar(id);
-      if (s.ok) setSimilar(s.data.items);
-    })();
-  }, [id]);
+  /**
+   * Every owner action that changes the row, run against its real endpoint and
+   * then re-read from the server — the screen never guesses the new state.
+   */
+  const runOwnerAction = async (action: OwnerAction) => {
+    setBusy(true);
+    if (action === "delete") {
+      const res = await listingsApi.remove(id);
+      setBusy(false);
+      setConfirm(null);
+      if (!res.ok) { toast.show("Couldn't delete that listing"); return; }
+      toast.show(`Moved to Recently deleted — ${res.data.trashDays} days to restore`);
+      router.replace("/listings");
+      return;
+    }
+    const res = await listingsApi.setStatus(id, action);
+    setBusy(false);
+    setConfirm(null);
+    if (!res.ok) {
+      toast.show(
+        res.error.code === "LISTING_STATE_LOCKED" ? "That isn't possible in the listing's current state"
+        : res.error.code === "FORBIDDEN" ? "Your role can't put a listing back on the feed"
+        : "Couldn't update that listing",
+      );
+      return;
+    }
+    toast.show(STATUS_DONE[action] ?? "Updated");
+    await load();
+  };
 
   // A listing the viewer may not see is indistinguishable from one that never
-  // existed — same 404 screen either way (Doc2 §5.4).
-  /**
-   * designs/P4 S5. A listing that was sold, rented, archived or never existed
-   * all land here — deliberately, because naming the reason would confirm that
-   * the id is real (Doc9 §7). The copy is the design's, which is already
-   * non-committal ("may have been sold, rented or removed").
-   */
+  // existed — same 404 screen either way (Doc2 §5.4). A listing that was sold,
+  // rented, archived or never existed all land here deliberately, because naming
+  // the reason would confirm that the id is real (Doc9 §7).
   if (notFound) {
     return (
       <Shell>
@@ -93,7 +138,7 @@ export function ListingDetail({ id, isGuest = false }: { id: string; isGuest?: b
         </div>
         <div className="flex flex-col items-center px-6 pb-6 pt-10 text-center">
           <Icon name="home" size={96} className="text-ink-tertiary" />
-          <div className="mt-5 text-[20px] font-bold leading-[1.3] text-ink-primary">
+          <div className="mt-5 text-20 font-bold leading-[1.3] text-ink-primary">
             This property is no longer available
           </div>
           <p className="mt-2 max-w-[280px] text-15 leading-[1.45] text-ink-secondary">
@@ -112,10 +157,11 @@ export function ListingDetail({ id, isGuest = false }: { id: string; isGuest?: b
     return (
       <Shell>
         <Skeleton className="aspect-[4/3] w-full" />
-        <div className="flex flex-col gap-3 p-4">
-          <Skeleton className="h-7 w-40" />
-          <Skeleton className="h-5 w-56" />
-          <Skeleton className="h-24 w-full rounded-12" />
+        <div className="flex flex-col gap-2 p-4">
+          <Skeleton className="h-8 w-40 rounded-4" />
+          <Skeleton className="h-5 w-56 rounded-4" />
+          <Skeleton className="mt-2 h-20 w-full rounded-4" />
+          <Skeleton className="h-40 w-full rounded-4" />
         </div>
       </Shell>
     );
@@ -123,7 +169,8 @@ export function ListingDetail({ id, isGuest = false }: { id: string; isGuest?: b
 
   const isOwner = Boolean(listing.owner);
   const sold = listing.availability !== "available";
-  const underReview = isOwner && listing.status !== "live";
+  const live = listing.status === "live";
+  const underReview = isOwner && !live;
   const cover = photos[idx]?.url ?? listing.coverUrl;
 
   return (
@@ -131,277 +178,136 @@ export function ListingDetail({ id, isGuest = false }: { id: string; isGuest?: b
       <DetailHeader
         title={listing.title ?? listing.typeLabel ?? ""}
         saved={saved}
-        // You don't wishlist your own property — it's already on your profile
+        // You don't bookmark your own property — it's already on your profile
         // and in My Listings, and the tap would land in the Saves metric you
         // read on your own insights screen. The server refuses it either way.
         canSave={!isOwner}
         // Sharing a link only makes sense for something a visitor can open. A
         // draft / under-review / hidden / sold listing 404s for everyone else,
         // so offering Share there hands out a dead link.
-        canShare={listing.status === "live"}
+        canShare={live}
         onBack={() => router.back()}
         onSave={() => void toggleSave()}
-        onShare={() => {
-          const url = window.location.href;
-          if (navigator.share) void navigator.share({ title: listing.title ?? "", url });
-          else { void navigator.clipboard?.writeText(url); toast.show("Link copied"); }
-        }}
-        onMore={() => setSheet("more")}
+        onShare={share}
+        onMore={() => setSheet(isOwner ? "manage" : "more")}
       />
 
-      {/* Hero carousel — designs/P4 S1: full-bleed 4:3 on black, with the
-          overlays sitting ON the photo (the header is transparent over it). */}
-      {/* shrink-0: the shell is a flex column, and an aspect-ratio-only child
-          gets collapsed to nothing without it. */}
-      <div className="relative aspect-[4/3] w-full shrink-0 overflow-hidden bg-black">
-        {cover ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={cover}
-            alt={photos[idx]?.altText ?? listing.title ?? ""}
-            data-protected="true"
-            onClick={() => setViewer(true)}
-            className={cn("h-full w-full cursor-pointer object-cover", sold && "grayscale")}
-          />
-        ) : (
-          <span className="grid h-full place-items-center text-ink-tertiary"><Icon name="image" size={40} /></span>
-        )}
+      {/* Hero — a real swipeable carousel (detailBody), shared with Preview so
+          the two can't drift. */}
+      <DetailHero
+        photos={photos}
+        cover={cover}
+        alt={photos[idx]?.altText ?? listing.title ?? ""}
+        idx={idx}
+        onIdx={setIdx}
+        onOpenPhoto={() => setViewer(true)}
+        grayscale={sold}
+        watermark={listing.status === "pending_review" ? "Under Review" : null}
+        promoted={Boolean(listing.promoted)}
+        // Type and area over the photo, the way a card labels itself — both are
+        // columns, so the overlay says nothing the payload didn't.
+        tags={[listing.typeLabel, listing.areaLabel].filter(Boolean) as string[]}
+      />
 
-        {listing.status === "pending_review" && (
-          <span className="pointer-events-none absolute inset-0 grid place-items-center">
-            <span className="rotate-[-24deg] text-[44px] font-bold uppercase tracking-[2px] text-white/[0.28]">
-              Under Review
-            </span>
-          </span>
-        )}
-
-        {listing.promoted && (
-          <span className="absolute left-3 top-14 rounded-4 bg-black/60 px-2.5 py-1.5 text-11 font-semibold uppercase tracking-[0.3px] leading-none text-white">
-            Promoted
-          </span>
-        )}
-
-        {photos.length > 1 && (
-          <>
-            <span className="absolute right-3 top-14 rounded-full bg-black/60 px-2.5 py-1.5 text-11 font-semibold leading-none text-white">
-              {idx + 1}/{photos.length}
-            </span>
-            <span className="absolute inset-x-0 bottom-3 flex justify-center gap-[5px]">
-              {photos.map((p, i) => (
-                <span
-                  key={p.id}
-                  className={cn(
-                    "h-[5px] rounded-full transition-[width,background-color]",
-                    i === idx ? "w-[5px] bg-accent" : "w-[5px] bg-white/50",
-                  )}
-                />
-              ))}
-            </span>
-          </>
-        )}
-      </div>
-
-      {/* Full-bleed status strips (design: a tinted bar, not a card) */}
-      {underReview && listing.status === "pending_review" && (
-        <div className="flex shrink-0 items-center gap-2 bg-info-soft px-4 py-2.5">
-          <Icon name="clock" size={16} className="shrink-0 text-info" />
-          <span className="text-13 leading-[1.4] text-ink-primary">
-            This listing is under review. It will go live once approved.
-          </span>
-        </div>
-      )}
-      {underReview && listing.status !== "pending_review" && (
-        <div className="flex shrink-0 items-center gap-2 bg-warning-soft px-4 py-2.5">
-          <Icon name="alert" size={16} className="shrink-0 text-warning" />
-          <span className="text-13 leading-[1.4] text-ink-primary">
-            {listing.status === "changes_requested"
-              ? "Changes requested — update the highlighted details and resubmit."
-              : listing.status === "rejected"
-              ? "This listing was rejected."
-              : "Only you can see this listing right now."}
-          </span>
-        </div>
+      {/* Status strips — full-bleed tinted bars, one per real condition. */}
+      {underReview && (
+        <StatusStrip
+          tone={listing.status === "pending_review" ? "info" : "warning"}
+          icon={listing.status === "pending_review" ? "clock" : "alert"}
+          text={
+            listing.status === "pending_review" ? "This listing is under review. It will go live once approved."
+            : listing.status === "changes_requested" ? "Changes requested — update the highlighted details and resubmit."
+            : listing.status === "rejected" ? "This listing was rejected."
+            : listing.status === "draft" ? "This is a draft. Only you can see it until you submit it."
+            : "Only you can see this listing right now."
+          }
+        />
       )}
       {sold && (
-        <div className="flex shrink-0 items-center gap-2 bg-error-soft px-4 py-2.5">
-          <Icon name="check" size={16} className="shrink-0 text-error" />
-          <span className="text-13 leading-[1.4] text-ink-primary">
-            {listing.availability === "rented" ? "This property has been rented." : "This property has been sold."}
-          </span>
-        </div>
+        <StatusStrip
+          tone="error"
+          icon="check-circle"
+          text={listing.availabilityLabel ?? "This property is no longer available."}
+        />
       )}
 
-      <div className="p-4 pb-28">
-        {/* price + kind pill */}
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-24 font-bold text-ink-primary">{listing.priceOnly ?? listing.price}</span>
-              {listing.isNegotiable && (
-                <span className="rounded-4 bg-surface-2 px-2 py-1.5 text-11 font-semibold leading-none text-ink-secondary">
-                  Negotiable
-                </span>
-              )}
-            </div>
-            {listing.pricePerSqft && (
-              <div className="mt-[5px] text-13 leading-none text-ink-tertiary">{listing.pricePerSqft}</div>
-            )}
-          </div>
-          <span className="mt-1 shrink-0 rounded-4 bg-accent-soft px-2.5 py-1.5 text-11 font-semibold uppercase leading-none tracking-[0.3px] text-accent">
-            {listing.kindLabel}
-          </span>
-        </div>
-
-        <h1 className="mt-3.5 text-17 font-semibold leading-[1.35] text-ink-primary">
-          {listing.title ?? listing.typeLabel}
-        </h1>
-        <div className="mt-[5px] flex items-center gap-[5px] text-13 leading-[1.3] text-ink-secondary">
-          <Icon name="pin" size={15} className="text-ink-tertiary" />
-          {listing.locationLabel ?? listing.areaLabel}
-        </div>
-
-        {/* key specs — fields chosen per property type in field_config */}
-        {!!(listing.keySpecs ?? []).length && (
-          <div className="mt-4 grid grid-cols-4 gap-0.5 rounded-12 bg-surface-2 px-2 py-3.5">
-            {(listing.keySpecs as { icon: string; value: string; label: string }[]).map((s) => (
-              <div key={s.label + s.value} className="flex flex-col items-center gap-[5px] text-center">
-                <Icon name={s.icon as never} size={22} className="text-ink-secondary" />
-                <span className="text-13 font-semibold leading-none text-ink-primary">{s.value}</span>
-                <span className="text-11 leading-none text-ink-tertiary">{s.label}</span>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* highlights */}
-        {!!(listing.highlights ?? []).length && (
-          <div className="hz-x -mx-4 mt-4 flex gap-2 px-4">
-            {(listing.highlights as string[]).map((h) => (
-              <span
-                key={h}
-                className="flex h-[34px] shrink-0 items-center whitespace-nowrap rounded-full border border-border bg-surface-2 px-3.5 text-13 font-semibold leading-none text-ink-primary"
-              >
-                {h}
-              </span>
-            ))}
-          </div>
-        )}
-
-        {underReview && listing.owner?.rejectReason && (
-          <div className="mt-4 rounded-8 bg-warning-soft p-3.5 text-11 leading-[1.45] text-ink-secondary">
-            {listing.owner.rejectReason}
-          </div>
-        )}
-
-        {/* Labels and values are resolved server-side from field_definitions —
-            this used to print the raw map, so a buyer read "Bhk 3" and
-            "Furnishing semi". */}
-        {/* Grouped exactly as the creation form asked for them (migration 0055).
-            A Flat carries twenty-seven details now; one flat two-column list of
-            that length is a wall, and the seller filled it in as four short
-            sections. The grouping is computed server-side so the preview, this
-            screen and the public page cannot disagree. */}
-        {!!(listing.attributeGroups ?? []).length && (
-          <div className="mt-6 flex flex-col gap-5">
-            {(listing.attributeGroups as AttrGroup[]).map((g) => (
-              <section key={g.key}>
-                <div className="mb-3 text-13 font-semibold leading-none text-ink-secondary">{g.label}</div>
-                <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-                  {g.rows.map((a) => (
-                    <div key={a.key}>
-                      <div className="text-11 leading-none text-ink-tertiary">{a.label}</div>
-                      <div className="mt-[3px] text-15 leading-[1.3] text-ink-primary">{a.value}</div>
-                    </div>
+      <PropertyDetailBody
+        listing={listing}
+        onOpenProfile={(username) => router.push(`/profile/${username}`)}
+        notice={
+          isOwner ? (
+            <OwnerNotice listing={listing} />
+          ) : null
+        }
+        footer={
+          /* Similar properties — matched server-side (same type/kind/city, ±35%
+             on price), so the rule isn't reverse-engineerable from the client. */
+          similar.length ? (
+            <>
+              <DetailSeparator />
+              <DetailSection icon="search" tone="info" title="Similar properties" count={similar.length}>
+                <div className={cn("hz-x flex gap-2 py-3", DETAIL_PAD)}>
+                  {similar.map((s) => (
+                    <button
+                      key={s.id}
+                      onClick={() => router.push(`/property/${s.id}`)}
+                      className="w-36 shrink-0 overflow-hidden rounded-4 border border-border bg-surface-1 text-left"
+                    >
+                      <span className="block aspect-[4/3] bg-surface-3">
+                        {s.coverUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={s.coverUrl} alt="" data-protected="true" className="h-full w-full object-cover" />
+                        ) : (
+                          <span className="grid h-full place-items-center text-ink-tertiary"><Icon name="image" size={22} /></span>
+                        )}
+                      </span>
+                      <span className="block px-2 py-2">
+                        <span className="block truncate text-13 font-semibold leading-none text-ink-primary">{s.price}</span>
+                        <span className="mt-1 block truncate text-11 leading-none text-ink-tertiary">{s.areaLabel}</span>
+                      </span>
+                    </button>
                   ))}
                 </div>
-              </section>
-            ))}
-          </div>
-        )}
-        <div className="flex flex-col gap-5 pt-5">
+              </DetailSection>
+            </>
+          ) : null
+        }
+      />
 
-        {listing.description && (
-          <div>
-            <div className="mb-1.5 text-13 font-semibold text-ink-secondary">Description</div>
-            <p className="whitespace-pre-wrap text-15 leading-[1.45] text-ink-primary selectable">{listing.description}</p>
-          </div>
-        )}
-
-        {!!(listing.amenities ?? []).length && (
-          <div>
-            <div className="mb-2 text-13 font-semibold text-ink-secondary">Amenities</div>
-            <div className="flex flex-wrap gap-2">
-              {listing.amenities.map((a: string) => (
-                <span key={a} className="rounded-full bg-surface-2 px-3 py-1.5 text-13 text-ink-secondary">{a}</span>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Similar properties — matched server-side (same type/kind/city, ±35%
-            on price), so the rule isn't reverse-engineerable from the client. */}
-        {!!similar.length && (
-          <div>
-            <div className="mb-2 text-13 font-semibold text-ink-secondary">Similar properties</div>
-            <div className="hz-x -mx-4 flex gap-3 px-4">
-              {similar.map((s) => (
-                <button
-                  key={s.id}
-                  onClick={() => router.push(`/property/${s.id}`)}
-                  className="w-40 shrink-0 overflow-hidden rounded-12 bg-surface-1 text-left shadow-l1 dark:border dark:border-border dark:shadow-none"
-                >
-                  <span className="block aspect-[4/3] bg-surface-3">
-                    {s.coverUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={s.coverUrl} alt="" data-protected="true" className="h-full w-full object-cover" />
-                    ) : (
-                      <span className="grid h-full place-items-center text-ink-tertiary"><Icon name="image" size={22} /></span>
-                    )}
-                  </span>
-                  <span className="block p-2.5">
-                    <span className="block truncate text-13 font-semibold text-ink-primary">{s.price}</span>
-                    <span className="mt-0.5 block truncate text-11 text-ink-tertiary">{s.areaLabel}</span>
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-        </div>
-      </div>
-
-      {/* Sticky bar — designs/P4 "sticky bottom bar". Which variant shows is
-          decided by what the SERVER sent (a withheld number simply isn't in the
-          payload), never by a local flag. */}
-      <div className="sticky bottom-0 z-sticky mt-auto border-t border-border bg-surface-1 shadow-l2 safe-bottom">
+      {/* Sticky bar — which variant shows is decided by what the SERVER sent (a
+          withheld number simply isn't in the payload), never by a local flag. */}
+      <div className="sticky bottom-0 z-sticky mt-auto border-t border-border bg-surface-1 safe-bottom">
         {isOwner && listing.owner?.stats && (
-          <div className="grid grid-cols-3 border-b border-divider">
+          <div className="grid grid-cols-3 divide-x divide-divider border-b border-divider">
             {[
               { k: "Views", v: listing.owner.stats.views },
               { k: "Saves", v: listing.owner.stats.saves },
               { k: "Leads", v: listing.owner.stats.leads },
             ].map((s) => (
               <div key={s.k} className="px-1 py-2 text-center">
-                {/* Saves and Leads have no table yet (P10 / P8). The server
-                    sends null and we print "—" — never a fabricated 0. */}
+                {/* A metric with no table behind it sends null and prints "—"
+                    — never a fabricated 0. */}
                 <div className="text-13 font-semibold leading-none text-ink-primary">
                   {s.v === null || s.v === undefined ? "—" : Number(s.v).toLocaleString("en-IN")}
                 </div>
-                <div className="mt-[3px] text-11 leading-none text-ink-tertiary">{s.k}</div>
+                <div className="mt-1 text-11 leading-none text-ink-tertiary">{s.k}</div>
               </div>
             ))}
           </div>
         )}
 
-        <div className="flex items-center gap-2 px-4 py-2.5">
+        <div className="flex items-center gap-2 px-3 py-2.5">
           {isOwner ? (
-            <>
-              <Button variant="outline" fullWidth onClick={() => router.push(`/listings/${listing.id}`)}>Edit</Button>
-              <Button variant="outline" fullWidth onClick={() => router.push(`/boost/new?listing=${listing.id}`)}>Boost</Button>
-              <Button className="flex-[1.4] whitespace-nowrap" onClick={() => router.push(`/listings/${listing.id}`)}>
-                {listing.kind === "rent" ? "Mark as Rented" : "Mark as Sold"}
-              </Button>
-            </>
+            <OwnerBar
+              listing={listing}
+              busy={busy}
+              onEdit={() => router.push(`/create/form?edit=${listing.id}`)}
+              onPreview={() => router.push(`/create/preview?listing=${listing.id}`)}
+              onBoost={() => router.push(`/boost/new?listing=${listing.id}`)}
+              onInsights={() => router.push(`/listings/${listing.id}/insights`)}
+              onAsk={(a) => setConfirm(confirmFor(a, listing))}
+              onMore={() => setSheet("manage")}
+            />
           ) : sold ? (
             <Button variant="outline" fullWidth onClick={() => router.push("/search")}>
               Browse similar properties
@@ -411,33 +317,28 @@ export function ListingDetail({ id, isGuest = false }: { id: string; isGuest?: b
               <button
                 aria-label="Call"
                 onClick={() => (window.location.href = `tel:${listing.contact.number}`)}
-                className="grid h-11 w-[52px] shrink-0 place-items-center rounded-8 border border-border bg-surface-1 text-ink-primary"
+                className="grid h-11 w-[52px] shrink-0 place-items-center rounded-4 border border-border bg-surface-1 text-ink-primary"
               >
                 <Icon name="phone" size={20} />
               </button>
               {listing.contact.whatsapp && (
                 <a
                   aria-label="WhatsApp"
-                  href={`https://wa.me/${String(listing.contact.whatsapp).replace(/\D/g, "")}`}
-                  className="grid h-11 w-[52px] shrink-0 place-items-center rounded-8 border border-accent bg-accent-soft text-accent"
+                  href={`https://wa.me/91${String(listing.contact.whatsapp).replace(/\D/g, "").slice(-10)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="grid h-11 w-[52px] shrink-0 place-items-center rounded-4 border border-accent bg-accent-soft text-accent"
                 >
-                  <Icon name="message" size={20} />
+                  <Icon name="whatsapp" size={20} />
                 </a>
               )}
               <Button fullWidth onClick={() => (isGuest ? setSheet("login") : setSheet("inquiry"))}>Send Inquiry</Button>
             </>
           ) : (
             <>
-              {/*
-                `flex-1 px-0` is what the design actually specifies for this
-                pair: both buttons are `flex:1` with NO horizontal padding (see
-                P4's sticky-bar markup). We had `fullWidth` (width:100%), which
-                sizes from content instead of splitting evenly, plus the shared
-                Button's default px-4 — together that left 111px for a label
-                needing 115px, so "Request Number" wrapped onto two lines.
-                Equal halves with centred text look identical; this only stops
-                the wrap.
-              */}
+              {/* Both buttons are flex:1 with NO horizontal padding: the shared
+                  Button's default px-4 left 111px for a label needing 115px, so
+                  "Request Number" wrapped onto two lines. */}
               <Button
                 variant="outline"
                 className="flex-1 px-0"
@@ -478,6 +379,18 @@ export function ListingDetail({ id, isGuest = false }: { id: string; isGuest?: b
               onShare={() => setSheet("share")}
               onReport={() => setSheet(isGuest ? "login" : "report")}
             />
+            <ManageSheet
+              open={sheet === "manage"}
+              listing={listing}
+              onClose={() => setSheet(null)}
+              onEdit={() => { setSheet(null); router.push(`/create/form?edit=${listing.id}`); }}
+              onPreview={() => { setSheet(null); router.push(`/create/preview?listing=${listing.id}`); }}
+              onPhotos={() => { setSheet(null); router.push(`/create/photos?listing=${listing.id}`); }}
+              onInsights={() => { setSheet(null); router.push(`/listings/${listing.id}/insights`); }}
+              onBoost={() => { setSheet(null); router.push(`/boost/new?listing=${listing.id}`); }}
+              onShare={() => setSheet("share")}
+              onAction={(a) => { setSheet(null); setConfirm(confirmFor(a, listing)); }}
+            />
             <ShareSheet open={sheet === "share"} onClose={() => setSheet(null)} card={card} />
             <ReportSheet open={sheet === "report"} onClose={() => setSheet(null)} card={card} />
             <InquirySheet open={sheet === "inquiry"} onClose={() => setSheet(null)} card={card} />
@@ -486,6 +399,17 @@ export function ListingDetail({ id, isGuest = false }: { id: string; isGuest?: b
         );
       })()}
 
+      <ConfirmDialog
+        open={Boolean(confirm)}
+        onClose={() => setConfirm(null)}
+        onConfirm={() => { if (confirm) void runOwnerAction(confirm.action); }}
+        title={confirm?.title ?? ""}
+        body={confirm?.body}
+        confirmLabel={confirm?.label ?? "Confirm"}
+        destructive={confirm?.destructive}
+        loading={busy}
+      />
+
       {/* Fullscreen photo viewer — pinch/double-tap zoom + navigation */}
       {viewer && cover && (
         <PhotoViewer
@@ -493,16 +417,230 @@ export function ListingDetail({ id, isGuest = false }: { id: string; isGuest?: b
           index={idx}
           onIndex={setIdx}
           onClose={() => setViewer(false)}
-          onShare={() => {
-            const url = window.location.href;
-            if (navigator.share) void navigator.share({ title: listing.title ?? "", url });
-            else { void navigator.clipboard?.writeText(url); toast.show("Link copied"); }
-          }}
+          onShare={share}
         />
       )}
     </Shell>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Owner actions
+// ---------------------------------------------------------------------------
+
+/** Everything the owner can do that WRITES. Each maps to a real endpoint. */
+type OwnerAction = "sold" | "rented" | "hide" | "unhide" | "reactivate" | "delete";
+
+const STATUS_DONE: Record<string, string> = {
+  sold: "Marked as sold",
+  rented: "Marked as rented",
+  hide: "Listing hidden",
+  unhide: "Listing is visible again",
+  reactivate: "Sent back for a quick review",
+};
+
+/**
+ * The confirmation copy, one per action — the SAME wording My Listings uses,
+ * because the consequences are the same ones (archive, boost stops, no refund
+ * for unused days — all applied server-side, Doc2 §15).
+ */
+function confirmFor(action: OwnerAction, listing: any) {
+  switch (action) {
+    case "sold":
+      return { action, title: "Mark as sold?", body: "The listing is archived, people who saved it are notified, and any running boost stops with no refund for unused days.", label: "Mark sold" };
+    case "rented":
+      return { action, title: "Mark as rented?", body: "The listing is archived, and any running boost stops with no refund for unused days. You can re-activate it later for free using the same slot.", label: "Mark rented" };
+    case "hide":
+      return { action, title: "Hide this listing?", body: "It stops appearing in the feed and search. You can unhide it any time.", label: "Hide" };
+    case "unhide":
+      return { action, title: "Make this listing visible?", body: "It goes back into the feed and search straight away.", label: "Unhide" };
+    case "reactivate":
+      return { action, title: "Re-activate this listing?", body: "It uses the same slot (free) and goes back for a quick review.", label: "Re-activate" };
+    case "delete":
+      return { action, title: "Delete this listing?", body: `"${listing.title ?? "This listing"}" moves to Recently deleted for 30 days. A listing that was live does not give its slot back.`, label: "Delete", destructive: true };
+  }
+}
+
+/** Which owner actions this listing's current state actually allows. */
+function ownerCaps(listing: any) {
+  const status = listing.status as string;
+  return {
+    isDraft: status === "draft",
+    isLive: status === "live",
+    isHidden: status === "hidden",
+    canBoost: status === "live" && listing.availability === "available",
+    canInsights: status === "live" || status === "archived" || listing.availability !== "available",
+    // Only a RENTED listing comes back — a sold one is finished (Doc2 §5.4).
+    canReactivate: listing.availability === "rented",
+    canClose: status === "live" && listing.availability === "available",
+    isRent: listing.kind === "rent",
+  };
+}
+
+/**
+ * The owner's sticky bar. Three slots at most, and the primary one is whatever
+ * this state actually needs doing next — a draft needs finishing, a live
+ * listing needs closing, a hidden one needs bringing back.
+ */
+function OwnerBar({
+  listing, busy, onEdit, onPreview, onBoost, onInsights, onAsk, onMore,
+}: {
+  listing: any;
+  busy: boolean;
+  onEdit: () => void;
+  onPreview: () => void;
+  onBoost: () => void;
+  onInsights: () => void;
+  onAsk: (a: OwnerAction) => void;
+  onMore: () => void;
+}) {
+  const c = ownerCaps(listing);
+
+  return (
+    <>
+      <Button variant="outline" className="flex-1 px-0" onClick={onEdit}>Edit</Button>
+      {c.isDraft ? (
+        <Button className="flex-[1.4] whitespace-nowrap px-0" onClick={onPreview}>Preview &amp; submit</Button>
+      ) : c.isHidden ? (
+        <Button className="flex-[1.4] whitespace-nowrap px-0" loading={busy} onClick={() => onAsk("unhide")}>Unhide</Button>
+      ) : c.canReactivate ? (
+        <Button className="flex-[1.4] whitespace-nowrap px-0" loading={busy} onClick={() => onAsk("reactivate")}>Re-activate</Button>
+      ) : c.canClose ? (
+        <>
+          <Button variant="outline" className="flex-1 px-0" onClick={onBoost}>Boost</Button>
+          <Button className="flex-[1.4] whitespace-nowrap px-0" loading={busy} onClick={() => onAsk(c.isRent ? "rented" : "sold")}>
+            {c.isRent ? "Mark Rented" : "Mark Sold"}
+          </Button>
+        </>
+      ) : c.canInsights ? (
+        <Button className="flex-[1.4] whitespace-nowrap px-0" onClick={onInsights}>Insights</Button>
+      ) : (
+        <Button className="flex-[1.4] whitespace-nowrap px-0" onClick={onPreview}>Preview</Button>
+      )}
+      <button
+        aria-label="More options"
+        onClick={onMore}
+        className="grid h-11 w-11 shrink-0 place-items-center rounded-4 border border-border text-ink-primary"
+      >
+        <Icon name="more" size={20} />
+      </button>
+    </>
+  );
+}
+
+/**
+ * The owner's ⋯ sheet. Every row is either a route that exists or an action
+ * that writes; nothing is listed that this listing's state can't do.
+ */
+function ManageSheet({
+  open, listing, onClose, onEdit, onPreview, onPhotos, onInsights, onBoost, onShare, onAction,
+}: {
+  open: boolean;
+  listing: any;
+  onClose: () => void;
+  onEdit: () => void;
+  onPreview: () => void;
+  onPhotos: () => void;
+  onInsights: () => void;
+  onBoost: () => void;
+  onShare: () => void;
+  onAction: (a: OwnerAction) => void;
+}) {
+  const c = ownerCaps(listing);
+  return (
+    <BottomSheet open={open} onClose={onClose} title="Manage listing">
+      <div className="flex flex-col pb-2">
+        <SheetOption icon={<Icon name="edit" size={22} className="text-ink-secondary" />} label="Edit details" onClick={onEdit} />
+        <SheetOption icon={<Icon name="camera" size={22} className="text-ink-secondary" />} label="Manage photos" onClick={onPhotos} />
+        <SheetOption icon={<Icon name="eye" size={22} className="text-ink-secondary" />} label="Preview as a buyer" onClick={onPreview} />
+        {c.canInsights && (
+          <SheetOption icon={<Icon name="chart" size={22} className="text-ink-secondary" />} label="Insights" onClick={onInsights} />
+        )}
+        {c.canBoost && (
+          <SheetOption icon={<Icon name="rocket" size={22} className="text-ink-secondary" />} label="Boost this listing" onClick={onBoost} />
+        )}
+        {c.isLive && (
+          <SheetOption icon={<Icon name="share" size={22} className="text-ink-secondary" />} label="Share" onClick={onShare} />
+        )}
+        {c.canClose && (
+          <>
+            <SheetOption icon={<Icon name="check-circle" size={22} className="text-ink-secondary" />} label="Mark as sold" onClick={() => onAction("sold")} />
+            <SheetOption icon={<Icon name="check-circle" size={22} className="text-ink-secondary" />} label="Mark as rented" onClick={() => onAction("rented")} />
+            <SheetOption icon={<Icon name="eye-off" size={22} className="text-ink-secondary" />} label="Hide temporarily" onClick={() => onAction("hide")} />
+          </>
+        )}
+        {c.isHidden && (
+          <SheetOption icon={<Icon name="eye" size={22} className="text-ink-secondary" />} label="Unhide" onClick={() => onAction("unhide")} />
+        )}
+        {c.canReactivate && (
+          <SheetOption icon={<Icon name="refund" size={22} className="text-ink-secondary" />} label="Re-activate" onClick={() => onAction("reactivate")} />
+        )}
+        <SheetOption icon={<Icon name="trash" size={22} className="text-error" />} label="Delete listing" destructive onClick={() => onAction("delete")} />
+      </div>
+    </BottomSheet>
+  );
+}
+
+/**
+ * The owner-only block above the details: the listing's own status badge, the
+ * moderator's words when there are any, and whether ownership proof is on file.
+ * All four values are columns on the row — none of it is shown to a visitor.
+ */
+function OwnerNotice({ listing }: { listing: any }) {
+  const o = listing.owner ?? {};
+  const notes = o.rejectReason || o.reviewNotes;
+  return (
+    <>
+      <DetailSeparator />
+      <DetailSection
+        icon="lock"
+        tone={listing.status === "live" ? "accent" : "warning"}
+        title="Only you can see this"
+      >
+        <div className={cn("flex items-center justify-between gap-3 py-2.5", DETAIL_PAD)}>
+          <span className="text-13 leading-none text-ink-tertiary">Status</span>
+          <StatusBadge kind={listing.badge?.kind ?? "pending"} label={listing.badge?.label} />
+        </div>
+        {notes && (
+          <div className={cn("border-t border-divider py-3", DETAIL_PAD)}>
+            <div className="text-11 uppercase leading-none tracking-[0.4px] text-ink-tertiary">From the review team</div>
+            <p className="mt-1.5 text-13 leading-[1.45] text-ink-secondary">{notes}</p>
+          </div>
+        )}
+        <div className="divide-y divide-divider border-t border-divider pb-1">
+          <DetailRow
+            label="Your number"
+            value={o.contact?.public ? "Shown to buyers" : "Hidden — buyers must request it"}
+          />
+          <DetailRow
+            label="Ownership proof"
+            value={o.hasOwnershipProof ? (o.ownershipProofType ? `Uploaded · ${o.ownershipProofType}` : "Uploaded") : "Not uploaded"}
+          />
+          {o.contact?.alt && <DetailRow label="Alternate number" value={String(o.contact.alt)} />}
+          {listing.postedOn && <DetailRow label="Posted on" value={listing.postedOn} />}
+        </div>
+      </DetailSection>
+    </>
+  );
+}
+
+function StatusStrip({ tone, icon, text }: { tone: "info" | "warning" | "error"; icon: "clock" | "alert" | "check-circle"; text: string }) {
+  const tones = {
+    info: "bg-info-soft text-info",
+    warning: "bg-warning-soft text-warning",
+    error: "bg-error-soft text-error",
+  } as const;
+  return (
+    <div className={cn("flex shrink-0 items-center gap-2 px-4 py-2.5", tones[tone])}>
+      <Icon name={icon} size={16} className="shrink-0" />
+      <span className="text-13 leading-[1.4] text-ink-primary">{text}</span>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Fullscreen viewer
+// ---------------------------------------------------------------------------
 
 /**
  * Fullscreen viewer (designs/P4 `viewer`).
@@ -512,7 +650,7 @@ export function ListingDetail({ id, isGuest = false }: { id: string; isGuest?: b
  * zoomed the drag pans instead of changing photo, which is what stops a pan
  * from skipping to the next image mid-inspection.
  */
-function PhotoViewer({
+export function PhotoViewer({
   photos, index, onIndex, onClose, onShare,
 }: {
   photos: Photo[];
@@ -651,16 +789,23 @@ function Shell({ children }: { children: React.ReactNode }) {
 }
 
 /**
- * The "morphing header" from designs/P4 S1: transparent buttons floating over
- * the hero photo, turning into a solid bar with the listing title once the
- * photo has scrolled away.
+ * The morphing header: transparent buttons floating over the hero photo,
+ * turning into a solid bar with the listing title once the photo has scrolled
+ * away.
+ *
+ * It listened to `window.scroll` (and to a `[data-detail-scroll]` element that
+ * nothing has ever rendered), but AppShell scrolls its own `<main>` — so the
+ * listener fired on nothing and the bar NEVER went solid: the title never
+ * appeared and white glyphs stayed white over white content. An
+ * IntersectionObserver on a sentinel at the bottom of the hero doesn't care
+ * which element scrolls, which is exactly why it works here.
  */
 function DetailHeader({
   title, saved, canSave = true, canShare = true, onBack, onSave, onShare, onMore,
 }: {
   title: string;
   saved: boolean;
-  /** Owner viewing their own listing — no wishlist control. */
+  /** Owner viewing their own listing — no bookmark control. */
   canSave?: boolean;
   /** Only a live listing has a link a visitor can actually open. */
   canShare?: boolean;
@@ -669,55 +814,69 @@ function DetailHeader({
   onShare: () => void;
   onMore: () => void;
 }) {
-  const [solid, setSolid] = useState(false);
+  const solid = useScrolledPastHero();
 
-  useEffect(() => {
-    const scroller = document.querySelector("[data-detail-scroll]") ?? window;
-    const onScroll = () => {
-      const y = scroller === window ? window.scrollY : (scroller as HTMLElement).scrollTop;
-      setSolid(y > 160); // design's threshold
-    };
-    scroller.addEventListener("scroll", onScroll, { passive: true });
-    onScroll();
-    return () => scroller.removeEventListener("scroll", onScroll);
-  }, []);
-
-  // Transparent state is a top scrim gradient with white, shadowed glyphs —
-  // not a pill behind each button (designs/P4 `hdrStyle` / `hdrBtn`).
+  // Transparent state is a top scrim gradient with white, shadowed glyphs.
   const btn = cn(
     "grid h-11 w-11 shrink-0 place-items-center",
     solid ? "text-ink-primary" : "text-white [filter:drop-shadow(0_1px_2px_rgba(0,0,0,.5))]",
   );
 
   return (
-    <div
-      className={cn(
-        // 52px is the design's app-bar height
-        "fixed inset-x-0 top-0 z-header flex h-[52px] items-center gap-0.5 px-1.5 safe-top transition-colors duration-200",
-        solid
-          ? "border-b border-border bg-surface-1"
-          : "border-b border-transparent bg-gradient-to-b from-black/35 to-transparent",
-      )}
-    >
-      <button aria-label="Back" onClick={onBack} className={btn}><Icon name="chevron-left" size={22} /></button>
-      <span
+    <>
+      <div
         className={cn(
-          "flex-1 truncate px-1 text-center text-15 font-semibold leading-[1.2] text-ink-primary transition-opacity duration-200",
-          solid ? "opacity-100" : "opacity-0",
+          // 52px is the design's app-bar height
+          "fixed inset-x-0 top-0 z-header mx-auto flex h-[52px] max-w-column items-center gap-0.5 px-1.5 safe-top transition-colors duration-200",
+          solid
+            ? "border-b border-border bg-surface-1"
+            : "border-b border-transparent bg-gradient-to-b from-black/35 to-transparent",
         )}
       >
-        {title}
-      </span>
-      {canSave && (
-        <button aria-label={saved ? "Remove from saved" : "Save"} onClick={onSave} className={btn}>
-          <Icon name="bookmark" size={21} filled={saved} />
-        </button>
-      )}
-      {canShare && (
-        <button aria-label="Share" onClick={onShare} className={btn}><Icon name="share" size={21} /></button>
-      )}
-      <button aria-label="More" onClick={onMore} className={btn}><Icon name="more" size={21} /></button>
-    </div>
+        <button aria-label="Back" onClick={onBack} className={btn}><Icon name="chevron-left" size={22} /></button>
+        <span
+          className={cn(
+            "flex-1 truncate px-1 text-center text-15 font-semibold leading-[1.2] text-ink-primary transition-opacity duration-200",
+            solid ? "opacity-100" : "opacity-0",
+          )}
+        >
+          {title}
+        </span>
+        {canSave && (
+          <button aria-label={saved ? "Remove from saved" : "Save"} onClick={onSave} className={btn}>
+            <Icon name="bookmark" size={21} filled={saved} />
+          </button>
+        )}
+        {canShare && (
+          <button aria-label="Share" onClick={onShare} className={btn}><Icon name="share" size={21} /></button>
+        )}
+        <button aria-label="More" onClick={onMore} className={btn}><Icon name="more" size={21} /></button>
+      </div>
+    </>
   );
 }
 
+/**
+ * Scroll state for the morphing header, shared by both detail screens.
+ *
+ * It watches the HERO element (`data-detail-hero`, set by DetailHero) and flips
+ * once most of the photo has gone under the bar. An IntersectionObserver has no
+ * opinion about which element scrolls — which is the whole point, because the
+ * previous scroll listener was attached to `window` while AppShell scrolls its
+ * own `<main>`, so it never fired once.
+ */
+export function useScrolledPastHero() {
+  const [solid, setSolid] = useState(false);
+  useEffect(() => {
+    if (typeof IntersectionObserver === "undefined") return;
+    const el = document.querySelector("[data-detail-hero]");
+    if (!el) return;
+    const io = new IntersectionObserver(
+      ([entry]) => setSolid(entry.intersectionRatio < 0.32),
+      { rootMargin: "-52px 0px 0px 0px", threshold: [0, 0.15, 0.32, 0.5, 1] },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+  return solid;
+}

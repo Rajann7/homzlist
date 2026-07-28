@@ -11,6 +11,7 @@ import { LocationCascade, PincodeField } from "./LocationPicker";
 import type { Amenity, FieldDefMap, FieldGroup, FieldOption } from "./fields";
 import { DynamicSections, Field, ToggleRow, inputCls, type AreaUnitOption } from "./FormControls";
 import { keysForKind, visibleKeys } from "@/lib/listings/visibility";
+import { scopedGroups } from "@/lib/listings/groupLabel";
 import { cn } from "@/lib/utils";
 
 /**
@@ -240,7 +241,7 @@ export function ListingForm() {
         <DynamicSections
           keys={askedKeys}
           defs={fieldDefs}
-          groups={fieldGroups}
+          groups={scopedGroups(fieldGroups, { kind: "property", category: type.category })}
           values={values}
           errors={errors}
           required={type.required}

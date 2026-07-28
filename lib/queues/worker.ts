@@ -41,8 +41,10 @@ function log(queue: string, job: Job) {
 async function imageProcessor(job: Job) {
   log(QUEUE_NAMES.image, job);
 
-  const { photoId } = (job.data ?? {}) as { photoId?: string };
+  const { photoId, table } = (job.data ?? {}) as { photoId?: string; table?: string };
   if (!photoId) return;
+  // Which table the row lives in — projects got their own in migration 0075.
+  const photoTable = table === "project_photos" ? "project_photos" : "listing_photos";
 
   const { createServiceClient } = await import("@/lib/supabase/server");
   const { readObject, putObject, publicUrlFor, BUCKET } = await import("@/lib/storage");
@@ -50,7 +52,7 @@ async function imageProcessor(job: Job) {
 
   const db = createServiceClient();
   const { data } = await db
-    .from("listing_photos")
+    .from(photoTable)
     .select("id, storage_key, bucket, variants, status")
     .eq("id", photoId)
     .maybeSingle();
@@ -75,7 +77,7 @@ async function imageProcessor(job: Job) {
   }
 
   await db
-    .from("listing_photos")
+    .from(photoTable)
     .update({ variants: urls, status: "ready" })
     .eq("id", photo.id);
 }

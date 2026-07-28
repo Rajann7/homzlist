@@ -7,7 +7,7 @@ import { BackButton, Checklist, OfflineBanner } from "@/components/billing/primi
 import { ConfirmDialog } from "@/components/ui/Dialog";
 import { ProposalSheet } from "./ProposalSheet";
 import { requirementsApi, type RequirementDetail as Detail } from "@/lib/listings/client";
-import { cn } from "@/lib/utils";
+import { DetailAnswerGrid, DetailCard, DetailSection } from "./detailBody";
 
 /**
  * P4 S4 — requirement detail, three variants the SERVER picks:
@@ -93,106 +93,135 @@ export function RequirementDetail({ id, isGuest = false }: { id: string; isGuest
     <Shell>
       {offline && <OfflineBanner />}
 
-      <div className="flex flex-col gap-5 p-4 pb-32">
-        {/* Chips row — designs/P4 S4: 4px tags, 11px uppercase, not pills */}
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="rounded-4 bg-accent-soft px-2 py-1.5 text-11 font-semibold uppercase leading-none tracking-[0.3px] text-accent">
-            {r.kindLabel}
-          </span>
-          {r.isUrgent && (
-            <span className="flex items-center gap-1 rounded-4 bg-warning-soft px-2 py-1.5 text-11 font-semibold uppercase leading-none tracking-[0.3px] text-warning">
-              <Icon name="clock" size={12} /> Urgent
-            </span>
-          )}
-          {isOwn && r.status === "live" && r.daysLeft !== null && (
-            <span className="rounded-4 bg-accent-soft px-2 py-1.5 text-11 font-semibold uppercase leading-none tracking-[0.3px] text-accent">
-              Active · {r.daysLeft} days left
-            </span>
-          )}
-          {/* Every other status — pending_review, changes_requested, rejected,
-              paused — used to render NOTHING, so a requirement still in the
-              moderation queue looked live. The badge is server-computed. */}
-          {!["live", "expired", "fulfilled"].includes(r.status) && (
-            <StatusBadge kind={r.badge.kind as never} label={r.badge.label} />
-          )}
-        </div>
+      {/* Same card language as the property / project detail (detailBody): a
+          surface-2 page, surface-1 cards with a 12px radius and an 8px gutter,
+          answers in the two-column grid. The three screens are one design. */}
+      <div className="flex grow flex-col bg-surface-2 pb-3">
+        {/* ---- Headline card ------------------------------------------- */}
+        <DetailCard>
+          <div className="px-3.5 pb-3.5 pt-3.5 sm:px-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                {/* Budget — blurred ONLY because it genuinely isn't in the payload */}
+                {locked ? (
+                  <div className="relative w-fit">
+                    <div className="select-none text-24 font-bold leading-[1.05] text-ink-primary blur-[6px]" aria-hidden="true">
+                      ₹00 L – ₹00 L
+                    </div>
+                    <span className="absolute inset-0 grid place-items-center">
+                      <Icon name="lock" size={20} className="text-ink-tertiary" />
+                    </span>
+                  </div>
+                ) : (
+                  <div className="text-24 font-bold leading-[1.05] text-ink-primary sm:text-[28px]">{r.budgetLabel}</div>
+                )}
+                <div className="mt-2 text-13 leading-none text-ink-tertiary">Budget</div>
+              </div>
+              <span className="mt-1.5 shrink-0 rounded-4 bg-accent-soft px-2 py-1 text-11 font-semibold uppercase leading-none tracking-[0.3px] text-accent">
+                {r.kindLabel}
+              </span>
+            </div>
+
+            <h1 className="mt-3 text-17 font-semibold leading-[1.35] text-ink-primary sm:text-20">
+              {[r.bhk ? `${r.bhk} BHK` : null, r.typeLabel ?? r.typeCode].filter(Boolean).join(" ")}
+            </h1>
+
+            {r.areaLabel && (
+              <div className="mt-2 flex items-start gap-2 text-13 leading-[1.4] text-ink-secondary sm:text-15">
+                <Icon name="pin" size={16} className="mt-0.5 shrink-0 text-accent" />
+                <span className="min-w-0">{r.areaLabel}</span>
+              </div>
+            )}
+
+            <div className="mt-3 flex flex-wrap items-center gap-1.5">
+              {r.isUrgent && (
+                <span className="flex items-center gap-1 rounded-4 bg-warning-soft px-2 py-1 text-11 font-semibold uppercase leading-none tracking-[0.3px] text-warning">
+                  <Icon name="clock" size={12} /> Urgent
+                </span>
+              )}
+              {isOwn && r.status === "live" && r.daysLeft !== null && (
+                <span className="rounded-4 bg-accent-soft px-2 py-1 text-11 font-semibold uppercase leading-none tracking-[0.3px] text-accent">
+                  Active · {r.daysLeft} days left
+                </span>
+              )}
+              {/* Every other status — pending_review, changes_requested,
+                  rejected, paused — used to render NOTHING, so a requirement
+                  still in the moderation queue looked live. Server-computed. */}
+              {!["live", "expired", "fulfilled"].includes(r.status) && (
+                <StatusBadge kind={r.badge.kind as never} label={r.badge.label} />
+              )}
+            </div>
+          </div>
+        </DetailCard>
 
         {/* expired / fulfilled read as a full strip in the design, not a chip */}
         {r.status === "expired" && (
-          <div className="flex items-center gap-2 rounded-8 bg-surface-3 px-3.5 py-2.5">
+          <div className="mx-2 mt-2 flex items-center gap-2 rounded-12 bg-surface-3 px-3.5 py-2.5 sm:mx-3">
             <Icon name="clock" size={16} className="shrink-0 text-ink-secondary" />
-            <span className="text-13 leading-[1.4] text-ink-secondary">
-              This requirement has expired.
-            </span>
+            <span className="text-13 leading-[1.4] text-ink-secondary">This requirement has expired.</span>
           </div>
         )}
         {r.status === "fulfilled" && (
-          <div className="flex items-center gap-2 rounded-8 bg-accent-soft px-3.5 py-2.5">
+          <div className="mx-2 mt-2 flex items-center gap-2 rounded-12 bg-accent-soft px-3.5 py-2.5 sm:mx-3">
             <Icon name="check" size={16} className="shrink-0 text-accent" />
-            <span className="text-13 leading-[1.4] text-ink-primary">
-              Fulfilled — proposals are closed.
-            </span>
+            <span className="text-13 leading-[1.4] text-ink-primary">Fulfilled — proposals are closed.</span>
           </div>
         )}
-
-        {/* Budget — blurred ONLY because it genuinely isn't in the payload */}
-        {locked ? (
-          <div className="relative">
-            <div className="select-none text-24 font-bold text-ink-primary blur-[6px]" aria-hidden="true">₹00 L – ₹00 L</div>
-            <span className="absolute inset-0 grid place-items-center">
-              <Icon name="lock" size={20} className="text-ink-tertiary" />
-            </span>
-          </div>
-        ) : (
-          <div className="text-24 font-bold text-ink-primary">{r.budgetLabel}</div>
-        )}
-
-        <div className="text-15 text-ink-primary">
-          {[r.bhk ? `${r.bhk} BHK` : null, r.kind === "rent" ? "Rent" : "Buy", r.areaLabel].filter(Boolean).join(" · ")}
-        </div>
 
         {locked ? (
           <>
-            {/* Poster row, blurred shapes only */}
-            <div className="relative flex items-center gap-3">
-              <span className="h-10 w-10 rounded-full bg-surface-3 blur-[6px]" aria-hidden="true" />
-              <span className="h-4 w-32 rounded-4 bg-surface-3 blur-[6px]" aria-hidden="true" />
-              <Icon name="lock" size={16} className="text-ink-tertiary" />
-            </div>
+            {/* Poster card, blurred shapes only — there is no poster in the
+                payload to reveal. */}
+            <DetailCard>
+              <div className="flex items-center gap-3 px-3.5 py-3.5 sm:px-4">
+                <span className="h-11 w-11 shrink-0 rounded-8 bg-surface-3 blur-[6px]" aria-hidden="true" />
+                <span className="h-4 w-32 rounded-4 bg-surface-3 blur-[6px]" aria-hidden="true" />
+                <span className="flex-1" />
+                <Icon name="lock" size={16} className="text-ink-tertiary" />
+              </div>
+            </DetailCard>
 
             {/* Paywall card */}
-            <div className="flex flex-col items-center gap-3 rounded-12 bg-accent-soft p-4 text-center">
-              <Icon name="lock" size={32} className="text-accent" />
-              <h3 className="text-17 font-semibold text-ink-primary">Unlock all requirements</h3>
-              <p className="text-13 text-ink-secondary">See full details, budgets and contact posters directly</p>
-              <div className="flex items-baseline gap-1">
-                <span className="text-24 font-bold text-ink-primary">₹2,999</span>
-                <span className="text-13 text-ink-tertiary">/month</span>
+            <DetailCard>
+              <div className="flex flex-col items-center gap-3 bg-accent-soft p-4 text-center">
+                <Icon name="lock" size={32} className="text-accent" />
+                <h3 className="text-17 font-semibold text-ink-primary">Unlock all requirements</h3>
+                <p className="text-13 text-ink-secondary">See full details, budgets and contact posters directly</p>
+                <div className="flex items-baseline gap-1">
+                  <span className="text-24 font-bold text-ink-primary">₹2,999</span>
+                  <span className="text-13 text-ink-tertiary">/month</span>
+                </div>
+                <Checklist items={["View all requirements", "30 proposals included", "Instant match alerts"]} />
+                <Button fullWidth className="mt-1" onClick={() => goOrLogin("/checkout?plan=p2999")}>
+                  Continue to Payment
+                </Button>
+                <button onClick={() => goOrLogin("/plans")} className="text-13 font-semibold text-accent">
+                  Compare plans
+                </button>
               </div>
-              <Checklist items={["View all requirements", "30 proposals included", "Instant match alerts"]} />
-              <Button fullWidth className="mt-1" onClick={() => goOrLogin("/checkout?plan=p2999")}>
-                Continue to Payment
-              </Button>
-              <button onClick={() => goOrLogin("/plans")} className="text-13 font-semibold text-accent">
-                Compare plans
-              </button>
-            </div>
+            </DetailCard>
           </>
         ) : (
           <>
-            <div className="flex flex-col rounded-12 border border-border bg-surface-1">
-              <Row label="Configuration" value={r.bhk ? `${r.bhk} BHK` : "—"} />
-              <Row label="Preferred areas" value={r.areaLabel ?? "—"} />
-              <Row label="Urgency" value={r.urgencyLabel} />
-              <Row label="Posted" value={r.postedOn ?? "—"} />
-              <Row label="Requirement ID" value={r.referenceId ?? "—"} last />
-            </div>
+            <DetailSection icon="list" tone="accent" title="Requirement details">
+              <DetailAnswerGrid
+                rows={[
+                  { key: "cfg", label: "Configuration", value: r.bhk ? `${r.bhk} BHK` : "—" },
+                  { key: "type", label: "Property type", value: r.typeLabel ?? r.typeCode },
+                  { key: "areas", label: "Preferred areas", value: r.areaLabel ?? "—" },
+                  { key: "urgency", label: "Urgency", value: r.urgencyLabel },
+                  { key: "posted", label: "Posted", value: r.postedOn ?? "—" },
+                  { key: "ref", label: "Requirement ID", value: r.referenceId ?? "—" },
+                ]}
+              />
+            </DetailSection>
 
             {r.notes && (
-              <div>
-                <div className="mb-1.5 text-13 font-semibold text-ink-secondary">Notes</div>
-                <p className="whitespace-pre-wrap text-15 leading-[1.45] text-ink-primary selectable">{r.notes}</p>
-              </div>
+              <DetailSection icon="file" tone="info" title="Notes">
+                <p className="selectable whitespace-pre-wrap px-3.5 py-3 text-14 leading-[1.6] text-ink-secondary sm:px-4 sm:text-15">
+                  {r.notes}
+                </p>
+              </DetailSection>
             )}
           </>
         )}
@@ -200,37 +229,39 @@ export function RequirementDetail({ id, isGuest = false }: { id: string; isGuest
         {/* ---- Own-requirement controls (P4 S4c) ---- */}
         {isOwn && (
           <>
-            {/* The toggle only means anything once the requirement is live —
-                `setRequirementActive` refuses any other status. Before approval
-                it said "Receiving proposals" over a row still in review. */}
-            <div className="flex items-center gap-3 rounded-8 bg-surface-2 p-4">
-              <div className="flex-1">
-                <div className="text-15 font-semibold text-ink-primary">Requirement active</div>
-                <div className="mt-0.5 text-11 text-ink-tertiary">
-                  {r.status !== "live" && r.status !== "paused"
-                    ? "Starts receiving proposals once it's approved"
-                    : r.isActive ? "Receiving proposals" : "Not receiving proposals"}
+            <DetailCard>
+              {/* The toggle only means anything once the requirement is live —
+                  `setRequirementActive` refuses any other status. Before
+                  approval it said "Receiving proposals" over a row in review. */}
+              <div className="flex items-center gap-3 px-3.5 py-3.5 sm:px-4">
+                <div className="flex-1">
+                  <div className="text-15 font-semibold text-ink-primary">Requirement active</div>
+                  <div className="mt-1 text-11 leading-[1.35] text-ink-tertiary">
+                    {r.status !== "live" && r.status !== "paused"
+                      ? "Starts receiving proposals once it's approved"
+                      : r.isActive ? "Receiving proposals" : "Not receiving proposals"}
+                  </div>
                 </div>
+                <Toggle
+                  checked={Boolean(r.isActive) && (r.status === "live" || r.status === "paused")}
+                  disabled={r.status !== "live" && r.status !== "paused"}
+                  label="Requirement active"
+                  onChange={(on) => (on ? void setActive(true) : setOffDlg(true))}
+                />
               </div>
-              <Toggle
-                checked={Boolean(r.isActive) && (r.status === "live" || r.status === "paused")}
-                disabled={r.status !== "live" && r.status !== "paused"}
-                label="Requirement active"
-                onChange={(on) => (on ? void setActive(true) : setOffDlg(true))}
-              />
-            </div>
 
-            <button
-              onClick={() => router.push(`/requirements/${r.id}/proposals`)}
-              className="flex h-14 items-center gap-3 rounded-8 border border-border bg-surface-1 px-4 text-left"
-            >
-              <span className="flex-1 text-15 font-semibold text-ink-primary">
-                {r.proposalCount ?? 0} proposal{(r.proposalCount ?? 0) === 1 ? "" : "s"} received
-              </span>
-              <Icon name="chevron-right" size={20} className="text-ink-tertiary" />
-            </button>
+              <button
+                onClick={() => router.push(`/requirements/${r.id}/proposals`)}
+                className="flex h-14 w-full items-center gap-3 border-t border-divider px-3.5 text-left sm:px-4"
+              >
+                <span className="flex-1 text-15 font-semibold text-ink-primary">
+                  {r.proposalCount ?? 0} proposal{(r.proposalCount ?? 0) === 1 ? "" : "s"} received
+                </span>
+                <Icon name="chevron-right" size={20} className="text-ink-tertiary" />
+              </button>
+            </DetailCard>
 
-            <p className="text-11 text-ink-tertiary">{r.quotaNote}</p>
+            <p className="mx-3.5 mt-2 text-11 leading-[1.4] text-ink-tertiary sm:mx-4">{r.quotaNote}</p>
           </>
         )}
       </div>
@@ -301,11 +332,3 @@ function Shell({ children }: { children: React.ReactNode }) {
   );
 }
 
-function Row({ label, value, last }: { label: string; value: string; last?: boolean }) {
-  return (
-    <div className={cn("flex items-center gap-3 px-3 py-2.5", !last && "border-b border-divider")}>
-      <span className="w-32 shrink-0 text-13 text-ink-secondary">{label}</span>
-      <span className="min-w-0 flex-1 text-13 text-ink-primary">{value}</span>
-    </div>
-  );
-}

@@ -9,6 +9,7 @@ import {
 } from "@/lib/listings/requirements";
 import { requirementDetailDTO } from "@/lib/listings/dto";
 import { getProfileById } from "@/lib/profile/service";
+import { getPropertyType } from "@/lib/listings/service";
 import { canPostRequirement } from "@/lib/listings/capabilities";
 
 /**
@@ -50,7 +51,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
   if (!res) return fail("NOT_FOUND");
 
   const proposals = res.access === "own" ? await requirementProposalCount(params.id) : null;
-  return ok({ requirement: requirementDetailDTO(res.row, res.access, proposals) });
+  return ok({ requirement: requirementDetailDTO(res.row, res.access, proposals, (await getPropertyType(res.row.type_code))?.label ?? null) });
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
@@ -119,7 +120,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   const res = await getRequirementForViewer(params.id, claims.sub);
   if (!res) return fail("NOT_FOUND");
   const proposals = await requirementProposalCount(params.id);
-  return ok({ requirement: requirementDetailDTO(res.row, res.access, proposals) });
+  return ok({ requirement: requirementDetailDTO(res.row, res.access, proposals, (await getPropertyType(res.row.type_code))?.label ?? null) });
 }
 
 export async function DELETE(_req: Request, { params }: { params: { id: string } }) {

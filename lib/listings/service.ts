@@ -122,6 +122,14 @@ export interface FieldGroupRow {
   key: string;
   label: string;
   sort_order: number;
+  /** Icon name + Doc1 tone for the detail screen's section header (0070). */
+  icon: string | null;
+  tone: string | null;
+  /**
+   * Alternative titles per scope (0072), resolved by lib/listings/groupLabel.ts
+   * — this is what stops a plot's water row sitting under "Parking".
+   */
+  scope_labels: Record<string, string> | null;
 }
 
 export interface AreaUnitRow {
@@ -152,7 +160,7 @@ export async function getAreaUnits(): Promise<AreaUnitRow[]> {
 export async function getFieldGroups(): Promise<FieldGroupRow[]> {
   const { data } = await db()
     .from("field_groups")
-    .select("key,label,sort_order")
+    .select("key,label,sort_order,icon,tone,scope_labels")
     .eq("is_active", true)
     .order("sort_order");
   return (data ?? []) as FieldGroupRow[];
@@ -222,10 +230,10 @@ export async function sanitizeAttributes(
 export async function getAmenities(category?: string) {
   const { data } = await db()
     .from("amenities")
-    .select("code,label,category,categories")
+    .select("code,label,category,categories,icon")
     .eq("is_active", true)
     .order("sort_order");
-  const rows = (data ?? []) as { code: string; label: string; category: string; categories: string[] }[];
+  const rows = (data ?? []) as { code: string; label: string; category: string; categories: string[]; icon: string | null }[];
   // Empty `categories` means "offered everywhere".
   return category ? rows.filter((a) => !a.categories.length || a.categories.includes(category)) : rows;
 }
@@ -291,8 +299,66 @@ export async function getAmenityLabels(): Promise<Map<string, string>> {
   return new Map(rows.map((a) => [a.code, a.label]));
 }
 
+/**
+ * Amenity code → its label AND its icon (migration 0070).
+ *
+ * The detail screen draws amenities as icon tiles rather than a line of words,
+ * and the icon is a column on the row — so adding the 21st amenity is still
+ * one INSERT and no code change.
+ */
+export async function getAmenityMeta(): Promise<Map<string, { label: string; icon: string | null; category: string | null }>> {
+  const rows = await getAmenities();
+  return new Map(rows.map((a) => [a.code, { label: a.label, icon: a.icon, category: a.category ?? null }]));
+}
+
 export function labelAmenities(values: string[] | null | undefined, labels: Map<string, string>): string[] {
   return (values ?? []).map((v) => labels.get(v) ?? v);
+}
+
+/**
+ * The person behind a listing or a project, for the detail screen's poster card.
+ *
+ * Exactly the fields every feed card already publishes about its poster (name,
+ * username, role, phone-verified tick, avatar) and nothing more — no phone, no
+ * email. The number rule is untouched: it still lives only in the listing's own
+ * `contact` block, and only when `contact_public` is true.
+ */
+export async function posterCard(profileId: string): Promise<{
+  id: string; name: string | null; username: string | null; role: string | null; verified: boolean; avatarUrl: string | null;
+} | null> {
+  const [{ data: p }, { data: v }] = await Promise.all([
+    db().from("profiles").select("id,name,username,role,photo_url").eq("id", profileId).maybeSingle(),
+    db().from("verifications").select("profile_id").eq("profile_id", profileId).eq("level", "phone").eq("status", "approved").maybeSingle(),
+  ]);
+  const row = p as { id: string; name: string | null; username: string | null; role: string | null; photo_url: string | null } | null;
+  if (!row) return null;
+  return {
+    id: row.id,
+    name: row.name,
+    username: row.username,
+    role: row.role,
+    verified: Boolean(v),
+    avatarUrl: row.photo_url,
+  };
+}
+
+/**
+ * Has THIS viewer already saved this listing?
+ *
+ * The detail screen's bookmark started empty on every open, because the payload
+ * never carried the answer — so a listing you had saved yesterday looked
+ * unsaved, and tapping the icon un-saved it. The feed has always sent `saved`
+ * per card; this is the same fact for one listing.
+ */
+export async function isListingSaved(listingId: string, viewerId: string | null): Promise<boolean> {
+  if (!viewerId) return false;
+  const { data } = await db()
+    .from("saves")
+    .select("listing_id")
+    .eq("profile_id", viewerId)
+    .eq("listing_id", listingId)
+    .maybeSingle();
+  return Boolean(data);
 }
 
 export async function getPropertyType(code: string): Promise<PropertyTypeRow | null> {

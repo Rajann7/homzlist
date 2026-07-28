@@ -8,18 +8,27 @@ import { PhotoEditorSheet, PhotoTileSheet } from "./PhotoEditor";
 import { cn } from "@/lib/utils";
 
 /**
- * P5 S5 — Photos.
+ * P5 S5 — Photos, for a listing (`?listing=`) or a project (`?project=`).
  *
  * Cover = the first tile (Doc2 §5.2), so reordering IS choosing the cover.
  * Uploads go presign → direct-to-storage → commit, and a file that fails is
  * reported on its own tile with a retry rather than sinking the whole batch.
  * The per-role cap is the server's answer; this only reflects it.
+ *
+ * The project half is migration 0075: the project form has always told builders
+ * "photos are added from the project's photo screen", and there was no such
+ * screen, no endpoint and no table — a scheme carried one cover image. Rather
+ * than a second grid that drifts from this one, the same screen points at the
+ * project routes.
  */
 export function Photos() {
   const router = useRouter();
   const params = useSearchParams();
   const toast = useToast();
-  const listingId = params.get("listing") ?? "";
+  const projectId = params.get("project") ?? "";
+  const isProject = Boolean(projectId);
+  const listingId = projectId || (params.get("listing") ?? "");
+  const subject = isProject ? "projects" as const : "listings" as const;
 
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [capacity, setCapacity] = useState<{ max: number | null; used: number; remaining: number | null } | null>(null);
@@ -33,13 +42,13 @@ export function Photos() {
 
   const load = useCallback(async () => {
     if (!listingId) return;
-    const r = await listingsApi.photos(listingId);
+    const r = isProject ? await listingsApi.projectPhotos(listingId) : await listingsApi.photos(listingId);
     if (r.ok) {
       setPhotos(r.data.photos);
       // The "6 / 10" counter is the server's per-role cap, not a client guess.
       setCapacity(r.data.capacity ?? null);
     }
-  }, [listingId]);
+  }, [listingId, isProject]);
 
   /**
    * Once a listing has left `draft` it is queued for review, and the creation
@@ -48,11 +57,11 @@ export function Photos() {
    * Bounce to the manager instead, replacing history so back doesn't loop.
    */
   useEffect(() => {
-    if (!listingId) return;
+    if (!listingId || isProject) return;
     void listingsApi.get(listingId).then((r) => {
       if (r.ok && r.data.listing.status !== "draft") router.replace("/listings");
     });
-  }, [listingId, router]);
+  }, [listingId, isProject, router]);
 
   useEffect(() => {
     void load();
@@ -88,7 +97,7 @@ export function Photos() {
 
     setBusy(true);
     setProgress({ done: 0, total: chosen.length });
-    const res = await uploadPhotos(listingId, chosen, (done, total) => setProgress({ done, total }));
+    const res = await uploadPhotos(listingId, chosen, (done, total) => setProgress({ done, total }), subject);
     setBusy(false);
     setProgress(null);
     if (res.photos) setPhotos(res.photos);
@@ -112,13 +121,15 @@ export function Photos() {
     const [m] = next.splice(from, 1);
     next.splice(to, 0, m);
     setPhotos(next); // optimistic — reverted by the reload if the server disagrees
-    const r = await listingsApi.reorderPhotos(listingId, next.map((p) => p.id));
+    const r = isProject
+      ? await listingsApi.reorderProjectPhotos(listingId, next.map((p) => p.id))
+      : await listingsApi.reorderPhotos(listingId, next.map((p) => p.id));
     if (r.ok) setPhotos(r.data.photos);
     else void load();
   };
 
   const remove = async (photoId: string) => {
-    const r = await listingsApi.deletePhoto(listingId, photoId);
+    const r = isProject ? await listingsApi.deleteProjectPhoto(listingId, photoId) : await listingsApi.deletePhoto(listingId, photoId);
     if (r.ok) setPhotos(r.data.photos);
     else toast.show("Couldn't remove that photo");
   };
@@ -132,7 +143,7 @@ export function Photos() {
 
   const saveLabel = async (photoId: string, text: string) => {
     setTile(null);
-    const r = await listingsApi.labelPhoto(listingId, photoId, text);
+    const r = isProject ? await listingsApi.labelProjectPhoto(listingId, photoId, text) : await listingsApi.labelPhoto(listingId, photoId, text);
     if (r.ok) setPhotos(r.data.photos);
     else toast.show("Couldn't save that label");
   };
@@ -146,13 +157,13 @@ export function Photos() {
     setEditing(null);
     setBusy(true);
     const file = new File([blob], `edited-${Date.now()}.jpg`, { type: "image/jpeg" });
-    const res = await uploadPhotos(listingId, [file]);
+    const res = await uploadPhotos(listingId, [file], undefined, subject);
     if (!res.ok) {
       setBusy(false);
       toast.show(res.error ?? "Couldn't save the edit");
       return;
     }
-    const del = await listingsApi.deletePhoto(listingId, original.id);
+    const del = isProject ? await listingsApi.deleteProjectPhoto(listingId, original.id) : await listingsApi.deletePhoto(listingId, original.id);
     setBusy(false);
     if (del.ok) setPhotos(del.data.photos);
     else void load();
@@ -185,7 +196,7 @@ export function Photos() {
           left={
             <button
               aria-label="Back"
-              onClick={() => router.push("/listings")}
+              onClick={() => router.push(isProject ? `/project/${listingId}` : "/listings")}
               className="chrome grid h-11 w-11 place-items-center rounded-full text-ink-primary active:bg-surface-2"
             >
               <Icon name="arrow-left" size={22} strokeWidth={1.9} />
@@ -197,15 +208,19 @@ export function Photos() {
         />
       }
     >
-      {/* creation step dots — photos is step 3 of 4 */}
-      <div className="flex shrink-0 justify-center gap-1 py-2">
-        {[0, 1, 2, 3].map((i) => (
-          <span
-            key={i}
-            className={cn("h-1.5 w-1.5 rounded-full", i === 2 ? "bg-accent" : "bg-border")}
-          />
-        ))}
-      </div>
+      {/* creation step dots — photos is step 3 of 4. A project's gallery is
+          reached from the project itself, not from a 4-step wizard, so it has
+          no step indicator. */}
+      {!isProject && (
+        <div className="flex shrink-0 justify-center gap-1 py-2">
+          {[0, 1, 2, 3].map((i) => (
+            <span
+              key={i}
+              className={cn("h-1.5 w-1.5 rounded-full", i === 2 ? "bg-accent" : "bg-border")}
+            />
+          ))}
+        </div>
+      )}
 
       <div className="px-4 pb-28 pt-2">
         <div className="grid grid-cols-3 gap-2">
@@ -317,8 +332,12 @@ export function Photos() {
       {/* The design keeps ONE label and disables it — a button that renames
           itself reads as a different button (designs/P5 S5). */}
       <div className="sticky bottom-0 z-sticky mt-auto border-t border-border bg-surface-1 px-4 py-3 shadow-l2 safe-bottom">
-        <Button fullWidth disabled={!ready} onClick={() => router.push(`/create/preview?listing=${listingId}`)}>
-          Continue to Preview
+        <Button
+          fullWidth
+          disabled={!ready}
+          onClick={() => router.push(isProject ? `/project/${listingId}` : `/create/preview?listing=${listingId}`)}
+        >
+          {isProject ? "Done" : "Continue to Preview"}
         </Button>
       </div>
 

@@ -53,6 +53,12 @@ export interface FieldGroup {
   key: string;
   label: string;
   sort_order: number;
+  /**
+   * Alternative titles per scope (0072). The form resolves the same title the
+   * detail screen shows, so a seller fills in "Water & power" on a plot rather
+   * than "Parking & utilities" and then reads a different heading back.
+   */
+  scope_labels?: Record<string, string> | null;
 }
 
 export interface Amenity {

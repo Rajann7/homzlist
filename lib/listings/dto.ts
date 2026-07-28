@@ -3,6 +3,7 @@ import { formatShortRupees } from "@/lib/billing/money";
 import type { FieldDefinitionRow, ListingRow, PropertyTypeRow } from "./service";
 import type { RequirementRow } from "./requirements";
 import { keysForKind } from "./visibility";
+import { scopedGroups } from "./groupLabel";
 
 /**
  * Listing DTOs (Doc9 §17 — explicit fields only).
@@ -12,6 +13,13 @@ import { keysForKind } from "./visibility";
  * hidden with CSS (Doc7 §51, Doc9 §17). A viewer who opens DevTools finds
  * nothing, because nothing was ever sent.
  */
+
+/** `listings.availability`, as the detail screen says it out loud. */
+const AVAILABILITY_LABEL: Record<string, string> = {
+  sold: "This property has been sold",
+  rented: "This property has been rented",
+  completed: "This deal is closed",
+};
 
 const ist = (iso: string | null) =>
   iso ? new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Kolkata" }) : null;
@@ -45,6 +53,58 @@ const UNIT_LABEL: Record<string, string> = {
 };
 
 /**
+ * One stored answer → the string a detail screen prints.
+ *
+ * Exported because PROJECTS need exactly the same rendering and had grown their
+ * own half of it: a project's site area printed "50 vigha" instead of
+ * "50 Vigha", and its booking amount printed "150000" instead of "1,50,000",
+ * because the unit-label map and the thousands-grouping both lived only in the
+ * listing path. Two copies of "how do we print an answer" is how a scheme and a
+ * flat end up describing the same field differently.
+ *
+ * Returns null when the value should not be shown at all (an unchecked
+ * checkbox, an empty list, a blank area).
+ */
+export function renderAttrValue(def: FieldDefinitionRow | undefined, raw: unknown): string | null {
+  const optLabel = (v: unknown) => def?.options?.find((o) => o.value === String(v))?.label ?? String(v);
+
+  // `"true"` / `"false"` as STRINGS reached the row from an older form build
+  // (corner_plot, meals). Without this they missed the boolean branch and
+  // printed "Corner plot — false"; migration 0073 repaired the stored rows and
+  // this keeps any straggler honest.
+  if (typeof raw === "boolean" || raw === "true" || raw === "false") {
+    // "Lift: No" is noise; the design only lists what's there.
+    return raw === true || raw === "true" ? "Yes" : null;
+  }
+  if (Array.isArray(raw)) {
+    return raw.length ? raw.map(optLabel).join(", ") : null;
+  }
+  if (raw && typeof raw === "object" && "value" in (raw as Record<string, unknown>)) {
+    const a = raw as { value: string; unit?: string };
+    if (!a.value) return null;
+    return `${Number(a.value).toLocaleString("en-IN")} ${UNIT_LABEL[a.unit ?? "sqft"] ?? a.unit ?? "sq ft"}`;
+  }
+  if (def?.control === "area") {
+    // An `area` field whose row holds a bare figure rather than the
+    // {value, unit} object the form writes today (older listings). Printing
+    // "14960" under "Land area" states no unit at all; sq ft is what the column
+    // has always meant when there is no unit beside it.
+    const n = Number(raw);
+    if (Number.isFinite(n) && n > 0) return `${n.toLocaleString("en-IN")} sq ft`;
+  }
+  if (def?.control === "date") {
+    // A DATE column comes back as an ISO timestamp; "2026-08-31T18:30:00.000Z"
+    // under "Available from" is not a date a tenant reads.
+    return ist(String(raw)) ?? String(raw);
+  }
+  if (def?.control === "number" && /^\d{4,}$/.test(String(raw))) {
+    // A bare "2500" under "Maintenance (₹/month)" reads as a typo.
+    return Number(raw).toLocaleString("en-IN");
+  }
+  return optLabel(raw);
+}
+
+/**
  * Attributes, rendered.
  *
  * `attributes` is stored as raw keys and raw option CODES — `{furnishing:
@@ -67,9 +127,25 @@ function attributeRows(
   // The per-kind extras are part of the order too — reading only `fields` put a
   // rented office's lease duration and lock-in in the unordered tail.
   const order = keysForKind(type?.field_config, kind);
-  // Config order first, then anything the row still carries from an older
-  // config (a retired field keeps showing rather than silently disappearing).
-  const keys = [...order.filter((k) => k in attrs), ...Object.keys(attrs).filter((k) => !order.includes(k))];
+  /**
+   * ONLY what this type asks for (Rajan, 29 Jul 2026 — "agriculture land, and
+   * it shows building, parking… check all of them, globally").
+   *
+   * This used to append every unrecognised key the row still carried, so that
+   * "a retired field keeps showing rather than silently disappearing". Audited
+   * across the live listings, that fallback was printing Furnishing and
+   * Construction status on farmland, Ownership on a PG bed and `wifi` under
+   * "More details" — 39 of 124 rows. A seller cannot even edit those keys (the
+   * form only renders the type's own fields), so showing them to a buyer states
+   * something about the property that nobody can correct.
+   *
+   * Real answers stored under an older NAME are not lost: migration 0073
+   * renamed the synonyms (`plot_area` → `land_area`, `washroom` → `washrooms`,
+   * `floor_no` → `floor`) so they arrive through the config, like every other
+   * field. Anything still outside the list is foreign to the type by
+   * definition, and the value stays in the row either way.
+   */
+  const keys = order.filter((k) => k in attrs);
 
   const rows: { key: string; label: string; value: string; group: string | null }[] = [];
   for (const key of keys) {
@@ -77,29 +153,9 @@ function attributeRows(
     if (raw === null || raw === undefined || raw === "") continue;
     const def = byKey.get(key);
     const label = def?.label ?? key.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
-    const optLabel = (v: unknown) => def?.options?.find((o) => o.value === String(v))?.label ?? String(v);
 
-    let value: string;
-    if (typeof raw === "boolean") {
-      if (!raw) continue; // "Lift: No" is noise; the design only lists what's there.
-      value = "Yes";
-    } else if (Array.isArray(raw)) {
-      if (!raw.length) continue;
-      value = raw.map(optLabel).join(", ");
-    } else if (raw && typeof raw === "object" && "value" in (raw as Record<string, unknown>)) {
-      const a = raw as { value: string; unit?: string };
-      if (!a.value) continue;
-      value = `${Number(a.value).toLocaleString("en-IN")} ${UNIT_LABEL[a.unit ?? "sqft"] ?? a.unit ?? "sq ft"}`;
-    } else if (def?.control === "date") {
-      // A DATE column comes back as an ISO timestamp; "2026-08-31T18:30:00.000Z"
-      // under "Available from" is not a date a tenant reads.
-      value = ist(String(raw)) ?? String(raw);
-    } else if (def?.control === "number" && /^\d{4,}$/.test(String(raw))) {
-      // A bare "2500" under "Maintenance (₹/month)" reads as a typo.
-      value = Number(raw).toLocaleString("en-IN");
-    } else {
-      value = optLabel(raw);
-    }
+    const value = renderAttrValue(def, raw);
+    if (value === null) continue;
     // The same grouping the creation form uses (migration 0055), so a seller
     // sees their listing described in the order they described it — and a
     // twenty-row "Details" list becomes four short, titled blocks.
@@ -117,17 +173,19 @@ function attributeRows(
  */
 function groupRows(
   rows: { key: string; label: string; value: string; group: string | null }[],
-  groups: { key: string; label: string }[] | undefined,
+  groups: { key: string; label: string; icon?: string | null; tone?: string | null }[] | undefined,
 ) {
   if (!rows.length) return [];
   const known = groups ?? [];
-  const out: { key: string; label: string; rows: typeof rows }[] = [];
+  // The icon and tone travel with the block (migration 0070) so the detail
+  // screen's section headers are config, not a map inside a component.
+  const out: { key: string; label: string; icon: string | null; tone: string | null; rows: typeof rows }[] = [];
   for (const g of known) {
     const items = rows.filter((r) => r.group === g.key);
-    if (items.length) out.push({ key: g.key, label: g.label, rows: items });
+    if (items.length) out.push({ key: g.key, label: g.label, icon: g.icon ?? null, tone: g.tone ?? null, rows: items });
   }
   const rest = rows.filter((r) => !r.group || !known.some((g) => g.key === r.group));
-  if (rest.length) out.push({ key: "other", label: "More details", rows: rest });
+  if (rest.length) out.push({ key: "other", label: "More details", icon: "list", tone: "neutral", rows: rest });
   return out;
 }
 
@@ -145,12 +203,127 @@ function areaSqft(raw: unknown): number | null {
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
+/** One entry of a type's `field_config.key_specs` candidate list (0071). */
+export interface KeySpecCandidate {
+  field: string;
+  label: string;
+  icon: string;
+  /** `column` = read the row itself (projects: towers/floors/…), not `attributes`. */
+  source?: "column" | "attribute";
+}
+
 /**
- * The 4-tile key-spec strip and the highlight chip row (designs/P4 S1).
+ * The key-spec strip, from a CANDIDATE list (migration 0071).
+ *
+ * The strip used to be exactly the four fields a type named, and any of them
+ * the seller left empty was dropped — so a Flat posted without `floor` drew a
+ * four-column grid with three tiles in it and a hole where the fourth was. The
+ * config now lists EIGHT candidates in preference order and this takes the
+ * first four that actually carry a value; the component then renders as many
+ * columns as it was given. A thin listing gets a short, complete strip instead
+ * of a full-width broken one.
+ *
+ * Shared with projects (`projectKeySpecs`), so a scheme's strip is the same
+ * DB-driven list rather than a second one hardcoded in a component.
+ */
+export function resolveKeySpecs(
+  candidates: KeySpecCandidate[] | undefined,
+  values: Record<string, unknown>,
+  defs: FieldDefinitionRow[] | undefined,
+  max = 4,
+): { icon: string; value: string; label: string; key: string }[] {
+  const byKey = new Map((defs ?? []).map((d) => [d.key, d]));
+  const out: { icon: string; value: string; label: string; key: string }[] = [];
+
+  for (const s of candidates ?? []) {
+    const raw = values[s.field];
+    if (raw === undefined || raw === null || raw === "" || raw === false) continue;
+    if (Array.isArray(raw) && !raw.length) continue;
+    // A yes/no answer is not a spec. "AC — Yes" in a tile that reads
+    // "3 BHK / 2 / 1,200" is noise, and the same fact is already a row in the
+    // details block below. Skip it and let the next candidate have the slot.
+    if (raw === true || raw === "true" || raw === "yes") continue;
+
+    let value: string | null;
+    let label = s.label;
+    if (s.label === "Bedrooms") {
+      // The design reads "3 BHK", not "3".
+      value = `${renderAttrValue(byKey.get(s.field), raw) ?? raw} BHK`;
+    } else if (s.label === "Floor" && values.total_floors) {
+      // "9 / 12" — the floor within the building.
+      value = `${raw} / ${values.total_floors}`;
+    } else if (s.field === "floors" && s.source === "column") {
+      // A project's tower height reads "G+14".
+      value = `G+${raw}`;
+    } else if (raw && typeof raw === "object" && "value" in (raw as Record<string, unknown>)) {
+      // An area object is a NUMBER on the strip ("2,400") with the unit moved
+      // into the label ("Built-up sqft") — the tile has no room for
+      // "2,400 sq ft" on one line, and a bare number with no unit anywhere is
+      // just an unlabelled figure. A non-sqft unit (Vigha, sq yard) keeps its
+      // unit in the value, because that is the number people quote.
+      const n = areaSqft(raw);
+      if (n === null) value = renderAttrValue(byKey.get(s.field), raw);
+      else { value = n.toLocaleString("en-IN"); label = `${s.label} sqft`; }
+    } else if (typeof raw === "number" || /^\d{4,}$/.test(String(raw))) {
+      // A bare 14960 in a tile reads as a phone number. `renderAttrValue` only
+      // groups when the definition says `control: number`, and a legacy row can
+      // carry a plain figure under a key that is configured as an area.
+      value = Number(raw).toLocaleString("en-IN");
+    } else {
+      value = renderAttrValue(byKey.get(s.field), raw);
+    }
+    if (value === null || value === "" || value === "Yes") continue;
+
+    out.push({ icon: s.icon, value, label, key: s.field });
+    if (out.length === max) break;
+  }
+  return out;
+}
+
+/**
+ * Top the strip up from the answers the row actually carries.
+ *
+ * A candidate list can still come up short: a row seeded before a type's field
+ * list changed stores `plot_area` where the config now says `land_area`, so
+ * NONE of the eight candidates match and the strip disappears from a listing
+ * that has plenty to show. Rather than leave a hole (or invent a value), this
+ * borrows the first rendered rows — real values, in the config's own order —
+ * and takes the section's DB icon (`field_groups.icon`) with them.
+ *
+ * Only runs when the type's own candidates produced fewer than two, so a
+ * well-configured listing is never affected by it.
+ */
+export function topUpSpecs(
+  specs: { icon: string; value: string; label: string; key: string }[],
+  rows: { key: string; label: string; value: string; group: string | null }[],
+  groups: { key: string; icon?: string | null }[] | undefined,
+  min = 2,
+  max = 4,
+) {
+  if (specs.length >= min) return specs;
+  // Keyed by FIELD, not by label: `land_area` is titled "Plot area" by the
+  // candidate list and "Land area" by its definition, so a label-keyed guard let
+  // the same answer appear as two tiles.
+  const used = new Set(specs.map((s) => s.key));
+  const iconOf = new Map((groups ?? []).map((g) => [g.key, g.icon ?? "list"]));
+  const out = [...specs];
+  for (const r of rows) {
+    if (out.length >= max) break;
+    // "Yes" rows and long prose make poor tiles — a tile is one short fact.
+    if (used.has(r.key) || r.value === "Yes" || r.value.length > 18) continue;
+    used.add(r.key);
+    out.push({ icon: iconOf.get(r.group ?? "") ?? "list", value: r.value, label: r.label, key: r.key });
+  }
+  return out;
+}
+
+/**
+ * The key-spec strip and the highlight chip row (designs/P4 S1).
  *
  * WHICH fields appear is per-type config in `property_types.field_config`
- * (migration 0023) and the VALUES are resolved through `field_definitions` —
- * nothing here is a hardcoded list, so an admin config change moves the screen.
+ * (migrations 0023 / 0069 / 0071) and the VALUES are resolved through
+ * `field_definitions` — nothing here is a hardcoded list, so an admin config
+ * change moves the screen.
  */
 function detailBlocks(
   attrs: Record<string, unknown>,
@@ -158,33 +331,14 @@ function detailBlocks(
   defs: FieldDefinitionRow[] | undefined,
 ) {
   const cfg = (type?.field_config ?? {}) as {
-    key_specs?: { field: string; label: string; icon: string }[];
+    key_specs?: KeySpecCandidate[];
     highlights?: string[];
   };
   const byKey = new Map((defs ?? []).map((d) => [d.key, d]));
   const label = (key: string, v: unknown) =>
     byKey.get(key)?.options?.find((o) => o.value === String(v))?.label ?? String(v);
 
-  const keySpecs: { icon: string; value: string; label: string }[] = [];
-  for (const s of cfg.key_specs ?? []) {
-    const raw = attrs[s.field];
-    if (raw === undefined || raw === null || raw === "") continue;
-    let value: string;
-    if (s.label === "Sqft") {
-      const n = areaSqft(raw);
-      if (n === null) continue;
-      value = n.toLocaleString("en-IN");
-    } else if (s.label === "Bedrooms") {
-      value = `${label(s.field, raw)} BHK`;
-    } else if (s.label === "Floor" && attrs.total_floors) {
-      // The design reads "4 / 7" — the floor within the building.
-      value = `${raw} / ${attrs.total_floors}`;
-    } else {
-      value = label(s.field, raw);
-    }
-    keySpecs.push({ icon: s.icon, value, label: s.label });
-    if (keySpecs.length === 4) break;
-  }
+  const keySpecs = resolveKeySpecs(cfg.key_specs, attrs, defs);
 
   const highlights: string[] = [];
   for (const key of cfg.highlights ?? []) {
@@ -249,13 +403,27 @@ export function listingDetailDTO(
     stats?: { views: number; saves: number | null; leads: number | null } | null;
     /** Amenity code → label (service.getAmenityLabels); raw codes otherwise. */
     amenityLabels?: Map<string, string>;
+    /** Amenity code → label + icon + category (service.getAmenityMeta). */
+    amenityMeta?: Map<string, { label: string; icon: string | null; category: string | null }>;
     /** Form sections, in order (service.getFieldGroups) — used to block the details. */
-    fieldGroups?: { key: string; label: string }[];
+    fieldGroups?: { key: string; label: string; icon?: string | null; tone?: string | null; scope_labels?: Record<string, string> | null }[];
+    /**
+     * Who posted it (service.listingPoster). The detail screen had no poster
+     * block at all: every feed card names and links its poster, and tapping
+     * through to the property lost them entirely, so a buyer could not tell an
+     * owner from a broker on the one screen where it decides how they'll deal.
+     * Public data — the feed already publishes exactly these fields.
+     */
+    poster?: { id: string; name: string | null; username: string | null; role: string | null; verified: boolean; avatarUrl: string | null } | null;
+    /** Whether this viewer already saved it (service.isListingSaved). */
+    saved?: boolean;
   },
 ) {
   const attrs = withRentColumns(l);
   const { keySpecs, highlights } = detailBlocks(attrs, type, opts.fieldDefs);
   const rows = attributeRows(attrs, type, opts.fieldDefs, l.kind);
+  // Never a strip with one tile in it — see topUpSpecs.
+  const specs = topUpSpecs(keySpecs, rows, opts.fieldGroups);
 
   // ₹/sqft is computed HERE, from the same figures the row holds — the client
   // must never derive a price (CLAUDE.md §6).
@@ -280,7 +448,7 @@ export function listingDetailDTO(
     pincode: l.pincode,
     pricePerSqft,
     kindLabel: l.kind === "rent" ? "For Rent" : "For Sale",
-    keySpecs,
+    keySpecs: specs,
     highlights,
     promoted: opts.promoted ?? false,
     // The card label carries "· Negotiable"; the detail screen shows the figure
@@ -294,10 +462,23 @@ export function listingDetailDTO(
     typeCode: l.type_code,
     typeLabel: type?.label ?? l.type_code,
     status: l.status,
+    // The badge for that status, resolved from the SAME map My Listings uses.
+    // The Preview screen used to hardcode "Under review" beside its bottom bar,
+    // so a listing sitting in `changes_requested` or already `live` was
+    // previewed under a label that wasn't its own (CLAUDE.md rule 12).
+    badge: STATUS_BADGE[l.status] ?? { kind: "expired", label: l.status },
     availability: l.availability,
+    // The archived reason as a word, so the screen never has to map the enum
+    // itself ("available" prints nothing — there's no banner for it).
+    availabilityLabel: AVAILABILITY_LABEL[l.availability] ?? null,
     areaLabel: l.area_label,
     coverUrl: l.cover_url,
     photoCount: l.photo_count,
+    // The type's family (residential / commercial / plot), so the detail can
+    // title its own blocks without re-deriving it from the type code.
+    typeCategory: type?.category ?? null,
+    poster: opts.poster ?? null,
+    saved: opts.saved ?? false,
     // Raw map stays for the owner's edit form; `attributeRows` is what any
     // screen should actually render.
     attributes: l.attributes,
@@ -309,9 +490,26 @@ export function listingDetailDTO(
      * Grouped here rather than in the component so the projects screen, the
      * preview and the public detail can't drift apart.
      */
-    attributeGroups: groupRows(rows, opts.fieldGroups),
+    /**
+     * Sections titled for THIS type (migration 0072). An Agriculture Land row
+     * used to file water + electricity under "Parking & utilities" and facing +
+     * ownership under "Building & ownership", because the section list is one
+     * global list and nothing re-titled it for a field.
+     */
+    attributeGroups: groupRows(rows, scopedGroups(opts.fieldGroups, { kind: "property", category: type?.category })),
     // Labels, not codes — "power_backup" is a storage detail, not UI copy.
-    amenities: (l.amenities ?? []).map((a) => opts.amenityLabels?.get(a) ?? a),
+    amenities: (l.amenities ?? []).map((a) => opts.amenityMeta?.get(a)?.label ?? opts.amenityLabels?.get(a) ?? a),
+    /**
+     * The same amenities with their icon and category (migration 0070), which
+     * is what the detail screen's tile grid renders. `amenities` above stays a
+     * plain string[] because the cards and the search chips read it.
+     */
+    amenityItems: (l.amenities ?? []).map((a) => ({
+      code: a,
+      label: opts.amenityMeta?.get(a)?.label ?? opts.amenityLabels?.get(a) ?? a,
+      icon: opts.amenityMeta?.get(a)?.icon ?? null,
+      category: opts.amenityMeta?.get(a)?.category ?? null,
+    })),
     postedOn: ist(l.live_at ?? l.created_at),
     // Whether a number EXISTS is public (it drives the Request-Number button);
     // the number itself is not.
@@ -545,6 +743,12 @@ export function requirementDetailDTO(
   r: RequirementRow,
   access: "own" | "unlocked" | "locked",
   proposalCount: number | null,
+  /**
+   * `property_types.label` for `type_code`. The payload only ever carried the
+   * CODE, so the detail screen had nothing to print but "flat" — the one line
+   * that says what the buyer is actually looking for was a storage value.
+   */
+  typeLabel?: string | null,
 ) {
   const card = requirementDTO(r);
   const daysLeft = card.daysLeft;
@@ -555,6 +759,7 @@ export function requirementDetailDTO(
     kind: r.kind,
     kindLabel: r.kind === "rent" ? "Looking to Rent" : "Looking to Buy",
     typeCode: r.type_code,
+    typeLabel: typeLabel ?? null,
     bhk: r.bhk,
     areaLabel: r.area_label,
     urgency: r.urgency,

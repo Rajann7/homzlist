@@ -47,6 +47,20 @@ export function SubmissionSuccess() {
   const kind: Kind = raw === "requirement" || raw === "project" ? raw : "listing";
   const copy = COPY[kind];
 
+  /**
+   * designs/P6 S3 puts a "Preview" text-link under the primary CTA, and it was
+   * missing — so the screen that says "here's what you just posted" had no way
+   * to actually show it. Requirements have no preview screen, and the link only
+   * appears when the caller passed the id it needs.
+   */
+  const id = params.get("id");
+  const previewHref =
+    !id || kind === "requirement"
+      ? null
+      : kind === "project"
+      ? `/create/preview?project=${id}`
+      : `/create/preview?listing=${id}`;
+
   return (
     <AppShell showNav={false} className="flex flex-col">
       <div className="flex flex-1 flex-col items-center px-6 pb-6 pt-12 text-center">
@@ -73,6 +87,14 @@ export function SubmissionSuccess() {
       {/* design: the CTA is a sticky bar, not the last item in the scroll flow */}
       <div className="sticky bottom-0 z-sticky mt-auto border-t border-border bg-surface-1 px-4 py-3 shadow-l2 safe-bottom">
         <Button fullWidth onClick={() => router.replace(copy.href)}>{copy.cta}</Button>
+        {previewHref && (
+          <button
+            onClick={() => router.push(previewHref)}
+            className="mt-2.5 h-11 w-full text-15 font-semibold leading-none text-accent"
+          >
+            {kind === "project" ? "Preview project" : "Preview listing"}
+          </button>
+        )}
       </div>
     </AppShell>
   );

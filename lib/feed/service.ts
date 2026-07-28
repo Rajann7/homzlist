@@ -453,6 +453,61 @@ export async function previewCard(listingId: string, ownerId: string): Promise<F
   return { ...card, isOwn: false };
 }
 
+/**
+ * ONE project as the feed card renders it — the builder's Preview screen.
+ *
+ * The project flow had no preview at all: a builder spent ₹9,999, filled five
+ * steps and went straight to the success screen, so the first time anyone saw
+ * the project card was after an admin approved it. Same contract as
+ * `previewCard` above — the SAME component off the SAME builder, so "this is
+ * how your project appears in the feed" is structural rather than a claim.
+ *
+ * Owner-only, and the row is fetched by (id, profile_id) so someone else's id
+ * is indistinguishable from a non-existent one.
+ */
+export async function previewProjectCard(projectId: string, ownerId: string): Promise<FeedCard | null> {
+  const { data } = await db()
+    .from("projects")
+    .select(PROJECT_COLS)
+    .eq("id", projectId)
+    .eq("profile_id", ownerId)
+    .maybeSingle();
+  const row = data as any | null;
+  if (!row) return null;
+
+  const [{ data: profs }, { data: vers }, units, typeLabels, propTypes, fieldDefs, unitLabels] = await Promise.all([
+    db().from("profiles").select("id,name,username,role,photo_url,phone").eq("id", ownerId),
+    db().from("verifications").select("profile_id").eq("level", "phone").eq("status", "approved").eq("profile_id", ownerId),
+    unitsFor([projectId]),
+    projectTypeLabels(),
+    propertyTypeLabels(),
+    getFieldDefinitions(),
+    areaUnitLabelMap(),
+  ]);
+
+  const card = toCard(
+    { row, kind: "project" },
+    new Map<string, any>(((profs ?? []) as any[]).map((p) => [p.id, p])),
+    new Set(((vers ?? []) as { profile_id: string }[]).map((v) => v.profile_id)),
+    new Map(),
+    new Set<string>(),
+    units,
+    typeLabels,
+    propTypes,
+    fieldDefs,
+    unitLabels,
+    new Map(),
+    // Not the builder's own id — `isOwn` would collapse the action bar to
+    // "View Project", and the preview exists to show what a BUYER sees.
+    null,
+  );
+  // `toCard` withholds the number from a null viewer (anti-scrape rule), which
+  // would render the buyer's bar without the thing it is previewing. This is
+  // the builder looking at their own project, so the number is their own.
+  const phone = ((profs ?? []) as any[])[0]?.phone ?? null;
+  return { ...card, isOwn: false, contactNumber: phone };
+}
+
 /** A stored option code rendered through its own field definition's label. */
 function defLabel(defs: FieldDefinitionRow[], key: string, value: unknown): string | null {
   if (value === null || value === undefined || value === "") return null;

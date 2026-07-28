@@ -3085,5 +3085,25 @@ STILL OPEN (out of scope, not broken by this change):
 - **Long titles clamp to two lines with "…"** on both cards. Unclamped, a long
   scheme name pushed the price and the facts strip down the card.
 
-STILL OPEN: project photo galleries (one cover only), and project cards being
-absent from the Buy/Rent tabs — the second is a product decision, not a defect.
+STILL OPEN: project cards being absent from the Buy/Rent tabs — a product
+decision, not a defect.
+
+## Closed — 29 Jul 2026
+
+- **Project photo galleries** (was: "one cover only"). Migration 0075 adds
+  `project_photos` + `projects.photo_count`, `lib/listings/photos.ts` is now
+  subject-parameterised so listings and projects share ONE presign → commit →
+  magic-byte gate → reorder → cover implementation, and
+  `/api/v1/projects/:id/photos{,/presign,/commit,/:photoId}` mirror the listing
+  routes. The P5 photo grid serves both (`?project=`), reached from the project
+  detail's ⋯ → Manage photos; every existing project's `cover_url` was
+  backfilled as photo #1. Proven live: upload → row at position 1 with real
+  width/height, Set-as-cover → position 0 + `projects.cover_url` updated,
+  delete → positions closed and cover restored. IDOR probe on another builder's
+  project: presign 404, PATCH 404, DELETE 404, cross-project commit key 422.
+- **The image worker had never run.** `imageProcessor` reads `photoId` off the
+  job and returns when it is missing — and `enqueueProcessing` never sent one,
+  so no photo has ever been given WebP variants. The job now carries `photoId`
+  and the `table` to write back to. Dormant in dev (no Redis → the documented
+  "mark ready" fallback), so this was invisible until projects needed the same
+  queue.

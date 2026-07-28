@@ -10,6 +10,7 @@ import { LocationCascade, PincodeField } from "./LocationPicker";
 import { DynamicSections, OptionChip, hasValue, type AreaUnitOption } from "./FormControls";
 import type { FieldDefMap, ProjectTypeConfig } from "@/lib/listings/client";
 import { visibleKeys } from "@/lib/listings/visibility";
+import { scopedGroups } from "@/lib/listings/groupLabel";
 import { cn } from "@/lib/utils";
 
 /**
@@ -295,7 +296,10 @@ export function ProjectForm() {
         toast.show("Changes saved — back for review");
         router.replace(`/projects/${editId}`);
       } else {
-        router.replace("/create/success?kind=project");
+        // The id rides along so the success screen's "Preview" link (P6 S3) has
+        // something to open — a builder never saw their ₹9,999 project card
+        // before an admin approved it.
+        router.replace(`/create/success?kind=project&id=${projectId}`);
       }
       return;
     }
@@ -437,7 +441,7 @@ export function ProjectForm() {
             <DynamicSections
               keys={chosenType?.fields ?? []}
               defs={fieldDefs}
-              groups={fieldGroups}
+              groups={scopedGroups(fieldGroups, { kind: "project", category: chosenType?.category })}
               values={{ ...attrs, build_status: buildStatus }}
               errors={errors}
               required={chosenType?.required ?? []}
@@ -490,9 +494,13 @@ export function ProjectForm() {
         {step === 2 && (
           <section className="flex flex-col gap-4">
             <SectionLabel>Media</SectionLabel>
+            {/* This promised a "project's photo screen" that did not exist —
+                no table, no endpoint, no route (migration 0075 built all three).
+                It now names where the screen actually is. */}
             <p className="text-13 text-ink-secondary">
-              Photos are added after the project is created, from the project&apos;s photo screen —
-              unlimited for Builder accounts.
+              Photos are added once the project is created: open the project and choose
+              <span className="font-semibold text-ink-primary"> ⋯ → Manage photos</span>. Builder
+              accounts are unlimited, and the first photo becomes the cover.
             </p>
 
             <div className="flex flex-col gap-2">

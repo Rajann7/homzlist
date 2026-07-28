@@ -109,13 +109,34 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   return fail("VALIDATION_ERROR", { field: "stage" });
 }
 
+/**
+ * GET is the one verb a BUYER may use.
+ *
+ * A brochure is the builder's own marketing PDF and the project detail offers
+ * it as a download — but the read was owner-scoped, so every visitor saw a
+ * screen with no brochure on it while the builder saw one. A `live` project is
+ * public by definition (the whole detail payload is), so its brochure is served
+ * to anyone; anything not yet live stays owner-only, and either way the bucket
+ * path itself is never handed out — only a 5-minute signed URL.
+ */
 export async function GET(_req: Request, { params }: { params: { id: string } }) {
-  const claims = await getCurrentUser();
-  if (!claims) return fail("UNAUTHORIZED");
   if (!UUID_RE.test(params.id)) return fail("NOT_FOUND");
+  const claims = await getCurrentUser();
 
-  const project = await ownProject(params.id, claims.sub);
-  if (!project) return fail("NOT_FOUND");
+  const { data } = await db()
+    .from("projects")
+    .select("id,profile_id,status,deleted_at,brochure_key,brochure_scanned")
+    .eq("id", params.id)
+    .maybeSingle();
+  const project = data as
+    | { id: string; profile_id: string; status: string; deleted_at: string | null; brochure_key: string | null; brochure_scanned: boolean }
+    | null;
+
+  // Same state-access matrix as the project itself: not-visible is NOT_FOUND,
+  // never FORBIDDEN, so a brochure request can't be used to probe ids.
+  if (!project || project.deleted_at) return fail("NOT_FOUND");
+  const isOwner = Boolean(claims && claims.sub === project.profile_id);
+  if (project.status !== "live" && !isOwner) return fail("NOT_FOUND");
   if (!project.brochure_key) return ok({ brochure: null });
 
   // Short-lived signed read — the raw bucket path stays unreachable.
