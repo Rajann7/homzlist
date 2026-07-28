@@ -2966,27 +2966,32 @@ holds listing slots.
 
 Nothing left open here.
 
-## Builder = projects only (28 Jul 2026) — two things left OPEN
+## Builder = projects only (28 Jul 2026) — both consequences now RESOLVED
 
 Migration 0067 took Sell / Rent / Requirement away from the Builder role
 (create, submit, un-hide, reopen and the active toggle are all refused
 server-side; existing builder listings were hidden and requirements paused).
-Two consequences were found and deliberately NOT changed, because both are
-design content and DESIGN LOCK says ask first:
+Two consequences were found, raised with Rajan, and fixed on his instruction.
+Both are authorised departures from the locked design — recorded here so nobody
+"fixes" them back:
 
-- **"Compare plans" sheet still credits ₹9,999 with things it doesn't grant.**
-  `components/billing/PlanWall.tsx` CompareSheet prints "Property listing ✓" and
-  "Requirement post ✓" in the ₹9,999 column. Both were already untrue before
-  this change (`plan_catalog.p9999` has `listing_quota = 0` and
-  `requirement_quota = 0`); now they are also unreachable by the only role that
-  can buy that plan. The rows are in `designs/P5` and `designs/P11`, so changing
-  the two cells to "—" needs Rajan's word. Every viewer of the sheet sees it,
-  not just builders.
-- **A builder's public profile now has a permanently empty "Sell / Rent" tab.**
-  `components/profile/OtherProfile.tsx` gives the builder role
-  `["Projects", "Sell / Rent"]`, and OwnProfile gives it
-  `["Projects", "Sell / Rent", "Requirements"]`. With no builder able to hold a
-  live listing, the public tab can only ever render "No listings yet". Dropping
-  the tab is a design change to the profile tab bar, so it is left as-is
-  pending a decision. (The OWN-profile tabs are arguably fine — that is where a
-  builder still sees the rows 0067 hid.)
+- **DESIGN-LOCK OVERRIDE · "Compare plans" ₹9,999 column.** Both compare sheets
+  (`components/billing/PlanWall.tsx` for the P5 wall, `components/billing/
+  Plans.tsx` for P11) printed "Property listing ✓", "Listing validity 6 months"
+  and "Requirement post 1" under ₹9,999. All three were already untrue before
+  this change — `plan_catalog.p9999` has `listing_quota = 0` and
+  `requirement_quota = 0` since migration 0065, it sells one project — and 0067
+  made them unreachable for the only role that can buy the plan. All three cells
+  now read "—". The 6-month window is the PROJECT's and is not lost: the plan
+  card carries it in its own sub-label ("per project · 6 months"). Nothing else
+  in either table moved; "Project posting ✓", "View others' requirements ·
+  Matched only", "Proposals · Unlimited" and "Match alerts · Priority" are all
+  still true of p9999. `test-builder-projects-only.mjs` now asserts the catalog
+  row those cells claim to read, so the copy can't drift from the DB again.
+- **DESIGN-LOCK OVERRIDE · builder PUBLIC profile.** `OtherProfile` gave the
+  builder role tabs `["Projects", "Sell / Rent"]` and a "Listings" stat tile.
+  Neither can be non-empty any more, so the tab is dropped (builder = one
+  "Projects" tab) and the stat tile shows Projects instead of a permanent
+  "0 Listings". `OwnProfile` is deliberately UNTOUCHED — its Sell / Rent and
+  Requirements tabs are where a builder still sees and manages the rows 0067
+  hid, so removing them there would strand that content.

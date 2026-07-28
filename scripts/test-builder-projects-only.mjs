@@ -160,6 +160,14 @@ check(!bCodes.includes("p999"), "₹999 Listing Plan is NOT on sale to a builder
 check(bCodes.includes("p9999"), "₹9,999 Builder Project plan still is", bCodes.join(","));
 check(bCodes.includes("p2999"), "₹2,999 Requirement Access (viewing) still is", bCodes.join(","));
 
+head("catalog copy matches the catalog row");
+// The "Compare plans" sheets (P5 wall + P11 Plans) print a ₹9,999 column by
+// hand. These are the numbers those cells claim to be reading.
+const p9999 = await one(`select listing_quota, requirement_quota, project_quota from plan_catalog where code='p9999'`);
+check(p9999.listing_quota === 0, "p9999 grants NO listing slot (compare sheet says '—')", String(p9999.listing_quota));
+check(p9999.requirement_quota === 0, "p9999 grants NO requirement post (compare sheet says '—')", String(p9999.requirement_quota));
+check(p9999.project_quota === 1, "p9999 grants 1 project", String(p9999.project_quota));
+
 head("builder — projects untouched");
 const bProjects = await api(BUILDER, "/api/v1/feed/builder-dashboard");
 check(bProjects.status === 200, "builder dashboard still loads", String(bProjects.status));

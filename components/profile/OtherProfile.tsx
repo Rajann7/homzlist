@@ -22,7 +22,11 @@ import { cn } from "@/lib/utils";
 const TABS: Record<string, string[]> = {
   owner: ["Sell", "Rent"],
   broker: ["Sell", "Rent"],
-  builder: ["Projects", "Sell / Rent"],
+  // No "Sell / Rent" for a builder: since migration 0067 that role cannot hold
+  // a live listing at all, so the tab could only ever render "No listings yet"
+  // — a permanently empty tab on every builder profile. Their OWN profile keeps
+  // it, because that is where they still see the rows 0067 hid.
+  builder: ["Projects"],
 };
 const REPORT_REASONS = ["Fake profile", "Spam", "Abusive behaviour", "Fraud attempt", "Impersonation"];
 // Display label → server reason code (reports.reason). Unknowns fall back to "other".
@@ -194,12 +198,13 @@ export function OtherProfile({ username, isGuest = false }: { username: string; 
         {/* Counts — a real row with its own surface, so one stat looks
             deliberate instead of stranded. */}
         <div className="mt-4 flex items-stretch overflow-hidden rounded-12 border border-border bg-surface-1">
-          <Stat n={p.stats.listings} label={p.stats.listings === 1 ? "Listing" : "Listings"} />
-          {p.role === "builder" && (
-            <>
-              <span className="w-px self-stretch bg-divider" />
-              <Stat n={p.stats.projects ?? 0} label={(p.stats.projects ?? 0) === 1 ? "Project" : "Projects"} />
-            </>
+          {/* A builder's Listings count is now structurally 0 (0067), so the
+              tile is theirs-only: Projects is the number that means something.
+              Everyone else keeps both exactly as before. */}
+          {p.role === "builder" ? (
+            <Stat n={p.stats.projects ?? 0} label={(p.stats.projects ?? 0) === 1 ? "Project" : "Projects"} />
+          ) : (
+            <Stat n={p.stats.listings} label={p.stats.listings === 1 ? "Listing" : "Listings"} />
           )}
           <span className="w-px self-stretch bg-divider" />
           <StatText value={p.memberSince} label="Member since" />

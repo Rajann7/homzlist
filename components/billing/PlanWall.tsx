@@ -188,10 +188,20 @@ function WallCard({ plan, recommended, onChoose }: { plan: PlanCard; recommended
 }
 
 function CompareSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+  /**
+   * ₹999 · ₹2,999 · ₹9,999, and every cell has to match `plan_catalog`.
+   *
+   * The ₹9,999 column used to claim a property listing, a 6-month listing
+   * validity and a requirement post. `p9999` grants `listing_quota = 0` and
+   * `requirement_quota = 0` — it has sold one project and nothing else since
+   * migration 0065 — and since 0067 the only role that can buy it may not post
+   * a listing or a requirement at all. Its 6-month window is the PROJECT's, and
+   * the card says so in its own sub-label ("per project · 6 months").
+   */
   const rows: [string, string, string, string][] = [
-    ["Property listing", "✓", "—", "✓"],
-    ["Listing validity", "Lifetime", "—", "6 mo"],
-    ["Requirement post", "1", "—", "✓"],
+    ["Property listing", "✓", "—", "—"],
+    ["Listing validity", "Lifetime", "—", "—"],
+    ["Requirement post", "1", "—", "—"],
     ["Requirement viewing", "—", "All", "All"],
     ["Proposals included", "10", "30", "∞"],
     ["Project posting", "—", "—", "✓"],

@@ -256,10 +256,18 @@ function CompareSheet({
 }: {
   open: boolean; onClose: () => void; plans: PlanCard[]; onChoose: (code: string) => void;
 }) {
+  /**
+   * Every cell has to match `plan_catalog`. The ₹9,999 column used to claim a
+   * property listing, a 6-month listing validity and a requirement post;
+   * `p9999` grants `listing_quota = 0` and `requirement_quota = 0` (migration
+   * 0065 — it sells one project), and since 0067 the only role that can buy it
+   * may not post either thing at all. The 6-month window belongs to the
+   * PROJECT, and the plan card carries it in its own sub-label.
+   */
   const rows: [string, string, string, string][] = [
-    ["Property listing", "y", "—", "y"],
-    ["Listing validity", "Lifetime", "—", "6 months"],
-    ["Requirement post", "1 × 30 days", "—", "1"],
+    ["Property listing", "y", "—", "—"],
+    ["Listing validity", "Lifetime", "—", "—"],
+    ["Requirement post", "1 × 30 days", "—", "—"],
     ["View others' requirements", "—", "y", "Matched only"],
     ["Proposals included", "10", "30", "Unlimited"],
     ["Project posting", "—", "—", "y"],
