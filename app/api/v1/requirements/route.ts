@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/lib/auth/current-user";
 import { getProfileById } from "@/lib/profile/service";
 import { rateLimit } from "@/lib/auth/rate-limit";
 import { createRequirement, MAX_AREAS } from "@/lib/listings/requirements";
+import { canPostRequirement } from "@/lib/listings/capabilities";
 import { requirementDTO } from "@/lib/listings/dto";
 
 /**
@@ -32,6 +33,8 @@ export async function POST(req: NextRequest) {
 
   const profile = await getProfileById(claims.sub);
   if (!profile || profile.state !== "active") return fail("FORBIDDEN");
+  // Requirements are an Owner/Broker product — a Builder posts projects only.
+  if (!canPostRequirement(profile.role)) return fail("FORBIDDEN");
 
   const limited = await rateLimit(`requirement-post:${claims.sub}`, 20, 3600);
   if (!limited.allowed) return fail("RATE_LIMITED");

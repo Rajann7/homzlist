@@ -8,6 +8,8 @@ import {
   updateRequirementContent, reopenRequirement,
 } from "@/lib/listings/requirements";
 import { requirementDetailDTO } from "@/lib/listings/dto";
+import { getProfileById } from "@/lib/profile/service";
+import { canPostRequirement } from "@/lib/listings/capabilities";
 
 /**
  * GET    /api/v1/requirements/:id (Doc7 §64) — locked / unlocked / own, decided
@@ -65,6 +67,17 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   } catch {
     return fail("VALIDATION_ERROR");
   }
+
+  /**
+   * A Builder may no longer have a requirement out there (migration 0067), so
+   * the three paths that would put one BACK on the public surface — reopen,
+   * the active toggle and a content edit (which re-enters review) — are closed
+   * for that role. Marking one fulfilled and deleting it stay open: those are
+   * ways OUT of the state, and closing them would strand the rows 0067 paused.
+   */
+  const profile = await getProfileById(claims.sub);
+  const revives = body.reopen === true || body.isActive === true || isContentEdit(body);
+  if (revives && !canPostRequirement(profile?.role ?? null)) return fail("FORBIDDEN");
 
   // Every mutation below is scoped to the caller's own row, so a crafted id
   // belonging to someone else matches nothing and returns 404.

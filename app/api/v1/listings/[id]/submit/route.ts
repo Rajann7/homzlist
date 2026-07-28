@@ -2,6 +2,8 @@ import { ok, fail } from "@/lib/api";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { submitListing } from "@/lib/listings/service";
 import { rateLimit } from "@/lib/auth/rate-limit";
+import { getProfileById } from "@/lib/profile/service";
+import { canPostListing } from "@/lib/listings/capabilities";
 
 /**
  * POST /api/v1/listings/:id/submit (Doc4 §27) — "Submit for Review".
@@ -23,6 +25,11 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
 
   const limited = await rateLimit(`listing-submit:${claims.sub}`, 60, 3600);
   if (!limited.allowed) return fail("RATE_LIMITED");
+
+  // Creation is gated at POST /listings, but a Builder who still holds a DRAFT
+  // from before the rule changed would otherwise publish it through here.
+  const profile = await getProfileById(claims.sub);
+  if (!canPostListing(profile?.role ?? null)) return fail("FORBIDDEN");
 
   const res = await submitListing(params.id, claims.sub);
   if (res.ok) return ok({ submitted: true });

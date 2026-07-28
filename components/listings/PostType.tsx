@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AppShell, Button, Header, Icon } from "@/components/billing/ui";
+import { AppShell, Button, Header, Icon, Skeleton } from "@/components/billing/ui";
 import { BackButton } from "@/components/billing/primitives";
 import { ConfirmDialog } from "@/components/ui/Dialog";
 import { listingsApi } from "@/lib/listings/client";
@@ -29,10 +29,18 @@ export type Intent = "listing" | "requirement" | "project";
 export function PostType({ entitlements }: { entitlements?: Entitlements }) {
   const router = useRouter();
   const [role, setRole] = useState<string | null>(null);
+  // The option LIST now differs by role, so it can't render before the role is
+  // known — a builder would see Sell/Rent for a frame and watch them vanish.
+  // A failed config call resolves too, as "not a builder", so the screen can
+  // never hang on a skeleton; the server refuses anything they shouldn't post.
+  const [roleLoaded, setRoleLoaded] = useState(false);
   const [tip, setTip] = useState(false);
 
   useEffect(() => {
-    void listingsApi.config().then((r) => setRole(r.ok ? r.data.role : null));
+    void listingsApi.config().then((r) => {
+      setRole(r.ok ? r.data.role : null);
+      setRoleLoaded(true);
+    });
   }, []);
 
   const slotsLeft = entitlements?.listingSlotsLeft;
@@ -42,14 +50,16 @@ export function PostType({ entitlements }: { entitlements?: Entitlements }) {
    * `intent` names the quota, and a blocked option detours through the plan
    * wall instead of walking the user into a form that refuses at the end.
    */
-  const options = [
-    { key: "sell", label: "Sell a property", sub: "List a property for sale", icon: "home" as const, href: "/create/type?kind=sell", intent: "listing" as const },
-    { key: "rent", label: "Rent out a property", sub: "List a property to rent", icon: "key" as const, href: "/create/type?kind=rent", intent: "listing" as const },
-    { key: "requirement", label: "Post a requirement", sub: "Tell sellers what you're looking for", icon: "search-list" as const, href: "/requirements/new", intent: "requirement" as const },
-    ...(role === "builder"
-      ? [{ key: "project", label: "New Project", sub: "Builder project with unit types", icon: "image" as const, href: "/projects/new", intent: "project" as const }]
-      : []),
-  ];
+  const options = role === "builder"
+    // A Builder posts PROJECTS and nothing else — Sell, Rent and Requirement
+    // are the Owner/Broker products (migration 0067). Hiding them here is
+    // presentation; POST /listings and POST /requirements refuse the role too.
+    ? [{ key: "project", label: "New Project", sub: "Builder project with unit types", icon: "image" as const, href: "/projects/new", intent: "project" as const }]
+    : [
+        { key: "sell", label: "Sell a property", sub: "List a property for sale", icon: "home" as const, href: "/create/type?kind=sell", intent: "listing" as const },
+        { key: "rent", label: "Rent out a property", sub: "List a property to rent", icon: "key" as const, href: "/create/type?kind=rent", intent: "listing" as const },
+        { key: "requirement", label: "Post a requirement", sub: "Tell sellers what you're looking for", icon: "search-list" as const, href: "/requirements/new", intent: "requirement" as const },
+      ];
 
   const go = (href: string, intent: Intent) => {
     // Entitlements missing (the fetch failed) → walk on and let the form's own
@@ -70,7 +80,8 @@ export function PostType({ entitlements }: { entitlements?: Entitlements }) {
         <div className="mb-3.5 text-15 leading-[1.4] text-ink-secondary">What would you like to post?</div>
 
         <div className="flex flex-col gap-3">
-          {options.map((o) => (
+          {!roleLoaded && [0, 1, 2].map((i) => <Skeleton key={i} className="h-20 w-full rounded-8" />)}
+          {roleLoaded && options.map((o) => (
             <button
               key={o.key}
               onClick={() => go(o.href, o.intent)}
@@ -93,7 +104,10 @@ export function PostType({ entitlements }: { entitlements?: Entitlements }) {
 
         {/* Slot counter (designs/P5 S2). The number is the SERVER's — the same
             value that decides whether this screen or the plan wall renders. */}
-        {typeof slotsLeft === "number" && slotsLeft > 0 && (
+        {/* Never to a builder: a leftover listing slot from before the rule
+            changed is a number they can no longer spend, so advertising it
+            would be the screen promising something the server refuses. */}
+        {roleLoaded && role !== "builder" && typeof slotsLeft === "number" && slotsLeft > 0 && (
           <div className="mt-4 flex items-center gap-2 rounded-8 bg-surface-2 px-3.5 py-3">
             <span className="flex-1 text-13 font-semibold leading-[1.3] text-accent">
               {slotsLeft} listing slot{slotsLeft === 1 ? "" : "s"} available
@@ -109,13 +123,17 @@ export function PostType({ entitlements }: { entitlements?: Entitlements }) {
         )}
 
         {/* Kept deliberately: Drafts has no other entry point, and stranding a
-            saved draft would be a dead-end (CLAUDE.md rule 10). */}
-        <button
-          onClick={() => router.push("/create/drafts")}
-          className="tap44 mx-auto mt-4 block text-13 font-semibold text-accent"
-        >
-          Continue from drafts
-        </button>
+            saved draft would be a dead-end (CLAUDE.md rule 10). Not for a
+            builder — drafts here are property drafts, and submitting one is
+            refused now, so the link would lead into a form with no exit. */}
+        {roleLoaded && role !== "builder" && (
+          <button
+            onClick={() => router.push("/create/drafts")}
+            className="tap44 mx-auto mt-4 block text-13 font-semibold text-accent"
+          >
+            Continue from drafts
+          </button>
+        )}
       </div>
 
       <ConfirmDialog

@@ -2965,3 +2965,28 @@ on that counter, and `POST /projects` refuses without it even when the account
 holds listing slots.
 
 Nothing left open here.
+
+## Builder = projects only (28 Jul 2026) — two things left OPEN
+
+Migration 0067 took Sell / Rent / Requirement away from the Builder role
+(create, submit, un-hide, reopen and the active toggle are all refused
+server-side; existing builder listings were hidden and requirements paused).
+Two consequences were found and deliberately NOT changed, because both are
+design content and DESIGN LOCK says ask first:
+
+- **"Compare plans" sheet still credits ₹9,999 with things it doesn't grant.**
+  `components/billing/PlanWall.tsx` CompareSheet prints "Property listing ✓" and
+  "Requirement post ✓" in the ₹9,999 column. Both were already untrue before
+  this change (`plan_catalog.p9999` has `listing_quota = 0` and
+  `requirement_quota = 0`); now they are also unreachable by the only role that
+  can buy that plan. The rows are in `designs/P5` and `designs/P11`, so changing
+  the two cells to "—" needs Rajan's word. Every viewer of the sheet sees it,
+  not just builders.
+- **A builder's public profile now has a permanently empty "Sell / Rent" tab.**
+  `components/profile/OtherProfile.tsx` gives the builder role
+  `["Projects", "Sell / Rent"]`, and OwnProfile gives it
+  `["Projects", "Sell / Rent", "Requirements"]`. With no builder able to hold a
+  live listing, the public tab can only ever render "No listings yet". Dropping
+  the tab is a design change to the profile tab bar, so it is left as-is
+  pending a decision. (The OWN-profile tabs are arguably fine — that is where a
+  builder still sees the rows 0067 hid.)

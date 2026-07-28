@@ -7,6 +7,7 @@ import { createListing, getPropertyType, sanitizeAttributes, NoSlotError } from 
 import { validateListing } from "@/lib/listings/validate";
 import { listingCardDTO } from "@/lib/listings/dto";
 import { getUserPrefs } from "@/lib/settings/service";
+import { canPostListing } from "@/lib/listings/capabilities";
 
 /**
  * POST /api/v1/listings (Doc7 §47) — submit a listing for review.
@@ -27,6 +28,11 @@ export async function POST(req: NextRequest) {
 
   const profile = await getProfileById(claims.sub);
   if (!profile || profile.state !== "active") return fail("FORBIDDEN");
+  // Sell/Rent is an Owner/Broker product — a Builder posts projects only. The
+  // per-type `roles` check below would already refuse (0067 removed 'builder'
+  // from every type), but the rule is a ROLE rule, so it says so out loud
+  // rather than depending on how the type table happens to be seeded.
+  if (!canPostListing(profile.role)) return fail("FORBIDDEN");
 
   const limited = await rateLimit(`listing-create:${claims.sub}`, 30, 3600);
   if (!limited.allowed) return fail("RATE_LIMITED");

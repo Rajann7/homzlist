@@ -78,6 +78,14 @@ export function RequirementForm() {
 
   const load = useCallback(async () => {
     const [cfg, mine] = await Promise.all([listingsApi.config(), listingsApi.myRequirements()]);
+    // Requirements are an Owner/Broker product — a Builder posts projects only.
+    // POST/PATCH already refuse the role; this is so typing the URL lands back
+    // on Create instead of on a form whose type list is empty and whose Submit
+    // can only ever 403.
+    if (cfg.ok && cfg.data.role === "builder") {
+      router.replace("/create");
+      return;
+    }
     if (cfg.ok) setTypes(cfg.data.types);
     if (mine.ok) setQuota(mine.data.quota);
     else setOffline(mine.error.code === "OFFLINE");
@@ -105,7 +113,7 @@ export function RequirementForm() {
       }
     }
     setLoading(false);
-  }, [editId]);
+  }, [editId, router]);
 
   useEffect(() => { void load(); }, [load]);
 

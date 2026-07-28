@@ -4,6 +4,8 @@ import { getCurrentUser } from "@/lib/auth/current-user";
 import { setListingStatus, NOT_OWNED, type StatusAction } from "@/lib/listings/service";
 import { rateLimit } from "@/lib/auth/rate-limit";
 import { myListingDTO } from "@/lib/listings/dto";
+import { getProfileById } from "@/lib/profile/service";
+import { canPostListing } from "@/lib/listings/capabilities";
 
 /**
  * POST /api/v1/listings/:id/status (Doc7 §53) — the status state machine
@@ -34,6 +36,15 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   const action = body.action as StatusAction;
   if (!ACTIONS.includes(action)) return fail("VALIDATION_ERROR", { field: "action" });
+
+  // Migration 0067 hid every Builder listing. The three actions that end in a
+  // publicly visible listing again are refused for that role — otherwise the
+  // takedown would be one "Unhide" tap away. sold/rented/completed/hide stay
+  // open: they move the listing further off the surface, not back onto it.
+  if (action === "unhide" || action === "reactivate" || action === "restore") {
+    const profile = await getProfileById(claims.sub);
+    if (!canPostListing(profile?.role ?? null)) return fail("FORBIDDEN");
+  }
 
   const listing = await setListingStatus(params.id, claims.sub, action);
   // Someone else's listing is NOT FOUND — answering "state locked" here would

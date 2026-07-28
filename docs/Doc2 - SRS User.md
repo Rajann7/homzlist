@@ -18,9 +18,9 @@
 |---|---|---|---|---|
 | Browse feed/search/detail (incl. shared links) | ✅ full view | ✅ | ✅ | ✅ |
 | Save/like/inquiry/post/chat | ❌ → login wall | ✅ | ✅ | ✅ |
-| List property (sale/rent) | ❌ | ✅ ₹999 | ✅ ₹999 | ✅ ₹999 |
+| List property (sale/rent) | ❌ | ✅ ₹999 | ✅ ₹999 | ❌ |
 | Post project | ❌ | ❌ | ❌ | ✅ ₹9,999 |
-| Post requirement | ❌ | ✅ quota | ✅ quota | ✅ quota |
+| Post requirement | ❌ | ✅ quota | ✅ quota | ❌ |
 | View requirements | ❌ | ₹2,999 | ₹2,999 | ₹2,999 (project-matched: included unlimited) |
 | Send proposals | ❌ | quota | quota | quota |
 | Verified badges | — | Phone/ID | Phone/ID/RERA | Phone/ID/RERA |
@@ -28,8 +28,8 @@
 | Feed type | public | all listings | all listings + own performance cards | **dashboard feed** (own stats + matched requirements only) |
 
 - Role chosen at registration (Owner/Broker/Builder cards). Role change = profile request → admin approval (admin can also direct-change, logged). Multiple brokers may list the same property (no exclusivity, no duplicate logic — allowed by design). Co-ownership normal.
-- Builder listing individual property uses ₹999 plan; builder never sees PG/irrelevant types in creation.
-- PG/Hostel type: Owner/Broker only.
+- **A Builder posts PROJECTS ONLY (amended 2026-07-28).** Sell, Rent and Requirement are Owner/Broker products. A builder cannot create one, cannot submit a leftover draft, and cannot bring an existing one back live; migration 0067 hid the listings and paused the requirements that already existed, and removed the ₹999 plan from the builder catalog. Unchanged for builders: browsing, chat, leads, proposals, and requirement VIEWING (₹2,999 + project-matched included). This supersedes the previous "builder listing individual property uses ₹999 plan".
+- PG/Hostel type: Owner/Broker only (as is now every other property type).
 
 # 3. AUTHENTICATION & ACCOUNT
 
