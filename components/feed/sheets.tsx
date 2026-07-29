@@ -156,7 +156,7 @@ const QUICK = [
   { key: "documents", label: "Documents ready?" },
   { key: "loan", label: "Loan available?" },
 ];
-export function InquirySheet({ open, onClose, card }: { open: boolean; onClose: () => void; card: FeedCard | null }) {
+export function InquirySheet({ open, onClose, card, unitId }: { open: boolean; onClose: () => void; card: FeedCard | null; unitId?: string }) {
   const toast = useToast();
   const router = useRouter();
   const [message, setMessage] = useState("");
@@ -180,7 +180,7 @@ export function InquirySheet({ open, onClose, card }: { open: boolean; onClose: 
     if (!card) return;
     setBusy(true);
     const res = isProject
-      ? await interactionsApi.projectInquiry(card.id, { message: message.trim() || prefill })
+      ? await interactionsApi.projectInquiry(card.id, { message: message.trim() || prefill, unitId })
       : await interactionsApi.inquiry(card.id, { message: message.trim() || prefill, intents: [...intents], shareNumber: share });
     setBusy(false);
     if (res.ok) {

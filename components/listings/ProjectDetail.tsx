@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { AppShell, BottomSheet, Button, Icon, Skeleton, StatusBadge, Toggle, useToast } from "@/components/billing/ui";
 import { OfflineBanner, SheetOption } from "@/components/billing/primitives";
 import { listingsApi, type Photo } from "@/lib/listings/client";
-import { InquirySheet, ReportSheet, ShareSheet } from "@/components/feed/sheets";
+import { InquirySheet, LoginSheet, ReportSheet, ShareSheet } from "@/components/feed/sheets";
 import type { FeedCard } from "@/lib/feed/client";
 import { DETAIL_PAD, DetailHero, DetailSection, DetailSeparator, ProjectDetailBody } from "./detailBody";
 import { PhotoViewer, useScrolledPastHero } from "./ListingDetail";
@@ -25,7 +25,7 @@ import { cn } from "@/lib/utils";
  * stored its land zone, NA/kheti status, plot approval, permissible floors,
  * total plots and booking amount, and the screen showed none of them.
  */
-export function ProjectDetail({ id }: { id: string }) {
+export function ProjectDetail({ id, isGuest = false }: { id: string; isGuest?: boolean }) {
   const router = useRouter();
   const toast = useToast();
 
@@ -44,7 +44,13 @@ export function ProjectDetail({ id }: { id: string }) {
   // "Contact builder" now opens an in-app conversation (migration 0084) instead
   // of handing the buyer to WhatsApp, where neither side could find it again.
   // Call and the WhatsApp shortcut are untouched.
-  const [inquiry, setInquiry] = useState<{ unitType?: string } | null>(null);
+  const [inquiry, setInquiry] = useState<{ unitType?: string; unitId?: string } | null>(null);
+  const [loginSheet, setLoginSheet] = useState(false);
+  // On the public host the viewer is always a guest (middleware strips the
+  // session), so an action that writes opens the login sheet instead of firing
+  // a request that can only come back 401 — the same gate ListingDetail uses.
+  const askBuilder = (unitType?: string, unitId?: string) =>
+    isGuest ? setLoginSheet(true) : setInquiry({ unitType, unitId });
   const [unitsBusy, setUnitsBusy] = useState(false);
 
   const load = useCallback(async () => {
@@ -169,7 +175,7 @@ export function ProjectDetail({ id }: { id: string }) {
         project={p}
         openUnit={openUnit}
         onToggleUnit={setOpenUnit}
-        onEnquireUnit={(unitType) => setInquiry({ unitType })}
+        onEnquireUnit={(unitType, unitId) => askBuilder(unitType, unitId)}
         brochure={brochure}
         onOpenProfile={(username) => router.push(`/profile/${username}`)}
         notice={p.isOwner ? <OwnerNotice project={p} /> : null}
@@ -207,7 +213,7 @@ export function ProjectDetail({ id }: { id: string }) {
             >
               <Icon name="whatsapp" size={20} />
             </a>
-            <Button fullWidth onClick={() => setInquiry({})}>Contact builder</Button>
+            <Button fullWidth onClick={() => askBuilder()}>Contact builder</Button>
           </>
         )}
       </div>
@@ -220,7 +226,9 @@ export function ProjectDetail({ id }: { id: string }) {
         open={!!inquiry}
         onClose={() => { setInquiry(null); }}
         card={inquiry ? ({ ...card, title: inquiry.unitType ? `${inquiry.unitType} at ${p.name}` : p.name } as FeedCard) : null}
+        unitId={inquiry?.unitId}
       />
+      <LoginSheet open={loginSheet} onClose={() => setLoginSheet(false)} />
 
       <BottomSheet open={sheet === "more"} onClose={() => setSheet(null)} title="Options">
         <div className="flex flex-col pb-2">

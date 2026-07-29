@@ -81,7 +81,7 @@ export const interactionsApi = {
    * The same endpoint, with a project as the subject (0084). A project chat is
    * live immediately, so the reply carries the thread to open.
    */
-  projectInquiry: (projectId: string, body: { message: string }) =>
+  projectInquiry: (projectId: string, body: { message: string; unitId?: string }) =>
     req<{ sent: boolean; alreadySent: boolean; threadId: string | null }>("/inquiries", "POST", { projectId, ...body }),
   report: (subjectType: "listing" | "project" | "requirement", subjectId: string, reason: string, note?: string | null) =>
     req<{ reported: boolean }>("/reports", "POST", { subjectType, subjectId, reason, note }),

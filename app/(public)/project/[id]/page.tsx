@@ -12,5 +12,5 @@ import { ProjectDetail } from "@/components/listings/ProjectDetail";
 export const dynamic = "force-dynamic";
 
 export default function Page({ params }: { params: { id: string } }) {
-  return <ProjectDetail id={params.id} />;
+  return <ProjectDetail id={params.id} isGuest />;
 }

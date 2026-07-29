@@ -124,7 +124,7 @@ export async function sendInquiry(
 export async function sendProjectInquiry(
   buyerId: string,
   projectId: string,
-  input: { message: string },
+  input: { message: string; unitId?: string | null },
 ): Promise<InquiryResult> {
   const { data: p } = await db().from("projects").select("id,profile_id,status").eq("id", projectId).maybeSingle();
   const project = p as { id: string; profile_id: string; status: string } | null;
@@ -152,12 +152,25 @@ export async function sendProjectInquiry(
     );
   if (((blocks as unknown[]) ?? []).length) return { ok: false, reason: "blocked" };
 
+  // The unit must belong to THIS project. A crafted id from another builder's
+  // scheme would otherwise label the thread with someone else's inventory.
+  let unitId: string | null = null;
+  if (input.unitId) {
+    const { data: u } = await db()
+      .from("project_units")
+      .select("id")
+      .eq("id", input.unitId)
+      .eq("project_id", projectId)
+      .maybeSingle();
+    unitId = (u as { id: string } | null)?.id ?? null;
+  }
+
   const message = (input.message ?? "").trim().slice(0, 2000) || "Hi, I'm interested in this project.";
   const already = !!prior;
   // The thread id goes back to the caller because a project chat is live the
   // moment it is sent — the sender is taken straight into it rather than being
   // told to wait for an accept that no longer exists.
-  const threadId = await ensureProjectInquiryThread({ buyerId, projectId, builderId: project.profile_id, message });
+  const threadId = await ensureProjectInquiryThread({ buyerId, projectId, builderId: project.profile_id, message, unitId });
   return { ok: true, alreadySent: already, threadId };
 }
 

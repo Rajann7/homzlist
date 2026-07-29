@@ -261,6 +261,8 @@ export function Thread({ threadId, base = "/messages" }: { threadId: string; bas
                 <span className={cn("rounded-4 px-1.5 py-0.5 font-semibold uppercase tracking-wide", S.chip)}>
                   {S.label}
                 </span>
+                {/* Which unit of the scheme this chat is about (0087). */}
+                {view.pinned.unitLabel && <span className="font-semibold text-ink-primary">{view.pinned.unitLabel}</span>}
                 {view.pinned.priceLabel && <span className="font-semibold text-ink-secondary">{view.pinned.priceLabel}</span>}
               </span>
             </span>

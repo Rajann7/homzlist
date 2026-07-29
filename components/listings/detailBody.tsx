@@ -736,7 +736,8 @@ export function ProjectDetailBody({
   project: any;
   openUnit: string | null;
   onToggleUnit: (id: string | null) => void;
-  onEnquireUnit: (unitType: string) => void;
+  /** The unit's id rides along so the chat can record WHICH unit (0087). */
+  onEnquireUnit: (unitType: string, unitId: string) => void;
   brochure?: { url: string | null; scanned: boolean } | null;
   notice?: React.ReactNode;
   footer?: React.ReactNode;
@@ -887,11 +888,14 @@ export function ProjectDetailBody({
                             </a>
                           )}
                           <button
-                            onClick={() => onEnquireUnit(u.unitType)}
+                            onClick={() => onEnquireUnit(u.unitType, u.id)}
                             disabled={soldOut}
                             className="flex h-10 flex-[1.6] items-center justify-center gap-1.5 rounded-8 bg-accent text-13 font-semibold leading-none text-ink-inverse disabled:bg-surface-3 disabled:text-ink-disabled"
                           >
-                            <Icon name="whatsapp" size={15} />
+                            {/* Was a WhatsApp mark. This button now opens an
+                                in-app chat (0084/0086), and an icon must mean
+                                what it does — migration 0076's whole point. */}
+                            <Icon name="message" size={15} />
                             {soldOut ? "Sold out" : "Enquire"}
                           </button>
                         </div>

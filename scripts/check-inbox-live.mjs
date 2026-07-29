@@ -93,11 +93,16 @@ for (const [p, m, b] of [
 // ---------------------------------------------------------------------------
 // 1. Actors — a builder with a live project, and two people to talk to them
 // ---------------------------------------------------------------------------
+// Prefer a builder with TWO live projects, so the "each project is its own
+// card" half of the walk actually runs; whichever project happens to be newest
+// overall may belong to a builder with only one.
 const { rows: [proj] } = await db.query(`
-  select pj.id, pj.name, pj.profile_id builder_id, b.name builder_name, b.phone builder_phone
+  select pj.id, pj.name, pj.profile_id builder_id, b.name builder_name, b.phone builder_phone,
+         count(*) over (partition by pj.profile_id) live_projects
     from projects pj join profiles b on b.id = pj.profile_id
    where pj.status = 'live' and b.state = 'active'
-   order by pj.created_at desc limit 1`);
+   order by count(*) over (partition by pj.profile_id) desc, pj.created_at desc
+   limit 1`);
 if (!proj) throw new Error("no live project to test against");
 
 const { rows: buyers } = await db.query(`
@@ -292,6 +297,39 @@ if (!proj2) {
   const afterBlock = await buyerA.req(`/api/v1/chat/threads/${t1.id}/message`, "POST", { text: "hello?" });
   check("a blocked project chat refuses new messages", afterBlock.json?.ok !== true, `status=${afterBlock.status}`);
   await builder.req(`/api/v1/chat/threads/${t1.id}/block`, "POST", { action: "unblock" });
+}
+
+// ---------------------------------------------------------------------------
+// 9b. WHICH unit the chat is about (0087)
+// ---------------------------------------------------------------------------
+const { rows: [unit] } = await db.query(`select id, unit_type from project_units where project_id=$1 order by position limit 1`, [proj.id]);
+if (!unit) {
+  check("unit-level enquiry walked", false, "the project has no unit types — skipped");
+} else {
+  const unitSend = await buyerA.req("/api/v1/inquiries", "POST", { projectId: proj.id, unitId: unit.id, message: `About the ${unit.unit_type} — what is the carpet area?` });
+  const { rows: [tu] } = await db.query(`select unit_id from chat_threads where buyer_id=$1 and project_id=$2`, [buyers[0].id, proj.id]);
+  check("unit: enquiring from a unit records WHICH unit", unitSend.json?.ok === true && tu?.unit_id === unit.id, `unit_id=${tu?.unit_id}`);
+
+  const recvUnit = await builder.req("/api/v1/chat/inbox?section=received");
+  const rowWithUnit = (recvUnit.json?.data?.groups ?? []).flatMap((x) => x.rows).find((r) => r.threadId === t0.id);
+  check("unit: the builder's row is labelled with it", rowWithUnit?.unitLabel === unit.unit_type, `unitLabel=${rowWithUnit?.unitLabel}`);
+
+  const thUnit = await builder.req(`/api/v1/chat/threads/${t0.id}`);
+  check("unit: the thread's subject strip names it", thUnit.json?.data?.pinned?.unitLabel === unit.unit_type, `unitLabel=${thUnit.json?.data?.pinned?.unitLabel}`);
+
+  // A unit id from ANOTHER project must not be able to label this thread.
+  const { rows: [foreign] } = await db.query(
+    `select u.id from project_units u where u.project_id <> $1 limit 1`, [proj.id]);
+  if (foreign) {
+    await buyerA.req("/api/v1/inquiries", "POST", { projectId: proj.id, unitId: foreign.id, message: "crafted" });
+    const { rows: [tf] } = await db.query(`select unit_id from chat_threads where buyer_id=$1 and project_id=$2`, [buyers[0].id, proj.id]);
+    check("unit: IDOR — a unit from another project is refused, the real one stands", tf?.unit_id === unit.id, `unit_id=${tf?.unit_id}`);
+  }
+  const badUnit = await buyerA.req("/api/v1/inquiries", "POST", { projectId: proj.id, unitId: "not-a-uuid", message: "x" });
+  check("unit: a malformed unit id is rejected", badUnit.json?.error?.code === "VALIDATION_ERROR", `code=${badUnit.json?.error?.code}`);
+
+  const { rows: [orphan] } = await db.query(`select count(*)::int n from chat_threads where unit_id is not null and project_id is null`);
+  check("unit: no thread carries a unit without a project (DB constraint)", orphan.n === 0, `${orphan.n} orphan(s)`);
 }
 
 // ---------------------------------------------------------------------------

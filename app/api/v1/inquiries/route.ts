@@ -35,9 +35,15 @@ export async function POST(req: NextRequest) {
   if (listingId && !UUID_RE.test(listingId)) return fail("VALIDATION_ERROR", { field: "listingId" });
   if (projectId && !UUID_RE.test(projectId)) return fail("VALIDATION_ERROR", { field: "projectId" });
 
+  // Which unit the buyer tapped Enquire on (0087). Optional — "Contact builder"
+  // is about the whole project. Ownership of the id is checked server-side.
+  const unitId = typeof body.unitId === "string" ? body.unitId : "";
+  if (unitId && !UUID_RE.test(unitId)) return fail("VALIDATION_ERROR", { field: "unitId" });
+
   const res = projectId
     ? await sendProjectInquiry(claims.sub, projectId, {
         message: typeof body.message === "string" ? body.message : "",
+        unitId: unitId || null,
       })
     : await sendInquiry(claims.sub, listingId, {
         message: typeof body.message === "string" ? body.message : "",

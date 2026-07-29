@@ -103,9 +103,13 @@ export async function getThread(threadId: string, me: string, opts: { before?: s
     // The third subject (migration 0084). A project has no price of its own —
     // the range is its units' min–max, same as every other project surface.
     const projectId = (t as any).project_id as string;
-    const [{ data: pj }, { data: units }] = await Promise.all([
+    const unitId = (t as any).unit_id as string | null;
+    const [{ data: pj }, { data: units }, { data: unitRow }] = await Promise.all([
       db().from("projects").select("id,name,cover_url,status,area_label,build_status").eq("id", projectId).maybeSingle(),
       db().from("project_units").select("price_from_paise").eq("project_id", projectId),
+      unitId
+        ? db().from("project_units").select("unit_type").eq("id", unitId).maybeSingle()
+        : Promise.resolve({ data: null }),
     ]);
     if (pj) {
       const row = pj as any;
@@ -119,6 +123,8 @@ export async function getThread(threadId: string, me: string, opts: { before?: s
         priceLabel: !list.length ? null : lo === hi ? formatShortRupees(lo) : `${formatShortRupees(lo)} – ${formatShortRupees(hi)}`,
         cover: row.cover_url, status: row.status,
         href: `/projects/${row.id}`,
+        // The unit the buyer asked about (0087) — null means the whole scheme.
+        unitLabel: (unitRow as { unit_type?: string } | null)?.unit_type ?? null,
       };
       if (row.status !== "live") listingBanner = "This project is no longer live";
     }

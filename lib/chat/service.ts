@@ -246,7 +246,7 @@ export async function ensureInquiryThread(inquiry: {
  * One thread per (buyer, project), enforced by `chat_threads_project_uniq`.
  */
 export async function ensureProjectInquiryThread(input: {
-  buyerId: string; projectId: string; builderId: string; message: string;
+  buyerId: string; projectId: string; builderId: string; message: string; unitId?: string | null;
 }): Promise<string> {
   const existing = await db()
     .from("chat_threads")
@@ -257,7 +257,12 @@ export async function ensureProjectInquiryThread(input: {
     .maybeSingle();
   if (existing.data) {
     const row = existing.data as { id: string };
-    await db().from("chat_threads").update({ status: "accepted", cooldown_until: null }).eq("id", row.id);
+    // A later enquiry names the unit the buyer is asking about NOW; an enquiry
+    // about the whole project doesn't erase the unit an earlier one named.
+    await db().from("chat_threads").update({
+      status: "accepted", cooldown_until: null,
+      ...(input.unitId ? { unit_id: input.unitId } : {}),
+    }).eq("id", row.id);
     await db().from("chat_messages").insert({
       thread_id: row.id, sender_id: input.buyerId, kind: "text", body: input.message,
     });
@@ -280,6 +285,7 @@ export async function ensureProjectInquiryThread(input: {
       buyer_id: input.buyerId,
       poster_id: input.builderId,
       project_id: input.projectId,
+      unit_id: input.unitId ?? null,
       status: "accepted",
       last_message_preview: input.message.slice(0, 140),
       last_message_kind: "text",
@@ -749,6 +755,14 @@ interface SubjectDTO {
   gone: boolean;          // subject deleted/expired — the chat outlives it
 }
 
+/** Unit labels ("3 BHK") for the threads that named one — 0087. */
+async function unitLabels(ids: (string | null | undefined)[]): Promise<Map<string, string>> {
+  const uniq = [...new Set(ids.filter((x): x is string => !!x))];
+  if (!uniq.length) return new Map();
+  const { data } = await db().from("project_units").select("id,unit_type").in("id", uniq);
+  return new Map((data as { id: string; unit_type: string }[] ?? []).map((u) => [u.id, u.unit_type]));
+}
+
 async function projectsByIds(ids: (string | null | undefined)[]) {
   const uniq = [...new Set(ids.filter((x): x is string => !!x))];
   if (!uniq.length) return { projects: new Map<string, any>(), prices: new Map<string, string>() };
@@ -819,12 +833,13 @@ export async function getInbox(me: string, section: InboxSection, opts: { search
   const threads = live.filter(section === "received" ? inReceived : inSent);
 
   const otherIds = threads.map((t) => (t.buyer_id === me ? t.poster_id : t.buyer_id));
-  const [people, levels, listings, reqs, projectData] = await Promise.all([
+  const [people, levels, listings, reqs, projectData, units] = await Promise.all([
     profilesByIds(otherIds),
     verificationLevels(otherIds),
     listingsByIds(threads.flatMap((t: any) => [t.listing_id, t.attached_listing_id])),
     requirementsByIds(threads.map((t) => t.requirement_id).filter((x): x is string => !!x)),
     projectsByIds(threads.map((t: any) => t.project_id)),
+    unitLabels(threads.map((t: any) => t.unit_id)),
   ]);
   const { projects, prices } = projectData;
 
@@ -892,6 +907,9 @@ export async function getInbox(me: string, section: InboxSection, opts: { search
       attachedTitle: attached?.title ?? null,
       attachedPrice: attached ? (attached.price_on_request ? "Price on request" : formatShortRupees(Number(attached.price_paise ?? 0))) : null,
       person: { ...personDTO(p, level), roleTag: roleTag(p?.role ?? null) },
+      // "3 BHK ·" in front of the snippet — a builder's first question about any
+      // message on a scheme. Null when the chat is about the whole project.
+      unitLabel: units.get(t.unit_id ?? "") ?? null,
       preview: t.last_message_kind === "photo" ? "Photo" : t.last_message_preview ?? "",
       previewOwn,
       timeLabel: timeAgo(t.last_message_at),

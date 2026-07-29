@@ -401,6 +401,8 @@ function ChatRow({ r, typing, sent, onOpen, onLong }: { r: any; typing: boolean;
         <span className={cn("mt-0.5 line-clamp-2 text-13", typing ? "italic text-accent" : r.unread > 0 ? "font-medium text-ink-primary" : "text-ink-secondary")}>
           {typing ? "Typing…" : (
             <>
+              {/* Which unit of the scheme, when the buyer said so (0087). */}
+              {r.unitLabel && <span className="font-semibold text-ink-tertiary">{r.unitLabel} · </span>}
               {r.previewOwn && <span className="text-ink-tertiary">You: </span>}
               {r.preview}
             </>

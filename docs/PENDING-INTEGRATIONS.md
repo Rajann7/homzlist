@@ -3402,3 +3402,57 @@ Found and fixed while walking this, rather than left for a user to hit:
     `towers = 0` opened its strip with "Towers 0" — on the project story AND on
     the P4 project detail. Zero counts are dropped and the next candidate takes
     the slot; "0 / 4" (ground floor) and "0%" still stand.
+
+---
+
+## Messages rebuilt subject-first + project chat (29 Jul 2026) — open items
+
+The inbox was rebuilt around the SUBJECT (property / project / requirement)
+instead of the person, in two sections — Received (threads on my posts) and
+Sent (threads I opened on someone else's). Migration 0084 made a project a chat
+subject for the first time; 0086 made a project chat open live instead of
+waiting behind Accept. Proven live by `npm run check:inbox` (78 checks) with
+`npm run check:messages` (105) still green.
+
+What is genuinely out of scope and is tracked here rather than left to be
+discovered by a real user:
+
+- ~~**A project chat has no unit dimension.**~~ **CLOSED (29 Jul 2026,
+  migration 0087).** `chat_threads.unit_id` now records which unit a buyer
+  tapped Enquire on; the builder's inbox row and the thread's subject strip are
+  labelled with it ("1 BHK · What is the carpet area?"). The id is validated
+  against the project server-side, so a unit from another builder's scheme
+  cannot label the thread, and a DB check keeps a unit from ever existing on a
+  non-project thread. Null stays a real answer: "Contact builder" is about the
+  whole scheme. What is still NOT built: filtering or grouping the inbox BY
+  unit — the label is shown, not yet a facet.
+
+- **Two contact paths on a project detail now leave different traces.**
+  "Contact builder" opens an in-app thread (a chat + a `project` lead the
+  builder can answer). The WhatsApp icon beside it still hands the buyer to
+  `wa.me` and records only a lead row with no conversation behind it. Both are
+  on the same sticky bar. Which one survives is Rajan's call — removing the
+  WhatsApp shortcut is a design change and was not made.
+
+- **The old 4-tab inbox endpoint is now unreferenced by any screen.**
+  `GET /api/v1/chat/threads` and `getThreads()` (the My Listings / My Inquiries
+  / Requirement Leads / My Responses payload) are still live, still authorized
+  and still exercised by `check:messages`, but nothing in the app calls them —
+  `/chat/inbox` replaced them. They should be deleted once nothing references
+  them; leaving them is dead surface area, not a bug.
+
+- **A project chat can no longer be declined,** by design (0086): declining is a
+  Requests-screen action and a project thread never reaches that screen. The
+  cooldown branch in `sendProjectInquiry` is therefore only reachable for
+  threads declined before the migration — all of which it repaired — so it now
+  stands as a guard rather than a live path.
+
+- **Site visits are property/project only.** The thread's "Site visit" button is
+  hidden on a requirement thread because there is nothing to visit; a
+  requirement poster who wants one has to ask in words. That matches the visit
+  state machine (`visits` hangs off a listing), and widening it would be a new
+  feature, not a fix.
+
+- **Admin read-only chat still has no surface** (already tracked above). Project
+  threads join the same gap: reports on them will queue with everything else
+  once P13-15 lands.
