@@ -17,7 +17,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 
 export type NotificationType =
   // chat / inquiry
-  | "inquiry_received" | "new_message" | "chat_accepted" | "number_requested" | "number_shared"
+  | "inquiry_received" | "new_message" | "chat_accepted" | "chat_declined" | "number_requested" | "number_shared"
   // listing lifecycle & moderation
   | "listing_approved" | "listing_changes_requested" | "listing_rejected" | "still_available"
   | "saved_listing_status" | "price_drop" | "report_outcome" | "suspension_lifted"

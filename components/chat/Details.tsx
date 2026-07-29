@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AppShell, Header, Icon, Avatar, VerifiedBadge, Toggle, BottomSheet, ConfirmDialog, useToast } from "@/components";
+import { AppShell, Header, Icon, Avatar, VerifiedBadge, Toggle, BottomSheet, ConfirmDialog, Skeleton, useToast } from "@/components";
 import { PhotoViewer } from "./PhotoViewer";
 import { chatApi } from "@/lib/chat/client";
 import { cn } from "@/lib/utils";
@@ -24,7 +24,7 @@ export function Details({ threadId, base = "/messages" }: { threadId: string; ba
   const load = async () => { const res = await chatApi.details(threadId); if (res.ok) setD(res.data); };
   useEffect(() => { load(); }, []);
 
-  if (!d) return <AppShell showNav={false} header={<Header left={<Back onClick={() => router.back()} />} title="Chat details" />}><div className="p-4"><div className="h-40 rounded-12 bg-surface-2" /></div></AppShell>;
+  if (!d) return <AppShell showNav={false} header={<Header left={<Back onClick={() => router.back()} />} title="Chat details" />}><div className="space-y-3 p-4"><Skeleton className="h-40 w-full rounded-12" /><Skeleton className="h-24 w-full rounded-12" /></div></AppShell>;
   const p = d.person;
 
   return (
@@ -114,7 +114,7 @@ export function Details({ threadId, base = "/messages" }: { threadId: string; ba
             </button>
           ))}
           <textarea value={reportNote} onChange={(e) => setReportNote(e.target.value)} rows={2} placeholder="Add a note (optional)" className="mt-3 w-full rounded-8 bg-surface-2 p-3 text-15 text-ink-primary outline-none" />
-          <button onClick={async () => { setReportOpen(false); await chatApi.reportUser(threadId, reportReason, reportNote); toast.show("Report submitted", { variant: "success" }); }} className="mt-3 h-11 w-full rounded-8 bg-error text-15 font-semibold text-white">Submit Report</button>
+          <button onClick={async () => { setReportOpen(false); await chatApi.reportUser(threadId, reportReason, reportNote); toast.show("Report submitted", { variant: "success" }); }} className="mt-3 h-11 w-full rounded-8 bg-error text-15 font-semibold text-ink-inverse">Submit Report</button>
         </div>
       </BottomSheet>
 

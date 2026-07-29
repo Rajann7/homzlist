@@ -31,6 +31,7 @@ async function req<T>(path: string, method: string, body?: unknown): Promise<Api
 }
 
 export type Tab = "my-listings" | "my-inquiries" | "requirement-leads" | "my-responses";
+export type InboxSection = "received" | "sent";
 
 /**
  * Upload one chat photo: presign (server picks the public chat bucket) → PUT the
@@ -75,6 +76,12 @@ export async function uploadChatPhoto(
 }
 
 export const chatApi = {
+  /** The subject-grouped home: `received` = on my posts, `sent` = I contacted. */
+  inbox: (section: InboxSection, opts: { q?: string } = {}) => {
+    const p = new URLSearchParams({ section });
+    if (opts.q) p.set("q", opts.q);
+    return req<any>(`/chat/inbox?${p.toString()}`, "GET");
+  },
   threads: (tab: Tab, opts: { grouping?: boolean; unread?: boolean; q?: string } = {}) => {
     const p = new URLSearchParams({ tab });
     if (opts.grouping) p.set("grouping", "1");
@@ -97,7 +104,11 @@ export const chatApi = {
   reportMsg: (msgId: string, reason: string, note?: string) => req<any>(`/chat/messages/${msgId}`, "POST", { reason, note }),
   requestNumber: (id: string) => req<any>(`/chat/threads/${id}/number`, "POST", { action: "request" }),
   numberRespond: (id: string, allow: boolean) => req<any>(`/chat/threads/${id}/number`, "POST", { action: "respond", allow }),
-  proposeVisit: (id: string, scheduledAt: string) => req<any>(`/chat/threads/${id}/visit`, "POST", { scheduledAt }),
+  proposeVisit: (id: string, scheduledAt: string) => req<any>(`/chat/threads/${id}/visit`, "POST", { action: "propose", scheduledAt }),
+  // Confirm / move / call off / record the outcome of the thread's visit, from
+  // inside the chat it was proposed in.
+  visitAct: (id: string, input: { action: "confirm" | "reschedule" | "cancel" | "outcome"; scheduledAt?: string; reason?: string; outcome?: "done" | "cancelled" }) =>
+    req<any>(`/chat/threads/${id}/visit`, "POST", input),
   continuity: (id: string, answer: "interested" | "not_interested" | "visit_fixed") => req<any>(`/chat/threads/${id}/continuity`, "POST", { answer }),
   block: (id: string, action: "block" | "unblock") => req<any>(`/chat/threads/${id}/block`, "POST", { action }),
   reportUser: (id: string, reason: string, note?: string) => req<any>(`/chat/threads/${id}/block`, "POST", { action: "report", reason, note }),

@@ -49,14 +49,33 @@ export async function getProfileById(id: string): Promise<FullProfile | null> {
 
 /** Valid username shape — also blocks LIKE metacharacters (%, _) reaching the query. */
 export const USERNAME_RE = /^[a-z0-9]{3,40}$/;
+// A username can never contain a hyphen, so the two forms can't collide.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export async function getProfileByUsername(username: string): Promise<FullProfile | null> {
+/**
+ * Resolve a public profile by its @username OR by its id.
+ *
+ * The id form matters because the places that link to a person from a
+ * conversation only ever hold an id: chat's ⋯ → "View profile", the Message
+ * Requests cards, the Blocked-users list. They all pushed `/profile/<uuid>`,
+ * which matched no username and left the profile screen on a permanent skeleton
+ * with the raw UUID as its title.
+ *
+ * Both forms are exact matches on an indexed column, so neither enables
+ * enumeration any more than the other: a UUID is not guessable, and usernames
+ * were already publicly addressable.
+ */
+export async function getProfileByUsername(handle: string): Promise<FullProfile | null> {
+  const db = createServiceClient();
   // Audit M1: exact (case-insensitive) match, never `ilike` with a raw param —
   // `%`/`_` would act as wildcards and enable enumeration. Stored usernames are
   // always lowercased (makeUsername), so a lowercased `eq` is an exact match.
-  const uname = username.toLowerCase();
+  const uname = handle.toLowerCase();
+  if (UUID_RE.test(uname)) {
+    const { data } = await db.from("profiles").select(SELECT).eq("id", uname).maybeSingle();
+    return (data as FullProfile) ?? null;
+  }
   if (!USERNAME_RE.test(uname)) return null;
-  const db = createServiceClient();
   const { data } = await db.from("profiles").select(SELECT).eq("username", uname).maybeSingle();
   return (data as FullProfile) ?? null;
 }

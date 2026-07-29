@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
@@ -157,10 +158,17 @@ const QUICK = [
 ];
 export function InquirySheet({ open, onClose, card }: { open: boolean; onClose: () => void; card: FeedCard | null }) {
   const toast = useToast();
+  const router = useRouter();
   const [message, setMessage] = useState("");
   const [intents, setIntents] = useState<Set<string>>(new Set(["site_visit"]));
   const [share, setShare] = useState(true);
   const [busy, setBusy] = useState(false);
+
+  // A project is the third inquiry subject (migration 0084). The sheet is the
+  // same one buyers already know; only the two listing-only controls (intent
+  // chips and share-number, both stored on the `inquiries` row a project has
+  // no equivalent of) are absent rather than shown dead.
+  const isProject = card?.kind === "project";
 
   const prefill = card
     ? `Hi, I'm interested in your ${card.title ?? card.meta ?? "property"}${card.areaLabel ? ` at ${card.areaLabel}` : ""}${
@@ -171,10 +179,29 @@ export function InquirySheet({ open, onClose, card }: { open: boolean; onClose: 
   const send = async () => {
     if (!card) return;
     setBusy(true);
-    const res = await interactionsApi.inquiry(card.id, { message: message.trim() || prefill, intents: [...intents], shareNumber: share });
+    const res = isProject
+      ? await interactionsApi.projectInquiry(card.id, { message: message.trim() || prefill })
+      : await interactionsApi.inquiry(card.id, { message: message.trim() || prefill, intents: [...intents], shareNumber: share });
     setBusy(false);
-    if (res.ok) { onClose(); setMessage(""); toast.show(res.data.alreadySent ? "Inquiry updated" : "Inquiry sent — waiting for owner to accept"); }
-    else if (res.error.code === "SELF_ACTION_BLOCKED") { toast.show("This is your own listing"); onClose(); }
+    if (res.ok) {
+      onClose(); setMessage("");
+      // A project chat opens immediately (0086), so the sender lands in it
+      // rather than being told to wait for an accept that never comes.
+      const threadId = (res.data as { threadId?: string | null }).threadId;
+      if (isProject && threadId) { toast.show("Message sent"); router.push(`/messages/${threadId}`); return; }
+      toast.show(res.data.alreadySent ? "Inquiry updated" : "Inquiry sent — waiting for the owner to accept");
+    }
+    else if (res.error.code === "SELF_ACTION_BLOCKED") { toast.show(`This is your own ${isProject ? "project" : "listing"}`); onClose(); }
+    // The poster declined an earlier inquiry — say when it re-opens instead of a
+    // dead "couldn't send" the sender can only read as a bug.
+    else if (res.error.code === "INQUIRY_COOLDOWN") {
+      const until = (res.error as { until?: string }).until;
+      const when = until ? new Date(until).toLocaleDateString("en-IN", { day: "numeric", month: "short", timeZone: "Asia/Kolkata" }) : "";
+      toast.show(when ? `Inquiry declined — you can send a new one after ${when}` : "You can't inquire on this listing yet", { variant: "error" });
+      onClose();
+    }
+    else if (res.error.code === "PROFILE_INCOMPLETE") { toast.show("Add your name and city to your profile first", { variant: "error" }); onClose(); }
+    else if (res.error.code === "FORBIDDEN") { toast.show("You can't inquire on this listing", { variant: "error" }); onClose(); }
     else toast.show("Couldn't send that inquiry");
   };
 
@@ -187,24 +214,28 @@ export function InquirySheet({ open, onClose, card }: { open: boolean; onClose: 
           rows={3}
           className="w-full resize-none rounded-8 bg-surface-2 p-3 text-15 text-ink-primary outline-none"
         />
-        <div>
-          <div className="mb-2 text-13 font-semibold text-ink-secondary">Quick questions</div>
-          <div className="flex flex-wrap gap-2">
-            {QUICK.map((q) => {
-              const on = intents.has(q.key);
-              return (
-                <button key={q.key} onClick={() => setIntents((s) => { const n = new Set(s); on ? n.delete(q.key) : n.add(q.key); return n; })}
-                  className={cn("rounded-full px-3 py-1.5 text-13 font-semibold", on ? "bg-accent-soft text-accent" : "bg-surface-2 text-ink-primary")}>
-                  {q.label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-        <div className="flex items-center gap-3 rounded-8 bg-surface-2 p-3">
-          <span className="flex-1 text-13 text-ink-primary">Share my number with owner</span>
-          <Toggle checked={share} onChange={setShare} label="Share my number" />
-        </div>
+        {!isProject && (
+          <>
+            <div>
+              <div className="mb-2 text-13 font-semibold text-ink-secondary">Quick questions</div>
+              <div className="flex flex-wrap gap-2">
+                {QUICK.map((q) => {
+                  const on = intents.has(q.key);
+                  return (
+                    <button key={q.key} onClick={() => setIntents((s) => { const n = new Set(s); on ? n.delete(q.key) : n.add(q.key); return n; })}
+                      className={cn("rounded-full px-3 py-1.5 text-13 font-semibold", on ? "bg-accent-soft text-accent" : "bg-surface-2 text-ink-primary")}>
+                      {q.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="flex items-center gap-3 rounded-8 bg-surface-2 p-3">
+              <span className="flex-1 text-13 text-ink-primary">Share my number with owner</span>
+              <Toggle checked={share} onChange={setShare} label="Share my number" />
+            </div>
+          </>
+        )}
         <Button fullWidth loading={busy} onClick={() => void send()}>Send Inquiry</Button>
       </div>
     </BottomSheet>

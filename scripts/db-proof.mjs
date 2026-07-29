@@ -16,12 +16,28 @@ for (const l of fs.readFileSync(path.join(ROOT, ".env.local"), "utf8").split(/\r
   if (m) E[m[1]] = m[2].replace(/^["']|["']$/g, "");
 }
 
-const c = new pg.Client({
-  host: `db.${E.SUPABASE_PROJECT_REF}.supabase.co`,
-  port: 5432, user: "postgres", password: E.SUPABASE_DB_PASSWORD,
-  database: "postgres", ssl: { rejectUnauthorized: false },
-});
-await c.connect();
+// Direct host first, then the regional poolers. Proof that can't connect is no
+// proof at all, and the direct host's DNS is intermittent.
+const REF = E.SUPABASE_PROJECT_REF;
+const CANDIDATES = [
+  { host: `db.${REF}.supabase.co`, port: 5432, user: "postgres" },
+  ...["ap-south-1", "ap-southeast-1", "us-east-1", "eu-central-1"].flatMap((r) => [
+    { host: `aws-0-${r}.pooler.supabase.com`, port: 5432, user: `postgres.${REF}` },
+    { host: `aws-0-${r}.pooler.supabase.com`, port: 6543, user: `postgres.${REF}` },
+  ]),
+];
+let c = null;
+let lastErr;
+for (const cand of CANDIDATES) {
+  const client = new pg.Client({
+    host: cand.host, port: cand.port, user: cand.user,
+    password: E.SUPABASE_DB_PASSWORD, database: "postgres",
+    ssl: { rejectUnauthorized: false }, connectionTimeoutMillis: 8000,
+  });
+  try { await client.connect(); c = client; break; }
+  catch (e) { lastErr = e; try { await client.end(); } catch {} }
+}
+if (!c) { console.error(`db connect failed: ${lastErr?.message}`); process.exit(1); }
 console.log(`Supabase project: ${E.SUPABASE_PROJECT_REF}\n`);
 
 const TABLES = [

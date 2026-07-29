@@ -185,6 +185,9 @@ export async function ensureInquiryThread(inquiry: {
   if (existing.data) {
     const id = (existing.data as { id: string }).id;
     // Re-inquiry revives a declined thread and refreshes its source pointer.
+    // The caller (sendInquiry) has already refused a send inside a live decline
+    // cooldown, so reaching here means the cooldown lapsed — clearing it is
+    // correct, and it is the ONLY thing that clears it.
     await db().from("chat_threads").update({ source_inquiry_id: inquiry.id, status: "pending", cooldown_until: null }).eq("id", id);
     return id;
   }
@@ -225,6 +228,88 @@ export async function ensureInquiryThread(inquiry: {
 }
 
 /**
+ * Ensure a thread for a PROJECT inquiry (migration 0084).
+ *
+ * A project chat opens ACCEPTED — it never becomes a request card (Rajan,
+ * 29 Jul 2026). Accept-before-seen exists to protect a private seller's inbox
+ * from strangers; a project is a marketing listing whose builder publishes
+ * their phone number on the page (Doc2 §6), so making them tap Accept before
+ * they can read a buyer's question is a step that protects nobody and loses
+ * leads. The conversation is live for both sides from the first message, and
+ * the builder's pipeline row is written immediately rather than on an accept
+ * that will never come.
+ *
+ * There is deliberately no `inquiries` row behind it: that table is listing-only
+ * (`listing_id not null`, 0026), and widening it would mean rewriting every
+ * reader of it. The thread IS the record.
+ *
+ * One thread per (buyer, project), enforced by `chat_threads_project_uniq`.
+ */
+export async function ensureProjectInquiryThread(input: {
+  buyerId: string; projectId: string; builderId: string; message: string;
+}): Promise<string> {
+  const existing = await db()
+    .from("chat_threads")
+    .select("id,status,cooldown_until")
+    .eq("kind", "inquiry")
+    .eq("buyer_id", input.buyerId)
+    .eq("project_id", input.projectId)
+    .maybeSingle();
+  if (existing.data) {
+    const row = existing.data as { id: string };
+    await db().from("chat_threads").update({ status: "accepted", cooldown_until: null }).eq("id", row.id);
+    await db().from("chat_messages").insert({
+      thread_id: row.id, sender_id: input.buyerId, kind: "text", body: input.message,
+    });
+    await db().from("chat_threads").update({
+      last_message_preview: input.message.slice(0, 140),
+      last_message_kind: "text",
+      last_message_sender: input.buyerId,
+      last_message_at: new Date().toISOString(),
+    }).eq("id", row.id);
+    // A re-opened chat is still a live lead for the builder.
+    await upsertLeadFromThread(row.id, { activity: "Asked about the project" });
+    await Promise.all([pingThread(row.id), pingInbox(input.builderId)]);
+    return row.id;
+  }
+
+  const { data: created } = await db()
+    .from("chat_threads")
+    .insert({
+      kind: "inquiry",
+      buyer_id: input.buyerId,
+      poster_id: input.builderId,
+      project_id: input.projectId,
+      status: "accepted",
+      last_message_preview: input.message.slice(0, 140),
+      last_message_kind: "text",
+      last_message_sender: input.buyerId,
+    })
+    .select("id")
+    .single();
+  const threadId = (created as { id: string }).id;
+  await seedParticipants(threadId, input.buyerId, input.builderId);
+  await db().from("chat_messages").insert({
+    thread_id: threadId, sender_id: input.buyerId, kind: "text", body: input.message,
+  });
+  // The chat IS the lead — there is no accept tap to hang it off.
+  await upsertLeadFromThread(threadId, { activity: "Asked about the project" });
+
+  const { data: proj } = await db().from("projects").select("name,cover_url").eq("id", input.projectId).maybeSingle();
+  const p = proj as { name: string; cover_url: string | null } | null;
+  await notify({
+    profileId: input.builderId, type: "inquiry_received", actorId: input.buyerId, threadId,
+    title: `**${await nameOf(input.buyerId)}** sent an inquiry on your project ${p?.name ?? ""}`.trim(),
+    body: `${await nameOf(input.buyerId)} sent you an inquiry`,
+    thumbUrl: p?.cover_url ?? null,
+    entityKind: "project", entityId: input.projectId,
+    data: { threadId, projectId: input.projectId },
+  });
+  await Promise.all([pingThread(threadId), pingInbox(input.builderId)]);
+  return threadId;
+}
+
+/**
  * Ensure a thread for a proposal. The proposal's message + attached listing (if
  * any) seed the conversation; the buyer's number is auto-visible to the poster
  * (Doc2 §8.1) — a `number_card` from the buyer is written so the poster sees it.
@@ -258,6 +343,31 @@ export async function ensureProposalThread(proposal: {
   await db().from("chat_messages").insert({
     thread_id: threadId, sender_id: proposal.sender_id, kind: "text", body: proposal.message,
   });
+  // Mode "I have a property" → the attached listing belongs IN the conversation
+  // as the rich card the spec asks for. It was only ever reachable from the
+  // request card and the Details screen's "shared listings", so once the poster
+  // accepted, the property being proposed vanished from the chat itself.
+  if (proposal.mode === "listing" && proposal.listing_id) {
+    const { data: l } = await db()
+      .from("listings")
+      .select("id,title,price_paise,price_on_request,cover_url,area_label")
+      .eq("id", proposal.listing_id)
+      .maybeSingle();
+    const row = l as any;
+    if (row) {
+      await db().from("chat_messages").insert({
+        thread_id: threadId, sender_id: proposal.sender_id, kind: "link", body: null,
+        // Same meta shape the pasted-link preview produces, so ONE renderer
+        // draws both (thumb + live price + details, clickable through).
+        meta: {
+          kind: "listing", entityId: row.id, title: row.title,
+          subtitle: [row.price_on_request ? "Price on request" : formatShortRupees(Number(row.price_paise ?? 0)), row.area_label].filter(Boolean).join(" · "),
+          cover: row.cover_url, domain: "homzlist.com", external: false,
+          url: `https://homzlist.com/property/${row.id}`,
+        },
+      });
+    }
+  }
   await db().from("proposals").update({ thread_id: threadId }).eq("id", proposal.id);
   // designs/P11 S7: "<b>RK Properties</b> sent a proposal on your requirement
   // (3 BHK, ₹40–60 L)" — the requirement's own attributes, not a generic line.
@@ -277,6 +387,56 @@ export async function ensureProposalThread(proposal: {
 async function nameOf(id: string): Promise<string> {
   const { data } = await db().from("profiles").select("name").eq("id", id).maybeSingle();
   return (data as { name?: string } | null)?.name ?? "Someone";
+}
+
+/**
+ * Create (or refresh) the poster's pipeline lead for a thread — the single place
+ * a chat turns into a lead (Doc2 §10.4).
+ *
+ * `source` is the thread's own kind, so the Leads screen and the CSV export can
+ * finally tell a property inquiry from a requirement proposal. Idempotent by the
+ * partial unique indexes added in 0081: an accept, a re-accept and a continuity
+ * answer all land on ONE row rather than stacking duplicates in the pipeline.
+ */
+export async function upsertLeadFromThread(threadId: string, patch: { stage?: string; activity?: string } = {}): Promise<void> {
+  const { data } = await db()
+    .from("chat_threads")
+    .select("id,kind,buyer_id,poster_id,listing_id,requirement_id,project_id")
+    .eq("id", threadId)
+    .maybeSingle();
+  const t = data as { kind: string; buyer_id: string; poster_id: string; listing_id: string | null; requirement_id: string | null; project_id: string | null } | null;
+  if (!t) return;
+
+  // Match on the SAME key the unique indexes use, so the lookup can never miss a
+  // row the insert would then collide with.
+  let find = db().from("leads").select("id,stage").eq("owner_id", t.poster_id).eq("lead_profile_id", t.buyer_id);
+  find = t.listing_id ? find.eq("listing_id", t.listing_id)
+    : t.project_id ? find.is("listing_id", null).eq("project_id", t.project_id)
+    : t.requirement_id ? find.is("listing_id", null).eq("requirement_id", t.requirement_id)
+    : find.is("listing_id", null).is("requirement_id", null);
+  const { data: existing } = await find.maybeSingle();
+
+  const activity = patch.activity ?? (t.kind === "proposal" ? "Proposal accepted" : "Inquiry accepted");
+  if (existing) {
+    const update: Record<string, unknown> = { last_activity: activity, last_activity_at: new Date().toISOString() };
+    // Never drag a lead BACKWARDS: an accept on an already-progressed lead
+    // refreshes its activity, it doesn't reset a Negotiation back to New.
+    if (patch.stage) update.stage = patch.stage;
+    await db().from("leads").update(update).eq("id", (existing as { id: string }).id);
+    return;
+  }
+  await db().from("leads").insert({
+    owner_id: t.poster_id,
+    lead_profile_id: t.buyer_id,
+    listing_id: t.listing_id,
+    project_id: t.project_id,
+    requirement_id: t.listing_id || t.project_id ? null : t.requirement_id,
+    // 0081 made `project` a real lead source; a project chat is filed as one so
+    // the Leads screen and the CSV export can tell it from a property inquiry.
+    source: t.project_id ? "project" : t.kind === "proposal" ? "proposal" : "inquiry",
+    stage: patch.stage ?? "new",
+    last_activity: activity,
+  });
 }
 
 async function seedParticipants(threadId: string, buyerId: string, posterId: string) {
@@ -312,15 +472,23 @@ export async function getRequests(posterId: string) {
 
   const senderIds = threads.map((t) => t.buyer_id);
   const inquiryIds = threads.map((t) => t.source_inquiry_id).filter((x): x is string => !!x);
-  const [people, levels, listings, reqs, inqData] = await Promise.all([
+  const [people, levels, listings, reqs, inqData, projectData] = await Promise.all([
     profilesByIds(senderIds),
     verificationLevels(senderIds),
     listingsByIds(threads.flatMap((t) => [t.listing_id, t.attached_listing_id])),
     requirementsByIds(threads.map((t) => t.requirement_id).filter((x): x is string => !!x)),
     inquiryIds.length ? db().from("inquiries").select("id,intents").in("id", inquiryIds) : Promise.resolve({ data: [] as any[] }),
+    // A project request would otherwise arrive with no subject at all — the
+    // builder would see "someone wants to chat" and nothing about what.
+    projectsByIds(threads.map((t: any) => t.project_id)),
   ]);
   // Intent chips ("Site visit?", "Negotiable?") the sender ticked (Doc4 §35).
-  const INTENT_LABEL: Record<string, string> = { visit: "Site visit?", negotiable: "Negotiable?", price: "Price?", availability: "Still available?", loan: "Loan help?", documents: "Documents?" };
+  // Keys must match what the Inquiry sheet actually stores (components/feed/
+  // sheets.tsx QUICK) — they didn't, so a ticked "Site visit?" reached the poster
+  // as the raw string `site_visit`. Labels are the sheet's own labels verbatim.
+  const INTENT_LABEL: Record<string, string> = {
+    site_visit: "Site visit?", negotiable: "Negotiable?", documents: "Documents ready?", loan: "Loan available?",
+  };
   const intentsByInquiry = new Map((inqData.data as { id: string; intents: string[] }[] ?? []).map((i) => [i.id, i.intents ?? []]));
 
   const cards = threads.map((t) => {
@@ -341,6 +509,12 @@ export async function getRequests(posterId: string) {
       listingCard: listingCard(listings.get(t.listing_id ?? "")),
       attachedCard: listingCard(listings.get(t.attached_listing_id ?? "")),
       requirementCard: requirementCard(reqs.get(t.requirement_id ?? "")),
+      projectCard: (() => {
+        const pj = projectData.projects.get((t as any).project_id ?? "");
+        return pj
+          ? { id: pj.id, title: pj.name, priceLabel: projectData.prices.get(pj.id) ?? null, cover: pj.cover_url, status: pj.status, area: pj.area_label }
+          : null;
+      })(),
       verified: level === "id" || level === "rera",
     };
   });
@@ -361,6 +535,11 @@ export async function acceptRequest(threadId: string, posterId: string): Promise
   const t = data as { id: string; poster_id: string; status: string; source_inquiry_id: string | null; source_proposal_id: string | null } | null;
   if (!t || t.poster_id !== posterId || t.status !== "pending") return { ok: false };
   await db().from("chat_threads").update({ status: "accepted" }).eq("id", threadId);
+  // Accepting IS the lead. Until now a lead row only appeared if someone happened
+  // to answer the post-number continuity prompt, so a broker could accept twenty
+  // inquiries and open an empty pipeline — the Leads screen promised "every lead
+  // on your listings" and delivered whatever the continuity chip had caught.
+  await upsertLeadFromThread(threadId);
   // Poster's read cursor starts now so the request message isn't "unread noise".
   await db().from("thread_participants").update({ last_read_at: new Date().toISOString() }).eq("thread_id", threadId).eq("profile_id", posterId);
   if (t.source_inquiry_id) await db().from("inquiries").update({ status: "accepted" }).eq("id", t.source_inquiry_id);
@@ -383,7 +562,7 @@ export async function acceptRequest(threadId: string, posterId: string): Promise
 
 /** Decline → 30-day cooldown on re-inquiry (Doc7 §90). */
 export async function declineRequest(threadId: string, posterId: string): Promise<{ ok: boolean }> {
-  const { data } = await db().from("chat_threads").select("id,poster_id,status,source_inquiry_id,source_proposal_id")
+  const { data } = await db().from("chat_threads").select("id,buyer_id,poster_id,status,source_inquiry_id,source_proposal_id")
     .eq("id", threadId).maybeSingle();
   const t = data as any;
   if (!t || t.poster_id !== posterId || t.status !== "pending") return { ok: false };
@@ -391,6 +570,17 @@ export async function declineRequest(threadId: string, posterId: string): Promis
   await db().from("chat_threads").update({ status: "declined", cooldown_until: until }).eq("id", threadId);
   if (t.source_inquiry_id) await db().from("inquiries").update({ status: "declined" }).eq("id", t.source_inquiry_id);
   if (t.source_proposal_id) await db().from("proposals").update({ status: "declined", responded_at: new Date().toISOString() }).eq("id", t.source_proposal_id);
+  // The sender had no way to learn they'd been declined except by re-opening the
+  // thread: accept notified them, decline said nothing and pushed nothing live.
+  // Both sides of the decision now behave the same way.
+  const cooldownDate = new Date(until).toLocaleDateString("en-IN", { day: "numeric", month: "short", timeZone: "Asia/Kolkata" });
+  await notify({
+    profileId: t.buyer_id, type: "chat_declined", actorId: posterId, threadId,
+    title: `**${await nameOf(posterId)}** declined your inquiry`,
+    body: `You can send a new one after ${cooldownDate}`,
+    data: { threadId, cooldownUntil: until },
+  });
+  await Promise.all([pingThread(threadId), pingInbox(t.buyer_id), pingInbox(posterId)]);
   return { ok: true };
 }
 
@@ -525,6 +715,250 @@ export async function getThreads(
     rows: g.rows,
   }));
   return { grouped: true, groups, statusCounts };
+}
+
+// ---------------------------------------------------------------------------
+// INBOX — the subject-grouped Messages home (two sections)
+// ---------------------------------------------------------------------------
+
+/**
+ * The Messages screen is a list of SUBJECTS, not of people.
+ *
+ * Two sections, and a thread can only ever be in one of them:
+ *   received — `poster_id = me`. Someone came to MY listing / project /
+ *              requirement. (Pending ones are requests, surfaced by the
+ *              requests strip and the Requests screen, not as cards here.)
+ *   sent     — `buyer_id = me`. I went to SOMEONE ELSE'S post.
+ *
+ * Inside a section, threads are grouped by their one subject (0084 makes that
+ * single by constraint) and each group carries a computed sentence — "4 buyers
+ * asked about your property", "You offered 2 BHK Shela — ₹47 L · no reply for
+ * 4 days". That sentence is server-computed for the same reason every other
+ * number here is: the browser must not derive business truth.
+ */
+export type InboxSection = "received" | "sent";
+
+interface SubjectDTO {
+  kind: "listing" | "project" | "requirement";
+  id: string;
+  title: string;          // FULL title — the client never truncates it
+  cover: string | null;
+  priceLabel: string | null;
+  meta: string | null;    // "Satellite · listed by you" / "by Kiran Mehta"
+  href: string;           // tapping the card opens the real post
+  gone: boolean;          // subject deleted/expired — the chat outlives it
+}
+
+async function projectsByIds(ids: (string | null | undefined)[]) {
+  const uniq = [...new Set(ids.filter((x): x is string => !!x))];
+  if (!uniq.length) return { projects: new Map<string, any>(), prices: new Map<string, string>() };
+  const [{ data }, { data: units }] = await Promise.all([
+    db().from("projects").select("id,name,cover_url,area_label,status,build_status,profile_id").in("id", uniq),
+    db().from("project_units").select("project_id,price_from_paise").in("project_id", uniq),
+  ]);
+  // Price range is the units' own min–max; a project has no price of its own.
+  const byProject = new Map<string, number[]>();
+  for (const u of (units as { project_id: string; price_from_paise: number | null }[] ?? [])) {
+    if (!u.price_from_paise) continue;
+    byProject.set(u.project_id, [...(byProject.get(u.project_id) ?? []), Number(u.price_from_paise)]);
+  }
+  const prices = new Map<string, string>();
+  for (const [id, list] of byProject) {
+    const lo = Math.min(...list), hi = Math.max(...list);
+    prices.set(id, lo === hi ? formatShortRupees(lo) : `${formatShortRupees(lo)} – ${formatShortRupees(hi)}`);
+  }
+  return { projects: new Map((data as any[] ?? []).map((p) => [p.id, p])), prices };
+}
+
+/** A requirement written as a sentence, not a code string. */
+function requirementTitle(r: any): string {
+  if (!r) return "Requirement";
+  const bhk = r.bhk ? `${r.bhk} BHK` : "property";
+  const how = r.kind === "rent" ? " on rent" : "";
+  const where = r.area_label ? ` in ${r.area_label}` : "";
+  const max = r.budget_max_paise ? ` under ${formatShortRupees(Number(r.budget_max_paise))}` : "";
+  return `Looking for ${bhk}${how}${where}${max}`;
+}
+
+function daysSince(iso: string): number {
+  return Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
+}
+
+export async function getInbox(me: string, section: InboxSection, opts: { search?: string } = {}) {
+  const { data } = await db()
+    .from("chat_threads")
+    .select("*")
+    .or(`buyer_id.eq.${me},poster_id.eq.${me}`)
+    .order("last_message_at", { ascending: false });
+  const all = (data as ThreadRow[] & { project_id: string | null }[]) ?? [];
+
+  const parts = await db().from("thread_participants").select("*").eq("profile_id", me).in("thread_id", all.map((t) => t.id));
+  const partMap = new Map((parts.data as any[] ?? []).map((p) => [p.thread_id, p]));
+  const live = all.filter((t) => !partMap.get(t.id)?.archived);
+
+  const unread = await unreadMap(
+    live.map((t) => t.id),
+    me,
+    new Map(live.map((t) => [t.id, partMap.get(t.id)?.last_read_at ?? "epoch"])),
+  );
+
+  // Both section counts, always — they are the two segment sub-labels.
+  const inReceived = (t: any) => t.poster_id === me && t.status !== "pending";
+  const inSent = (t: any) => t.buyer_id === me;
+  const counts = {
+    received: {
+      chats: live.filter(inReceived).length,
+      unread: live.filter((t) => inReceived(t) && (unread.get(t.id) ?? 0) > 0).length,
+    },
+    sent: {
+      chats: live.filter(inSent).length,
+      unread: live.filter((t) => inSent(t) && (unread.get(t.id) ?? 0) > 0).length,
+    },
+  };
+
+  const threads = live.filter(section === "received" ? inReceived : inSent);
+
+  const otherIds = threads.map((t) => (t.buyer_id === me ? t.poster_id : t.buyer_id));
+  const [people, levels, listings, reqs, projectData] = await Promise.all([
+    profilesByIds(otherIds),
+    verificationLevels(otherIds),
+    listingsByIds(threads.flatMap((t: any) => [t.listing_id, t.attached_listing_id])),
+    requirementsByIds(threads.map((t) => t.requirement_id).filter((x): x is string => !!x)),
+    projectsByIds(threads.map((t: any) => t.project_id)),
+  ]);
+  const { projects, prices } = projectData;
+
+  // Proposal status drives the per-row state chip on requirement threads.
+  const propIds = threads.map((t) => t.source_proposal_id).filter(Boolean) as string[];
+  const propStatus = new Map<string, string>();
+  if (propIds.length) {
+    const { data: pr } = await db().from("proposals").select("id,status").in("id", propIds);
+    for (const p of (pr as any[] ?? [])) propStatus.set(p.id, p.status);
+  }
+
+  const rows = threads.map((t: any) => {
+    const otherId = t.buyer_id === me ? t.poster_id : t.buyer_id;
+    const p = people.get(otherId);
+    const level = levels.get(otherId) ?? null;
+    const part = partMap.get(t.id);
+    const previewOwn = t.last_message_sender === me;
+    const status = t.source_proposal_id ? propStatus.get(t.source_proposal_id) ?? t.status : t.status;
+
+    // The subject — exactly one of the three.
+    const listing = listings.get(t.listing_id ?? "");
+    const project = projects.get(t.project_id ?? "");
+    const requirement = reqs.get(t.requirement_id ?? "");
+    const attached = listings.get(t.attached_listing_id ?? "");
+
+    let subject: SubjectDTO;
+    if (project) {
+      subject = {
+        kind: "project", id: project.id, title: project.name,
+        cover: project.cover_url, priceLabel: prices.get(project.id) ?? null,
+        meta: [project.area_label, section === "received" ? "your project" : null].filter(Boolean).join(" · ") || null,
+        href: `/projects/${project.id}`,
+        gone: project.status !== "live",
+      };
+    } else if (listing) {
+      subject = {
+        kind: "listing", id: listing.id, title: listing.title,
+        cover: listing.cover_url,
+        priceLabel: listing.price_on_request ? "Price on request" : formatShortRupees(Number(listing.price_paise ?? 0)),
+        meta: [listing.area_label, section === "received" ? "listed by you" : p ? `by ${p.name ?? "owner"}` : null].filter(Boolean).join(" · ") || null,
+        href: `/property/${listing.id}`,
+        gone: listing.status !== "live",
+      };
+    } else if (requirement) {
+      subject = {
+        kind: "requirement", id: requirement.id, title: requirementTitle(requirement),
+        cover: null, priceLabel: null,
+        meta: section === "received" ? "your requirement" : p ? `by ${p.name ?? "poster"}` : null,
+        href: `/requirements/${requirement.id}`,
+        gone: requirement.status === "expired" || !requirement.is_active,
+      };
+    } else {
+      // The post was deleted; `on delete set null` keeps the conversation.
+      subject = {
+        kind: t.kind === "proposal" ? "requirement" : "listing", id: "",
+        title: "This post was removed", cover: null, priceLabel: null,
+        meta: null, href: "", gone: true,
+      };
+    }
+
+    return {
+      threadId: t.id,
+      subject,
+      subjectKey: project?.id ?? listing?.id ?? requirement?.id ?? `gone:${t.id}`,
+      attachedTitle: attached?.title ?? null,
+      attachedPrice: attached ? (attached.price_on_request ? "Price on request" : formatShortRupees(Number(attached.price_paise ?? 0))) : null,
+      person: { ...personDTO(p, level), roleTag: roleTag(p?.role ?? null) },
+      preview: t.last_message_kind === "photo" ? "Photo" : t.last_message_preview ?? "",
+      previewOwn,
+      timeLabel: timeAgo(t.last_message_at),
+      lastMessageAt: t.last_message_at,
+      idleDays: daysSince(t.last_message_at),
+      unread: unread.get(t.id) ?? 0,
+      muted: !!part?.muted,
+      pinned: !!part?.pinned,
+      pending: t.status === "pending",
+      declined: t.status === "declined",
+      proposalStatus: t.kind === "proposal" ? status : null,
+    };
+  });
+
+  // Search filters the ROWS; a group survives if any of its rows match.
+  const q = opts.search?.trim().toLowerCase();
+  const kept = q
+    ? rows.filter((r) => r.person.name.toLowerCase().includes(q) || r.subject.title.toLowerCase().includes(q) || r.preview.toLowerCase().includes(q))
+    : rows;
+
+  const byKey = new Map<string, typeof kept>();
+  for (const r of kept) byKey.set(r.subjectKey, [...(byKey.get(r.subjectKey) ?? []), r]);
+
+  const groups = [...byKey.entries()].map(([key, list]) => {
+    const first = list[0];
+    const unreadCount = list.reduce((n, r) => n + (r.unread > 0 ? 1 : 0), 0);
+    const n = list.length;
+    const kind = first.subject.kind;
+
+    // ── the one sentence that explains the card ──────────────────────────────
+    let summary: string;
+    if (section === "received") {
+      summary =
+        kind === "requirement"
+          ? `${n} ${n === 1 ? "person offered" : "people offered"} you a property`
+          : `${n} ${n === 1 ? "buyer asked" : "buyers asked"} about your ${kind === "project" ? "project" : "property"}`;
+    } else if (kind === "requirement") {
+      summary = first.attachedTitle
+        ? `You offered ${first.attachedTitle}${first.attachedPrice ? ` — ${first.attachedPrice}` : ""}`
+        : "You sent a proposal";
+    } else {
+      summary = `You asked about this ${kind === "project" ? "project" : "property"}`;
+    }
+
+    // ── the qualifier after it ───────────────────────────────────────────────
+    const newest = list.reduce((a, b) => (a.lastMessageAt > b.lastMessageAt ? a : b));
+    let detail: string | null = null;
+    if (unreadCount > 0) detail = `${unreadCount} unread`;
+    else if (newest.previewOwn && newest.idleDays >= 2) detail = `no reply for ${newest.idleDays} days`;
+    else if (list.every((r) => r.pending)) detail = "waiting to be accepted";
+
+    return {
+      key,
+      subject: first.subject,
+      direction: section === "received" ? "in" : "out",
+      summary,
+      detail,
+      chatCount: n,
+      unreadCount,
+      lastMessageAt: newest.lastMessageAt,
+      rows: list.sort((a, b) => (a.pinned === b.pinned ? +new Date(b.lastMessageAt) - +new Date(a.lastMessageAt) : a.pinned ? -1 : 1)),
+    };
+  });
+
+  groups.sort((a, b) => (b.unreadCount - a.unreadCount) || (+new Date(b.lastMessageAt) - +new Date(a.lastMessageAt)));
+
+  return { section, counts, groups };
 }
 
 /** Requests-row summary shown atop every tab. */

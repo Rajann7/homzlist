@@ -94,16 +94,45 @@ export async function getThread(threadId: string, me: string, opts: { before?: s
         type: "listing", id: row.id, title: row.title,
         priceLabel: row.price_on_request ? "Price on request" : formatShortRupees(Number(row.price_paise ?? 0)),
         cover: row.cover_url, status: row.status, availability: row.availability,
+        href: `/property/${row.id}`,
       };
       if (row.status === "sold" || row.status === "rented" || row.availability !== "available") listingBanner = "This property is no longer available";
       if (row.status === "archived" || row.status === "hidden") listingBanner = "This property is no longer available";
+    }
+  } else if ((t as any).project_id) {
+    // The third subject (migration 0084). A project has no price of its own —
+    // the range is its units' min–max, same as every other project surface.
+    const projectId = (t as any).project_id as string;
+    const [{ data: pj }, { data: units }] = await Promise.all([
+      db().from("projects").select("id,name,cover_url,status,area_label,build_status").eq("id", projectId).maybeSingle(),
+      db().from("project_units").select("price_from_paise").eq("project_id", projectId),
+    ]);
+    if (pj) {
+      const row = pj as any;
+      const list = ((units as { price_from_paise: number | null }[]) ?? [])
+        .map((u) => Number(u.price_from_paise ?? 0))
+        .filter((n) => n > 0);
+      const lo = list.length ? Math.min(...list) : 0;
+      const hi = list.length ? Math.max(...list) : 0;
+      pinned = {
+        type: "project", id: row.id, title: row.name,
+        priceLabel: !list.length ? null : lo === hi ? formatShortRupees(lo) : `${formatShortRupees(lo)} – ${formatShortRupees(hi)}`,
+        cover: row.cover_url, status: row.status,
+        href: `/projects/${row.id}`,
+      };
+      if (row.status !== "live") listingBanner = "This project is no longer live";
     }
   } else if (t.requirement_id) {
     const { data: r } = await db().from("requirements").select("id,kind,bhk,budget_min_paise,budget_max_paise,area_label,status,is_active").eq("id", t.requirement_id).maybeSingle();
     if (r) {
       const row = r as any;
       const budget = row.budget_min_paise ? `${formatShortRupees(Number(row.budget_min_paise))}–${formatShortRupees(Number(row.budget_max_paise)).replace(/^₹/, "")}` : "";
-      pinned = { type: "requirement", id: row.id, title: [row.bhk ? `${row.bhk} BHK` : "", budget, row.area_label].filter(Boolean).join(" · "), status: row.status };
+      pinned = {
+        type: "requirement", id: row.id, status: row.status,
+        title: `Looking for ${row.bhk ? `${row.bhk} BHK` : "property"}${row.kind === "rent" ? " on rent" : ""}${row.area_label ? ` in ${row.area_label}` : ""}${row.budget_max_paise ? ` under ${formatShortRupees(Number(row.budget_max_paise))}` : ""}`,
+        priceLabel: budget || null,
+        href: `/requirements/${row.id}`,
+      };
       if (row.status === "expired" || !row.is_active) listingBanner = "This requirement has expired — new proposals are closed";
     }
   }
@@ -176,11 +205,29 @@ export async function getThread(threadId: string, me: string, opts: { before?: s
       ? { id: other.id, name: other.name ?? "HomzList user", photo: other.photo_url, role: other.role, roleTag: other.role === "broker" ? "Broker" : other.role === "builder" ? "Builder" : "Owner", verified, deleted: other.state === "deleted", online: isOnline, lastSeen: lastSeenLabel, responseLabel: other.response_label }
       : { id: "", name: "Deleted user", deleted: true },
     pinned,
+    // Which way this conversation runs, said in words. The thread screen shows
+    // it under the subject so "whose post is this and who came to whom" is never
+    // something the reader has to work out from the bubbles.
+    context: pinned
+      ? {
+          mine: side === "poster",
+          line:
+            side === "poster"
+              ? pinned.type === "requirement"
+                ? `${other?.name ?? "They"} offered you a property`
+                : `${other?.name ?? "They"} asked about your ${pinned.type}`
+              : pinned.type === "requirement"
+                ? "You sent a proposal on this requirement"
+                : `You asked about this ${pinned.type}`,
+        }
+      : null,
     listingBanner,
     messages,
     firstUnreadId: firstUnread?.id ?? null,
     hasMore: raw.length === PAGE,
     numberAllowed: allowed,
+    // The thread's live visit (null when none) — drives the card's real controls.
+    visit: await liveVisit(threadId, me),
     block: blocks,
     myState: { pinned: !!(myPart as any)?.pinned, muted: !!(myPart as any)?.muted, archived: !!(myPart as any)?.archived },
   };
@@ -208,19 +255,30 @@ export async function sendMessage(
   const blocks = await blockState(t, me);
   if (blocks.iBlocked || blocks.blockedMe) return { ok: false, reason: "blocked" };
 
+  // Photo sending is switched OFF in chat (Rajan's instruction). Enforced here,
+  // not just by hiding the button — otherwise a crafted POST still posts images.
+  // Photos already in a thread keep rendering; only new ones are refused.
   const text = (input.text ?? "").slice(0, MESSAGE_MAX);
-  const isPhoto = !!input.photoUrl;
-  if (!isPhoto && !text.trim()) return { ok: false, reason: "empty" };
+  if (input.photoUrl) return { ok: false, reason: "photo_disabled" };
+  if (!text.trim()) return { ok: false, reason: "empty" };
 
-  const numberFlag = !isPhoto && NUMBER_PATTERN.test(text);
-  const profanityFlag = !isPhoto && PROFANITY.some((w) => text.toLowerCase().includes(w));
+  const numberFlag = NUMBER_PATTERN.test(text);
+  const profanityFlag = PROFANITY.some((w) => text.toLowerCase().includes(w));
+
+  // Link preview (Doc2 §10.2). Resolved SERVER-side, and only for our own
+  // property/project URLs — a HomzList link becomes the rich card the design
+  // draws (thumb + live price + details); anything else gets a title-less card
+  // carrying the caution strip, and we never fetch a third-party page, so a
+  // pasted link can't turn the server into an SSRF probe.
+  const preview = await linkPreview(text);
 
   const { data } = await db().from("chat_messages").insert({
     thread_id: threadId, sender_id: me,
-    kind: isPhoto ? "photo" : "text",
-    body: isPhoto ? (text || null) : text,
+    kind: preview ? "link" : "text",
+    body: text,
     photo_url: input.photoUrl ?? null, photo_w: input.photoW ?? null, photo_h: input.photoH ?? null,
     reply_to: input.replyTo && /^[0-9a-f-]{36}$/i.test(input.replyTo) ? input.replyTo : null,
+    meta: preview ?? {},
     number_flag: numberFlag, profanity_flag: profanityFlag,
   }).select("*").single();
 
@@ -245,8 +303,8 @@ export async function sendMessage(
       const first = await notify({
         profileId: recipient, type: "new_message", actorId: me, threadId,
         groupKey: `thread:${threadId}`,
-        title: `**${who}:** ${isPhoto ? "📷 Photo" : text.slice(0, 90)}`,
-        body: isPhoto ? "📷 Photo" : text.slice(0, 120),
+        title: `**${who}:** ${text.slice(0, 90)}`,
+        body: text.slice(0, 120),
         data: { threadId },
       });
       if (first.grouped && first.groupCount > 1 && first.id) {
@@ -261,6 +319,58 @@ export async function sendMessage(
   return { ok: true, message: { id: m.id, mine: true, kind: m.kind, body: m.body, photo: m.photo_url, reactions: {}, seen: false, numberFlag, createdAt: m.created_at } };
 }
 
+// A URL anywhere in the body. Only the FIRST is previewed (WhatsApp-style).
+const URL_RE = /https?:\/\/[^\s<>"']+/i;
+// Our own property / project permalinks — the only links we enrich into a card.
+const INTERNAL_RE = /^\/(?:property|projects?)\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i;
+
+/**
+ * Build a link-preview `meta` for a message body, or null when there's no link.
+ *
+ * A HomzList property/project link is resolved from OUR OWN tables — so the card
+ * shows the live title/price/cover (and stays right when the listing is edited),
+ * exactly like the pinned card. External links are marked `external` and carry
+ * no fetched metadata at all: no outbound request, no attacker-chosen content.
+ */
+async function linkPreview(text: string): Promise<Record<string, unknown> | null> {
+  const match = URL_RE.exec(text ?? "");
+  if (!match) return null;
+  let url: URL;
+  try { url = new URL(match[0]); } catch { return null; }
+
+  const host = url.hostname.toLowerCase();
+  const isOurs = host === "homzlist.com" || host.endsWith(".homzlist.com") || host === "localhost" || host === "127.0.0.1";
+  const internal = isOurs ? INTERNAL_RE.exec(url.pathname) : null;
+  if (!internal) {
+    return { url: url.toString(), domain: host, external: !isOurs };
+  }
+
+  const id = internal[1];
+  const isProject = /^\/projects?\//i.test(url.pathname);
+  if (isProject) {
+    const { data } = await db().from("projects").select("id,name,cover_url,status").eq("id", id).maybeSingle();
+    const p = data as { id: string; name: string; cover_url: string | null; status: string } | null;
+    // Only a PUBLIC project becomes a card. A draft/rejected id pasted into chat
+    // must not leak its name — it falls back to a plain domain card.
+    if (!p || p.status !== "live") return { url: url.toString(), domain: host, external: false };
+    return { url: url.toString(), domain: host, external: false, kind: "project", entityId: p.id, title: p.name, cover: p.cover_url };
+  }
+
+  const { data } = await db()
+    .from("listings")
+    .select("id,title,price_paise,price_on_request,cover_url,area_label,status")
+    .eq("id", id)
+    .maybeSingle();
+  const l = data as any;
+  if (!l || l.status !== "live") return { url: url.toString(), domain: host, external: false };
+  return {
+    url: url.toString(), domain: host, external: false, kind: "listing", entityId: l.id,
+    title: l.title,
+    subtitle: [l.price_on_request ? "Price on request" : formatShortRupees(Number(l.price_paise ?? 0)), l.area_label].filter(Boolean).join(" · "),
+    cover: l.cover_url,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // markRead / markAllRead — Doc7 §94
 // ---------------------------------------------------------------------------
@@ -268,6 +378,10 @@ export async function markRead(threadId: string, me: string): Promise<{ ok: bool
   const loaded = await loadThreadForParticipant(threadId, me);
   if (!loaded) return { ok: false };
   await db().from("thread_participants").update({ last_read_at: new Date().toISOString() }).eq("thread_id", threadId).eq("profile_id", me);
+  // `message.seen` is a realtime event (spec) — without this ping the SENDER's
+  // ticks only turned blue on their next 15-second poll, so "seen" was the one
+  // live signal in the thread that wasn't live.
+  await pingThread(threadId);
   return { ok: true };
 }
 
@@ -420,6 +534,103 @@ export async function proposeVisit(threadId: string, me: string, scheduledAt: st
   return { ok: true };
 }
 
+/**
+ * The thread's live visit, if any — what the in-thread visit card renders.
+ *
+ * The card used to be a printed date with no controls: a proposed visit could
+ * never be confirmed, moved or called off from the chat it was born in, and the
+ * `visit_confirmed` message kind the renderer already handled was never written
+ * by anything. `visits` rows are the truth; the card reads this.
+ */
+async function liveVisit(threadId: string, me: string) {
+  const { data } = await db()
+    .from("visits")
+    .select("id,scheduled_at,status,outcome,buyer_id,poster_id,cancel_reason")
+    .eq("thread_id", threadId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const v = data as {
+    id: string; scheduled_at: string; status: string; outcome: string | null;
+    buyer_id: string; poster_id: string; cancel_reason: string | null;
+  } | null;
+  if (!v) return null;
+  return {
+    id: v.id,
+    scheduledAt: v.scheduled_at,
+    status: v.status,
+    outcome: v.outcome,
+    // Whether the viewer may still act, and on what — computed server-side so
+    // the card never has to guess (and a crafted request can't act anyway).
+    canConfirm: v.status === "proposed",
+    canReschedule: v.status === "proposed" || v.status === "confirmed",
+    canCancel: v.status === "proposed" || v.status === "confirmed",
+    // The outcome prompt only makes sense once the slot has actually passed.
+    canSetOutcome: v.status === "confirmed" && new Date(v.scheduled_at) < new Date(),
+    mine: v.buyer_id === me,
+  };
+}
+
+/**
+ * Act on the thread's visit from inside the chat (Doc7 §101, Doc2 §10.2).
+ *
+ * Delegates to the same `lib/listings/visits` service the My-Visits screen uses
+ * — one state machine, not two — and then writes the chat card the design draws
+ * so the conversation carries a record of what happened.
+ */
+export async function visitAction(
+  threadId: string, me: string,
+  input: { action: "confirm" | "reschedule" | "cancel" | "outcome"; scheduledAt?: string; reason?: string; outcome?: "done" | "cancelled" },
+): Promise<{ ok: boolean; reason?: string }> {
+  const loaded = await loadThreadForParticipant(threadId, me);
+  if (!loaded) return { ok: false, reason: "not_found" };
+  const { t } = loaded;
+  if (t.status !== "accepted") return { ok: false, reason: "not_open" };
+
+  const current = await liveVisit(threadId, me);
+  if (!current) return { ok: false, reason: "no_visit" };
+
+  const { confirmVisit, rescheduleVisit, cancelVisit, setVisitOutcome } = await import("@/lib/listings/visits");
+  const whenLabel = (iso: string) =>
+    new Date(iso).toLocaleString("en-IN", { weekday: "long", day: "numeric", month: "short", hour: "numeric", minute: "2-digit", timeZone: "Asia/Kolkata" });
+
+  let done = false;
+  let card: Record<string, unknown> | null = null;
+
+  if (input.action === "confirm") {
+    done = await confirmVisit(current.id, me);
+    if (done) card = { kind: "visit_confirmed", body: "Site visit confirmed", meta: { visitId: current.id, scheduledAt: current.scheduledAt } };
+  } else if (input.action === "reschedule") {
+    const when = new Date(input.scheduledAt ?? "");
+    if (isNaN(+when)) return { ok: false, reason: "bad_date" };
+    done = await rescheduleVisit(current.id, me, when.toISOString(), null);
+    if (done) card = { kind: "visit_proposal", body: "Proposed a new time", meta: { visitId: current.id, scheduledAt: when.toISOString() } };
+  } else if (input.action === "cancel") {
+    done = await cancelVisit(current.id, me, input.reason ?? null);
+    if (done) card = { kind: "system", body: `Site visit cancelled — ${whenLabel(current.scheduledAt)}` };
+  } else {
+    const outcome = input.outcome === "done" || input.outcome === "cancelled" ? input.outcome : null;
+    if (!outcome) return { ok: false, reason: "bad_outcome" };
+    done = await setVisitOutcome(current.id, me, outcome);
+    if (done) card = { kind: "system", body: outcome === "done" ? "Site visit completed" : "Site visit didn't happen" };
+    // A completed visit is real pipeline movement — record it against the lead
+    // even when the visit carried no listing (setVisitOutcome only covers the
+    // listing case), so a requirement-born visit isn't silently dropped.
+    if (done && outcome === "done") {
+      const { upsertLeadFromThread } = await import("./service");
+      await upsertLeadFromThread(threadId, { stage: "visit", activity: "Visit completed" });
+    }
+  }
+
+  if (!done) return { ok: false, reason: "not_allowed" };
+  if (card) {
+    await db().from("chat_messages").insert({ thread_id: threadId, sender_id: me, ...card });
+  }
+  await pingThread(threadId);
+  await pingInbox(t.buyer_id === me ? t.poster_id : t.buyer_id);
+  return { ok: true };
+}
+
 /** Continuity prompt answer → updates/creates a lead stage (Doc2 §10.4). */
 export async function continuityAnswer(threadId: string, me: string, answer: "interested" | "not_interested" | "visit_fixed"): Promise<{ ok: boolean }> {
   const loaded = await loadThreadForParticipant(threadId, me);
@@ -427,12 +638,15 @@ export async function continuityAnswer(threadId: string, me: string, answer: "in
   const { t } = loaded;
   const label = answer === "visit_fixed" ? "Visit fixed" : answer === "interested" ? "Interested" : "Not interested";
   await db().from("chat_messages").insert({ thread_id: threadId, sender_id: null, kind: "system", body: `Marked as: ${label}` });
-  // Reflect into the poster's lead pipeline (owner_id = poster, lead = buyer).
+  // Reflect into the poster's lead pipeline through the ONE upsert (0081's unique
+  // indexes). The old code matched a lead on (owner, buyer) alone, ignoring which
+  // listing it was about — so a second listing's answer overwrote the first
+  // listing's stage, and its insert could mint a duplicate row.
   const stage = answer === "visit_fixed" ? "visit" : answer === "interested" ? "contacted" : "closed_lost";
-  const { data: lead } = await db().from("leads").select("id").eq("owner_id", t.poster_id).eq("lead_profile_id", t.buyer_id).maybeSingle();
-  if (lead) await db().from("leads").update({ stage, last_activity: label, last_activity_at: new Date().toISOString() }).eq("id", (lead as any).id);
-  else await db().from("leads").insert({ owner_id: t.poster_id, lead_profile_id: t.buyer_id, listing_id: t.listing_id, requirement_id: t.requirement_id, source: "inquiry", stage, last_activity: label });
+  const { upsertLeadFromThread } = await import("./service");
+  await upsertLeadFromThread(threadId, { stage, activity: label });
   await pingThread(threadId);
+  await pingInbox(t.buyer_id === me ? t.poster_id : t.buyer_id);
   return { ok: true };
 }
 

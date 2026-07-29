@@ -1,5 +1,6 @@
 import { cn } from "@/lib/utils";
 import { BottomNav, type NavItem } from "./BottomNav";
+import { KeyboardInset } from "./KeyboardInset";
 
 /**
  * AppShell — the global mobile shell (pulled from P2/P3): centred 470px column.
@@ -29,7 +30,14 @@ export interface AppShellProps {
 
 export function AppShell({ children, header, showNav = true, navItems, className, scroll = true }: AppShellProps) {
   return (
-    <div className="mx-auto flex h-[100dvh] w-full max-w-column flex-col overflow-hidden bg-page">
+    // Height subtracts the on-screen keyboard (--kbd, published by KeyboardInset).
+    // `100dvh` alone does not shrink when the keyboard opens on iOS/Android, so a
+    // bottom-pinned composer ended up underneath it.
+    <div
+      className="mx-auto flex w-full max-w-column flex-col overflow-hidden bg-page"
+      style={{ height: "calc(100dvh - var(--kbd, 0px))" }}
+    >
+      <KeyboardInset />
       {header}
       <main
         className={cn(

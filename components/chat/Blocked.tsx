@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AppShell, Header, Icon, Avatar, VerifiedBadge, useToast } from "@/components";
+import { AppShell, Header, Icon, Avatar, VerifiedBadge, Skeleton, useToast } from "@/components";
 import { Glyph } from "./glyphs";
 import { chatApi } from "@/lib/chat/client";
 
@@ -31,7 +31,10 @@ export function Blocked({ base = "/messages" }: { base?: string }) {
         title={<span>Blocked users</span>} />}>
       {users === null ? (
         <div className="pt-2">{Array.from({ length: 3 }).map((_, i) => (
-          <div key={i} className="flex items-center gap-3 border-b border-divider px-4 py-3"><div className="h-11 w-11 shrink-0 rounded-full bg-surface-2" /><div className="flex-1 space-y-2"><div className="h-3 w-1/3 rounded bg-surface-2" /></div></div>
+          <div key={i} className="flex items-center gap-3 border-b border-divider px-4 py-3">
+            <Skeleton className="h-11 w-11 shrink-0 rounded-full" />
+            <div className="flex-1 space-y-2"><Skeleton className="h-3 w-1/3" /></div>
+          </div>
         ))}</div>
       ) : users.length === 0 ? (
         <div className="flex flex-col items-center px-8 pt-24 text-center">

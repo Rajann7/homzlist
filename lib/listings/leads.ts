@@ -23,7 +23,8 @@ export interface LeadRow {
   lead_profile_id: string;
   listing_id: string | null;
   requirement_id: string | null;
-  source: "inquiry" | "proposal" | "visit";
+  project_id: string | null;
+  source: LeadSource;
   stage: Stage;
   last_activity: string | null;
   last_activity_at: string;
@@ -32,10 +33,28 @@ export interface LeadRow {
   created_at: string;
 }
 
+/** Where a lead came from — 'project' added in 0081 (see SOURCE_LABEL). */
+export type LeadSource = "inquiry" | "proposal" | "visit" | "project";
+
+/**
+ * The spec's three lead families, in the words it uses. A lead's family is a
+ * REAL column now that accepting an inquiry/proposal files the row with its own
+ * source — before 0081 every project lead was recorded as an 'inquiry' and the
+ * three were indistinguishable in the pipeline and in the export.
+ */
+export const SOURCE_LABEL: Record<LeadSource, string> = {
+  inquiry: "Property lead",
+  proposal: "Requirement proposal",
+  project: "Project lead",
+  visit: "Site visit",
+};
+
 export interface LeadView {
   id: string;
   stage: Stage;
   source: LeadRow["source"];
+  /** "Property lead" / "Requirement proposal" / "Project lead" — the spec's families. */
+  sourceLabel: string;
   lastActivity: string | null;
   lastActivityAt: string;
   notes: { text: string; at: string }[];
@@ -94,14 +113,19 @@ export async function listLeads(ownerId: string, role: string | null): Promise<L
     leadIds.length ? db().from("verifications").select("profile_id,level,status").in("profile_id", leadIds) : Promise.resolve({ data: [] as unknown[] }),
     listingIds.length ? db().from("listings").select("id,title,price_paise,price_on_request,area_label,cover_url").in("id", listingIds) : Promise.resolve({ data: [] as unknown[] }),
   ]);
-  // One thread per (listing, buyer) — resolve each lead's chat so "Message" opens
-  // the real thread instead of a toast. Owner-scoped, so no foreign thread leaks.
-  const { data: threads } = listingIds.length
-    ? await db().from("chat_threads").select("id,listing_id,buyer_id").eq("poster_id", ownerId).in("listing_id", listingIds)
-    : { data: [] as unknown[] };
-  const threadMap = new Map(
-    ((threads ?? []) as { id: string; listing_id: string | null; buyer_id: string }[]).map((t) => [`${t.listing_id}:${t.buyer_id}`, t.id]),
-  );
+  // Resolve each lead's chat so "Message" opens the real thread instead of a
+  // toast. Owner-scoped, so no foreign thread leaks. Requirement-born leads
+  // (proposals) are keyed on requirement_id — they used to get `threadId: null`
+  // unconditionally, so every proposal lead in the pipeline had a dead button.
+  const { data: threads } = await db()
+    .from("chat_threads")
+    .select("id,listing_id,requirement_id,buyer_id")
+    .eq("poster_id", ownerId);
+  const threadMap = new Map<string, string>();
+  for (const t of ((threads ?? []) as { id: string; listing_id: string | null; requirement_id: string | null; buyer_id: string }[])) {
+    if (t.listing_id) threadMap.set(`l:${t.listing_id}:${t.buyer_id}`, t.id);
+    else if (t.requirement_id) threadMap.set(`r:${t.requirement_id}:${t.buyer_id}`, t.id);
+  }
   const profMap = new Map((profs ?? []).map((p: any) => [p.id, p]));
   const verMap = new Map<string, { phone: boolean; id: boolean; rera: boolean }>();
   for (const v of (vers ?? []) as { profile_id: string; level: string; status: string }[]) {
@@ -118,6 +142,7 @@ export async function listLeads(ownerId: string, role: string | null): Promise<L
       id: r.id,
       stage: r.stage,
       source: r.source,
+      sourceLabel: SOURCE_LABEL[r.source] ?? SOURCE_LABEL.inquiry,
       lastActivity: r.last_activity,
       lastActivityAt: r.last_activity_at,
       notes: r.notes ?? [],
@@ -131,7 +156,11 @@ export async function listLeads(ownerId: string, role: string | null): Promise<L
       property: l
         ? { id: l.id, title: l.title, priceLabel: l.price_on_request ? "Price on request" : priceLabel(l.price_paise), areaLabel: l.area_label, coverUrl: l.cover_url }
         : null,
-      threadId: r.listing_id ? threadMap.get(`${r.listing_id}:${r.lead_profile_id}`) ?? null : null,
+      threadId: r.listing_id
+        ? threadMap.get(`l:${r.listing_id}:${r.lead_profile_id}`) ?? null
+        : r.requirement_id
+          ? threadMap.get(`r:${r.requirement_id}:${r.lead_profile_id}`) ?? null
+          : null,
     };
   });
 
@@ -198,7 +227,7 @@ export async function markLeadNotRelevant(id: string, ownerId: string): Promise<
 
 // ---- CSV export (Doc7 §105) ------------------------------------------------
 
-export const CSV_FIELDS = ["name", "phone", "property", "stage", "date", "last_activity"] as const;
+export const CSV_FIELDS = ["name", "phone", "property", "source", "stage", "date", "last_activity"] as const;
 export type CsvField = (typeof CSV_FIELDS)[number];
 
 /**
@@ -234,6 +263,7 @@ export async function exportLeadsCsv(ownerId: string, fields: CsvField[]): Promi
       name: p.name ?? "",
       phone: p.phone ?? "",
       property: l ? [l.title, l.area_label].filter(Boolean).join(", ") : "",
+      source: SOURCE_LABEL[r.source] ?? SOURCE_LABEL.inquiry,
       stage: STAGE_LABEL[r.stage],
       date: new Date(r.created_at).toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata" }),
       last_activity: r.last_activity ?? "",
@@ -244,7 +274,7 @@ export async function exportLeadsCsv(ownerId: string, fields: CsvField[]): Promi
 }
 
 const CSV_HEADER: Record<CsvField, string> = {
-  name: "Name", phone: "Phone", property: "Property", stage: "Stage", date: "Date", last_activity: "Last activity",
+  name: "Name", phone: "Phone", property: "Property", source: "Source", stage: "Stage", date: "Date", last_activity: "Last activity",
 };
 
 function csvCell(v: string): string {

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AppShell, Header, Icon, Avatar, VerifiedBadge, ConfirmDialog, useToast } from "@/components";
+import { AppShell, Header, Icon, Avatar, VerifiedBadge, ConfirmDialog, Skeleton, useToast } from "@/components";
 import { Glyph } from "./glyphs";
 import { chatApi } from "@/lib/chat/client";
 import { cn } from "@/lib/utils";
@@ -21,7 +21,20 @@ export function Requests({ base = "/messages" }: { base?: string }) {
   const [sub, setSub] = useState<"verified" | "others">("verified");
   const [decline, setDecline] = useState<any>(null);
 
-  const load = async () => { setLoading(true); const res = await chatApi.requests(); if (res.ok) setData(res.data); setLoading(false); };
+  const load = async () => {
+    setLoading(true);
+    const res = await chatApi.requests();
+    if (res.ok) {
+      setData(res.data);
+      // Open on the tab that HAS the requests. "Verified" was hardcoded as the
+      // landing tab, so a poster with five unverified requests and no verified
+      // ones opened this screen on "No message requests" — the header said 5,
+      // the body said none, and the five sat one untapped tab away.
+      if (res.data.verifiedCount === 0 && res.data.othersCount > 0) setSub("others");
+      else if (res.data.verifiedCount > 0) setSub("verified");
+    }
+    setLoading(false);
+  };
   useEffect(() => { load(); }, []);
 
   const cards = data ? (sub === "verified" ? data.verified : data.others) : [];
@@ -55,7 +68,7 @@ export function Requests({ base = "/messages" }: { base?: string }) {
       </div>
 
       {loading ? (
-        <div className="space-y-3 p-4">{Array.from({ length: 2 }).map((_, i) => <div key={i} className="h-56 rounded-12 bg-surface-2" />)}</div>
+        <div className="space-y-3 p-4">{Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} className="h-56 w-full rounded-12" />)}</div>
       ) : cards.length === 0 ? (
         <div className="flex flex-col items-center px-8 pt-24 text-center">
           <span className="mb-4 text-ink-tertiary"><Glyph name="envelope-open" s={72} /></span>
@@ -112,7 +125,9 @@ export function Requests({ base = "/messages" }: { base?: string }) {
               )}
 
               {/* attached / listing / requirement card */}
-              {(c.listingCard || c.attachedCard) && <RichCard card={c.listingCard || c.attachedCard} />}
+              {(c.listingCard || c.attachedCard || c.projectCard) && (
+                <RichCard card={c.listingCard || c.attachedCard || c.projectCard} project={!c.listingCard && !c.attachedCard && !!c.projectCard} />
+              )}
               {c.requirementCard && <div className="mt-3 rounded-8 bg-surface-2 px-3 py-2 text-13 text-ink-secondary">For: {c.requirementCard.title}</div>}
 
               {/* seen-privacy note (inquiry only) */}
@@ -123,7 +138,7 @@ export function Requests({ base = "/messages" }: { base?: string }) {
               {/* actions */}
               <div className="mt-3 flex gap-2">
                 <button onClick={() => setDecline(c)} className="h-11 flex-1 rounded-8 border border-border text-15 font-semibold text-ink-primary active:bg-surface-2">Decline</button>
-                <button onClick={() => accept(c)} className="h-11 flex-1 rounded-8 bg-accent text-15 font-semibold text-white active:bg-accent-pressed">Accept</button>
+                <button onClick={() => accept(c)} className="h-11 flex-1 rounded-8 bg-accent text-15 font-semibold text-ink-inverse active:bg-accent-pressed">Accept</button>
               </div>
               <button onClick={() => router.push(`/profile/${c.person.id}`)} className="mt-2 w-full text-center text-13 font-semibold text-accent">View profile</button>
             </div>
@@ -137,14 +152,16 @@ export function Requests({ base = "/messages" }: { base?: string }) {
   );
 }
 
-function RichCard({ card }: { card: any }) {
+function RichCard({ card, project = false }: { card: any; project?: boolean }) {
   if (!card) return null;
   return (
     <div className="mt-3 flex items-center gap-3 rounded-8 bg-surface-2 px-3 py-2">
-      {card.cover ? <img src={card.cover} alt="" className="h-12 w-12 rounded-4 object-cover" /> : <span className="grid h-12 w-12 place-items-center rounded-4 bg-surface-3"><Icon name="home" size={18} className="text-ink-tertiary" /></span>}
+      {card.cover ? <img src={card.cover} alt="" className="h-12 w-12 rounded-4 object-cover" /> : <span className="grid h-12 w-12 place-items-center rounded-4 bg-surface-3"><Icon name={project ? "building" : "home"} size={18} className="text-ink-tertiary" /></span>}
       <div className="min-w-0 flex-1">
-        <span className="block truncate text-13 font-semibold text-ink-primary">{card.title}</span>
-        <span className="block text-11 text-ink-tertiary">{card.priceLabel}</span>
+        {/* The subject's name wraps rather than being cut — on a request card it
+            is the whole reason the person is writing. */}
+        <span className="block break-words text-13 font-semibold text-ink-primary">{card.title}</span>
+        <span className="block text-11 text-ink-tertiary">{[project ? "Project" : null, card.priceLabel].filter(Boolean).join(" · ")}</span>
       </div>
       <Icon name="chevron-right" size={18} className="text-ink-tertiary" />
     </div>

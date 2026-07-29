@@ -2,13 +2,12 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { AppShell, Header, Icon, Avatar, VerifiedBadge, BottomSheet, ConfirmDialog, useToast } from "@/components";
+import { AppShell, Header, Icon, Avatar, VerifiedBadge, BottomSheet, ConfirmDialog, Skeleton, useToast } from "@/components";
 import { Glyph } from "./glyphs";
-import { chatApi, uploadChatPhoto } from "@/lib/chat/client";
+import { chatApi } from "@/lib/chat/client";
 import { PhotoViewer } from "./PhotoViewer";
 import { subscribeChat, broadcastTyping } from "@/lib/chat/realtime-client";
 import { threadTopic, inboxTopic } from "@/lib/chat/realtime-topics";
-import { normalizeImage } from "@/lib/listings/image-client";
 import { cn } from "@/lib/utils";
 
 /**
@@ -17,6 +16,13 @@ import { cn } from "@/lib/utils";
  * which the server included solely because the viewer is entitled to it — the
  * NumberCard renders that sealed value, never a client-held digit.
  */
+
+/** Same colour language as the inbox: green property · blue project · amber want. */
+const SUBJECT = {
+  listing: { chip: "bg-accent-soft text-accent", ink: "text-accent", label: "Property" },
+  project: { chip: "bg-info-soft text-info", ink: "text-info", label: "Project" },
+  requirement: { chip: "bg-warning-soft text-warning", ink: "text-warning", label: "Requirement" },
+} as const;
 
 const EMOJIS = ["👍", "❤️", "😊", "🙏", "✅"];
 const SUGGESTIONS = ["Is it still available?", "Can we schedule a visit?", "Is the price negotiable?"];
@@ -40,11 +46,12 @@ export function Thread({ threadId, base = "/messages" }: { threadId: string; bas
   const [chatSearch, setChatSearch] = useState(false);
   const [chatSearchQuery, setChatSearchQuery] = useState("");
   const [searchIdx, setSearchIdx] = useState(0);
-  const [attach, setAttach] = useState(false);
-  const [uploading, setUploading] = useState(false);
   const [viewPhoto, setViewPhoto] = useState<string | null>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
   const [visitSheet, setVisitSheet] = useState(false);
+  // The slot picker serves both "propose" and "reschedule" — same sheet, and the
+  // mode decides which endpoint the chosen slot goes to.
+  const [visitMode, setVisitMode] = useState<"propose" | "reschedule">("propose");
+  const [cancelVisitDialog, setCancelVisitDialog] = useState(false);
   const [templates, setTemplates] = useState<any[]>([]);
   const [warnDismissed, setWarnDismissed] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -127,6 +134,11 @@ export function Thread({ threadId, base = "/messages" }: { threadId: string; bas
   const searchCounter = matchIds.length ? `${Math.min(searchIdx + 1, matchIds.length)} of ${matchIds.length}` : "0 of 0";
   // The most recent of MY messages the other side has seen → "Seen HH:MM" label (Doc4 §36).
   const lastSeenId = [...(view.messages ?? [])].reverse().find((m: any) => m.mine && m.seen && !m.pending)?.id ?? null;
+  // Only the newest card for the LIVE visit carries the controls; older ones in
+  // the scrollback are a record of what was proposed, not a second set of buttons.
+  const lastVisitCardId = view.visit
+    ? [...(view.messages ?? [])].reverse().find((m: any) => (m.kind === "visit_proposal" || m.kind === "visit_confirmed") && m.meta?.visitId === view.visit.id)?.id ?? null
+    : null;
 
   const composerDisabled = view.status === "declined" || view.block.iBlocked || view.block.blockedMe || p.deleted || (view.status === "pending" && view.side === "poster");
   const showNumberWarn = !warnDismissed && !view.numberAllowed && view.side === "buyer" && NUMBER_RE.test(text);
@@ -160,33 +172,6 @@ export function Thread({ threadId, base = "/messages" }: { threadId: string; bas
     if (view?.person?.id) broadcastTyping(inboxTopic(view.person.id), { threadId });
   }
 
-  function pickPhoto(capture: boolean) {
-    setAttach(false);
-    const el = fileRef.current;
-    if (!el) return;
-    if (capture) el.setAttribute("capture", "environment"); else el.removeAttribute("capture");
-    el.value = "";
-    el.click();
-  }
-  async function onPhotoPicked(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file || uploading) return;
-    setUploading(true);
-    const replyId = reply?.id ?? null;
-    setReply(null);
-    const localUrl = URL.createObjectURL(file);
-    const optimistic = { id: `tmp-${Date.now()}`, mine: true, kind: "photo", photo: localUrl, reactions: {}, seen: false, pending: true, createdAt: new Date().toISOString(), time: "" };
-    setView((v: any) => ({ ...v, messages: [...v.messages, optimistic] }));
-    const norm = await normalizeImage(file).then((r) => r.file).catch(() => file);
-    const up = await uploadChatPhoto(norm);
-    if (!up.ok) { toast.show(up.error, { variant: "error" }); setUploading(false); load(false); return; }
-    const res = await chatApi.send(threadId, { photoUrl: up.url, photoW: up.w, photoH: up.h, replyTo: replyId });
-    if (!res.ok) toast.show("Couldn't send", { variant: "error" });
-    setUploading(false);
-    URL.revokeObjectURL(localUrl);
-    load(false);
-  }
-
   async function requestNumber() {
     const res = await chatApi.requestNumber(threadId);
     if (res.ok) { toast.show("Number requested"); load(false); }
@@ -200,6 +185,26 @@ export function Thread({ threadId, base = "/messages" }: { threadId: string; bas
   async function continuity(answer: "interested" | "not_interested" | "visit_fixed") { await chatApi.continuity(threadId, answer); toast.show("Lead status updated", { variant: "success" }); load(false); }
 
   async function openQuick() { const res = await chatApi.templates(); if (res.ok) setTemplates(res.data.templates); setQuickReplies(true); }
+
+  /**
+   * Act on the thread's live visit. "Reschedule" re-opens the same slot picker
+   * the propose flow uses, so there is one way to choose a time; everything else
+   * is a single call. Cancel confirms first — it's the other party's Saturday.
+   */
+  async function onVisit(input: { action: "confirm" | "reschedule" | "cancel" | "outcome"; outcome?: "done" | "cancelled" }) {
+    if (input.action === "reschedule") { setVisitMode("reschedule"); setVisitSheet(true); return; }
+    if (input.action === "cancel") { setCancelVisitDialog(true); return; }
+    const res = await chatApi.visitAct(threadId, input);
+    if (res.ok) {
+      toast.show(
+        input.action === "confirm" ? "Visit confirmed"
+        : input.outcome === "done" ? "Visit marked as completed"
+        : "Marked as not happened",
+        { variant: "success" },
+      );
+      load(false);
+    } else toast.show("Couldn't update that visit", { variant: "error" });
+  }
 
   const searchHeader = (
     <div className="flex h-14 flex-none items-center gap-1.5 border-b border-divider bg-page px-2">
@@ -231,15 +236,59 @@ export function Thread({ threadId, base = "/messages" }: { threadId: string; bas
         right={!p.deleted && <button aria-label="Chat menu" onClick={() => setMenu(true)} className="grid h-11 w-11 place-items-center"><Icon name="more" size={24} className="text-ink-primary" /></button>}
       />
     )}>
-      {/* Pinned property/requirement bar */}
-      {view.pinned && (
-        <button onClick={() => view.pinned.type === "listing" ? router.push(`/property/${view.pinned.id}`) : router.push(`/requirements/${view.pinned.id}`)}
-          className={cn("shrink-0 flex w-full items-center gap-3 border-b border-border px-4 py-2 text-left transition-colors", priceFlash ? "bg-accent-soft" : "bg-surface-2")}>
-          {view.pinned.cover ? <img src={view.pinned.cover} alt="" className="h-10 w-10 rounded-4 object-cover" /> : <span className="grid h-10 w-10 place-items-center rounded-4 bg-surface-3"><Icon name={view.pinned.type === "listing" ? "home" : "search"} size={18} className="text-ink-tertiary" /></span>}
-          <span className="min-w-0 flex-1"><span className="block truncate text-13 font-semibold text-ink-primary">{view.pinned.title}</span>{view.pinned.priceLabel && <span className="block text-11 text-ink-tertiary">{view.pinned.priceLabel}</span>}</span>
-          <Icon name="chevron-right" size={18} className="text-ink-tertiary" />
-        </button>
-      )}
+      {/* ── What this chat is about ───────────────────────────────────────
+          The subject comes first, in full, with the same colour language the
+          inbox uses (green property · blue project · amber requirement) and one
+          sentence saying which way the conversation runs. Tapping it opens the
+          real post. */}
+      {view.pinned && (() => { const S = SUBJECT[(view.pinned.type as keyof typeof SUBJECT) ?? "listing"] ?? SUBJECT.listing; return (
+        <div className={cn("shrink-0 border-b border-border transition-colors", priceFlash ? "bg-accent-soft" : "bg-surface-2")}>
+          <button
+            onClick={() => view.pinned.href && router.push(view.pinned.href)}
+            className="flex w-full items-start gap-3 px-3 py-2.5 text-left active:bg-surface-3"
+          >
+            {view.pinned.cover ? (
+              <img src={view.pinned.cover} alt="" className="h-12 w-12 shrink-0 rounded-8 bg-surface-3 object-cover" />
+            ) : (
+              <span className={cn("grid h-12 w-12 shrink-0 place-items-center rounded-8", S.chip)}>
+                <Icon name={view.pinned.type === "project" ? "building" : view.pinned.type === "requirement" ? "search-list" : "home"} size={22} />
+              </span>
+            )}
+            <span className="min-w-0 flex-1">
+              {/* wraps — a chat's subject is never worth truncating */}
+              <span className="block break-words text-13 font-semibold leading-snug text-ink-primary">{view.pinned.title}</span>
+              <span className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-11 text-ink-tertiary">
+                <span className={cn("rounded-4 px-1.5 py-0.5 font-semibold uppercase tracking-wide", S.chip)}>
+                  {S.label}
+                </span>
+                {view.pinned.priceLabel && <span className="font-semibold text-ink-secondary">{view.pinned.priceLabel}</span>}
+              </span>
+            </span>
+            <Icon name="chevron-right" size={18} className="mt-1 shrink-0 text-ink-tertiary" />
+          </button>
+          <div className="flex items-center gap-2 px-3 pb-2">
+            {view.context && (
+              <p className={cn("flex min-w-0 flex-1 items-center gap-1.5 text-11 font-semibold", view.context.mine ? S.ink : "text-ink-secondary")}>
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" className="shrink-0" aria-hidden>
+                  {view.context.mine ? <path d="M17 7L7 17M7 17h7M7 17v-7" /> : <path d="M7 17L17 7M17 7h-7M17 7v7" />}
+                </svg>
+                <span className="truncate">{view.context.line}</span>
+              </p>
+            )}
+            {/* A site visit is an action, so it is a button you can see — it used
+                to be the second row of a seven-item ⋯ menu. Only for a property
+                or a project: there is nothing to visit about a requirement. */}
+            {view.status === "accepted" && !view.visit && view.pinned.type !== "requirement" && !view.block.iBlocked && !view.block.blockedMe && (
+              <button
+                onClick={() => { setVisitMode("propose"); setVisitSheet(true); }}
+                className="flex shrink-0 items-center gap-1.5 rounded-full bg-surface-1 px-3 py-1.5 text-11 font-semibold text-ink-primary shadow-l1 active:bg-surface-3"
+              >
+                <Icon name="clock" size={14} /> Site visit
+              </button>
+            )}
+          </div>
+        </div>
+      ); })()}
       {view.listingBanner && <div className="shrink-0 bg-warning-soft px-4 py-1.5 text-center text-11 text-warning">{view.listingBanner}</div>}
 
       {/* Message area */}
@@ -264,6 +313,7 @@ export function Thread({ threadId, base = "/messages" }: { threadId: string; bas
               onLong={() => m.kind === "text" || m.kind === "photo" ? setMsgSheet(m) : undefined}
               onAllow={() => setAllowDialog(true)} onDeny={() => respondNumber(false)}
               onContinuity={continuity}
+              onVisit={onVisit} lastVisitCardId={lastVisitCardId}
               onCopyNumber={() => { navigator.clipboard?.writeText(view.otherNumber); toast.show("Number copied", { variant: "success" }); }}
               toast={toast} />
           ))
@@ -315,8 +365,9 @@ export function Thread({ threadId, base = "/messages" }: { threadId: string; bas
           {view.side === "buyer" && !view.numberAllowed && view.status === "accepted" && (
             <button onClick={requestNumber} className="flex w-full items-center justify-center gap-1.5 border-b border-divider py-2 text-13 font-semibold text-accent"><Icon name="phone" size={16} /> Request number</button>
           )}
+          {/* Photo sending removed on Rajan's instruction — the composer is text
+              only. Photos already in a thread still render and open full-screen. */}
           <div className="flex items-end gap-2 px-2 py-2">
-            <button aria-label="Attach" onClick={() => setAttach(true)} className="grid h-11 w-11 shrink-0 place-items-center text-ink-secondary"><Icon name="image" size={24} /></button>
             <textarea value={text} onChange={(e) => { setText(e.target.value); setWarnDismissed(false); onComposerType(); }} rows={1} placeholder="Message…"
               className={cn("max-h-28 min-h-11 flex-1 resize-none bg-surface-2 px-3 py-2.5 text-15 text-ink-primary outline-none placeholder:text-ink-tertiary", text.length > 60 ? "rounded-16" : "rounded-full")} />
             <button aria-label="Quick replies" onClick={openQuick} className="grid h-11 w-11 shrink-0 place-items-center text-ink-secondary"><Glyph name="bolt" s={22} /></button>
@@ -327,15 +378,26 @@ export function Thread({ threadId, base = "/messages" }: { threadId: string; bas
       )}
 
       {/* ── Sheets & dialogs ─────────────────────────────────────────── */}
+      {/* Four items, and every one of them is about the person you're talking
+          to. "Propose a site visit" moved out to a visible button (a visit is an
+          action, not a setting); "Not interested" lives on the continuity card
+          that asks the question; Block and Report are one row, because nobody
+          blocks someone they don't also want reported. */}
       <BottomSheet open={menu} onClose={() => setMenu(false)} title={p.name}>
         <div className="pb-2">
           <MenuRow label="View profile" onClick={() => { setMenu(false); router.push(`/profile/${p.id}`); }} />
-          <MenuRow label="Propose a site visit" onClick={() => { setMenu(false); setVisitSheet(true); }} />
-          <MenuRow label="Mute notifications" onClick={async () => { setMenu(false); await chatApi.setState(threadId, { muted: !view.myState.muted }); toast.show(view.myState.muted ? "Unmuted" : "Muted"); load(false); }} />
-          <MenuRow label="Search in chat" onClick={() => { setMenu(false); setChatSearch(true); setChatSearchQuery(""); setSearchIdx(0); }} />
-          <MenuRow label={view.block.iBlocked ? "Unblock user" : "Block user"} danger onClick={() => { setMenu(false); setBlockDialog(true); }} />
-          <MenuRow label="Report" danger onClick={() => { setMenu(false); setReportSheet({ user: true }); }} />
-          <MenuRow label="Not interested — close chat" onClick={() => { setMenu(false); continuity("not_interested"); }} />
+          <MenuRow label="Search in this chat" onClick={() => { setMenu(false); setChatSearch(true); setChatSearchQuery(""); setSearchIdx(0); }} />
+          <MenuRow label={view.myState.muted ? "Unmute notifications" : "Mute notifications"} onClick={async () => { setMenu(false); await chatApi.setState(threadId, { muted: !view.myState.muted }); toast.show(view.myState.muted ? "Unmuted" : "Muted"); load(false); }} />
+          {/* The poster's own lead lives on this thread; closing it must stay
+              reachable even in a thread the continuity card never appeared in. */}
+          {view.side === "poster" && view.status === "accepted" && (
+            <MenuRow label="Mark as not interested" onClick={() => { setMenu(false); continuity("not_interested"); }} />
+          )}
+          {view.block.iBlocked ? (
+            <MenuRow label="Unblock user" danger onClick={() => { setMenu(false); setBlockDialog(true); }} />
+          ) : (
+            <MenuRow label="Report & block" danger onClick={() => { setMenu(false); setReportSheet({ user: true, thenBlock: true }); }} />
+          )}
         </div>
       </BottomSheet>
 
@@ -362,13 +424,6 @@ export function Thread({ threadId, base = "/messages" }: { threadId: string; bas
         )}
       </BottomSheet>
 
-      <BottomSheet open={attach} onClose={() => setAttach(false)} title="Attach">
-        <div className="pb-2">
-          <MenuRow label="Photo from gallery" onClick={() => pickPhoto(false)} />
-          <MenuRow label="Take photo" onClick={() => pickPhoto(true)} />
-        </div>
-      </BottomSheet>
-      <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onPhotoPicked} />
       <PhotoViewer url={viewPhoto} onClose={() => setViewPhoto(null)} />
 
       <QuickRepliesSheet open={quickReplies} onClose={() => setQuickReplies(false)} templates={templates}
@@ -376,11 +431,35 @@ export function Thread({ threadId, base = "/messages" }: { threadId: string; bas
         onChange={async () => { const res = await chatApi.templates(); if (res.ok) setTemplates(res.data.templates); }}
         toast={toast} />
 
-      <VisitSheet open={visitSheet} onClose={() => setVisitSheet(false)} onPropose={async (iso) => { setVisitSheet(false); const r = await chatApi.proposeVisit(threadId, iso); if (r.ok) { toast.show("Visit proposed", { variant: "success" }); load(false); } }} />
+      <VisitSheet open={visitSheet} mode={visitMode} onClose={() => { setVisitSheet(false); setVisitMode("propose"); }}
+        onPropose={async (iso) => {
+          setVisitSheet(false);
+          const r = visitMode === "reschedule"
+            ? await chatApi.visitAct(threadId, { action: "reschedule", scheduledAt: iso })
+            : await chatApi.proposeVisit(threadId, iso);
+          setVisitMode("propose");
+          if (r.ok) { toast.show(visitMode === "reschedule" ? "New time proposed" : "Visit proposed", { variant: "success" }); load(false); }
+          else toast.show("Couldn't schedule that visit", { variant: "error" });
+        }} />
 
+      <ConfirmDialog open={cancelVisitDialog} onClose={() => setCancelVisitDialog(false)}
+        onConfirm={async () => {
+          setCancelVisitDialog(false);
+          const r = await chatApi.visitAct(threadId, { action: "cancel" });
+          if (r.ok) { toast.show("Visit cancelled"); load(false); } else toast.show("Couldn't cancel that visit", { variant: "error" });
+        }}
+        title="Cancel this site visit?" body={<span>{p.name} will see that it was cancelled.</span>} destructive confirmLabel="Cancel visit" />
+
+      {/* "Report & block" is one decision for the user and two writes for us:
+          the report row for the admin queue, then the block that actually stops
+          them. Reporting alone used to leave the person able to keep messaging. */}
       <ReportSheet open={!!reportSheet} onClose={() => setReportSheet(null)} onSubmit={async (reason, note) => {
+        const blockToo = !!reportSheet.thenBlock;
         const r = reportSheet.messageId ? await chatApi.reportMsg(reportSheet.messageId, reason, note) : await chatApi.reportUser(threadId, reason, note);
-        setReportSheet(null); if (r.ok) toast.show("Report submitted", { variant: "success" });
+        setReportSheet(null);
+        if (blockToo) await chatApi.block(threadId, "block");
+        if (r.ok) toast.show(blockToo ? `Reported and blocked ${p.name}` : "Report submitted", { variant: "success" });
+        if (blockToo) load(false);
       }} />
 
       <ConfirmDialog open={allowDialog} onClose={() => setAllowDialog(false)} onConfirm={() => respondNumber(true)}
@@ -396,7 +475,8 @@ export function Thread({ threadId, base = "/messages" }: { threadId: string; bas
 // ---------------------------------------------------------------------------
 // Message renderer
 // ---------------------------------------------------------------------------
-function MessageItem({ m, prev, view, isDivider, dividerRef, onLong, onAllow, onDeny, onContinuity, onCopyNumber, toast, searchMatch, activeMatch, isLastSeen, onViewPhoto, onReply }: any) {
+function MessageItem({ m, prev, view, isDivider, dividerRef, onLong, onAllow, onDeny, onContinuity, onCopyNumber, onVisit, lastVisitCardId, toast, searchMatch, activeMatch, isLastSeen, onViewPhoto, onReply }: any) {
+  const router = useRouter();
   const longTimer = useRef<any>(null);
   const bubbleRef = useRef<HTMLDivElement>(null);
   const [dragX, setDragX] = useState(0);
@@ -469,7 +549,7 @@ function MessageItem({ m, prev, view, isDivider, dividerRef, onLong, onAllow, on
         {!requesterIsMe && !view.numberAllowed && (
           <div className="mt-2 flex justify-center gap-2">
             <button onClick={onDeny} className="h-9 rounded-8 border border-border px-4 text-13 font-semibold text-ink-primary">Deny</button>
-            <button onClick={onAllow} className="h-9 rounded-8 bg-accent px-4 text-13 font-semibold text-white">Allow</button>
+            <button onClick={onAllow} className="h-9 rounded-8 bg-accent px-4 text-13 font-semibold text-ink-inverse">Allow</button>
           </div>
         )}
       </div>,
@@ -486,7 +566,7 @@ function MessageItem({ m, prev, view, isDivider, dividerRef, onLong, onAllow, on
         {num && (
           <div className="mt-2 flex justify-center gap-3">
             <button onClick={onCopyNumber} className="grid h-10 w-10 place-items-center rounded-full bg-surface-1 text-ink-primary"><Icon name="copy" size={18} /></button>
-            <a href={`tel:${num}`} className="grid h-10 w-10 place-items-center rounded-full bg-accent text-white"><Icon name="phone" size={18} /></a>
+            <a href={`tel:${num}`} className="grid h-10 w-10 place-items-center rounded-full bg-accent text-ink-inverse"><Icon name="phone" size={18} /></a>
           </div>
         )}
       </div>,
@@ -496,10 +576,34 @@ function MessageItem({ m, prev, view, isDivider, dividerRef, onLong, onAllow, on
   if (m.kind === "visit_proposal" || m.kind === "visit_confirmed") {
     const confirmed = m.kind === "visit_confirmed";
     const when = m.meta?.scheduledAt ? new Date(m.meta.scheduledAt).toLocaleString("en-IN", { weekday: "long", day: "numeric", month: "short", hour: "numeric", minute: "2-digit", timeZone: "Asia/Kolkata" }) : "";
+    // Controls belong ONLY on the card for the visit that is still live, and only
+    // while the server says this viewer may act — an older card in the scrollback
+    // is history, not a second set of buttons.
+    const live = view.visit && m.meta?.visitId === view.visit.id ? view.visit : null;
+    const isLatest = live && m.id === lastVisitCardId;
+    const acts = isLatest ? live : null;
     return wrap(
       <div className={cn("mx-auto my-1 w-[86%] rounded-12 p-3", confirmed ? "border-[1.5px] border-accent bg-surface-1" : "border border-border bg-surface-1")}>
         <p className="flex items-center gap-1.5 text-15 font-semibold text-ink-primary">{confirmed ? <Icon name="check-circle" size={18} className="text-accent" /> : <Glyph name="calendar" s={18} />}{confirmed ? "Site visit confirmed" : "Site visit proposed"}</p>
         <p className="mt-1 text-13 text-ink-secondary">{when}</p>
+        {view.pinned?.title && <p className="mt-0.5 text-11 text-ink-tertiary">{view.pinned.title}</p>}
+        {acts && (
+          <div className="mt-3 flex gap-4">
+            {/* Confirm only makes sense for the side that didn't propose it. */}
+            {acts.canConfirm && !m.mine && <button onClick={() => onVisit({ action: "confirm" })} className="text-13 font-semibold text-accent">Confirm</button>}
+            {acts.canReschedule && <button onClick={() => onVisit({ action: "reschedule" })} className="text-13 font-semibold text-accent">Reschedule</button>}
+            {acts.canCancel && <button onClick={() => onVisit({ action: "cancel" })} className="text-13 font-semibold text-error">Cancel</button>}
+          </div>
+        )}
+        {/* The slot has passed — record what actually happened, which is what
+            moves the lead to the Visit stage. Without this the visit state
+            machine dead-ended at `confirmed` forever. */}
+        {acts?.canSetOutcome && (
+          <div className="mt-3 flex gap-4 border-t border-divider pt-2.5">
+            <button onClick={() => onVisit({ action: "outcome", outcome: "done" })} className="text-13 font-semibold text-accent">Visit happened</button>
+            <button onClick={() => onVisit({ action: "outcome", outcome: "cancelled" })} className="text-13 font-semibold text-ink-secondary">{`Didn't happen`}</button>
+          </div>
+        )}
       </div>,
     );
   }
@@ -532,21 +636,36 @@ function MessageItem({ m, prev, view, isDivider, dividerRef, onLong, onAllow, on
           <img src={m.photo} alt="" onClick={() => onViewPhoto?.(m.photo)} className="max-h-64 cursor-pointer rounded-12 object-cover" />
         ) : m.kind === "link" ? (
           <div>
-            <p className="mb-1 whitespace-pre-wrap break-words">{m.body}</p>
-            {m.meta?.title && (
-              <div className="rounded-8 bg-surface-1 p-2">
-                <p className="text-13 font-semibold text-ink-primary">{m.meta.title}</p>
+            {/* Rich card for our own property/project links (title + live price
+                + cover, resolved server-side); a plain domain card otherwise. */}
+            {m.meta?.title ? (
+              <button
+                onClick={() => m.meta.entityId && router.push(m.meta.kind === "project" ? `/projects/${m.meta.entityId}` : `/property/${m.meta.entityId}`)}
+                className="mb-1 block w-[220px] overflow-hidden rounded-8 bg-surface-1 text-left"
+              >
+                {m.meta.cover
+                  ? <img src={m.meta.cover} alt="" className="h-[110px] w-full object-cover" />
+                  : <span className="block h-[110px] w-full bg-surface-3" />}
+                <span className="block p-2">
+                  <span className="block text-13 font-semibold text-ink-primary">{m.meta.title}</span>
+                  {m.meta.subtitle && <span className="block text-11 text-ink-secondary">{m.meta.subtitle}</span>}
+                  <span className="block text-11 text-ink-tertiary">{m.meta.domain}</span>
+                </span>
+              </button>
+            ) : m.meta?.domain ? (
+              <div className="mb-1 rounded-8 bg-surface-1 p-2">
                 <p className="text-11 text-ink-tertiary">{m.meta.domain}</p>
                 {m.meta.external && <p className="mt-1 rounded bg-warning-soft px-1.5 py-0.5 text-11 text-warning">External link — open with care</p>}
               </div>
-            )}
+            ) : null}
+            <p className="whitespace-pre-wrap break-words">{m.body}</p>
           </div>
         ) : (
           <p className="whitespace-pre-wrap break-words">{m.body}</p>
         )}
         <span className="mt-0.5 flex items-center justify-end gap-1 text-11 text-ink-tertiary">
           {m.time}
-          {mine && !m.pending && <Icon name="check" size={12} className={m.seen ? "text-accent" : "text-ink-tertiary"} />}
+          {mine && !m.pending && <Ticks seen={m.seen} />}
           {mine && m.pending && <Icon name="clock" size={11} />}
         </span>
         {m.reactions && Object.keys(m.reactions).length > 0 && (
@@ -557,6 +676,21 @@ function MessageItem({ m, prev, view, isDivider, dividerRef, onLong, onAllow, on
       </div>
       {mine && isLastSeen && <span className="mt-1 pr-1 text-11 text-ink-tertiary">Seen {m.time}</span>}
     </div>,
+  );
+}
+
+/**
+ * Delivery ticks — the design's exact double-check glyph (P7 bubble meta):
+ * `stroke: ink3` once delivered, `stroke: accent` once seen. We were drawing the
+ * single-check Icon, so a delivered message and a seen one differed only by
+ * colour on a mark the design never uses.
+ */
+function Ticks({ seen }: { seen: boolean }) {
+  return (
+    <svg width="16" height="14" viewBox="0 0 24 18" fill="none" stroke="currentColor" strokeWidth={2}
+      className={seen ? "text-accent" : "text-ink-tertiary"} aria-label={seen ? "Seen" : "Delivered"}>
+      <path d="M2 9l4 4 8-10M9 13l1 1 8-10" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
   );
 }
 
@@ -605,7 +739,7 @@ function QuickRepliesSheet({ open, onClose, templates, onPick, onChange, toast }
         {editing === "new" || editing ? (
           <div className="p-4">
             <textarea autoFocus value={draft} onChange={(e) => setDraft(e.target.value)} rows={3} className="w-full rounded-8 bg-surface-2 p-3 text-15 text-ink-primary outline-none" placeholder="Template text…" />
-            <button onClick={async () => { if (editing === "new") await chatApi.templateCreate(draft); else await chatApi.templateUpdate(editing.id, draft); toast.show("Template saved", { variant: "success" }); setEditing(null); onChange(); }} className="mt-2 h-11 w-full rounded-8 bg-accent text-15 font-semibold text-white">Save</button>
+            <button onClick={async () => { if (editing === "new") await chatApi.templateCreate(draft); else await chatApi.templateUpdate(editing.id, draft); toast.show("Template saved", { variant: "success" }); setEditing(null); onChange(); }} className="mt-2 h-11 w-full rounded-8 bg-accent text-15 font-semibold text-ink-inverse">Save</button>
           </div>
         ) : (
           <button onClick={() => { setEditing("new"); setDraft(""); }} className="flex h-12 w-full items-center gap-2 px-4 text-15 font-semibold text-accent"><Icon name="plus" size={18} /> New template</button>
@@ -615,17 +749,17 @@ function QuickRepliesSheet({ open, onClose, templates, onPick, onChange, toast }
   );
 }
 
-function VisitSheet({ open, onClose, onPropose }: { open: boolean; onClose: () => void; onPropose: (iso: string) => void }) {
+function VisitSheet({ open, onClose, onPropose, mode = "propose" }: { open: boolean; onClose: () => void; onPropose: (iso: string) => void; mode?: "propose" | "reschedule" }) {
   const days = Array.from({ length: 3 }).map((_, i) => { const d = new Date(); d.setDate(d.getDate() + i + 1); return d; });
   const times = ["10:00", "11:00", "16:00"];
   const [day, setDay] = useState(0);
   const [time, setTime] = useState("11:00");
   return (
-    <BottomSheet open={open} onClose={onClose} title="Propose a site visit">
+    <BottomSheet open={open} onClose={onClose} title={mode === "reschedule" ? "Pick a new time" : "Propose a site visit"}>
       <div className="p-4">
-        <div className="mb-3 flex gap-2">{days.map((d, i) => <button key={i} onClick={() => setDay(i)} className={cn("flex-1 rounded-8 py-2 text-13 font-medium", day === i ? "bg-accent text-white" : "bg-surface-2 text-ink-secondary")}>{d.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" })}</button>)}</div>
-        <div className="mb-4 flex gap-2">{times.map((t) => <button key={t} onClick={() => setTime(t)} className={cn("flex-1 rounded-8 py-2 text-13 font-medium", time === t ? "bg-accent text-white" : "bg-surface-2 text-ink-secondary")}>{fmtTime(t)}</button>)}</div>
-        <button onClick={() => { const d = days[day]; const [h, m] = time.split(":"); d.setHours(+h, +m, 0, 0); onPropose(d.toISOString()); }} className="h-11 w-full rounded-8 bg-accent text-15 font-semibold text-white">Propose visit</button>
+        <div className="mb-3 flex gap-2">{days.map((d, i) => <button key={i} onClick={() => setDay(i)} className={cn("flex-1 rounded-8 py-2 text-13 font-medium", day === i ? "bg-accent text-ink-inverse" : "bg-surface-2 text-ink-secondary")}>{d.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" })}</button>)}</div>
+        <div className="mb-4 flex gap-2">{times.map((t) => <button key={t} onClick={() => setTime(t)} className={cn("flex-1 rounded-8 py-2 text-13 font-medium", time === t ? "bg-accent text-ink-inverse" : "bg-surface-2 text-ink-secondary")}>{fmtTime(t)}</button>)}</div>
+        <button onClick={() => { const d = days[day]; const [h, m] = time.split(":"); d.setHours(+h, +m, 0, 0); onPropose(d.toISOString()); }} className="h-11 w-full rounded-8 bg-accent text-15 font-semibold text-ink-inverse">{mode === "reschedule" ? "Propose new time" : "Propose visit"}</button>
       </div>
     </BottomSheet>
   );
@@ -644,14 +778,38 @@ function ReportSheet({ open, onClose, onSubmit }: { open: boolean; onClose: () =
           </button>
         ))}
         <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} placeholder="Add a note (optional)" className="mt-3 w-full rounded-8 bg-surface-2 p-3 text-15 text-ink-primary outline-none" />
-        <button onClick={() => onSubmit(reason, note)} className="mt-3 h-11 w-full rounded-8 bg-error text-15 font-semibold text-white">Submit Report</button>
+        <button onClick={() => onSubmit(reason, note)} className="mt-3 h-11 w-full rounded-8 bg-error text-15 font-semibold text-ink-inverse">Submit Report</button>
       </div>
     </BottomSheet>
   );
 }
 
+/**
+ * The thread's twin: subject strip, then alternating bubbles. It draws the
+ * subject header too, because that is the tallest thing on the screen — without
+ * it the bubbles jumped down the moment the payload landed.
+ */
 function ThreadSkeleton({ base, onBack }: { base: string; onBack: () => void }) {
-  return <AppShell showNav={false} header={<Header left={<button onClick={onBack} className="grid h-11 w-11 place-items-center -ml-2"><Icon name="arrow-left" size={24} /></button>} title="…" />}><div className="space-y-3 p-4">{Array.from({ length: 5 }).map((_, i) => <div key={i} className={cn("h-10 w-1/2 rounded-16 bg-surface-2", i % 2 && "ml-auto")} />)}</div></AppShell>;
+  return (
+    <AppShell showNav={false} header={
+      <Header
+        left={<button aria-label="Back" onClick={onBack} className="grid h-11 w-11 place-items-center -ml-2"><Icon name="arrow-left" size={24} className="text-ink-primary" /></button>}
+        title={<span className="flex items-center gap-2"><Skeleton className="h-8 w-8 rounded-full" /><Skeleton className="h-3.5 w-28" /></span>}
+      />}>
+      <div className="border-b border-border bg-surface-2 px-3 py-2.5">
+        <div className="flex gap-3">
+          <Skeleton className="h-12 w-12 shrink-0 rounded-8" />
+          <div className="flex-1 space-y-2 pt-0.5"><Skeleton className="h-3.5 w-3/4" /><Skeleton className="h-3 w-1/3" /></div>
+        </div>
+        <Skeleton className="mt-2 h-3 w-1/2" />
+      </div>
+      <div className="space-y-3 p-4">
+        {[0, 1, 2, 3, 4].map((i) => (
+          <Skeleton key={i} className={cn("h-10 rounded-16", i % 2 ? "ml-auto w-2/5" : "w-1/2")} />
+        ))}
+      </div>
+    </AppShell>
+  );
 }
 function NotFound({ base, onBack }: { base: string; onBack: () => void }) {
   return <AppShell showNav={false} header={<Header left={<button onClick={onBack} className="grid h-11 w-11 place-items-center -ml-2"><Icon name="arrow-left" size={24} /></button>} title="Chat" />}><div className="flex flex-col items-center pt-24 text-center"><p className="text-15 text-ink-secondary">{`This chat isn't available.`}</p></div></AppShell>;

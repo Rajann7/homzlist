@@ -24,15 +24,29 @@ if (!sql.trim()) {
   process.exit(1);
 }
 
-const c = new pg.Client({
-  host: `db.${E.SUPABASE_PROJECT_REF}.supabase.co`,
-  port: 5432,
-  user: "postgres",
-  password: E.SUPABASE_DB_PASSWORD,
-  database: "postgres",
-  ssl: { rejectUnauthorized: false },
-});
-await c.connect();
+// Direct first, then the regional poolers — the direct host's DNS drops out
+// often enough that a one-host client turns "show me the row" into an outage.
+// Same ladder scripts/migrate.mjs and the check:* scripts already walk.
+const ref = E.SUPABASE_PROJECT_REF;
+const CANDIDATES = [
+  { name: "direct", host: `db.${ref}.supabase.co`, port: 5432, user: "postgres" },
+  ...["ap-south-1", "ap-southeast-1", "us-east-1", "eu-central-1"].flatMap((r) => [
+    { name: `pooler-${r}:5432`, host: `aws-0-${r}.pooler.supabase.com`, port: 5432, user: `postgres.${ref}` },
+    { name: `pooler-${r}:6543`, host: `aws-0-${r}.pooler.supabase.com`, port: 6543, user: `postgres.${ref}` },
+  ]),
+];
+let c = null;
+let lastErr;
+for (const cand of CANDIDATES) {
+  const client = new pg.Client({
+    host: cand.host, port: cand.port, user: cand.user,
+    password: E.SUPABASE_DB_PASSWORD, database: "postgres",
+    ssl: { rejectUnauthorized: false }, connectionTimeoutMillis: 8000,
+  });
+  try { await client.connect(); c = client; break; }
+  catch (e) { lastErr = e; try { await client.end(); } catch {} }
+}
+if (!c) { console.error(`db connect failed: ${lastErr?.message}`); process.exit(1); }
 try {
   const res = await c.query(sql);
   const all = Array.isArray(res) ? res : [res];

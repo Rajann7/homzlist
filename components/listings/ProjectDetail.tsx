@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { AppShell, BottomSheet, Button, Icon, Skeleton, StatusBadge, Toggle, useToast } from "@/components/billing/ui";
 import { OfflineBanner, SheetOption } from "@/components/billing/primitives";
 import { listingsApi, type Photo } from "@/lib/listings/client";
-import { ReportSheet, ShareSheet } from "@/components/feed/sheets";
+import { InquirySheet, ReportSheet, ShareSheet } from "@/components/feed/sheets";
 import type { FeedCard } from "@/lib/feed/client";
 import { DETAIL_PAD, DetailHero, DetailSection, DetailSeparator, ProjectDetailBody } from "./detailBody";
 import { PhotoViewer, useScrolledPastHero } from "./ListingDetail";
@@ -41,6 +41,10 @@ export function ProjectDetail({ id }: { id: string }) {
   const [idx, setIdx] = useState(0);
   const [viewer, setViewer] = useState(false);
   const [sheet, setSheet] = useState<null | "more" | "manage" | "share" | "report" | "units">(null);
+  // "Contact builder" now opens an in-app conversation (migration 0084) instead
+  // of handing the buyer to WhatsApp, where neither side could find it again.
+  // Call and the WhatsApp shortcut are untouched.
+  const [inquiry, setInquiry] = useState<{ unitType?: string } | null>(null);
   const [unitsBusy, setUnitsBusy] = useState(false);
 
   const load = useCallback(async () => {
@@ -165,7 +169,7 @@ export function ProjectDetail({ id }: { id: string }) {
         project={p}
         openUnit={openUnit}
         onToggleUnit={setOpenUnit}
-        onEnquireUnit={(unitType) => contactBuilder("whatsapp", unitType)}
+        onEnquireUnit={(unitType) => setInquiry({ unitType })}
         brochure={brochure}
         onOpenProfile={(username) => router.push(`/profile/${username}`)}
         notice={p.isOwner ? <OwnerNotice project={p} /> : null}
@@ -203,12 +207,21 @@ export function ProjectDetail({ id }: { id: string }) {
             >
               <Icon name="whatsapp" size={20} />
             </a>
-            <Button fullWidth onClick={() => contactBuilder("whatsapp")}>Contact builder</Button>
+            <Button fullWidth onClick={() => setInquiry({})}>Contact builder</Button>
           </>
         )}
       </div>
 
       {/* ---- Sheets ---------------------------------------------------- */}
+      {/* In-app inquiry — the same sheet a property uses, with the project as
+          the subject. A unit-level "Enquire" carries the unit into the message
+          itself, because a thread's subject is the project, not the unit. */}
+      <InquirySheet
+        open={!!inquiry}
+        onClose={() => { setInquiry(null); }}
+        card={inquiry ? ({ ...card, title: inquiry.unitType ? `${inquiry.unitType} at ${p.name}` : p.name } as FeedCard) : null}
+      />
+
       <BottomSheet open={sheet === "more"} onClose={() => setSheet(null)} title="Options">
         <div className="flex flex-col pb-2">
           <SheetOption icon={<Icon name="share" size={22} className="text-ink-secondary" />} label="Share" onClick={() => setSheet("share")} />

@@ -35,6 +35,9 @@ const STAGE_CHIP: Record<LeadView["stage"], { label: string; cls: string }> = {
 
 const EXPORT_FIELDS = [
   { key: "name", label: "Name" }, { key: "phone", label: "Phone" }, { key: "property", label: "Property" },
+  // Source tells a property lead from a requirement proposal from a project lead
+  // — the three families the pipeline mixes together in one list.
+  { key: "source", label: "Source" },
   { key: "stage", label: "Stage" }, { key: "date", label: "Date" }, { key: "last_activity", label: "Last activity" },
 ];
 

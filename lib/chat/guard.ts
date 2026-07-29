@@ -8,12 +8,15 @@ import { getProfileById } from "@/lib/profile/service";
  * session cannot POST a message (Doc9 §22); the mutating routes call
  * `requireActive` which is a plain participant check, never an admin bypass.
  */
-export async function requireActive(): Promise<{ id: string } | { error: "UNAUTHORIZED" | "FORBIDDEN" }> {
+export async function requireActive(): Promise<{ id: string } | { error: "UNAUTHORIZED" | "FORBIDDEN" | "PROFILE_INCOMPLETE" }> {
   const claims = await getCurrentUser();
   if (!claims) return { error: "UNAUTHORIZED" };
   const profile = await getProfileById(claims.sub);
   if (!profile || profile.state !== "active") return { error: "FORBIDDEN" };
-  if (!profile.name) return { error: "FORBIDDEN" }; // min-profile (name) required to chat (Doc2 §10.1)
+  // Min-profile = NAME + CITY (Doc2 §10.1). Only the name was ever checked, so a
+  // cityless account could open threads the poster then had no location context
+  // for — the whole point of the rule.
+  if (!profile.name || !profile.city_id) return { error: "PROFILE_INCOMPLETE" };
   return { id: claims.sub };
 }
 
