@@ -1,0 +1,459 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>P9 Profile — redesign sample v2 (Owner / Broker / Builder)</title>
+<style>
+  :root{
+    --bg-page:#fff; --surface-1:#fff; --surface-2:#f6f7f8; --surface-3:#eceef0;
+    --border:#e3e6e8; --divider:#eef0f2;
+    --ink-primary:#0e1113; --ink-secondary:#4b5257; --ink-tertiary:#878f96;
+    --accent:#0f9d58; --accent-soft:#e9f5ee;
+    --error:#d93a45; --warning:#b8730a; --info:#1667c7;
+    --r-card:8px; --r-chip:4px; --r-btn:6px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:#dfe3e6;color:var(--ink-primary);padding:26px 20px 60px;
+  }
+  h1{font-size:20px;font-weight:700;text-align:center}
+  .sub{text-align:center;color:#5b6167;font-size:13px;margin:6px 0 24px;line-height:1.5}
+  .stage{display:flex;gap:26px;justify-content:center;flex-wrap:wrap;align-items:flex-start}
+  .col{width:390px}
+  .coltitle{font-size:12px;font-weight:700;text-align:center;margin-bottom:8px;letter-spacing:.6px;text-transform:uppercase;color:#5b6167}
+  .phone{
+    width:390px;height:860px;background:var(--bg-page);border-radius:20px;overflow:hidden;
+    box-shadow:0 14px 40px rgba(10,20,30,.16);display:flex;flex-direction:column;user-select:none;
+  }
+  .scroll{flex:1;overflow-y:auto;overscroll-behavior:contain;background:var(--surface-2)}
+  .scroll::-webkit-scrollbar{width:0}
+  svg{display:block}
+
+  /* ---------------- app header ---------------- */
+  .apphdr{
+    position:sticky;top:0;z-index:20;height:52px;display:flex;align-items:center;
+    justify-content:space-between;padding:0 14px 0 16px;background:var(--surface-1);
+    border-bottom:1px solid var(--border);
+  }
+  .apphdr .u{display:flex;align-items:center;gap:4px;font-size:16px;font-weight:700;letter-spacing:-.2px}
+  .ico{width:42px;height:42px;display:grid;place-items:center;color:var(--ink-primary)}
+
+  /* ---------------- identity ---------------- */
+  .pblock{background:var(--surface-1);padding:16px 16px 14px;border-bottom:1px solid var(--border)}
+  .idrow{display:flex;gap:14px;align-items:flex-start}
+  .avwrap{position:relative;flex:0 0 auto}
+  .av{width:72px;height:72px;border-radius:var(--r-card);object-fit:cover;background:var(--surface-3);
+      border:1px solid var(--border)}
+  .idtxt{min-width:0;flex:1}
+  .nameline{display:flex;align-items:center;gap:6px}
+  .name{font-size:19px;font-weight:700;letter-spacing:-.4px;line-height:1.15}
+  .tick{width:15px;height:15px;flex:0 0 auto}
+  .rolerow{margin-top:6px;display:flex;align-items:center;gap:7px;font-size:12px;color:var(--ink-secondary)}
+  .rolechip{
+    display:inline-flex;align-items:center;height:20px;padding:0 7px;border-radius:var(--r-chip);
+    background:var(--ink-primary);color:#fff;font-size:10px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;
+  }
+  .dot{width:3px;height:3px;border-radius:50%;background:var(--ink-tertiary);flex:0 0 auto}
+  .verifline{margin-top:9px;display:flex;gap:14px;flex-wrap:wrap}
+  .v{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;color:var(--ink-tertiary)}
+  .v.on{color:var(--accent)}
+  .bio{margin-top:12px;font-size:13px;line-height:1.5;color:var(--ink-secondary);user-select:text}
+  .since{margin-top:7px;font-size:11px;color:var(--ink-tertiary);letter-spacing:.1px}
+
+  .btnrow{margin-top:14px;display:flex;gap:8px}
+  .btn{
+    height:36px;border-radius:var(--r-btn);border:1px solid var(--border);background:var(--surface-1);
+    font-size:13.5px;font-weight:600;color:var(--ink-primary);display:flex;align-items:center;
+    justify-content:center;gap:6px;flex:1;font-family:inherit;
+  }
+  .btn.primary{background:var(--ink-primary);border-color:var(--ink-primary);color:#fff}
+
+  /* ---------------- featured ---------------- */
+  .featured{display:flex;gap:14px;overflow-x:auto;padding:14px 16px;background:var(--surface-1);
+    border-bottom:1px solid var(--border)}
+  .featured::-webkit-scrollbar{height:0}
+  .fitem{width:60px;flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:6px}
+  .fcirc{width:60px;height:60px;border-radius:var(--r-card);border:1px solid var(--border);overflow:hidden;
+    display:grid;place-items:center;background:var(--surface-2);color:var(--ink-tertiary)}
+  .fcirc img{width:100%;height:100%;object-fit:cover}
+  .fcirc.new{border:1px dashed var(--ink-tertiary)}
+  .flab{font-size:11px;color:var(--ink-secondary);max-width:60px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+  /* ---------------- tabs ---------------- */
+  .tabsbar{
+    position:sticky;top:52px;z-index:15;display:flex;background:var(--surface-1);
+    border-bottom:1px solid var(--border);padding:0 8px;
+  }
+  .tab{
+    flex:1;padding:13px 2px 12px;font-size:13px;font-weight:700;color:var(--ink-tertiary);
+    position:relative;text-align:center;background:none;border:0;font-family:inherit;letter-spacing:.2px;
+  }
+  .tab .n{font-size:11px;font-weight:700;margin-left:5px;color:var(--ink-tertiary)}
+  .tab.on{color:var(--ink-primary)}
+  .tab.on .n{color:var(--accent)}
+  .tab.on:after{content:"";position:absolute;left:10px;right:10px;bottom:-1px;height:2px;background:var(--ink-primary)}
+  .onetab{
+    position:sticky;top:52px;z-index:15;background:var(--surface-1);border-bottom:1px solid var(--border);
+    padding:13px 16px 12px;display:flex;align-items:center;gap:7px;
+  }
+  .onetab b{font-size:13px;font-weight:700;letter-spacing:.2px}
+  .onetab .n{font-size:11px;font-weight:700;color:var(--accent)}
+
+  /* ---------------- list ---------------- */
+  .list{padding:12px 0 26px}
+  .sechdr{
+    display:flex;align-items:center;padding:2px 16px 10px;font-size:11px;font-weight:700;
+    letter-spacing:.8px;text-transform:uppercase;color:var(--ink-tertiary);
+  }
+  .sechdr .act{margin-left:auto;color:var(--accent);letter-spacing:.2px;text-transform:none;font-size:12px}
+  .group{
+    margin:0 12px;background:var(--surface-1);border:1px solid var(--border);border-radius:var(--r-card);
+    overflow:hidden;
+  }
+  .row{display:flex;gap:12px;padding:12px;position:relative}
+  .row + .row{border-top:1px solid var(--divider)}
+  .thumb{width:84px;height:84px;border-radius:var(--r-chip);flex:0 0 auto;background:var(--surface-3);
+    overflow:hidden;position:relative}
+  .thumb img{width:100%;height:100%;object-fit:cover}
+  .thumb .cnt{position:absolute;right:4px;bottom:4px;display:flex;align-items:center;gap:3px;color:#fff;
+    font-size:10px;font-weight:700;text-shadow:0 1px 2px rgba(0,0,0,.6)}
+  .thumb .ribbon{position:absolute;inset:0;background:rgba(14,17,19,.55);display:grid;place-items:center;
+    color:#fff;font-size:11px;font-weight:800;letter-spacing:1.4px}
+  .body{min-width:0;flex:1;display:flex;flex-direction:column}
+  .top{display:flex;align-items:flex-start;gap:8px}
+  .price{font-size:16px;font-weight:800;letter-spacing:-.4px;line-height:1.2}
+  .price span{font-size:11px;font-weight:600;color:var(--ink-tertiary);letter-spacing:0}
+  .title{margin-top:3px;font-size:13px;color:var(--ink-secondary);line-height:1.35;
+    display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}
+  .meta{margin-top:5px;font-size:11.5px;color:var(--ink-tertiary);display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+  .meta b{color:var(--ink-secondary);font-weight:600}
+  .loc{margin-top:4px;font-size:11.5px;color:var(--ink-tertiary);display:flex;align-items:center;gap:4px}
+  .foot{margin-top:9px;display:flex;align-items:center;gap:10px}
+  .lead{font-size:11.5px;color:var(--ink-secondary);font-weight:600;display:flex;align-items:center;gap:5px}
+  .lead b{color:var(--accent);font-weight:800}
+  .upd{font-size:11px;color:var(--ink-tertiary)}
+  .more{margin-left:auto;color:var(--ink-tertiary);width:20px;height:20px;display:grid;place-items:center}
+
+  /* status = dot + word, no loud pill */
+  .st{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:700;
+    letter-spacing:.5px;text-transform:uppercase;flex:0 0 auto;white-space:nowrap}
+  .st i{width:6px;height:6px;border-radius:50%;background:currentColor;display:block}
+  .s-live{color:var(--accent)}
+  .s-boost{color:var(--warning)}
+  .s-rev{color:var(--info)}
+  .s-off{color:var(--ink-tertiary)}
+  .s-exp{color:var(--error)}
+  .boostbar{
+    display:flex;align-items:center;gap:6px;margin:0;padding:7px 12px;background:#fdf7ec;
+    border-top:1px solid var(--divider);font-size:11px;font-weight:600;color:var(--warning);
+  }
+
+  /* project row */
+  .prow{display:block;padding:0}
+  .pcover{height:150px;background:var(--surface-3);position:relative}
+  .pcover img{width:100%;height:100%;object-fit:cover}
+  .pcover .st{position:absolute;left:10px;top:10px;background:rgba(255,255,255,.95);
+    padding:4px 8px;border-radius:var(--r-chip)}
+  .pcover .ph{position:absolute;right:10px;top:10px;color:#fff;font-size:10.5px;font-weight:700;
+    display:flex;align-items:center;gap:4px;background:rgba(14,17,19,.55);padding:4px 7px;border-radius:var(--r-chip)}
+  .pbody{padding:12px}
+  .ptop{display:flex;align-items:flex-start;gap:10px}
+  .pname{font-size:15.5px;font-weight:700;letter-spacing:-.3px}
+  .pconf{margin-top:3px;font-size:12px;color:var(--ink-tertiary)}
+  .pprice{text-align:right;flex:0 0 auto}
+  .pprice b{font-size:16px;font-weight:800;letter-spacing:-.4px;display:block}
+  .pprice small{font-size:10px;color:var(--ink-tertiary);font-weight:600;letter-spacing:.3px;text-transform:uppercase}
+  .pstrip{
+    margin-top:11px;padding-top:10px;border-top:1px solid var(--divider);display:flex;gap:0;
+  }
+  .pcell{flex:1;min-width:0}
+  .pcell + .pcell{border-left:1px solid var(--divider);padding-left:10px}
+  .pcell span{display:block;font-size:9.5px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--ink-tertiary)}
+  .pcell b{display:block;margin-top:3px;font-size:12px;font-weight:600;color:var(--ink-primary);
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+  /* requirement row */
+  .rrow{display:block;padding:12px 12px 12px 14px;position:relative}
+  .rrow:before{content:"";position:absolute;left:0;top:12px;bottom:12px;width:2px;background:var(--accent);border-radius:2px}
+  .rrow.off:before{background:var(--ink-tertiary)}
+  .rrow.exp:before{background:var(--error)}
+  .rtop{display:flex;align-items:flex-start;gap:8px}
+  .rbudget{font-size:16px;font-weight:800;letter-spacing:-.4px}
+  .rsub{margin-top:3px;font-size:12.5px;color:var(--ink-secondary)}
+  .rareas{margin-top:6px;font-size:11.5px;color:var(--ink-tertiary)}
+  .rfoot{margin-top:10px;display:flex;align-items:center}
+  .prop{font-size:12px;font-weight:600;color:var(--ink-primary);display:flex;align-items:center;gap:7px}
+  .newpill{height:17px;padding:0 6px;border-radius:var(--r-chip);background:var(--accent-soft);color:var(--accent);
+    font-size:10px;font-weight:800;display:inline-flex;align-items:center;letter-spacing:.3px}
+  .chev{margin-left:auto;color:var(--ink-tertiary)}
+
+  /* bottom nav */
+  .bnav{
+    height:56px;flex:0 0 auto;border-top:1px solid var(--border);background:var(--surface-1);
+    display:flex;align-items:center;justify-content:space-around;color:var(--ink-tertiary)
+  }
+  .bnav .on{color:var(--ink-primary)}
+  .navav{width:26px;height:26px;border-radius:6px;object-fit:cover;border:1.5px solid var(--ink-primary)}
+  .note{max-width:1280px;margin:32px auto 0;background:#fff;border-radius:10px;padding:18px 22px;font-size:13px;line-height:1.75;color:#2c3236}
+  .note h3{font-size:14px;margin-bottom:6px}
+  .note li{margin-left:18px}
+</style>
+</head>
+<body>
+
+<h1>P9 · Profile — redesign v2</h1>
+<p class="sub">QR removed · list only (no grid) · no view counts · smaller radius · new colour treatment · Builder = Projects only.</p>
+
+<div class="stage" id="stage"></div>
+
+<div class="note">
+  <h3>v2 changes</h3>
+  <ul>
+    <li><b>QR button removed</b> from all three roles — row is now Edit profile + Share profile.</li>
+    <li><b>Grid / list toggle removed</b> — everything is the list layout, same on Builder.</li>
+    <li><b>View counts gone</b> from property rows. Leads + last-updated stay.</li>
+    <li><b>Colour:</b> loud pills dropped. Status is a coloured dot + uppercase word (green live, amber boosted, blue under review, grey off, red expired). Ink-black is the primary colour, green only for live status / counts.</li>
+    <li><b>Radius:</b> cards 8px, thumbs & chips 4px, buttons 6px, avatar squared to 8px.</li>
+    <li><b>Structure:</b> items sit in one bordered group with hairline dividers (ledger style) instead of floating shadow cards.</li>
+    <li><b>Builder:</b> only the Projects tab — no Sell / Rent, no Requirements.</li>
+  </ul>
+</div>
+
+<script>
+const I = {
+  chev:'<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>',
+  plus:'<svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+  menu:'<svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>',
+  tick:'<svg class="tick" viewBox="0 0 24 24" fill="#1667c7"><path d="M12 2 14.2 4.4l3.2-.4.6 3.2 2.9 1.5-1.4 2.9 1.4 2.9-2.9 1.5-.6 3.2-3.2-.4L12 22l-2.2-2.4-3.2.4-.6-3.2L3.1 15l1.4-2.9L3.1 9.2 6 7.7l.6-3.2 3.2.4z"/><path d="m10.6 15.3-2.9-2.9 1.3-1.3 1.6 1.6 4-4 1.3 1.3z" fill="#fff"/></svg>',
+  ok:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m4 12 5 5L20 6"/></svg>',
+  no:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="12" cy="12" r="9"/></svg>',
+  pin:'<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>',
+  stack:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="8" y="3" width="13" height="13" rx="2"/><path d="M4 8v11a2 2 0 0 0 2 2h11"/></svg>',
+  msg:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 8.4 8.4 0 0 1-3.8-.9L3 20l1.1-4.6A8.4 8.4 0 1 1 21 11.5Z"/></svg>',
+  bolt:'<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M13 2 4 14h6l-1 8 9-12h-6z"/></svg>',
+  dots:'<svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>',
+  right:'<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="m9 18 6-6-6-6"/></svg>',
+  search:'<svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>',
+  navhome:'<svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>',
+  navadd:'<svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M12 8v8M8 12h8" stroke-linecap="round"/></svg>',
+  navmsg:'<svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 8.4 8.4 0 0 1-3.8-.9L3 20l1.1-4.6A8.4 8.4 0 1 1 21 11.5Z"/></svg>',
+};
+const ph=(s,w=300,h=300)=>`https://picsum.photos/seed/${s}/${w}/${h}`;
+
+const ROLES={
+  owner:{label:'Owner',
+    user:{u:'rajan_sharma',name:'Rajan Sharma',av:ph('rajanav',200,200),role:'Owner',city:'Indore',
+      bio:'2 flats in Vijay Nagar. Direct owner — no brokerage.',since:'Member since Mar 2025 · Replies in ~2h',
+      v:[['Phone',1],['ID',1],['RERA',0]]},
+    featured:[['New Launch','f1'],['Ready','f2']],
+    tabs:[
+      {t:'Sell',n:3,kind:'listing',items:[
+        {img:'o1',price:'₹82 L',title:'3 BHK Apartment in Silver Sands',loc:'Vijay Nagar, Indore',
+         meta:['3 BHK','1450 sqft','Ready to move'],st:['s-live','Live'],photos:8,leads:9,upd:'2d ago'},
+        {img:'o2',price:'₹1.15 Cr',title:'4 BHK Villa with private lawn',loc:'Bicholi Mardana, Indore',
+         meta:['4 BHK','2400 sqft','Ready to move'],st:['s-boost','Boosted'],photos:12,leads:23,upd:'5h ago',
+         boost:'Boosted in Indore · 4 days left'},
+        {img:'o3',price:'₹46 L',title:'2 BHK in Sagar Green Hills',loc:'Nipania, Indore',
+         meta:['2 BHK','980 sqft'],st:['s-rev','Under review'],photos:5,leads:0,upd:'1h ago'},
+      ]},
+      {t:'Rent',n:2,kind:'listing',items:[
+        {img:'o4',price:'₹18,000',unit:'/mo',title:'2 BHK semi-furnished, top floor',loc:'Scheme 78, Indore',
+         meta:['2 BHK','1100 sqft','Semi-furnished'],st:['s-live','Live'],photos:6,leads:6,upd:'1w ago'},
+        {img:'o5',price:'₹32,000',unit:'/mo',title:'3 BHK furnished near Ring Road',loc:'Vijay Nagar, Indore',
+         meta:['3 BHK','1600 sqft','Furnished'],st:['s-off','Rented'],rib:'RENTED',photos:9,leads:14,upd:'3w ago'},
+      ]},
+      {t:'Requirements',n:2,kind:'req',items:[
+        {budget:'₹40 L – ₹55 L',sub:'2 BHK · Buy · Apartment',areas:'Nipania · Bicholi · Kanadia',
+         st:['s-live','Active · 22d'],props:7,neu:3},
+        {budget:'₹15,000 – ₹20,000 / mo',sub:'2 BHK · Rent · Any type',areas:'Vijay Nagar · Scheme 54',
+         st:['s-exp','Expired'],bar:'exp',props:4,neu:0},
+      ]},
+    ]},
+
+  broker:{label:'Broker',
+    user:{u:'sethi_estates',name:'Amrit Sethi',av:ph('brokerav',200,200),role:'Broker',city:'Indore',
+      bio:'Sethi Estates · 11 years in Indore residential. Resale, rentals & investor deals.',
+      since:'Member since Jan 2024 · Replies in ~20m',v:[['Phone',1],['ID',1],['RERA',1]]},
+    featured:[['Vijay Nagar','b1'],['Under ₹50L','b2'],['Rentals','b3']],
+    tabs:[
+      {t:'Sell',n:4,kind:'listing',items:[
+        {img:'b1',price:'₹1.42 Cr',title:'4 BHK duplex, corner plot, east facing',loc:'Bengali Square, Indore',
+         meta:['4 BHK','2850 sqft','Ready to move'],st:['s-boost','Boosted'],photos:14,leads:41,upd:'3h ago',
+         boost:'Boosted in Indore · 9 days left'},
+        {img:'b2',price:'₹68 L',title:'3 BHK in Sky Corp Residency',loc:'Nipania, Indore',
+         meta:['3 BHK','1320 sqft'],st:['s-live','Live'],photos:10,leads:17,upd:'1d ago'},
+        {img:'b3',price:'₹28 L',title:'Residential plot, corner facing',loc:'Super Corridor, Indore',
+         meta:['Plot','1500 sqft'],st:['s-live','Live'],photos:4,leads:8,upd:'4d ago'},
+        {img:'b4',price:'₹95 L',title:'3 BHK ready-to-move, gated society',loc:'Rau, Indore',
+         meta:['3 BHK','1780 sqft'],st:['s-off','Sold'],rib:'SOLD',photos:11,leads:29,upd:'2w ago'},
+      ]},
+      {t:'Rent',n:2,kind:'listing',items:[
+        {img:'b5',price:'₹45,000',unit:'/mo',title:'Commercial office, 3rd floor with lift',loc:'AB Road, Indore',
+         meta:['Office','2200 sqft'],st:['s-live','Live'],photos:7,leads:11,upd:'2d ago'},
+        {img:'b6',price:'₹22,000',unit:'/mo',title:'3 BHK unfurnished, family only',loc:'Scheme 114, Indore',
+         meta:['3 BHK','1450 sqft'],st:['s-live','Live'],photos:8,leads:5,upd:'6d ago'},
+      ]},
+      {t:'Requirements',n:2,kind:'req',items:[
+        {budget:'₹60 L – ₹85 L',sub:'3 BHK · Buy · Client requirement',areas:'Vijay Nagar · Nipania · Bicholi',
+         st:['s-live','Active · 18d'],props:12,neu:5},
+        {budget:'₹25,000 – ₹40,000 / mo',sub:'Office · Rent · 1500–2500 sqft',areas:'AB Road · Vijay Nagar',
+         st:['s-off','Paused'],bar:'off',props:6,neu:0},
+      ]},
+    ]},
+
+  builder:{label:'Builder',
+    user:{u:'shreeram_infra',name:'Shreeram Infra',av:ph('builderav',200,200),role:'Builder',city:'Indore',
+      bio:'RERA-registered developer · 18 projects delivered since 2009. Townships & premium apartments.',
+      since:'Member since Aug 2023 · Replies in ~1h',v:[['Phone',1],['ID',1],['RERA',1]]},
+    featured:[['Skyline','p1'],['Greens','p2'],['Amenities','p3']],
+    single:true,
+    tabs:[
+      {t:'Projects',n:3,kind:'project',items:[
+        {img:'pr1',name:'Shreeram Skyline',conf:'Apartments · 2, 3 & 4 BHK · 240 units',price:'₹58 L',from:'onwards',
+         st:['s-boost','Boosted'],photos:22,
+         cells:[['Status','Under construction'],['Possession','Dec 2027'],['RERA','P-IND-24-118']]},
+        {img:'pr2',name:'Shreeram Greens Phase 2',conf:'Plots · 1000–2400 sqft · 88 plots',price:'₹19 L',from:'onwards',
+         st:['s-live','Live'],photos:15,
+         cells:[['Status','Ready to register'],['Possession','Immediate'],['RERA','P-IND-23-091']]},
+        {img:'pr3',name:'Shreeram Nest',conf:'Villas · 3 & 4 BHK · 42 villas',price:'₹1.35 Cr',from:'onwards',
+         st:['s-rev','Under review'],photos:9,
+         cells:[['Status','New launch'],['Possession','Jun 2028'],['RERA','Applied']]},
+      ]},
+    ]},
+};
+
+function listingRow(x){
+  return `<div class="row">
+    <div class="thumb">
+      <img src="${ph(x.img,300,300)}">
+      ${x.rib?`<span class="ribbon">${x.rib}</span>`:''}
+      ${x.photos?`<span class="cnt">${I.stack}${x.photos}</span>`:''}
+    </div>
+    <div class="body">
+      <div class="top">
+        <div style="min-width:0;flex:1">
+          <div class="price">${x.price}${x.unit?`<span>${x.unit}</span>`:''}</div>
+          <div class="title">${x.title}</div>
+        </div>
+        <span class="st ${x.st[0]}"><i></i>${x.st[1]}</span>
+      </div>
+      <div class="meta">${x.meta.map((m,i)=>`${i?'<span class="dot"></span>':''}<b>${m}</b>`).join('')}</div>
+      <div class="loc">${I.pin}${x.loc}</div>
+      <div class="foot">
+        <span class="lead">${I.msg}<b>${x.leads}</b> leads</span>
+        <span class="upd">Updated ${x.upd}</span>
+        <span class="more">${I.dots}</span>
+      </div>
+    </div>
+  </div>
+  ${x.boost?`<div class="boostbar">${I.bolt}${x.boost}</div>`:''}`;
+}
+
+function projectRow(x){
+  return `<div class="row prow">
+    <div class="pcover">
+      <img src="${ph(x.img,800,450)}">
+      <span class="st ${x.st[0]}"><i></i>${x.st[1]}</span>
+      <span class="ph">${I.stack}${x.photos}</span>
+    </div>
+    <div class="pbody">
+      <div class="ptop">
+        <div style="min-width:0;flex:1">
+          <div class="pname">${x.name}</div>
+          <div class="pconf">${x.conf}</div>
+        </div>
+        <div class="pprice"><b>${x.price}</b><small>${x.from}</small></div>
+      </div>
+      <div class="pstrip">
+        ${x.cells.map(([k,v])=>`<div class="pcell"><span>${k}</span><b>${v}</b></div>`).join('')}
+      </div>
+    </div>
+  </div>`;
+}
+
+function reqRow(x){
+  return `<div class="row rrow ${x.bar||''}">
+    <div class="rtop">
+      <div style="min-width:0;flex:1">
+        <div class="rbudget">${x.budget}</div>
+        <div class="rsub">${x.sub}</div>
+      </div>
+      <span class="st ${x.st[0]}"><i></i>${x.st[1]}</span>
+    </div>
+    <div class="rareas">${I.pin} ${x.areas}</div>
+    <div class="rfoot">
+      <span class="prop">${x.props} proposals ${x.neu?`<span class="newpill">${x.neu} NEW</span>`:''}</span>
+      <span class="chev">${I.right}</span>
+    </div>
+  </div>`;
+}
+
+function tabBody(tab){
+  const r = tab.kind==='req'?reqRow : tab.kind==='project'?projectRow : listingRow;
+  const label = tab.kind==='req'?'Your requirements' : tab.kind==='project'?'Your projects' : `${tab.t} listings`;
+  const act = tab.kind==='req'?'Post requirement' : tab.kind==='project'?'Add project' : 'Add listing';
+  return `<div class="list">
+    <div class="sechdr">${label}<span class="act">+ ${act}</span></div>
+    <div class="group">${tab.items.map(r).join('')}</div>
+  </div>`;
+}
+
+function phone(key,d){
+  const u=d.user;
+  const head = d.single
+    ? `<div class="onetab"><b>PROJECTS</b><span class="n">${d.tabs[0].n}</span></div>`
+    : `<div class="tabsbar">${d.tabs.map((t,i)=>`<button class="tab ${i?'':'on'}" data-r="${key}" data-i="${i}">${t.t}<span class="n">${t.n}</span></button>`).join('')}</div>`;
+  return `<div class="col">
+    <div class="coltitle">${d.label}</div>
+    <div class="phone">
+      <div class="scroll">
+        <div class="apphdr">
+          <div class="u">${u.u} ${I.chev}</div>
+          <div style="display:flex"><span class="ico">${I.plus}</span><span class="ico">${I.menu}</span></div>
+        </div>
+
+        <div class="pblock">
+          <div class="idrow">
+            <div class="avwrap"><img class="av" src="${u.av}"></div>
+            <div class="idtxt">
+              <div class="nameline"><span class="name">${u.name}</span>${u.v[2][1]||u.v[1][1]?I.tick:''}</div>
+              <div class="rolerow"><span class="rolechip">${u.role}</span><span class="dot"></span><span>${u.city}</span></div>
+              <div class="verifline">${u.v.map(([n,on])=>`<span class="v ${on?'on':''}">${on?I.ok:I.no}${n}</span>`).join('')}</div>
+            </div>
+          </div>
+          <p class="bio">${u.bio}</p>
+          <p class="since">${u.since}</p>
+          <div class="btnrow">
+            <button class="btn primary">Edit profile</button>
+            <button class="btn">Share profile</button>
+          </div>
+        </div>
+
+        <div class="featured">
+          ${d.featured.map(([n,s])=>`<div class="fitem"><div class="fcirc"><img src="${ph(s,140,140)}"></div><div class="flab">${n}</div></div>`).join('')}
+          <div class="fitem"><div class="fcirc new">${I.plus}</div><div class="flab">New</div></div>
+        </div>
+
+        ${head}
+        <div id="body-${key}">${tabBody(d.tabs[0])}</div>
+      </div>
+      <div class="bnav">
+        <span class="on">${I.navhome}</span><span>${I.search}</span><span>${I.navadd}</span>
+        <span>${I.navmsg}</span><img class="navav" src="${u.av}">
+      </div>
+    </div>
+  </div>`;
+}
+
+document.getElementById('stage').innerHTML=Object.entries(ROLES).map(([k,d])=>phone(k,d)).join('');
+document.addEventListener('click',e=>{
+  const b=e.target.closest('.tab'); if(!b) return;
+  const k=b.dataset.r,i=+b.dataset.i;
+  document.querySelectorAll(`.tab[data-r="${k}"]`).forEach(t=>t.classList.toggle('on',t===b));
+  document.getElementById('body-'+k).innerHTML=tabBody(ROLES[k].tabs[i]);
+});
+</script>
+</body>
+</html>

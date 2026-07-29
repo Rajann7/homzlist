@@ -359,6 +359,11 @@ function priceLabel(l: Pick<ListingRow, "price_paise" | "price_on_request" | "is
 
 /** Card shape for feed/search/manager lists. */
 export function listingCardDTO(l: ListingRow) {
+  const attrs = (l.attributes ?? {}) as Record<string, unknown>;
+  // `bhk` is an option CODE, not a number — "5+" is a real stored value, so
+  // coercing it with Number() silently dropped every 5+ BHK listing's headline
+  // fact. It travels as the code and the card prints "<code> BHK".
+  const bhk = attrs.bhk === undefined || attrs.bhk === null || attrs.bhk === "" ? null : String(attrs.bhk);
   return {
     id: l.id,
     title: l.title,
@@ -371,6 +376,12 @@ export function listingCardDTO(l: ListingRow) {
     kind: l.kind,
     status: l.status,
     availability: l.availability,
+    // The profile row's meta line ("3 BHK · 1,450 sqft"). Both come from the
+    // row itself — `area_sqft` is the column the search filters already sort on
+    // — so a card can state them without the browser reaching into
+    // `attributes` and guessing which key holds the size.
+    bhk,
+    sqft: l.area_sqft,
   };
 }
 

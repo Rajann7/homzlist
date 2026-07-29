@@ -70,6 +70,13 @@ export interface PublicProject {
   priceFrom: string | null;
   buildStatusLabel: string | null;
   possessionLabel: string | null;
+  /** The row's configuration line — "Apartments · 2, 3 BHK · 240 units". */
+  projectTypeLabel?: string | null;
+  units?: { unitType: string | null }[];
+  totalUnits?: number | null;
+  photoCount?: number;
+  /** Public by design on a project (Doc2 §6) — the number or the exemption. */
+  rera?: { exempt: true; reason: string | null } | { exempt: false; number: string | null };
 }
 
 export const profileApi = {
@@ -89,7 +96,7 @@ export const profileApi = {
   publicProfile: (username: string) => req<{ profile: any }>(`/profile/${encodeURIComponent(username)}`, "GET"),
   /** Live listings for someone else's profile grid (P9 S2). */
   publicListings: (username: string) =>
-    req<{ items: { id: string; title: string | null; price: string; coverUrl: string | null; areaLabel: string | null; kind: "sell" | "rent" }[] }>(
+    req<{ items: { id: string; title: string | null; price: string; coverUrl: string | null; areaLabel: string | null; kind: "sell" | "rent"; photoCount: number; bhk: string | null; sqft: number | null }[] }>(
       `/profile/${encodeURIComponent(username)}/listings`, "GET",
     ),
   /** Live projects for a builder's public profile — the P9 S2 Projects tab. */

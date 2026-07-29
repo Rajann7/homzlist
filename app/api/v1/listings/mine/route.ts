@@ -1,6 +1,6 @@
 import { ok, fail } from "@/lib/api";
 import { getCurrentUser } from "@/lib/auth/current-user";
-import { listMine, promotedListingIds } from "@/lib/listings/service";
+import { listMine, activeBoostsFor, leadCountsFor } from "@/lib/listings/service";
 import { listMyProjectCards } from "@/lib/listings/projects";
 import { myListingDTO } from "@/lib/listings/dto";
 
@@ -26,9 +26,17 @@ export async function GET() {
   // tiles get it comes from the `boosts` table in one batched query — never
   // from anything the client could assume. Projects are boostable too (Doc2
   // §13), and their boosts are matched on the project kind.
-  const [promoted, promotedProjects] = await Promise.all([
-    promotedListingIds(rows.map((r) => r.id)),
-    promotedListingIds(projects.map((p) => p.id), "project"),
+  // The profile card also states WHERE a boost is running and how long it has
+  // left, and carries the listing's lead count — both batched here for the same
+  // reason the chip is: one query for the list, never one per row.
+  //
+  // `activeBoostsFor` answers "is it boosted" as well (it is the same `boosts`
+  // query with two more columns), so `promoted` is read off the same map rather
+  // than costing a second round trip per subject kind.
+  const [boosts, projectBoosts, leads] = await Promise.all([
+    activeBoostsFor(rows.map((r) => r.id)),
+    activeBoostsFor(projects.map((p) => p.id), "project"),
+    leadCountsFor(rows.map((r) => r.id)),
   ]);
 
   // One list, newest first, whichever table the row came from.
@@ -36,12 +44,15 @@ export async function GET() {
     ...rows.map((r) => ({
       ...myListingDTO(r),
       subjectKind: "listing" as const,
-      promoted: promoted.has(r.id),
+      promoted: boosts.has(r.id),
+      boost: boosts.get(r.id) ?? null,
+      leads: leads.get(r.id) ?? 0,
       sortAt: r.created_at,
     })),
     ...projects.map(({ createdAt, ...p }) => ({
       ...p,
-      promoted: promotedProjects.has(p.id),
+      promoted: projectBoosts.has(p.id),
+      boost: projectBoosts.get(p.id) ?? null,
       sortAt: createdAt,
     })),
   ].sort((a, b) => String(b.sortAt ?? "").localeCompare(String(a.sortAt ?? "")));

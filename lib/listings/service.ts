@@ -67,6 +67,8 @@ export interface ListingRow {
   edited_since_approval: boolean;
   area_sqft: number | null;
   created_at: string;
+  /** Touched by the `listings_updated_at` trigger on every edit (0005). */
+  updated_at: string;
   live_at: string | null;
   deleted_at: string | null;
 }
@@ -790,6 +792,64 @@ export async function promotedListingIds(
     .lte("starts_at", now)
     .gt("ends_at", now);
   return new Set((data ?? []).map((r: { listing_id: string }) => r.listing_id));
+}
+
+/**
+ * The running boost behind each of these ids — where it is placed and how long
+ * it has left.
+ *
+ * `promotedListingIds` answers "is it boosted", which was all a chip needed.
+ * The profile row states the boost out loud ("Boosted in Indore · 4 days
+ * left"), and both halves of that sentence are columns on the row that was
+ * paid for: `target_label` and `ends_at`. Nothing here is computed from the
+ * catalog code or assumed from the duration, because a boost that was paused
+ * and resumed no longer matches its own `duration_days`.
+ */
+export async function activeBoostsFor(
+  listingIds: string[],
+  kind: "listing" | "project" | "requirement" = "listing",
+): Promise<Map<string, { targetLabel: string; daysLeft: number }>> {
+  const out = new Map<string, { targetLabel: string; daysLeft: number }>();
+  if (!listingIds.length) return out;
+  const now = new Date();
+  const { data } = await db()
+    .from("boosts")
+    .select("listing_id,target_label,ends_at")
+    .in("listing_id", listingIds)
+    .eq("subject_kind", kind)
+    .eq("status", "active")
+    .lte("starts_at", now.toISOString())
+    .gt("ends_at", now.toISOString());
+  for (const b of (data ?? []) as { listing_id: string; target_label: string; ends_at: string }[]) {
+    const daysLeft = Math.max(1, Math.ceil((new Date(b.ends_at).getTime() - now.getTime()) / 86_400_000));
+    // A listing can carry two overlapping boosts; the row shows the one that
+    // runs longest rather than whichever the query happened to return first.
+    const prev = out.get(b.listing_id);
+    if (!prev || daysLeft > prev.daysLeft) out.set(b.listing_id, { targetLabel: b.target_label, daysLeft });
+  }
+  return out;
+}
+
+/**
+ * Relevant lead counts for a whole list, in one query.
+ *
+ * The batch form of `ownerListingStats().leads`, for the profile rows — the
+ * seller's one number per listing. Same filter as the per-listing count
+ * (`is_relevant`), so the row and the insights screen can never disagree about
+ * how many inquiries a listing has.
+ */
+export async function leadCountsFor(listingIds: string[]): Promise<Map<string, number>> {
+  const out = new Map<string, number>();
+  if (!listingIds.length) return out;
+  const { data } = await db()
+    .from("leads")
+    .select("listing_id")
+    .in("listing_id", listingIds)
+    .eq("is_relevant", true);
+  for (const { listing_id } of (data ?? []) as { listing_id: string }[]) {
+    out.set(listing_id, (out.get(listing_id) ?? 0) + 1);
+  }
+  return out;
 }
 
 /**

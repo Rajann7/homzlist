@@ -157,6 +157,16 @@ export interface MyListing {
   daysLeft?: number;
   /** Boosted right now — the PROMOTED chip on a profile tile (P9 S1). */
   promoted?: boolean;
+  /** Where that boost is placed and what's left of it — server-computed. */
+  boost?: { targetLabel: string; daysLeft: number } | null;
+  /** Relevant inquiries on this listing (P9 S1 row). Listings only. */
+  leads?: number;
+  /**
+   * Meta line on the profile row. Both from the row, neither derived here.
+   * `bhk` is the stored option code ("3", "5+"), never a number.
+   */
+  bhk?: string | null;
+  sqft?: number | null;
   createdOn: string | null;
 }
 
@@ -174,6 +184,14 @@ export interface MyProject {
   possessionLabel: string | null;
   totalUnits: number | null;
   availableUnits: number | null;
+  /** The row's configuration line: "Apartments · 2, 3 BHK · 240 units". */
+  projectTypeLabel?: string | null;
+  units?: { unitType: string | null }[];
+  photoCount?: number;
+  /** RERA number, or the approved exemption — the same shape the detail uses. */
+  rera?: { exempt: true; reason: string | null } | { exempt: false; number: string | null };
+  promoted?: boolean;
+  boost?: { targetLabel: string; daysLeft: number } | null;
 }
 
 /**

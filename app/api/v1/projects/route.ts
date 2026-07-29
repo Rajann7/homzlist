@@ -4,7 +4,7 @@ import { getCurrentUser } from "@/lib/auth/current-user";
 import { getProfileById } from "@/lib/profile/service";
 import { rateLimit } from "@/lib/auth/rate-limit";
 import { createProject, listMyProjects, getProjectType, sanitizeProjectAttributes, NoProjectSlotError } from "@/lib/listings/projects";
-import { getFieldDefinitions } from "@/lib/listings/service";
+import { getFieldDefinitions, activeBoostsFor } from "@/lib/listings/service";
 
 /**
  * The exemption reasons and the build statuses are `field_definitions` option
@@ -40,7 +40,14 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 export async function GET() {
   const claims = await getCurrentUser();
   if (!claims) return fail("UNAUTHORIZED");
-  return ok({ items: await listMyProjects(claims.sub) });
+  const items = await listMyProjects(claims.sub);
+  // The builder's own Projects list states a running boost exactly as a
+  // listing row does. It comes from the `boosts` table here rather than being
+  // inferred from `status`, which only ever says live/hidden/under review.
+  const boosts = await activeBoostsFor(items.map((p) => p.id), "project");
+  return ok({
+    items: items.map((p) => ({ ...p, promoted: boosts.has(p.id), boost: boosts.get(p.id) ?? null })),
+  });
 }
 
 export async function POST(req: NextRequest) {

@@ -11,6 +11,7 @@ import { Skeleton } from "@/components/ui/Skeleton";
 import { useToast } from "@/components/ui/Toast";
 import { ProfileBadges } from "./ProfileBadges";
 import { FeaturedCollectionSheet } from "./ProfileSheets";
+import { CardList, ListingCard, ProjectCard, TabCount } from "./ProfileRows";
 import { profileApi, type FeaturedCollection, type FeaturedItem, type PublicProject } from "@/lib/profile/client";
 import { cn } from "@/lib/utils";
 
@@ -54,7 +55,12 @@ export function OtherProfile({ username, isGuest = false }: { username: string; 
   // so the endpoint and `profileApi.blockUser` stay; only this entry point is gone.
   const [notFound, setNotFound] = useState(false);
   const [listings, setListings] = useState<
-    { id: string; title: string | null; price: string; coverUrl: string | null; areaLabel: string | null; kind: "sell" | "rent" }[] | null
+    | {
+        id: string; title: string | null; price: string; coverUrl: string | null;
+        areaLabel: string | null; kind: "sell" | "rent"; photoCount: number;
+        bhk: string | null; sqft: number | null;
+      }[]
+    | null
   >(null);
   // Builder-only. The Projects tab used to fall through to `listings`, so it
   // rendered exactly what the Sell / Rent tab did and a builder's projects were
@@ -167,27 +173,27 @@ export function OtherProfile({ username, isGuest = false }: { username: string; 
       )}
 
       {/* ---- Identity block -------------------------------------------------
-          Name and role lead, avatar beside them, and the counts sit in their own
-          balanced row underneath. The old layout put a single stat next to an
-          84px avatar with `justify-around`, which left a wide dead gap on every
-          non-builder profile and made the whole header read as unfinished. */}
+          Same language as the redesigned own-profile (29 Jul 2026). A visitor
+          still sees only public facts — no status, no leads anywhere below. */}
       <div className="px-4 pt-5">
         <div className="flex items-start gap-3.5">
-          <Avatar name={p.name ?? undefined} src={p.photoUrl ?? undefined} size={64} />
+          <Avatar name={p.name ?? undefined} src={p.photoUrl ?? undefined} size={78} />
           <div className="min-w-0 flex-1 pt-0.5">
-            <div className="flex items-center gap-1.5">
-              <h2 className="truncate text-20 font-bold leading-tight text-ink-primary">{p.name}</h2>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <h2 className="truncate text-17 font-bold tracking-[-0.2px] text-ink-primary">{p.name}</h2>
               <ProfileBadges badges={p.badges} />
             </div>
-            <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+            <div className="mt-1 flex items-center gap-1.5 text-13 text-ink-secondary">
               {roleLabel && (
-                <span className="chrome rounded-full bg-accent-soft px-2.5 py-1 text-11 font-semibold text-accent">{roleLabel}</span>
+                <span className="chrome inline-flex h-[22px] items-center rounded-full bg-accent-soft px-2.5 text-11 font-bold text-accent">
+                  {roleLabel}
+                </span>
               )}
               {p.cityName && (
-                <span className="chrome inline-flex items-center gap-1 rounded-full bg-surface-2 px-2.5 py-1 text-11 font-medium text-ink-secondary">
-                  <Icon name="pin" size={12} strokeWidth={2} />
-                  {p.cityName}
-                </span>
+                <>
+                  <i className="h-[3px] w-[3px] rounded-full bg-ink-tertiary" />
+                  <span className="truncate">{p.cityName}</span>
+                </>
               )}
             </div>
           </div>
@@ -197,7 +203,7 @@ export function OtherProfile({ username, isGuest = false }: { username: string; 
 
         {/* Counts — a real row with its own surface, so one stat looks
             deliberate instead of stranded. */}
-        <div className="mt-4 flex items-stretch overflow-hidden rounded-12 border border-border bg-surface-1">
+        <div className="mt-4 flex items-stretch overflow-hidden rounded-8 border border-border bg-surface-1">
           {/* A builder's Listings count is now structurally 0 (0067), so the
               tile is theirs-only: Projects is the number that means something.
               Everyone else keeps both exactly as before. */}
@@ -219,7 +225,7 @@ export function OtherProfile({ username, isGuest = false }: { username: string; 
           <button
             aria-label="About this account"
             onClick={() => setAbout(true)}
-            className="grid h-11 w-11 shrink-0 place-items-center rounded-8 border border-border text-ink-secondary active:bg-surface-2"
+            className="grid h-11 w-11 shrink-0 place-items-center rounded-6 border border-border text-ink-secondary active:bg-surface-2"
           >
             <Icon name="info" size={19} strokeWidth={1.8} />
           </button>
@@ -244,7 +250,7 @@ export function OtherProfile({ username, isGuest = false }: { username: string; 
             // rendered as "Ready to m…". The column is wider than the ring now and
             // the name wraps to two lines before it truncates.
             <button key={c.id} onClick={() => void openCollection(c)} className="flex w-[76px] shrink-0 flex-col items-center gap-1.5">
-              <span className="grid h-[68px] w-[68px] place-items-center overflow-hidden rounded-full bg-surface-2 text-ink-tertiary ring-1 ring-border">
+              <span className="grid h-[68px] w-[68px] place-items-center overflow-hidden rounded-full border border-border bg-surface-2 text-ink-tertiary">
                 {c.coverUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={c.coverUrl} alt="" className="h-full w-full object-cover" />
@@ -258,77 +264,66 @@ export function OtherProfile({ username, isGuest = false }: { username: string; 
         </div>
       )}
 
-      {/* Tabs + grid (live-only, empty until listings). Sticky so the grid keeps
-          its context while scrolling, and the indicator is inset to the label
-          rather than spanning the full cell. */}
-      <div className="chrome sticky top-header z-sticky mt-5 flex border-b border-border bg-page">
-        {tabs.map((t, i) => (
-          <button
-            key={t}
-            onClick={() => setTab(i)}
-            className={cn(
-              "relative flex-1 py-3 text-15 font-semibold transition-colors",
-              i === tab ? "text-ink-primary" : "text-ink-tertiary",
-            )}
-          >
-            {t}
-            {i === tab && <span className="absolute inset-x-6 bottom-0 h-[2px] rounded-full bg-accent" />}
-          </button>
-        ))}
-      </div>
-      {/* Grid — tab-filtered. "Sell"/"Rent" filter by kind; the builder's
-          "Sell / Rent" tab shows everything. Each tile opens the listing. */}
+      {/* Tabs (live-only). Sticky so the list keeps its context while scrolling.
+          A builder has exactly one tab, so it renders as a label rather than as
+          a single full-width "tab" that looks like it should have siblings. */}
+      {tabs.length === 1 ? (
+        <div className="chrome sticky top-header z-sticky mt-5 flex items-center border-b border-border bg-surface-1 px-4 py-3">
+          <b className="text-15 font-semibold text-ink-primary">{tabs[0]}</b>
+          <TabCount n={projects?.length ?? 0} active />
+        </div>
+      ) : (
+        <div className="chrome sticky top-header z-sticky mt-5 flex border-b border-border bg-surface-1">
+          {tabs.map((t, i) => (
+            <button
+              key={t}
+              onClick={() => setTab(i)}
+              className={cn(
+                "relative flex flex-1 items-center justify-center py-3 text-15 font-semibold transition-colors",
+                i === tab ? "text-ink-primary" : "text-ink-tertiary",
+              )}
+            >
+              {t}
+              <TabCount
+                n={(listings ?? []).filter((l) => (t === "Sell" ? l.kind === "sell" : l.kind === "rent")).length}
+                active={i === tab}
+              />
+              {i === tab && <span className="absolute inset-x-0 -bottom-px h-[2px] bg-accent" />}
+            </button>
+          ))}
+        </div>
+      )}
+      {/* The list — tab-filtered, same row shapes as the owner's own profile
+          minus every owner-only fact. The 2-column tile grid is gone (29 Jul
+          2026): one layout, both profiles. */}
       {listings === null ? (
-        <div className="grid grid-cols-2 gap-2 p-4">
-          {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="aspect-[4/5] w-full rounded-12" />)}
+        <div className="flex flex-col gap-2.5 px-3.5 pt-3">
+          {[0, 1, 2].map((i) => <Skeleton key={i} className="h-[138px] w-full rounded-8" />)}
         </div>
       ) : tabs[tab] === "Projects" ? (
         // Real projects, not the listings this tab used to borrow.
         projects === null ? (
-          <div className="grid grid-cols-2 gap-2 p-4">
-            {[0, 1].map((i) => <Skeleton key={i} className="aspect-[4/5] w-full rounded-12" />)}
+          <div className="flex flex-col gap-2.5 px-3.5 pt-3">
+            {[0, 1].map((i) => <Skeleton key={i} className="h-[350px] w-full rounded-8" />)}
           </div>
         ) : projects.length === 0 ? (
           <EmptyGrid title="No projects yet" body="This builder hasn't published a project." />
         ) : (
-          <div className="grid grid-cols-2 gap-2 p-4">
+          <CardList>
             {projects.map((pr) => (
-              <button
+              <ProjectCard
                 key={pr.id}
                 onClick={() => router.push(`/project/${pr.id}`)}
-                className="overflow-hidden rounded-12 border border-border bg-surface-1 text-left shadow-l1 active:opacity-90 dark:shadow-none"
-                aria-label={pr.name}
-              >
-                <span className="relative block aspect-[4/3] overflow-hidden bg-surface-2">
-                  {pr.coverUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={pr.coverUrl} alt="" data-protected="true" className="h-full w-full object-cover" />
-                  ) : (
-                    <span className="grid h-full place-items-center text-ink-tertiary"><Icon name="building" size={26} /></span>
-                  )}
-                  {pr.buildStatusLabel && (
-                    <span className="chrome absolute left-1.5 top-1.5 rounded-4 bg-black/60 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.3px] text-white">
-                      {pr.buildStatusLabel}
-                    </span>
-                  )}
-                </span>
-                <span className="block px-2.5 py-2">
-                  {/* A project with no priced unit yet leads with its name; the
-                      name is not repeated underneath in that case. */}
-                  <span className="block truncate text-15 font-bold leading-tight text-ink-primary">
-                    {pr.priceFrom ? `From ${pr.priceFrom}` : pr.name}
-                  </span>
-                  {pr.priceFrom && <span className="mt-1 block truncate text-11 text-ink-secondary">{pr.name}</span>}
-                  {pr.areaLabel && (
-                    <span className="mt-0.5 flex items-center gap-1 text-11 text-ink-tertiary">
-                      <Icon name="pin" size={11} strokeWidth={2} />
-                      <span className="truncate">{pr.areaLabel}</span>
-                    </span>
-                  )}
-                </span>
-              </button>
+                coverUrl={pr.coverUrl}
+                photoCount={pr.photoCount}
+                name={pr.name}
+                config={publicProjectConfig(pr)}
+                priceFrom={pr.priceFrom}
+                areaLabel={pr.areaLabel}
+                specs={publicProjectSpecs(pr)}
+              />
             ))}
-          </div>
+          </CardList>
         )
       ) : (() => {
         const label = tabs[tab];
@@ -344,38 +339,21 @@ export function OtherProfile({ username, isGuest = false }: { username: string; 
           );
         }
         return (
-          // Two columns instead of three. At 375px a third column left each tile
-          // ~124px wide, which is why "₹1.05 Cr · Negotiable" was clipping — the
-          // price, the one thing a browser scans for, was the thing being cut.
-          <div className="grid grid-cols-2 gap-2 p-4">
+          <CardList>
             {shown.map((l) => (
-              <button
+              <ListingCard
                 key={l.id}
                 onClick={() => router.push(`/property/${l.id}`)}
-                className="group overflow-hidden rounded-12 border border-border bg-surface-1 text-left shadow-l1 active:opacity-90 dark:shadow-none"
-                aria-label={l.title ?? l.price}
-              >
-                <span className="relative block aspect-[4/3] overflow-hidden bg-surface-2">
-                  {l.coverUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={l.coverUrl} alt="" data-protected="true" className="h-full w-full object-cover" />
-                  ) : (
-                    <span className="grid h-full place-items-center text-ink-tertiary"><Icon name="home" size={26} /></span>
-                  )}
-                </span>
-                <span className="block px-2.5 py-2">
-                  {/* Price on its own line at full width, so it never truncates. */}
-                  <span className="block truncate text-15 font-bold leading-tight text-ink-primary">{priceMain(l.price)}</span>
-                  {l.areaLabel && (
-                    <span className="mt-1 flex items-center gap-1 text-11 text-ink-tertiary">
-                      <Icon name="pin" size={11} strokeWidth={2} />
-                      <span className="truncate">{l.areaLabel}</span>
-                    </span>
-                  )}
-                </span>
-              </button>
+                coverUrl={l.coverUrl}
+                photoCount={l.photoCount}
+                price={l.price}
+                title={l.title}
+                bhk={l.bhk}
+                sqft={l.sqft}
+                areaLabel={l.areaLabel}
+              />
             ))}
-          </div>
+          </CardList>
         );
       })()}
 
@@ -448,13 +426,28 @@ function StatText({ value, label }: { value: string; label: string }) {
   );
 }
 
-/**
- * The price a card leads with. The server sends "₹68 Lakh · Negotiable"; the
- * card shows the amount and drops the qualifier, which the detail page states in
- * full. Nothing is recomputed here — it is the server's own string, split.
- */
-function priceMain(price: string) {
-  return price.split("·")[0].trim();
+/** "Apartments · 2 BHK, 3 BHK · 240 units" — only what the project carries. */
+function publicProjectConfig(p: PublicProject) {
+  const unitTypes = Array.from(new Set((p.units ?? []).map((u) => u.unitType).filter((u): u is string => Boolean(u))));
+  return (
+    [
+      p.projectTypeLabel,
+      unitTypes.length ? unitTypes.join(", ") : null,
+      p.totalUnits ? `${p.totalUnits} units` : null,
+    ]
+      .filter(Boolean)
+      .join(" · ") || null
+  );
+}
+
+/** The fact chips on a public project card. RERA is public by design (Doc2 §6). */
+function publicProjectSpecs(p: PublicProject) {
+  const rera = p.rera ? (p.rera.exempt ? "RERA exempt" : p.rera.number ? `RERA ${p.rera.number}` : null) : null;
+  return [
+    p.buildStatusLabel,
+    p.possessionLabel ? `Poss. ${p.possessionLabel}` : null,
+    rera,
+  ].filter((s): s is string => Boolean(s));
 }
 
 function EmptyGrid({ title, body }: { title: string; body: string }) {

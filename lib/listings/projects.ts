@@ -382,7 +382,12 @@ export async function recordProjectLead(
         owner_id: ownerId,
         lead_profile_id: leadProfileId,
         project_id: projectId,
-        source: "inquiry",
+        // 'project' is the source family for anything that came off a project
+        // (0081). This wrote 'inquiry' — the same family a property inquiry
+        // uses — so a builder's pipeline mixed the two, and the same person
+        // arriving by Call and then by chat produced two different labels on
+        // one row depending on which happened last.
+        source: "project",
         stage: "new",
         last_activity: activity.slice(0, 120),
         last_activity_at: new Date().toISOString(),
@@ -876,6 +881,8 @@ function projectDTO(
     areaLabel: p.area_label,
     pincode: p.pincode ?? null,
     coverUrl: p.cover_url,
+    /** The "12 photos" marker on the project row — the row's own counter. */
+    photoCount: p.photo_count ?? 0,
     /** "12 Jul 2026" — the detail screen prints when the scheme was posted. */
     postedOn: p.live_at || p.created_at
       ? new Date(p.live_at ?? p.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Kolkata" })
