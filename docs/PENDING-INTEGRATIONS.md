@@ -3503,3 +3503,59 @@ RK Properties' pending listings through the real staff endpoint
 (`QA PG Rent Rajkot`, reject #1). That listing is now `rejected` in the dev DB
 and RK's Account status is no longer "in good standing" — intentionally left in
 place as the seeded proof of a state that had never had a row.
+
+---
+
+## Admin data seed (30 Jul 2026) — what the hunt turned up
+
+`npm run seed:admin` fills every P13-14-15 screen with real, interlinked rows.
+Three things had to be fixed in the schema before the data could exist at all,
+and four are left open for the admin build.
+
+**Fixed here**
+
+- **A Super Admin could not exist.** `staff_level_check` allowed only `'staff'`
+  and `'admin'`, so the whole Super tier of Doc3 §1.1 — plans/pricing, staff
+  management, feature flags, audit log, evidence SOP, branding — had no role to
+  hang off, and the "minimum 2 super admins" rule was unenforceable. Migration
+  `0089_staff_super_level.sql` adds `'super'`.
+- **The Appeals auto-flag tab could never have a row.** Doc5 A8 gives Appeals
+  two tabs, but `moderation_appeals.subject` was limited to
+  listing/requirement/project, so a user disputing a false positive on their own
+  bio had nowhere to land. Migration `0090_appeals_auto_flag.sql` adds
+  `'auto_flag'`.
+- **35 admin tables did not exist.** Audit log, support desk, disputes, CMS,
+  templates/strings, flags/limits/retention, blocklist, number patterns, cron,
+  health, analytics, trash and exports were all missing. Migration
+  `0088_admin_core.sql` creates them, RLS on, no policy — the same deny-by-
+  default posture as every other table in this schema.
+
+**Still open — for the admin build**
+
+- **Nothing WRITES to most of the new tables yet.** `admin_audit_log`,
+  `cron_runs`, `health_checks`, `queue_depths`, `analytics_events`,
+  `platform_daily_stats`, `funnel_daily`, `story_aggregates` and `backups` are
+  seeded so the screens are not empty, but no endpoint or job produces them.
+  Every admin mutation must append to `admin_audit_log`, and the BullMQ workers
+  must record their runs, or these screens will drift into fiction.
+- **`trash_items` is a registry with no producer.** Soft-deletes across
+  listings/requirements/projects/users/chats set their own `deleted_at`; nothing
+  writes the row the Trash browser reads, and nothing purges on `purge_at`.
+- **Reconciliation rows are synthetic.** `reconciliation_runs` / `_items` are
+  seeded; the hourly Razorpay match job (Doc7 §17.12) must fill them for real,
+  and the per-row "re-check" button needs an endpoint.
+- **Two pre-existing boosts point at a listing that no longer exists** (from an
+  earlier seed, not this one). Harmless today because the boost queue joins on
+  the listing, but `boosts.listing_id` has no FK — worth adding one.
+
+**Deliberately not seeded — Module 12.** Legal pages, CMS pages and blog posts
+(P12 + Doc10) are left empty on Rajan's instruction: that module gets its own
+prompt and its copy comes from Doc10, so seeding invented legal text now would
+only have to be thrown away. `cms_pages`, `cms_page_versions` and `blog_posts`
+exist and are empty. FAQs, banners and broadcasts ARE seeded — other admin
+screens read them.
+
+**Deliberately not done:** no admin Google whitelist was created. The staff rows
+exist as DATA (so audit, ticket assignee, exports "by" and the Staff screen are
+populated) but nobody can log in with them. Real admin accounts get created with
+the admin build, when Rajan gives the emails.
