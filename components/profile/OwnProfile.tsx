@@ -277,10 +277,15 @@ export function OwnProfile() {
                 </>
               )}
             </div>
-            {/* All three levels, including the ones NOT earned — and each opens
-                the screen that earns it (Doc2 §11), so no chip is decorative. */}
+            {/* Every level this role CAN earn, including the ones not earned yet
+                — and each opens the screen that earns it (Doc2 §11), so no chip
+                is decorative. RERA is a Broker/Builder level (Doc2 role table:
+                Owner = Phone/ID), so an owner was being shown a permanently
+                unearnable "✗ RERA" chip that led to a level they can't get. */}
             <div className="mt-2 flex flex-wrap gap-1.5">
-              {([["Phone", p.badges.phone], ["ID", p.badges.id], ["RERA", p.badges.rera]] as const).map(([label, on]) => (
+              {([["Phone", p.badges.phone], ["ID", p.badges.id],
+                 ...(p.role === "broker" || p.role === "builder" ? [["RERA", p.badges.rera] as const] : []),
+                ] as const).map(([label, on]) => (
                 <button
                   key={label}
                   onClick={() => !viewAs && router.push("/profile/verification")}

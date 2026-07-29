@@ -149,7 +149,19 @@ export type IconName =
   | "percent"
   | "map"
   | "balcony"
-  | "shutter";
+  | "shutter"
+  /**
+   * Bottom-nav five (Rajan, 29 Jul 2026 — "instagram me jo hai wo hi use karo").
+   * Deliberately their OWN names instead of reusing home/search/plus/message/user:
+   * those five are shared with the rest of the app (`plus` is every "+ Add" row,
+   * `home` is the property glyph, `search` sits in every search field), and the
+   * brief was the bottom nav only — nothing else may shift.
+   */
+  | "nav-home"
+  | "nav-search"
+  | "nav-create"
+  | "nav-message"
+  | "nav-profile";
 
 interface IconProps extends React.SVGProps<SVGSVGElement> {
   name: IconName;
@@ -160,6 +172,49 @@ interface IconProps extends React.SVGProps<SVGSVGElement> {
 
 // Each entry renders inside a 24×24 viewBox. `f` = whether fill is applied.
 const PATHS: Record<IconName, (f: boolean) => React.ReactNode> = {
+  /* ---- bottom nav (Instagram geometry, 24×24, same stroke family) ---------
+   * `nav-home`, `nav-search` and `nav-message` take the svg's own fill, so the
+   * active tab is the solid Instagram glyph. `nav-create` and `nav-profile` pin
+   * fill="none" on their frame: filling the rounded square would swallow the
+   * plus, and filling the profile ring would swallow the head and shoulders —
+   * those two read "active" through the heavier stroke the nav already passes. */
+  "nav-home": () => (
+    <path d="M9.005 16.545a2.997 2.997 0 0 1 2.997-2.997A2.997 2.997 0 0 1 15 16.545V22h7V11.543L12 2 2 11.543V22h7.005Z" />
+  ),
+  "nav-search": () => (
+    <>
+      <circle cx="10.5" cy="10.5" r="8.5" />
+      <path d="m16.511 16.511 5.489 5.489" fill="none" />
+    </>
+  ),
+  "nav-create": () => (
+    <>
+      <path
+        d="M2 12v3.45c0 2.849.698 4.005 1.606 4.944.94.909 2.098 1.606 4.946 1.606h6.896c2.848 0 4.006-.697 4.946-1.606.908-.939 1.606-2.095 1.606-4.944V8.552c0-2.849-.698-4.006-1.606-4.945-.94-.909-2.098-1.607-4.946-1.607H8.552c-2.848 0-4.006.698-4.946 1.607C2.698 4.546 2 5.703 2 8.552Z"
+        fill="none"
+      />
+      <path d="M6.545 12h10.91M12 6.545v10.91" fill="none" />
+    </>
+  ),
+  // Active = Instagram's solid plane. Stroked, the fold notch at (9.218,10.083)
+  // closed up and the mark read as a fat triangle, so the filled state drops the
+  // stroke (and the fold line, which is inside the solid) and is pure fill.
+  "nav-message": (f) =>
+    f ? (
+      <path d="M11.698 20.334 22 3.001H2l7.218 7.083 2.48 10.25Z" stroke="none" />
+    ) : (
+      <>
+        <path d="M22 3 9.218 10.083" fill="none" />
+        <path d="M11.698 20.334 22 3.001H2l7.218 7.083 2.48 10.25Z" fill="none" />
+      </>
+    ),
+  "nav-profile": () => (
+    <>
+      <circle cx="12" cy="12" r="10" fill="none" />
+      <circle cx="12" cy="9.42" r="4.1" fill="none" />
+      <path d="M5.44 19.5a7.58 7.58 0 0 1 13.12 0" fill="none" />
+    </>
+  ),
   home: () => <path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z" />,
   search: () => (
     <>

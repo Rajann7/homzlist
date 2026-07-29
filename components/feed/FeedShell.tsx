@@ -86,7 +86,7 @@ export function FeedShell({
         {children}
       </div>
       {/* Unread count rides the Messages icon (now in the bottom nav). */}
-      <BottomNav items={DEFAULT_NAV.map((it) => (it.name === "message" ? { ...it, badge: badges?.messages ?? 0 } : it))} />
+      <BottomNav items={DEFAULT_NAV.map((it) => (it.name === "nav-message" ? { ...it, badge: badges?.messages ?? 0 } : it))} />
 
       <CitySheet open={citySheet} onClose={() => setCitySheet(false)} selectedId={selectedCityId} onSelect={onCity} />
     </div>

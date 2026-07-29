@@ -1,9 +1,11 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Icon, type IconName } from "@/components/ui/Icon";
+import { feedApi } from "@/lib/feed/client";
 import { useRole } from "./RoleContext";
 
 /**
@@ -31,12 +33,14 @@ export interface NavItem {
 
 // Canonical 5 (P3): home · search · plus (create) · message (chat) · user (profile).
 // (Messages sits in the nav; Saved moved to the feed header top-right.)
+// Icons are the `nav-*` set (Instagram geometry) — nav-only names, so the shared
+// home/search/plus/message/user glyphs the rest of the app draws are untouched.
 export const DEFAULT_NAV: NavItem[] = [
-  { name: "home", href: "/", label: "Home", match: (p) => p === "/" },
-  { name: "search", href: "/search", label: "Search", match: (p) => p.startsWith("/search") },
-  { name: "plus", href: "/create", label: "Create", match: (p) => p.startsWith("/create") },
-  { name: "message", href: "/messages", label: "Messages", match: (p) => p.startsWith("/messages") },
-  { name: "user", href: "/profile", label: "Profile", match: (p) => p.startsWith("/profile") },
+  { name: "nav-home", href: "/", label: "Home", match: (p) => p === "/" },
+  { name: "nav-search", href: "/search", label: "Search", match: (p) => p.startsWith("/search") },
+  { name: "nav-create", href: "/create", label: "Create", match: (p) => p.startsWith("/create") },
+  { name: "nav-message", href: "/messages", label: "Messages", match: (p) => p.startsWith("/messages") },
+  { name: "nav-profile", href: "/profile", label: "Profile", match: (p) => p.startsWith("/profile") },
 ];
 
 export function BottomNav({ items }: { items?: NavItem[] }) {
@@ -50,7 +54,30 @@ export function BottomNav({ items }: { items?: NavItem[] }) {
   // Applied here rather than at each call site so a caller that passes its own
   // list (the feed does, to ride the unread badge on Messages) can't reintroduce
   // the icon — which would have been the very first screen a builder opens.
-  const resolved = (items ?? DEFAULT_NAV).filter((i) => !(role === "builder" && i.name === "search"));
+  const base = (items ?? DEFAULT_NAV).filter((i) => !(role === "builder" && i.name === "nav-search"));
+
+  // Unread messages badge. The feed passes its own count (it already reads
+  // /feed/badges for the header bell), so a caller-supplied `badge` always wins.
+  // Every OTHER screen used to render the nav with no count at all — the icon
+  // was silently lying on profile, listings, search, chat. This fills that in
+  // from the same server count (unread threads + pending requests), re-read when
+  // the route changes and when the tab regains focus, so it clears after the
+  // user has been through the inbox. Guests get 0 from the endpoint.
+  const wantsFetch = base.some((i) => i.name === "nav-message" && i.badge === undefined);
+  const [unread, setUnread] = useState(0);
+  useEffect(() => {
+    if (!wantsFetch) return;
+    let alive = true;
+    const read = () => feedApi.badges().then((r) => { if (alive && r.ok) setUnread(r.data.messages); });
+    void read();
+    const onVis = () => document.visibilityState === "visible" && read();
+    document.addEventListener("visibilitychange", onVis);
+    return () => { alive = false; document.removeEventListener("visibilitychange", onVis); };
+  }, [wantsFetch, pathname]);
+
+  const resolved = base.map((i) =>
+    i.name === "nav-message" && i.badge === undefined ? { ...i, badge: unread } : i,
+  );
 
   return (
     <nav

@@ -473,10 +473,10 @@ function SheetRow({ label, onClick, danger }: { label: string; onClick: () => vo
 // subdomain. Seller's home tab is their Listings dashboard; public's is the feed.
 function navFor(base: string, seller: boolean) {
   return [
-    { name: "home" as const, href: seller ? "/listings" : "/", label: "Home", match: (p: string) => p === (seller ? "/listings" : "/") },
-    { name: "search" as const, href: "/search", label: "Search", match: (p: string) => p.includes("/search") },
-    { name: "plus" as const, href: "/create", label: "Create", match: (p: string) => p.includes("/create") },
-    { name: "message" as const, href: base, label: "Messages", match: (p: string) => p.includes("/messages") },
-    { name: "user" as const, href: "/profile", label: "Profile", match: (p: string) => p.includes("/profile") },
+    { name: "nav-home" as const, href: seller ? "/listings" : "/", label: "Home", match: (p: string) => p === (seller ? "/listings" : "/") },
+    { name: "nav-search" as const, href: "/search", label: "Search", match: (p: string) => p.includes("/search") },
+    { name: "nav-create" as const, href: "/create", label: "Create", match: (p: string) => p.includes("/create") },
+    { name: "nav-message" as const, href: base, label: "Messages", match: (p: string) => p.includes("/messages") },
+    { name: "nav-profile" as const, href: "/profile", label: "Profile", match: (p: string) => p.includes("/profile") },
   ];
 }
