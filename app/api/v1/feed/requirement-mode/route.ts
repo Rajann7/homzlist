@@ -3,7 +3,7 @@ import { ok, fail } from "@/lib/api";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { rateLimit, clientIp } from "@/lib/auth/rate-limit";
 import { browseRequirements } from "@/lib/listings/matching";
-import { proposalBalance } from "@/lib/listings/proposals";
+import { proposalBalance, builderMayPropose } from "@/lib/listings/proposals";
 
 /**
  * GET /api/v1/feed/requirement-mode (Doc7 §79) — requirement cards in the feed
@@ -26,5 +26,8 @@ export async function GET(req: NextRequest) {
     typeCode: type || null,
   });
   const balance = claims && unlocked ? await proposalBalance(claims.sub) : { left: 0, total: 0, unlimited: false };
-  return ok({ sections, unlocked, cityName, balance });
+  // Same builder rule the POST enforces (0087) — the card needs it to render a
+  // reason instead of a Send button that is going to 403.
+  const canPropose = claims ? await builderMayPropose(claims.sub) : true;
+  return ok({ sections, unlocked, cityName, balance, canPropose });
 }

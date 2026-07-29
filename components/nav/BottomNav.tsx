@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Icon, type IconName } from "@/components/ui/Icon";
+import { useRole } from "./RoleContext";
 
 /**
  * BottomNav — P3 canonical (CLAUDE.md rule 6 / Doc6 §5.3). THE bottom nav, used
@@ -38,8 +39,18 @@ export const DEFAULT_NAV: NavItem[] = [
   { name: "user", href: "/profile", label: "Profile", match: (p) => p.startsWith("/profile") },
 ];
 
-export function BottomNav({ items = DEFAULT_NAV }: { items?: NavItem[] }) {
+export function BottomNav({ items }: { items?: NavItem[] }) {
   const pathname = usePathname() ?? "/";
+  const role = useRole();
+  // A BUILDER has no Search: they post projects and answer requirements, and
+  // browse/explore is an Owner/Broker product (Rajan, 29 Jul 2026). Four items,
+  // and the row reflows by itself because every item is `flex-1` — the same
+  // feature-toggle behaviour documented above.
+  //
+  // Applied here rather than at each call site so a caller that passes its own
+  // list (the feed does, to ride the unread badge on Messages) can't reintroduce
+  // the icon — which would have been the very first screen a builder opens.
+  const resolved = (items ?? DEFAULT_NAV).filter((i) => !(role === "builder" && i.name === "search"));
 
   return (
     <nav
@@ -51,7 +62,7 @@ export function BottomNav({ items = DEFAULT_NAV }: { items?: NavItem[] }) {
         "items-start border-t border-border bg-surface-1 pb-[env(safe-area-inset-bottom)]",
       )}
     >
-      {items.map((item) => {
+      {resolved.map((item) => {
         const active = item.match ? item.match(pathname) : pathname === item.href;
         return (
           <Link

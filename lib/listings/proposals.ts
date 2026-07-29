@@ -51,8 +51,32 @@ export interface ProposalRow {
 
 export type SendResult =
   | { ok: true; proposal: ProposalRow }
-  | { ok: false; reason: "self" | "duplicate" | "not_open" | "bad_listing" | "validation" }
+  | { ok: false; reason: "self" | "duplicate" | "not_open" | "bad_listing" | "validation" | "needs_live_project" }
   | { ok: false; reason: "need_topup"; balance: number };
+
+/**
+ * A builder reaches requirements THROUGH a published project, never on its own
+ * (Rajan, 29 Jul 2026 — supersedes Doc2 §2's "Builder ₹2,999" row).
+ *
+ * The plan half is a catalog fact: migration 0087 dropped 'builder' from
+ * p2999.roles, so `getCatalog` hides it and checkout/quote 403 it with no new
+ * code. This is the OTHER half — buying ₹9,999 is not the same as having a
+ * project people can answer, and a proposal from a builder whose project is
+ * still in review points the poster at something they cannot open.
+ *
+ * `live` only: a draft, a pending_review or a taken-down project all mean the
+ * same thing to the person receiving the proposal — there is nothing to see.
+ */
+export async function builderMayPropose(senderId: string): Promise<boolean> {
+  const { data: prof } = await db().from("profiles").select("role").eq("id", senderId).maybeSingle();
+  if ((prof as { role: string | null } | null)?.role !== "builder") return true;
+  const { count } = await db()
+    .from("projects")
+    .select("id", { count: "exact", head: true })
+    .eq("profile_id", senderId)
+    .eq("status", "live");
+  return (count ?? 0) > 0;
+}
 
 /** Current pooled proposal balance (server truth for the sheet's "N remaining"). */
 export async function proposalBalance(profileId: string): Promise<{ left: number; total: number; unlimited: boolean }> {
@@ -106,6 +130,10 @@ export async function sendProposal(
   if (!req || req.status !== "live" || !req.is_active) return { ok: false, reason: "not_open" };
 
   if (req.profile_id === senderId) return { ok: false, reason: "self" };
+
+  // Checked BEFORE the quota draw: a builder with no live project must not have
+  // a proposal unit spent (and then refunded) to be told no.
+  if (!(await builderMayPropose(senderId))) return { ok: false, reason: "needs_live_project" };
 
   // Duplicate guard (also enforced by the unique index — this is the friendly path).
   const { data: dup } = await db()
@@ -174,6 +202,23 @@ export async function sendProposal(
       .select("*")
       .single();
     if (error) throw error;
+
+    // A proposal IS a chat request, exactly like an inquiry — so its thread is
+    // born HERE, not on accept. It used to be created only when the poster
+    // accepted, which meant three things silently didn't work:
+    //   • the poster was never notified a proposal had arrived (the
+    //     `proposal_received` notification lives in ensureProposalThread, so it
+    //     fired at accept-time, at the person who had just accepted it);
+    //   • a pending proposal never reached the Message Requests screen;
+    //   • "My Responses" reads chat threads, so the sender's own tab — and its
+    //     whole pending/declined/expired status strip — was permanently empty.
+    // Best-effort: the proposal itself is already committed and the unit spent,
+    // so a realtime/notification hiccup must not fail the send.
+    try {
+      const { ensureProposalThread } = await import("@/lib/chat/service");
+      await ensureProposalThread(data as any);
+    } catch { /* the P8 proposals screen still shows it; accept re-ensures */ }
+
     return { ok: true, proposal: data as ProposalRow };
   } catch (e) {
     await releaseQuota(senderId, userPlanId, "proposal", 1, "Proposal create failed");
@@ -386,9 +431,14 @@ export async function acceptProposal(proposalId: string, posterId: string): Prom
     .maybeSingle();
   let threadId: string | null = null;
   if (p) {
-    const { ensureProposalThread } = await import("@/lib/chat/service");
+    // The thread already exists (created at send time); this re-ensures it for
+    // any proposal predating that change, then opens it.
+    const { ensureProposalThread, upsertLeadFromThread } = await import("@/lib/chat/service");
     threadId = await ensureProposalThread(p as any);
     await db().from("chat_threads").update({ status: "accepted" }).eq("id", threadId);
+    // Accepting here must produce the same pipeline lead as accepting from the
+    // Messages screen — one behaviour, two doors.
+    await upsertLeadFromThread(threadId, { activity: "Proposal accepted" });
   }
   // Doc2 §14 catalog: "proposal received/accepted/declined/expired". The SENDER
   // has been waiting on this answer; without a notification the only way to
@@ -403,9 +453,22 @@ export async function acceptProposal(proposalId: string, posterId: string): Prom
   return { ok: true, status: "accepted", threadId };
 }
 
+/**
+ * Close the proposal's chat thread when the poster says no. Without this the
+ * thread stayed `pending` forever: it kept sitting in the poster's Message
+ * Requests after they had already declined it on the Proposals screen, and the
+ * sender's "My Responses" row still read as waiting.
+ */
+async function closeProposalThread(proposalId: string): Promise<void> {
+  const { data } = await db().from("chat_threads").select("id").eq("source_proposal_id", proposalId).maybeSingle();
+  const id = (data as { id: string } | null)?.id;
+  if (id) await db().from("chat_threads").update({ status: "declined" }).eq("id", id);
+}
+
 export async function declineProposal(proposalId: string, posterId: string): Promise<ActResult> {
   const row = await actOnProposal(proposalId, posterId, "declined");
   if (!row) return { ok: false, reason: "not_found" };
+  await closeProposalThread(proposalId);
   await notify({
     profileId: row.sender_id, type: "proposal_declined", actorId: posterId,
     title: `Your proposal was **declined** — ${(await requirementBrief(row.requirement_id)).title}`,
@@ -424,6 +487,7 @@ export async function declineProposal(proposalId: string, posterId: string): Pro
 export async function notRelevantProposal(proposalId: string, posterId: string): Promise<ActResult> {
   const row = await actOnProposal(proposalId, posterId, "not_relevant");
   if (!row) return { ok: false, reason: "not_found" };
+  await closeProposalThread(proposalId);
 
   const { count } = await db()
     .from("proposals")
@@ -467,6 +531,10 @@ export async function expireStaleProposals(): Promise<{ expired: number; fulfill
   // The sender spent a proposal count on this; 30 days of silence ending in a
   // status flip nobody was told about is exactly the dead-end Doc2 §14 lists.
   for (const p of (exp ?? []) as { id: string; sender_id: string; requirement_id: string }[]) {
+    // An expired proposal's chat must close too — otherwise its thread sat in the
+    // poster's Message Requests as an open request long after the proposal behind
+    // it had died, and the sender could still type into it.
+    await closeProposalThread(p.id);
     await notify({
       profileId: p.sender_id,
       type: "proposal_expired",

@@ -2,7 +2,7 @@ import type { NextRequest } from "next/server";
 import { ok, fail } from "@/lib/api";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { browseRequirements } from "@/lib/listings/matching";
-import { proposalBalance } from "@/lib/listings/proposals";
+import { proposalBalance, builderMayPropose } from "@/lib/listings/proposals";
 
 /**
  * GET /api/v1/requirements/browse (Doc7 §63) — browse others' requirements.
@@ -32,5 +32,9 @@ export async function GET(req: NextRequest) {
     ? await proposalBalance(claims.sub)
     : { left: 0, total: 0, unlimited: false };
 
-  return ok({ sections, unlocked, cityName, balance });
+  // A builder proposes only through a LIVE project (0087). Sent so the card
+  // renders the reason instead of a Send button the POST is going to refuse.
+  const canPropose = claims ? await builderMayPropose(claims.sub) : true;
+
+  return ok({ sections, unlocked, cityName, balance, canPropose });
 }

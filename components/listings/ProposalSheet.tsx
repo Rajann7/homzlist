@@ -30,6 +30,8 @@ export function ProposalSheet({
   const toast = useToast();
   type Sheet = {
     balance: { left: number; total: number; unlimited: boolean };
+    /** false = builder with no LIVE project (0087) — the send would 403. */
+    canPropose: boolean;
     alreadySent: boolean;
     listings: { id: string; title: string | null; priceLabel: string; areaLabel: string | null; coverUrl: string | null }[];
     prefill: { listing: string; chat: string };
@@ -87,6 +89,9 @@ export function ProposalSheet({
     if (res.error.code === "NEED_TOPUP") { setTopup(true); return; }
     if (res.error.code === "DUPLICATE_PROPOSAL") { toast.show("You've already sent a proposal for this requirement"); void load(); return; }
     if (res.error.code === "SELF_ACTION_BLOCKED") { toast.show("You can't propose to your own requirement"); onClose(); return; }
+    // A builder's project went down (or was never live) between opening the
+    // sheet and sending — re-read so the sheet shows the blocked state.
+    if (res.error.code === "PROJECT_REQUIRED") { toast.show("Publish a project first to send proposals", { variant: "error" }); void load(); return; }
     if (res.error.code === "OFFLINE") { toast.show("You're offline"); return; }
     toast.show("Couldn't send that proposal");
   }, [requirementId, mode, pickedListing, message, toast, onSent, onClose, load]);
@@ -188,6 +193,15 @@ export function ProposalSheet({
               </div>
             )}
 
+            {/* Builder with no LIVE project (0087) — a plan alone doesn't earn
+                the send, a published project does. */}
+            {!data.canPropose && !data.alreadySent && (
+              <div className="flex items-center gap-2 rounded-8 bg-warning-soft px-3 py-2.5">
+                <Icon name="alert" size={16} className="shrink-0 text-warning" />
+                <span className="text-11 text-ink-secondary">Publish a project first — proposals come with your project.</span>
+              </div>
+            )}
+
             {/* Footer: remaining + send / top-up */}
             {exhausted && !data.alreadySent && (
               <div className="flex items-center gap-2 rounded-8 bg-error-soft px-3 py-2.5">
@@ -197,7 +211,7 @@ export function ProposalSheet({
             )}
             <div className="flex items-center justify-between gap-3">
               <span className="text-11 text-ink-tertiary">{remainLabel}</span>
-              {exhausted ? (
+              {exhausted && data.canPropose ? (
                 <Button className="flex-1 max-w-[220px]" onClick={() => setTopup(true)} disabled={data.alreadySent}>
                   Add 10 proposals — ₹499
                 </Button>
@@ -205,7 +219,7 @@ export function ProposalSheet({
                 <Button
                   className="flex-1 max-w-[220px]"
                   loading={sending}
-                  disabled={data.alreadySent || (mode === "listing" && !pickedListing && data.listings.length > 0)}
+                  disabled={!data.canPropose || data.alreadySent || (mode === "listing" && !pickedListing && data.listings.length > 0)}
                   onClick={() => void doSend()}
                 >
                   Send Proposal

@@ -24,6 +24,9 @@ export const ERROR_CODES = [
   "PAYMENT_PENDING",
   "DUPLICATE_PROPOSAL",
   "SELF_ACTION_BLOCKED",
+  "PROFILE_INCOMPLETE",   // min-profile (name + city) required before inquiring/chatting
+  "INQUIRY_COOLDOWN",     // the poster declined; re-inquiry opens again after cooldown_until
+  "PROJECT_REQUIRED",     // builder proposing with no LIVE project (0087 rule)
   "LISTING_STATE_LOCKED",
   "NUMBER_NOT_ALLOWED",
   "VALIDATION_ERROR",
@@ -43,6 +46,9 @@ const MESSAGE_KEY: Record<ErrorCode, string> = Object.fromEntries(
 const HTTP_STATUS: Partial<Record<ErrorCode, number>> = {
   UNAUTHORIZED: 401,
   FORBIDDEN: 403,
+  PROFILE_INCOMPLETE: 403,
+  INQUIRY_COOLDOWN: 403,
+  PROJECT_REQUIRED: 403,
   NOT_FOUND: 404,
   RATE_LIMITED: 429,
   VALIDATION_ERROR: 422,

@@ -20,7 +20,7 @@ import { cn } from "@/lib/utils";
  */
 export function RequirementFeed({ kind, guest = false }: { kind: "all" | "sell" | "rent"; guest?: boolean }) {
   const router = useRouter();
-  type Data = { sections: { tier: string; label: string | null; cards: BrowseCard[] }[]; unlocked: boolean; balance: { left: number; unlimited: boolean } };
+  type Data = { sections: { tier: string; label: string | null; cards: BrowseCard[] }[]; unlocked: boolean; balance: { left: number; unlimited: boolean }; canPropose: boolean };
   const [data, setData] = useState<Data | null>(null);
   const [paywall, setPaywall] = useState(false);
   const [loginSheet, setLoginSheet] = useState(false);
@@ -34,7 +34,7 @@ export function RequirementFeed({ kind, guest = false }: { kind: "all" | "sell" 
     setData(null);
     const res = await browseApi.list(kind === "all" ? null : kind, null);
     if (res.ok) setData(res.data as never);
-    else setData({ sections: [], unlocked: false, balance: { left: 0, unlimited: false } });
+    else setData({ sections: [], unlocked: false, balance: { left: 0, unlimited: false }, canPropose: true });
   }, [kind]);
   useEffect(() => { void load(); }, [load]);
 
@@ -59,7 +59,7 @@ export function RequirementFeed({ kind, guest = false }: { kind: "all" | "sell" 
             <div className="flex items-center gap-1.5"><Icon name="pin" size={14} className="text-ink-tertiary" /><span className="text-13 font-semibold uppercase tracking-[0.3px] text-ink-tertiary">{s.label}</span></div>
           )}
           {s.cards.map((c) => (
-            <ReqCard key={c.id} c={c} sent={sent.has(c.id) || Boolean(c.alreadySent)} onUnlock={() => guard(() => setPaywall(true))} onPropose={() => guard(() => setProposalFor(c.id))} onOpen={() => router.push(`/requirements/${c.id}`)} />
+            <ReqCard key={c.id} c={c} sent={sent.has(c.id) || Boolean(c.alreadySent)} canPropose={data.canPropose} onUnlock={() => guard(() => setPaywall(true))} onPropose={() => guard(() => setProposalFor(c.id))} onOpen={() => router.push(`/requirements/${c.id}`)} onPostProject={() => router.push("/create")} />
           ))}
         </div>
       ))}
@@ -82,7 +82,7 @@ export function RequirementFeed({ kind, guest = false }: { kind: "all" | "sell" 
   );
 }
 
-function ReqCard({ c, sent, onUnlock, onPropose, onOpen }: { c: BrowseCard; sent: boolean; onUnlock: () => void; onPropose: () => void; onOpen: () => void }) {
+function ReqCard({ c, sent, canPropose, onUnlock, onPropose, onOpen, onPostProject }: { c: BrowseCard; sent: boolean; canPropose: boolean; onUnlock: () => void; onPropose: () => void; onOpen: () => void; onPostProject: () => void }) {
   const locked = c.access === "locked";
   return (
     <div className="relative overflow-hidden rounded-12 border border-border bg-surface-1 p-4 pl-5">
@@ -107,7 +107,19 @@ function ReqCard({ c, sent, onUnlock, onPropose, onOpen }: { c: BrowseCard; sent
             {c.posterVerified && <Icon name="verified" size={14} className="text-accent" />}
             <span className="ml-auto text-11 text-ink-tertiary">{c.postedAgo}</span>
           </div>
-          {sent ? <div className="mt-3 flex items-center justify-center gap-1 text-13 font-semibold text-accent"><Icon name="check" size={16} /> Proposal sent</div> : <Button fullWidth className="mt-3" onClick={onPropose}>Send Proposal</Button>}
+          {sent ? (
+            <div className="mt-3 flex items-center justify-center gap-1 text-13 font-semibold text-accent"><Icon name="check" size={16} /> Proposal sent</div>
+          ) : canPropose ? (
+            <Button fullWidth className="mt-3" onClick={onPropose}>Send Proposal</Button>
+          ) : (
+            // Builder with no LIVE project (0087). The server refuses the send,
+            // so the card says why and offers the one action that fixes it
+            // rather than a button that returns PROJECT_REQUIRED.
+            <>
+              <div className="mt-3 text-13 text-ink-tertiary">Publish a project to send proposals</div>
+              <Button variant="outline" fullWidth className="mt-2" onClick={onPostProject}>Post a Project</Button>
+            </>
+          )}
         </>
       )}
     </div>

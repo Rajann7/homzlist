@@ -5,7 +5,7 @@ import { getProfileById } from "@/lib/profile/service";
 import { rateLimit } from "@/lib/auth/rate-limit";
 import { createServiceClient } from "@/lib/supabase/server";
 import {
-  sendProposal, proposalsForRequirement, proposalBalance,
+  sendProposal, proposalsForRequirement, proposalBalance, builderMayPropose,
 } from "@/lib/listings/proposals";
 
 /**
@@ -66,15 +66,19 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 
   // Default: the sender's proposal sheet data.
   const db = createServiceClient();
-  const [{ data: listings }, balance, { data: dup }] = await Promise.all([
+  const [{ data: listings }, balance, { data: dup }, canPropose] = await Promise.all([
     db.from("listings").select("id,title,price_paise,price_on_request,area_label,cover_url,attributes")
       .eq("profile_id", claims.sub).eq("status", "live").order("created_at", { ascending: false }).limit(20),
     proposalBalance(claims.sub),
     db.from("proposals").select("id").eq("requirement_id", params.id).eq("sender_id", claims.sub).in("status", ["pending", "accepted"]).maybeSingle(),
+    // Same answer the POST enforces, so the sheet can say WHY up front instead
+    // of offering a Send button that is going to 403 (0087 builder rule).
+    builderMayPropose(claims.sub),
   ]);
 
   return ok({
     balance,
+    canPropose,
     alreadySent: Boolean(dup),
     listings: ((listings ?? []) as any[]).map((l) => ({
       id: l.id,
@@ -115,6 +119,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       case "need_topup": return fail("NEED_TOPUP", { balance: res.balance });
       case "duplicate": return fail("DUPLICATE_PROPOSAL");
       case "self": return fail("SELF_ACTION_BLOCKED");
+      case "needs_live_project": return fail("PROJECT_REQUIRED");
       case "not_open": return fail("NOT_FOUND");
       case "bad_listing": return fail("VALIDATION_ERROR", { field: "listingId" });
       default: return fail("VALIDATION_ERROR");

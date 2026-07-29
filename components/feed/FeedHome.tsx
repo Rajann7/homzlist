@@ -139,7 +139,7 @@ export function FeedHome() {
         )}
 
         {isBuilder ? (
-          <BuilderDashboard />
+          <BuilderDashboard cityName={me?.cityName ?? null} />
         ) : (
           <>
             <StoryRow circles={stories ?? []} loading={stories === null} />

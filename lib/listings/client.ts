@@ -660,7 +660,7 @@ export interface SentProposal {
 
 export const browseApi = {
   list: (kind?: "sell" | "rent" | null, typeCode?: string | null) =>
-    req<{ sections: BrowseSection[]; unlocked: boolean; cityName: string | null; balance: { left: number; total: number; unlimited: boolean } }>(
+    req<{ sections: BrowseSection[]; unlocked: boolean; cityName: string | null; balance: { left: number; total: number; unlimited: boolean }; canPropose: boolean }>(
       `/requirements/browse?${new URLSearchParams({ ...(kind ? { kind } : {}), ...(typeCode ? { type: typeCode } : {}) }).toString()}`,
       "GET",
     ),
@@ -671,6 +671,8 @@ export const proposalsApi = {
   sheet: (requirementId: string) =>
     req<{
       balance: { left: number; total: number; unlimited: boolean };
+      /** false = builder with no LIVE project (0087); the sheet says so. */
+      canPropose: boolean;
       alreadySent: boolean;
       listings: { id: string; title: string | null; priceLabel: string; areaLabel: string | null; coverUrl: string | null }[];
       prefill: { listing: string; chat: string };

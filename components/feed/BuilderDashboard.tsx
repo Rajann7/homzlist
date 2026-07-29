@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/Icon";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { RequirementFeed } from "./RequirementFeed";
 import { feedApi } from "@/lib/feed/client";
 import { cn } from "@/lib/utils";
 
@@ -13,7 +14,7 @@ import { cn } from "@/lib/utils";
  * requirements matched to those projects. NEVER any foreign listing. Stats use
  * REAL data (units + the builder's real lead count) — no fabricated view count.
  */
-export function BuilderDashboard() {
+export function BuilderDashboard({ cityName }: { cityName?: string | null }) {
   const router = useRouter();
   type Data = {
     projects: { id: string; name: string; coverUrl: string | null; statLine: string; buildStatus: string }[];
@@ -58,7 +59,23 @@ export function BuilderDashboard() {
     // CTA stays on `/create` rather than jumping to the form: creation is
     // payment-first, and `CreateEntry` shows the ₹9,999 wall BEFORE a builder
     // with no slot fills in a multi-step project form they can't submit.
-    return <EmptyState title="No projects yet" subtitle="Post a project to see stats and matching requirements here." cta={{ label: "Post a Project", onClick: () => router.push("/create") }} />;
+    //
+    // Below it, the demand ALREADY in their city. Both P2 builder sections need
+    // a project to exist, so a builder who has just registered used to land on
+    // a home that was this empty state and nothing else — no reason to believe
+    // there were buyers here, on the one screen that has to make that case.
+    // This is the requirement feed as-is, not a second version of it: same
+    // cards, same city scope, same ₹2,999 wall stripped server-side, so an
+    // unpaid builder sees that the demand exists without seeing the budgets.
+    return (
+      <div>
+        <EmptyState title="No projects yet" subtitle="Post a project to see stats and matching requirements here." cta={{ label: "Post a Project", onClick: () => router.push("/create") }} />
+        <div className="px-4 pb-1 text-13 font-semibold uppercase tracking-[0.3px] text-ink-tertiary">
+          {cityName ? `Requirements in ${cityName}` : "Requirements near you"}
+        </div>
+        <RequirementFeed kind="all" />
+      </div>
+    );
   }
 
   return (

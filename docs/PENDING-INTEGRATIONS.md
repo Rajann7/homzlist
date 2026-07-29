@@ -8,6 +8,7 @@ Three kinds of pending work, in priority order:
 |---|---|---|---|
 | **A1** | Boost approval never happens | **Module 11 — Admin Panel** (P13-14-15), not credentials | 🟡 Money is now safe (auto-refund after 48h), but boosts still can't go live |
 | **A2** | Trial grants unreachable | Module 11 — Admin Panel (P13-14-15) | No — feature simply unusable |
+| **A5** | Nothing a seller posts ever goes live | **Module 11 — Admin Panel** (P13-14-15) | 🔴 YES — see below |
 | **B1** | Razorpay webhook secret | Rajan (dashboard) | 🔴 YES — late payments never settle |
 | **B2** | Cron not scheduled in prod | Deploy step (`CRON_SECRET` on host) | 🔴 YES — expiry/refund/reminders never run |
 | **A3** | Boost never appears in feed/search | **Module 9 — Boost placement** | 🟡 Even an approved boost would show nowhere |
@@ -677,6 +678,75 @@ no fake saved-list is shown. The table underneath is real; nothing saved is lost
 # A. Blocked on the ADMIN module, not on any key
 
 These are the ones people forget, because no credential will ever fix them.
+
+## RULE CHANGE — a builder reaches requirements through a PROJECT (29 Jul 2026)
+
+Rajan's decision, and it **supersedes Doc2 §2 line 24** ("View requirements …
+Builder ₹2,999") and the builder row of §4.2:
+
+- A builder can no longer buy the requirement-only plan. `p2999.roles` is now
+  `{owner, broker}` (migration 0087) — `getCatalog` hides it and the existing
+  `item.roles.includes(profile.role)` guards in `/billing/quote` and
+  `/billing/checkout` turn a direct attempt into a 403. No new code path.
+- Requirement access comes WITH the ₹9,999 project plan (`requirement_access`
+  is now a real `plan_catalog` column, true for p2999 and p9999).
+- **A builder may only send a proposal while a project of theirs is `live`.**
+  Enforced in `sendProposal` BEFORE the quota draw, so a blocked builder never
+  has a unit spent and refunded; surfaced as `PROJECT_REQUIRED` (403) and as
+  `canPropose:false` on the browse / requirement-mode / proposal-sheet payloads
+  so the button is never dead.
+
+Proven end-to-end: `npm run check:builder-req` — 23/23.
+
+### Found while doing it: the requirement paywall had never worked
+
+`hasRequirementAccess()` reads `user_plans.terms->>'requirement_access'` and
+**no plan snapshot has ever carried that key**. The function therefore returned
+false for every user who has ever paid: 80 `user_plans` rows, not one able to
+unlock a requirement card, so the ₹2,999 "unlock all requirements" bought
+nothing and every browse screen in the app was locked for everybody. 0087 makes
+the flag a catalog column and backfills the existing snapshots (7 × p2999,
+5 × p9999). Verified on screen: a broker holding p2999 now sees full budgets,
+poster names and "30 proposals remaining" where the same account previously saw
+blurred cards.
+
+One builder holds a legacy p2999 bought before this rule. They keep it until it
+expires (the snapshot is frozen by design) — but the live-project gate still
+applies to their proposals, which is the half that matters.
+
+## A5. Nothing a seller posts ever goes live — found 29 Jul 2026
+
+Reported as "the project a builder publishes never shows on the home page", and
+it is not a feed bug: `createProject` writes `status='pending_review'`
+(`lib/listings/projects.ts`) and the ONLY transition to `live` is
+`moderate(..., "approve")`, reachable only through
+`POST /api/v1/admin/moderate/:subject/:id` behind the `staff` table. The
+endpoint and the state machine both work. **What does not exist is a screen that
+calls them** — `app/(admin)/account/` is a login and a placeholder page, so
+in practice no human can ever approve anything.
+
+The DB says it plainly: on 29 Jul the `projects` table held **14
+`pending_review` rows against 6 `live`**, and `moderation_log` had **one**
+project decision in its entire history — the live rows were seeded, not
+approved. Listings are in the same shape (27 `pending_review` in Rajkot alone).
+So a builder pays ₹9,999, fills five steps, and the project is invisible to
+every user forever; the builder's own dashboard is the only place it exists, as
+"Under review".
+
+**Cleared on DEV 29 Jul 2026** on Rajan's instruction: all 14 were pushed
+through the real staff endpoint (not raw SQL), so `moderation_log`, the
+`listing_approved` notification and boost-resume all ran as they will in
+production. `projects` is now 20/20 live. This is a one-time unblock of the
+existing queue — **the next project posted goes straight back to
+`pending_review`**, so the gap is open until Module 11 ships.
+
+Deliberately NOT fixed by auto-approving on submit: that would put a ₹9,999
+project (and every listing) in front of users with no review at all, which is
+the control the queue exists to provide.
+
+**Closes with Module 11 (P13-14-15)**: a staff review screen over
+`reviewQueue("project" | "listing" | "requirement")` and the moderate endpoint —
+both already built and tested.
 
 ## A1. ✅ CLOSED 26 Jul 2026 (Module 9) — a paid boost CAN now become active
 
