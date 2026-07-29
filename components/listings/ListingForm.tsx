@@ -297,7 +297,11 @@ export function ListingForm() {
               {amenities
                 .filter((a) => !a.categories.length || a.categories.includes(type.category))
                 .map((a) => {
-                  const on = ((values.amenities as string[]) ?? []).includes(a.label);
+                  // CODE, not label (migration 0078). `listings.amenities`
+                  // stores codes, so comparing the LABEL meant an edit re-opened
+                  // with none of the seller's amenities selected — and saving
+                  // from there wiped them.
+                  const on = ((values.amenities as string[]) ?? []).includes(a.code);
                   return (
                     <button
                       key={a.code}
@@ -310,7 +314,7 @@ export function ListingForm() {
                           const cur = (s.amenities as string[]) ?? [];
                           return {
                             ...s,
-                            amenities: cur.includes(a.label) ? cur.filter((x) => x !== a.label) : [...cur, a.label],
+                            amenities: cur.includes(a.code) ? cur.filter((x) => x !== a.code) : [...cur, a.code],
                           };
                         })
                       }
@@ -595,7 +599,8 @@ function listingToValues(l: any): Record<string, any> {
     areaId: o.location?.areaId ?? null,
     areaLabel: l.areaLabel ?? null,
     pincode: o.location?.pincode ?? "",
-    amenities: l.amenities ?? [],
+    // `amenities` on the payload is LABELS for display; the form works in codes.
+    amenities: (l.amenityItems ?? []).map((a: { code: string }) => a.code),
     contactPublic: !!(c.public ?? l.contactPublic),
     contactNumber: c.number ?? "",
     altNumber: c.alt ?? "",

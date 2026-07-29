@@ -165,7 +165,8 @@ export function ProjectForm() {
         setReraNumber(o.reraNumber ?? "");
         setReraExempt(!!o.reraExempt);
         setExemptReason(o.reraExemptReason ?? "");
-        setAmenities(p.amenities ?? []);
+        // Codes — `p.amenities` is the label list the detail screen prints.
+        setAmenities((p.amenityItems ?? []).map((a: { code: string }) => a.code));
         setBanks(p.bankApprovals ?? []);
         // The owner payload carries the whole chain, so an edit re-opens the
         // cascade on the real place rather than on the builder's home city.
@@ -536,9 +537,12 @@ export function ProjectForm() {
               <SectionLabel>Amenities</SectionLabel>
               <div className="flex flex-wrap gap-2">
                 {amenityOptions.map((a) => {
-                  const on = amenities.includes(a.label);
+                  // CODES, not labels (migration 0077). Sending the label is
+                  // what left every project amenity without an icon: the meta
+                  // map the detail screen reads is keyed by code.
+                  const on = amenities.includes(a.code);
                   return (
-                    <OptionChip key={a.code} selected={on} onClick={() => setAmenities((c) => on ? c.filter((x) => x !== a.label) : [...c, a.label])}>
+                    <OptionChip key={a.code} selected={on} onClick={() => setAmenities((c) => on ? c.filter((x) => x !== a.code) : [...c, a.code])}>
                       {a.label}
                     </OptionChip>
                   );

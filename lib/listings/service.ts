@@ -294,6 +294,38 @@ export async function getPublicProfileCounts(profileId: string, role: string | n
  * the labels stay data (Doc2 §5.1: a new amenity is a row, not a code change).
  * Unknown values pass through untouched — older rows stored the label itself.
  */
+/**
+ * Amenity codes, checked against the master list (migration 0077).
+ *
+ * Neither the listing nor the project path validated these: the route kept any
+ * 40 strings the browser sent and the column stored them verbatim, so a crafted
+ * request could publish arbitrary text as an "amenity" on a public detail page,
+ * and a typo'd code silently rendered as its own label with the fallback icon.
+ * CLAUDE.md rule 4 (never trust the browser) and rule 7 (option lists come from
+ * config) both land here.
+ *
+ * A LABEL is accepted and converted, because the project form has been sending
+ * labels since it was written — that is what left every project amenity without
+ * an icon, since `amenityMeta` is keyed by code.
+ */
+export async function sanitizeAmenities(input: unknown): Promise<string[]> {
+  if (!Array.isArray(input) || !input.length) return [];
+  const { data } = await db().from("amenities").select("code,label");
+  const rows = (data ?? []) as { code: string; label: string }[];
+  const byCode = new Map(rows.map((r) => [r.code.toLowerCase(), r.code]));
+  const byLabel = new Map(rows.map((r) => [r.label.toLowerCase().trim(), r.code]));
+
+  const out: string[] = [];
+  for (const raw of input.slice(0, 60)) {
+    if (typeof raw !== "string") continue;
+    const k = raw.toLowerCase().trim();
+    const code = byCode.get(k) ?? byLabel.get(k);
+    if (code && !out.includes(code)) out.push(code);
+    if (out.length === 40) break;
+  }
+  return out;
+}
+
 export async function getAmenityLabels(): Promise<Map<string, string>> {
   const rows = await getAmenities();
   return new Map(rows.map((a) => [a.code, a.label]));
@@ -507,7 +539,8 @@ export async function createListing(
       // Vigha/Guntha/acre → sq ft at write time (Doc2 §5.1). The seller's own
       // unit stays in `attributes`; this is the comparable figure.
       area_sqft: await primaryAreaSqft(input.attributes),
-      amenities: input.amenities,
+      // Master-list checked, never the raw strings the browser sent.
+      amenities: await sanitizeAmenities(input.amenities),
       contact_public: input.contact.public,
       contact_number: input.contact.number ?? null,
       alt_number: input.contact.alt ?? null,

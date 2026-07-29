@@ -2,7 +2,7 @@ import "server-only";
 import { createServiceClient } from "@/lib/supabase/server";
 import { consumeQuota, releaseQuota, reserveSlot, transitionSlot } from "@/lib/billing/service";
 import { formatShortRupees } from "@/lib/billing/money";
-import { getAmenityLabels, getAmenityMeta, getFieldDefinitions, getFieldGroups, posterCard, type FieldDefinitionRow } from "./service";
+import { getAmenityLabels, getAmenityMeta, getFieldDefinitions, getFieldGroups, posterCard, sanitizeAmenities, type FieldDefinitionRow } from "./service";
 import { visibleKeys } from "./visibility";
 import { scopedGroups } from "./groupLabel";
 import { STATUS_BADGE, renderAttrValue, resolveKeySpecs, topUpSpecs, type KeySpecCandidate } from "./dto";
@@ -220,7 +220,9 @@ export async function createProject(
       total_units: input.totalUnits,
       available_units: input.availableUnits,
       bank_approvals: input.bankApprovals,
-      amenities: input.amenities,
+      // Codes from the master list — the form used to send LABELS, which is why
+      // no project amenity ever resolved an icon (amenityMeta is keyed by code).
+      amenities: await sanitizeAmenities(input.amenities),
       description: input.description,
       state_id: input.stateId,
       district_id: input.districtId,
@@ -312,7 +314,9 @@ export async function updateProject(
       total_units: input.totalUnits,
       available_units: input.availableUnits,
       bank_approvals: input.bankApprovals,
-      amenities: input.amenities,
+      // Codes from the master list — the form used to send LABELS, which is why
+      // no project amenity ever resolved an icon (amenityMeta is keyed by code).
+      amenities: await sanitizeAmenities(input.amenities),
       description: input.description,
       state_id: input.stateId,
       district_id: input.districtId,
