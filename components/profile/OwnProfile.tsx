@@ -74,7 +74,11 @@ export function OwnProfile() {
   useEffect(() => {
     void (async () => {
       const [l, r, f] = await Promise.all([listingsApi.mine(), listingsApi.myRequirements(), profileApi.featured()]);
-      setListings(l.ok ? l.data.items : []);
+      // `/listings/mine` carries a builder's PROJECTS too (the My Listings
+      // manager shows both). Here they have their own tab, fed by
+      // `myProjects()` below — so the Sell / Rent grid keeps only properties
+      // rather than drawing every scheme twice.
+      setListings(l.ok ? l.data.items.filter((i) => i.subjectKind !== "project") : []);
       setRequirements(r.ok ? r.data.items : []);
       setCollections(f.ok ? f.data.items : []);
       if (f.ok) setMaxFeaturedItems(f.data.maxItems);
@@ -715,7 +719,7 @@ function TabContent({
           photoCount={l.photoCount}
           promoted={l.promoted}
           status={l.status}
-          availability={l.availability}
+          availability={l.availability ?? undefined}
           badgeLabel={l.badge.label}
         />
       ))}

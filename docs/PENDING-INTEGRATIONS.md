@@ -3101,9 +3101,102 @@ decision, not a defect.
   width/height, Set-as-cover → position 0 + `projects.cover_url` updated,
   delete → positions closed and cover restored. IDOR probe on another builder's
   project: presign 404, PATCH 404, DELETE 404, cross-project commit key 422.
+- **My Listings was empty for every builder.** `GET /listings/mine` only read
+  the `listings` table, and migration 0067 stops a builder posting a property at
+  all — so the screen named after their inventory said "No listings yet" while
+  their `projects` rows existed. It returns projects too now, tagged
+  `subjectKind`, sorted into the same list, counted by the same chips; the card
+  routes to the project's pages and the sheet drops the actions a project has no
+  endpoint for (sold / rented / hide / delete). `OwnProfile` filters them back
+  out of its Sell / Rent grid, where they already have their own tab.
+- **"Boost" looked like a dead button.** A subject that isn't boostable *yet*
+  (still under review) pushed the seller to the Boosts LIST — "No boosts yet",
+  no explanation, nothing to do. Both insights screens now open the buy screen,
+  which draws the subject dimmed with its lock label ("Under review") exactly as
+  designed. The buy screen's empty state fired on "nothing ELIGIBLE" and now
+  fires only on "nothing AT ALL", and its "Go to My Listings" CTA went to `/`.
+- **A query-string subject was trusted.** `/boost/new?listing=…` armed Continue
+  for whatever id was in the URL, so an ineligible one reached checkout and was
+  refused there — payment screen first, refusal after. The id is honoured only
+  if the server's `eligible` says so.
+- **`promotedListingIds` ignored `subject_kind`.** `boosts.listing_id` holds the
+  id of a listing, project OR requirement; the batch lookup matched on id alone.
 - **The image worker had never run.** `imageProcessor` reads `photoId` off the
   job and returns when it is missing — and `enqueueProcessing` never sent one,
   so no photo has ever been given WebP variants. The job now carries `photoId`
   and the `table` to write back to. Dormant in dev (no Redis → the documented
   "mark ready" fallback), so this was invisible until projects needed the same
   queue.
+
+Found while fixing the two above, and CLOSED the same day (migration 0079) —
+**a builder could not remove or pause a project.** A listing has had delete →
+30-day trash → restore/purge, hide/unhide and sold/rented since Module 4. A
+project had NONE of them: no `DELETE /api/v1/projects/:id`, no status route,
+and the read paths filtered on a `deleted_at` that nothing in the product ever
+wrote. A scheme that was finished, withdrawn or posted by mistake stayed on the
+profile and in the feed permanently, and the ₹9,999 slot behind it could never
+be released. Now shipped:
+
+- `POST /projects/:id/status` — hide / unhide / restore. Hiding PAUSES a
+  running boost (the project is placed nowhere, so days the builder paid for
+  must not run down against an invisible row) and going live again RESUMES it.
+  Hiding a project that is still under review is refused: it would strand the
+  row outside the review queue, which has no entry for a hidden project.
+  Restore returns it to `pending_review`, never straight to live — the row was
+  out of moderation's sight for up to 30 days and it carries a RERA number.
+- `DELETE /projects/:id` — soft delete → the same 30-day trash the listings
+  use, one list, `subjectKind` per row. The slot comes back ONLY when the
+  project never reached `live` (measured on `live_at`, not the current status,
+  so a live-then-hidden project doesn't earn a refund); otherwise one ₹9,999
+  plan could be recycled forever by publishing, deleting and re-posting. The
+  refund credits `project_used`, not `listing_used` — `releaseSlotAndRefundQuota`
+  took a `kind` for this.
+- `POST /projects/:id/purge` — "Delete now", filtered on `status = 'deleted'`
+  inside the statement so it can never hard-delete a live project.
+- `lifecycle.purgeProjectTrash` — the 31st-day sweep, so the trash screen's
+  "permanently deleted after 30 days" has a job behind it.
+
+CLOSED the same day (migration 0080) — **purging orphaned every image.**
+`project_photos` and `listing_photos` cascade on the DB delete, but the objects
+they pointed at were only ever removed from storage when a photo was deleted
+one at a time through the photo endpoint. Purge — the "Delete now" button AND
+the 31st-day cron — dropped the row, cascaded the photo rows, and left the
+files in the bucket forever with nothing left in the database that knew the
+keys. A project's BROCHURE leaked worse: it is a column, not a photo row, so no
+cascade would ever have reached it, and it sits in the PRIVATE bucket.
+
+Two comments in `lib/listings/photos.ts` also pointed a failed delete at "the
+7-day orphan sweep". There was no sweep. Now:
+
+- `purgeSubjectStorage(ids, subject, reason)` deletes the objects BEFORE the
+  rows go (while the keys are still readable), covering photos for both
+  subjects plus the project brochure. Called from `purgeListing`,
+  `purgeProject`, `purgeTrash` and `purgeProjectTrash`.
+- `deleteObjectOrRecord` writes a failed delete into `storage_orphans` instead
+  of swallowing it, and `lifecycle.sweepStorageOrphans` retries the queue every
+  night (giving up after 10 attempts and leaving the row as the record of a
+  real leak). It is deliberately NOT a bucket scanner: a job that enumerates
+  the bucket and deletes what it cannot match to a row is one query bug away
+  from wiping live photos, so the queue only ever holds keys the app itself
+  asked to delete.
+- `storage_orphans` has RLS on with NO policy — service-role only. Proven: with
+  a row present, an anon REST select returns `[]` and an anon insert is 401,
+  while the service role sees the row.
+
+Proven live against the real bucket (`npm run check:purge-storage`, 27 checks):
+purging a project removed its photo object from `listing-photos` and its
+brochure from `private-docs`; purging a listing removed its photo; the cron
+purge of 30-day-old trash did the same; a seeded failed-delete row was drained
+by the sweep; and another builder's purge attempt left both the row and the
+object untouched (404), unauthenticated 401.
+
+- **An empty screen was being used to mean "the request failed".** Both the
+  builder home (`BuilderDashboard`) and the seller's manager (`MyListings`)
+  wrote `items: []` on ANY error and then rendered their empty state — so a
+  401, a 500 or a dropped connection drew "No projects yet" / "No listings yet"
+  over a real inventory. This is the "blank home page" a builder hits: the dev
+  KV is in-memory (`lib/kv.ts`), every hot reload wipes the session store, the
+  next `builder-dashboard` call 401s, and the screen reports it as an empty
+  database. Both now separate offline (the design's banner) from a failed read
+  (an error state with Retry) from genuinely empty, and neither invents an
+  answer the server never gave.

@@ -2,7 +2,8 @@ import "server-only";
 import { createServiceClient } from "@/lib/supabase/server";
 import { consumeQuota, releaseQuota, reserveSlot, transitionSlot } from "@/lib/billing/service";
 import { formatShortRupees } from "@/lib/billing/money";
-import { getAmenityLabels, getAmenityMeta, getFieldDefinitions, getFieldGroups, posterCard, sanitizeAmenities, type FieldDefinitionRow } from "./service";
+import { getAmenityLabels, getAmenityMeta, getFieldDefinitions, getFieldGroups, posterCard, releaseSlotAndRefundQuota, sanitizeAmenities, type FieldDefinitionRow } from "./service";
+import { pauseBoostsForSubject, resumeBoostsForSubject, stopBoostsForSubject } from "@/lib/billing/boost";
 import { visibleKeys } from "./visibility";
 import { scopedGroups } from "./groupLabel";
 import { STATUS_BADGE, renderAttrValue, resolveKeySpecs, topUpSpecs, type KeySpecCandidate } from "./dto";
@@ -421,6 +422,254 @@ export async function listMyProjects(profileId: string) {
   const [amenityLabels, ctx] = await Promise.all([getAmenityLabels(), projectContext()]);
   return ((data ?? []) as any[]).map((p) =>
     projectDTO(p, p.project_units ?? [], amenityLabels, { defs: ctx.defs, groups: ctx.groups, type: ctx.forRow(p), amenityMeta: ctx.amenityMeta }));
+}
+
+// ---------------------------------------------------------------------------
+// Lifecycle — hide / unhide / delete / restore / purge (migration 0079)
+//
+// A listing has had all of this since Module 4. A project had none of it: no
+// status route, no DELETE route, and a `deleted_at` filter over a column
+// nothing ever wrote. So a scheme posted by mistake could not be taken down,
+// and the ₹9,999 slot behind it could never be released.
+//
+// Every rule here is the LISTING rule, applied to the same shared enum:
+//  - hide pauses a running boost (the project is placed nowhere, so the days
+//    the builder paid for must not run down against an invisible row),
+//  - going live again resumes it,
+//  - delete stops a running boost and refunds one still awaiting approval,
+//  - the slot comes back ONLY if the project was never approved — otherwise a
+//    single ₹9,999 could be recycled by publishing, deleting and re-posting.
+// ---------------------------------------------------------------------------
+
+/** Ownership failed. Distinct from "illegal transition", which is a 400. */
+export const PROJECT_NOT_OWNED = Symbol("PROJECT_NOT_OWNED");
+
+export type ProjectStatusAction = "hide" | "unhide" | "restore";
+
+export async function setProjectStatus(id: string, profileId: string, action: ProjectStatusAction) {
+  // Owner-scoped, NOT visibility-scoped: `restore` exists precisely to act on a
+  // row that every viewer gate treats as gone.
+  const { data: row } = await db().from("projects").select("*").eq("id", id).maybeSingle();
+  const current = row as Record<string, any> | null;
+  if (!current || current.profile_id !== profileId) return PROJECT_NOT_OWNED;
+  if (action !== "restore" && current.status === "deleted") return null;
+
+  const now = new Date().toISOString();
+  let patch: Record<string, unknown>;
+
+  switch (action) {
+    case "hide":
+      // Only something currently visible can be hidden. Hiding a project that
+      // is still under review would strand it: review has no queue entry for a
+      // hidden row, so it could never be approved OR rejected.
+      if (current.status !== "live") return null;
+      patch = { status: "hidden", hidden_at: now };
+      break;
+    case "unhide":
+      if (current.status !== "hidden") return null;
+      // Hiding is not an edit. Content a moderator already approved and which
+      // has not been touched since goes straight back live; anything else
+      // queues for the pass it still owes. `edited_since_approval` is the same
+      // flag the listing rule reads.
+      patch = {
+        status: current.approved_at && !current.edited_since_approval ? "live" : "pending_review",
+        hidden_at: null,
+      };
+      break;
+    case "restore":
+      if (current.status !== "deleted") return null;
+      // Back to review, never straight to live: the row spent up to 30 days
+      // out of moderation's sight, and a project carries a RERA number whose
+      // validity is exactly what review checks.
+      patch = { status: "pending_review", deleted_at: null, hidden_at: null, submitted_at: now };
+      break;
+  }
+
+  const { data } = await db()
+    .from("projects")
+    .update(patch)
+    .eq("id", id)
+    .eq("profile_id", profileId)
+    .select("*")
+    .maybeSingle();
+  if (!data) return null;
+
+  if (action === "hide") await pauseBoostsForSubject(id, "Project hidden · boost paused");
+  if ((data as { status: string }).status === "live") await resumeBoostsForSubject(id);
+
+  return data as Record<string, any>;
+}
+
+/**
+ * Soft delete → 30-day trash, mirroring `softDeleteListing`.
+ *
+ * The slot is released ONLY when the project never reached `live`: the builder
+ * paid ₹9,999 for a published scheme and never got one. Once it has been live
+ * the slot stays consumed — otherwise one plan could be recycled forever.
+ */
+export async function softDeleteProject(id: string, profileId: string): Promise<boolean> {
+  const { data: row } = await db()
+    .from("projects")
+    .select("id,profile_id,status,slot_id,approved_at,live_at,deleted_at")
+    .eq("id", id)
+    .eq("profile_id", profileId)
+    .maybeSingle();
+  const before = row as { id: string; status: string; slot_id: string | null; live_at: string | null; deleted_at: string | null } | null;
+  if (!before || before.deleted_at) return false;
+
+  // "Never published" is measured by `live_at`, not by the CURRENT status — a
+  // project that went live and was later hidden HAS had its slot's worth.
+  const neverPublished = !before.live_at;
+
+  const { data } = await db()
+    .from("projects")
+    .update({ status: "deleted", deleted_at: new Date().toISOString() })
+    .eq("id", id)
+    .eq("profile_id", profileId)
+    .is("deleted_at", null)
+    .select("id,slot_id")
+    .maybeSingle();
+  if (!data) return false;
+
+  const slotId = (data as { slot_id: string | null }).slot_id;
+  if (neverPublished && slotId) {
+    // The PROJECT quota, not the listing one — a project slot is drawn from
+    // `project_used` (migration 0065), and refunding the wrong counter would
+    // hand back a listing the builder never bought.
+    await releaseSlotAndRefundQuota(slotId, profileId, "project deleted before approval", "project");
+    await db().from("projects").update({ slot_id: null }).eq("id", id);
+  }
+
+  await stopBoostsForSubject(id, "Project deleted · boost stopped");
+  return true;
+}
+
+/**
+ * "Delete now" from trash — the same thing the 30-day cron does, on demand.
+ *
+ * The `status = 'deleted'` filter is applied IN the statement rather than
+ * checked first, so two parallel calls cannot race past it and this can never
+ * hard-delete a live project. The consumed slot is not returned.
+ */
+export async function purgeProject(id: string, profileId: string): Promise<boolean> {
+  // Same order as the listing purge: objects before rows. A project also
+  // carries a BROCHURE in the private bucket, which is a column rather than a
+  // photo row, so nothing would ever have cascaded it (migration 0080).
+  const { data: owned } = await db()
+    .from("projects")
+    .select("id")
+    .eq("id", id)
+    .eq("profile_id", profileId)
+    .eq("status", "deleted")
+    .maybeSingle();
+  if (!owned) return false;
+
+  const { purgeSubjectStorage, PROJECT_PHOTOS } = await import("./photos");
+  await purgeSubjectStorage([id], PROJECT_PHOTOS, "project purged");
+
+  const { data } = await db()
+    .from("projects")
+    .delete()
+    .eq("id", id)
+    .eq("profile_id", profileId)
+    .eq("status", "deleted")
+    .select("id");
+  return (data ?? []).length > 0;
+}
+
+/** Trash (P10 S4) — the builder's soft-deleted projects. */
+export async function listTrashProjects(profileId: string) {
+  const { data } = await db()
+    .from("projects")
+    .select("id,name,status,cover_url,area_label,photo_count,deleted_at,project_units(price_from_paise)")
+    .eq("profile_id", profileId)
+    .eq("status", "deleted")
+    .order("deleted_at", { ascending: false })
+    .limit(100);
+
+  return ((data ?? []) as any[]).map((p) => ({
+    subjectKind: "project" as const,
+    id: p.id,
+    title: p.name,
+    price: projectPriceLabel(p.project_units),
+    areaLabel: p.area_label,
+    coverUrl: p.cover_url,
+    photoCount: p.photo_count ?? 0,
+    badge: STATUS_BADGE[p.status] ?? { kind: "expired", label: p.status },
+    status: p.status,
+    availability: null,
+    reviewNotes: null,
+    rejectReason: null,
+    isLocked: false,
+    canBoost: false,
+    canReactivate: false,
+    stillAvailableAsked: false,
+    deletedAt: p.deleted_at as string | null,
+  }));
+}
+
+/** Cheapest priced unit — what a project shows where a listing shows its price. */
+function projectPriceLabel(units: { price_from_paise: number | null }[] | null): string {
+  const from = (units ?? [])
+    .map((u) => u.price_from_paise)
+    .filter((v): v is number => typeof v === "number" && v > 0)
+    .sort((a, b) => a - b)[0];
+  return from ? `From ${formatShortRupees(from)}` : "Price on request";
+}
+
+/**
+ * A builder's projects as the MY LISTINGS manager renders them (P6 S6).
+ *
+ * The manager only ever read the `listings` table, so a builder — who cannot
+ * post a property at all (migration 0067) — created a project, tapped "My
+ * Listings" and was told "No listings yet" while the row sat in `projects`.
+ * This returns those rows in the same card shape the manager already draws,
+ * tagged with `subjectKind` so the screen knows which routes to open.
+ *
+ * Deliberately lighter than `listMyProjects`: the manager card needs a cover,
+ * a title, a price line, a badge and the moderator's notes — not the amenity
+ * labels, key specs and attribute groups the detail screen builds.
+ */
+export async function listMyProjectCards(profileId: string) {
+  const { data } = await db()
+    .from("projects")
+    .select("id,name,status,cover_url,area_label,photo_count,review_notes,reject_reason,is_locked,created_at,project_units(price_from_paise)")
+    .eq("profile_id", profileId)
+    .is("deleted_at", null)
+    .order("created_at", { ascending: false })
+    .limit(100);
+
+  return ((data ?? []) as any[]).map((p) => {
+    return {
+      subjectKind: "project" as const,
+      id: p.id,
+      title: p.name,
+      // Same "from the cheapest priced unit" rule the project card uses,
+      // computed here rather than left for the client to reduce over.
+      price: projectPriceLabel(p.project_units),
+      // The two lifecycle actions a project supports. The manager reads these
+      // rather than re-deriving the rule from `status`, so the sheet and the
+      // endpoint can never disagree about what is allowed.
+      canHide: p.status === "live",
+      canUnhide: p.status === "hidden",
+      areaLabel: p.area_label,
+      coverUrl: p.cover_url,
+      photoCount: p.photo_count ?? 0,
+      badge: STATUS_BADGE[p.status] ?? { kind: "expired", label: p.status },
+      status: p.status,
+      // A project has no sold/rented state of its own — units are marked sold
+      // individually — so the manager's availability filters never match one.
+      availability: null,
+      reviewNotes: p.review_notes,
+      rejectReason: p.reject_reason,
+      isLocked: p.is_locked,
+      // Only an approved, live scheme can be boosted, exactly as for a listing.
+      canBoost: p.status === "live",
+      canReactivate: false,
+      stillAvailableAsked: false,
+      createdAt: p.created_at as string,
+    };
+  });
 }
 
 /**

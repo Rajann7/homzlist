@@ -33,19 +33,28 @@ export function Trash() {
 
   useEffect(() => { void load(); }, [load]);
 
+  // Projects live in this list too (migration 0079). They restore and purge
+  // through their OWN endpoints — the listing routes know nothing about a
+  // project id — so the row says which kind it is and the call follows.
+  const isProject = (item: TrashItem) => item.subjectKind === "project";
+
   const restore = async (item: TrashItem) => {
-    const r = await listingsApi.setStatus(item.id, "restore");
-    toast.show(r.ok ? "Restored" : "Couldn't restore that listing");
+    const proj = isProject(item);
+    const r = proj
+      ? await listingsApi.setProjectStatus(item.id, "restore")
+      : await listingsApi.setStatus(item.id, "restore");
+    toast.show(r.ok ? "Restored" : proj ? "Couldn't restore that project" : "Couldn't restore that listing");
     void load();
   };
 
   const purge = async () => {
     if (!confirm) return;
     setBusy(true);
-    const r = await listingsApi.purge(confirm.id);
+    const proj = isProject(confirm);
+    const r = proj ? await listingsApi.purgeProject(confirm.id) : await listingsApi.purge(confirm.id);
     setBusy(false);
     setConfirm(null);
-    toast.show(r.ok ? "Deleted permanently" : "Couldn't delete that listing");
+    toast.show(r.ok ? "Deleted permanently" : proj ? "Couldn't delete that project" : "Couldn't delete that listing");
     void load();
   };
 
@@ -104,14 +113,17 @@ export function Trash() {
 
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-15 font-semibold leading-[1.2] text-ink-secondary">
-                    {item.title || item.typeCode}
+                    {item.title || item.typeCode || "Untitled"}
                   </div>
                   <div className="mt-0.5 truncate text-13 text-ink-tertiary">
                     {[item.price, item.areaLabel].filter(Boolean).join(" · ")}
                   </div>
                   <div className="mt-2 flex flex-wrap gap-1.5">
+                    {/* The chip already existed and always read "Listing" — it
+                        is the row's kind, so it has to tell the truth now that
+                        a project can be in here. */}
                     <span className="rounded-4 bg-surface-2 px-1.5 py-1 text-11 font-semibold leading-none text-ink-secondary">
-                      Listing
+                      {isProject(item) ? "Project" : "Listing"}
                     </span>
                     <span
                       className={cn(
@@ -147,7 +159,11 @@ export function Trash() {
         destructive
         title="Delete permanently?"
         body={confirm?.title ?? ""}
-        consequence="This cannot be undone, and the listing slot it used is not returned."
+        consequence={
+          confirm && isProject(confirm)
+            ? "This cannot be undone, and the project slot it used is not returned."
+            : "This cannot be undone, and the listing slot it used is not returned."
+        }
         confirmLabel="Delete"
       />
     </Shell>

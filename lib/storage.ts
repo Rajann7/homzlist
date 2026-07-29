@@ -175,6 +175,45 @@ export async function deleteObject(key: string, bucket: string = BUCKET.public):
   await r2Client().send(new DeleteObjectCommand({ Bucket: r2.bucket, Key: key }));
 }
 
+/**
+ * Delete an object, and if that fails, WRITE THE KEY DOWN (migration 0080).
+ *
+ * `deleteObject` throwing used to mean the key was gone from the database and
+ * the object was still in the bucket, with nothing left that knew about it —
+ * two comments in lib/listings/photos.ts pointed at a "7-day orphan sweep"
+ * that was never built. `storage_orphans` is that sweep's queue, and
+ * `lifecycle.sweepStorageOrphans` drains it.
+ *
+ * Use this wherever the row that holds the key is about to disappear. Never
+ * throws: losing an object is a cost, but failing a user's delete because the
+ * bucket was briefly unreachable is worse.
+ */
+export async function deleteObjectOrRecord(key: string, bucket: string, reason: string): Promise<boolean> {
+  try {
+    await deleteObject(key, bucket);
+    return true;
+  } catch (e) {
+    try {
+      await createServiceClient()
+        .from("storage_orphans")
+        .upsert(
+          {
+            storage_key: key,
+            bucket,
+            reason: reason.slice(0, 200),
+            last_error: (e instanceof Error ? e.message : String(e)).slice(0, 300),
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "storage_key,bucket" },
+        );
+    } catch {
+      // If we cannot even record it, there is nothing further to try here —
+      // and the caller's delete must still succeed.
+    }
+    return false;
+  }
+}
+
 /** Fetch an object's bytes server-side (used by the image worker + migration). */
 export async function readObject(key: string, bucket: string = BUCKET.public): Promise<Buffer | null> {
   const driver = storageDriver();

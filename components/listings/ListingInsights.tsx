@@ -247,7 +247,10 @@ export function ListingInsights({ id }: { id: string }) {
         <Button
           variant="outline"
           className="flex-1 px-0"
-          onClick={() => router.push(l.promoted ? "/boost" : l.canBoost ? `/boost/new?listing=${l.id}` : "/boost")}
+          // Not-yet-boostable used to land on the Boosts list ("No boosts yet"),
+          // which reads as a button that did nothing. The buy screen shows this
+          // listing dimmed with the reason it can't be boosted instead.
+          onClick={() => router.push(l.promoted ? "/boost" : `/boost/new?listing=${l.id}`)}
         >
           Boost
         </Button>

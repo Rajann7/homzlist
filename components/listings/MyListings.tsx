@@ -14,6 +14,11 @@ import { cn } from "@/lib/utils";
  * Status changes are consequential — marking sold archives the listing and
  * stops any running boost with no refund — so each one is a double-confirm
  * carrying its consequence line (Doc2 §15).
+ *
+ * The list carries a builder's PROJECTS as well. A builder cannot post a
+ * property at all, so this screen used to be permanently empty for them; the
+ * rows are the same card, and `subjectKind` decides which routes each one
+ * opens and which of the sheet's actions actually exist for it.
  */
 export function MyListings() {
   const router = useRouter();
@@ -25,6 +30,8 @@ export function MyListings() {
     filters: { key: string; label: string; count: number }[];
   } | null>(null);
   const [offline, setOffline] = useState(false);
+  /** The read failed for a reason that is NOT offline — see `load`. */
+  const [failed, setFailed] = useState(false);
   const [sheetFor, setSheetFor] = useState<MyListing | null>(null);
   const [confirm, setConfirm] = useState<{ listing: MyListing; action: string; title: string; body: string; label: string } | null>(null);
   const [busy, setBusy] = useState(false);
@@ -35,8 +42,15 @@ export function MyListings() {
 
   const load = useCallback(async () => {
     const r = await listingsApi.mine();
-    if (r.ok) { setData(r.data); setOffline(false); }
-    else { setOffline(r.error.code === "OFFLINE"); setData({ items: [], counts: { live: 0, pending: 0, action: 0 }, filters: [] }); }
+    if (r.ok) { setData(r.data); setOffline(false); setFailed(false); return; }
+    // A FAILED read is not an empty manager. Writing `items: []` on any error
+    // meant a dropped connection or an expired session drew "No listings yet"
+    // over a seller's real inventory — the screen telling them their listings
+    // are gone. Offline keeps its banner (the design's); anything else gets a
+    // retry instead of a lie.
+    setOffline(r.error.code === "OFFLINE");
+    setFailed(r.error.code !== "OFFLINE");
+    setData({ items: [], counts: { live: 0, pending: 0, action: 0 }, filters: [] });
   }, []);
 
   const loadTrash = useCallback(async () => {
@@ -49,10 +63,19 @@ export function MyListings() {
   const run = async () => {
     if (!confirm) return;
     setBusy(true);
-    const r = await listingsApi.setStatus(confirm.listing.id, confirm.action);
+    // A project's status machine is its own endpoint (migration 0079) — the
+    // listing route knows nothing about a project id.
+    const isProj = confirm.listing.subjectKind === "project";
+    const r = isProj
+      ? await listingsApi.setProjectStatus(confirm.listing.id, confirm.action as "hide" | "unhide" | "restore")
+      : await listingsApi.setStatus(confirm.listing.id, confirm.action);
     setBusy(false);
     setConfirm(null);
-    toast.show(r.ok ? "Listing updated" : "Couldn't update that listing");
+    toast.show(
+      r.ok
+        ? isProj ? "Project updated" : "Listing updated"
+        : isProj ? "Couldn't update that project" : "Couldn't update that listing",
+    );
     void load();
   };
 
@@ -85,6 +108,23 @@ export function MyListings() {
     );
   }
 
+  // The read failed. "No listings yet" here would be the screen inventing an
+  // answer the server never gave — so it says what actually happened and
+  // offers the retry instead.
+  if (failed) {
+    return (
+      <Shell>
+        <EmptyState
+          className="pt-10"
+          title="Couldn't load your listings"
+          subtitle="They're still there. Try again in a moment."
+          illustration={<Icon name="alert" size={96} className="text-ink-disabled" />}
+          cta={{ label: "Retry", onClick: () => void load() }}
+        />
+      </Shell>
+    );
+  }
+
   if (!data.items.length) {
     return (
       <Shell>
@@ -99,6 +139,12 @@ export function MyListings() {
       </Shell>
     );
   }
+
+  // Where a row opens, per kind. A project's public page, edit form and
+  // insights all live under different paths than a listing's.
+  const isProject = (l: MyListing) => l.subjectKind === "project";
+  const viewHref = (l: MyListing) => (isProject(l) ? `/project/${l.id}` : `/listings/${l.id}`);
+  const editHref = (l: MyListing) => (isProject(l) ? `/projects/${l.id}` : `/create/form?edit=${l.id}`);
 
   // Client-side narrowing of a list the server already scoped to this seller —
   // the counts on the chips are the server's, so they can't disagree.
@@ -140,7 +186,7 @@ export function MyListings() {
         {visible.map((l) => (
           <div key={l.id} className="overflow-hidden rounded-12 bg-surface-1 shadow-l1 dark:border dark:border-border dark:shadow-none">
             <div className="flex gap-3 p-3">
-              <button onClick={() => router.push(`/listings/${l.id}`)} className="h-20 w-20 shrink-0 overflow-hidden rounded-8 bg-surface-3">
+              <button onClick={() => router.push(viewHref(l))} className="h-20 w-20 shrink-0 overflow-hidden rounded-8 bg-surface-3">
                 {l.coverUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={l.coverUrl} alt="" className="h-full w-full object-cover" />
@@ -168,7 +214,7 @@ export function MyListings() {
                 the flow strands something the user paid for. Edit reopens the
                 form and then exits to the detail screen, which is a different
                 journey; this resumes the creation flow where it stopped. */}
-            {l.status === "draft" && (
+            {l.status === "draft" && !isProject(l) && (
               <div className="border-t border-divider bg-surface-2 px-3 py-2.5">
                 <div className="text-13 font-semibold text-ink-primary">Not submitted yet</div>
                 <div className="mt-0.5 text-11 text-ink-tertiary">
@@ -213,7 +259,9 @@ export function MyListings() {
                     <span className="font-semibold capitalize">{field.replace(/_/g, " ")}:</span> {note}
                   </div>
                 ))}
-                <Button size="small" className="mt-2" onClick={() => router.push(`/create/form?edit=${l.id}`)}>Edit listing</Button>
+                <Button size="small" className="mt-2" onClick={() => router.push(editHref(l))}>
+                  {isProject(l) ? "Edit project" : "Edit listing"}
+                </Button>
               </div>
             )}
 
@@ -246,10 +294,23 @@ export function MyListings() {
 
       <BottomSheet open={!!sheetFor} onClose={() => setSheetFor(null)} title={sheetFor?.title ?? "Listing"}>
         <div className="pb-2">
-          <SheetOption label="View listing" icon={<Icon name="home" size={20} />} onClick={() => { const l = sheetFor!; setSheetFor(null); router.push(`/listings/${l.id}`); }} />
-          <SheetOption label="Edit" icon={<Icon name="camera" size={20} />} onClick={() => { const l = sheetFor!; setSheetFor(null); router.push(`/create/form?edit=${l.id}`); }} />
+          <SheetOption
+            label={sheetFor && isProject(sheetFor) ? "View project" : "View listing"}
+            icon={<Icon name="home" size={20} />}
+            onClick={() => { const l = sheetFor!; setSheetFor(null); router.push(viewHref(l)); }}
+          />
+          <SheetOption label="Edit" icon={<Icon name="camera" size={20} />} onClick={() => { const l = sheetFor!; setSheetFor(null); router.push(editHref(l)); }} />
+          {sheetFor && isProject(sheetFor) && (
+            // A project's numbers live on its own insights screen — the sheet is
+            // the only way into them from here.
+            <SheetOption label="View insights" icon={<Icon name="chart" size={20} />} onClick={() => { const l = sheetFor!; setSheetFor(null); router.push(`/projects/${l.id}/insights`); }} />
+          )}
           {sheetFor?.canBoost && (
-            <SheetOption label="Boost this listing" icon={<Icon name="rocket" size={20} />} onClick={() => { const l = sheetFor!; setSheetFor(null); router.push(`/boost/new?listing=${l.id}`); }} />
+            <SheetOption
+              label={isProject(sheetFor) ? "Boost this project" : "Boost this listing"}
+              icon={<Icon name="rocket" size={20} />}
+              onClick={() => { const l = sheetFor!; setSheetFor(null); router.push(`/boost/new?listing=${l.id}${isProject(l) ? "&kind=project" : ""}`); }}
+            />
           )}
           {sheetFor?.canReactivate && (
             <SheetOption
@@ -262,7 +323,39 @@ export function MyListings() {
               }}
             />
           )}
-          {sheetFor?.status === "live" && (
+          {/* A project's own hide / unhide (migration 0079). Sold and rented
+              stay listing-only: a scheme isn't sold as one unit, its units are
+              marked sold individually on the insights screen. Both flags are
+              the SERVER's verdict, not a status test repeated here. */}
+          {sheetFor?.canHide && (
+            <SheetOption
+              label="Hide temporarily"
+              icon={<Icon name="wifi-off" size={20} />}
+              onClick={() => {
+                const l = sheetFor!;
+                setSheetFor(null);
+                setConfirm({ listing: l, action: "hide", title: "Hide this project?", body: "It stops appearing in the feed and search, and any running boost pauses — the unused days are kept for when you unhide it.", label: "Hide" });
+              }}
+            />
+          )}
+          {sheetFor?.canUnhide && (
+            <SheetOption
+              label="Unhide"
+              icon={<Icon name="home" size={20} />}
+              onClick={() => {
+                const l = sheetFor!;
+                setSheetFor(null);
+                setConfirm({ listing: l, action: "unhide", title: "Unhide this project?", body: "It appears in the feed and search again, and a paused boost resumes with the days it had left.", label: "Unhide" });
+              }}
+            />
+          )}
+
+          {/* Sold / rented / hide / unhide / delete all POST to the LISTING
+              status + delete endpoints, which know nothing about a project id.
+              A project's units are marked sold individually on its insights
+              screen instead, so these must not be drawn for one — a button
+              that 404s is a dead button (CLAUDE.md rule 10). */}
+          {sheetFor?.status === "live" && !isProject(sheetFor) && (
             <>
               <SheetOption
                 label="Mark as sold"
@@ -293,7 +386,7 @@ export function MyListings() {
           )}
           {/* `hide` had no counterpart in the sheet, so a hidden listing could
               only come back via the lifecycle cron or not at all. */}
-          {sheetFor?.status === "hidden" && (
+          {sheetFor?.status === "hidden" && !isProject(sheetFor) && (
             <SheetOption
               label="Unhide"
               icon={<Icon name="home" size={20} />}
@@ -310,11 +403,26 @@ export function MyListings() {
             icon={<Icon name="close" size={20} />}
             onClick={async () => {
               const l = sheetFor!;
+              const proj = isProject(l);
               setSheetFor(null);
-              if (!window.confirm("Delete this listing? It goes to trash for 30 days. Your listing slot is NOT returned.")) return;
-              const r = await listingsApi.remove(l.id);
-              toast.show(r.ok ? "Moved to trash — restorable for 30 days" : "Couldn't delete that listing");
+              // The slot line differs and it is not cosmetic: a project that
+              // never went live gives its ₹9,999 slot back (the builder paid
+              // for a published scheme and never got one), while a listing's
+              // slot was spent when it was submitted.
+              const warning = proj
+                ? l.status === "live" || l.status === "hidden"
+                  ? "Delete this project? It goes to trash for 30 days. Your project slot is NOT returned."
+                  : "Delete this project? It goes to trash for 30 days. It was never published, so your project slot comes back."
+                : "Delete this listing? It goes to trash for 30 days. Your listing slot is NOT returned.";
+              if (!window.confirm(warning)) return;
+              const r = proj ? await listingsApi.removeProject(l.id) : await listingsApi.remove(l.id);
+              toast.show(
+                r.ok
+                  ? "Moved to trash — restorable for 30 days"
+                  : proj ? "Couldn't delete that project" : "Couldn't delete that listing",
+              );
               void load();
+              void loadTrash();
             }}
           />
         </div>

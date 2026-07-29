@@ -36,7 +36,10 @@
     "seed:module10": "node scripts/seed-module10.mjs",
     "check:notifications": "node scripts/check-notifications-live.mjs",
     "seed:locations": "node scripts/seed-india-locations.mjs",
-    "test:create-flow": "node scripts/test-create-flow-live.mjs"
+    "test:create-flow": "node scripts/test-create-flow-live.mjs",
+    "check:my-listings": "node scripts/check-my-listings-projects.mjs",
+    "check:project-lifecycle": "node scripts/check-project-lifecycle.mjs",
+    "check:purge-storage": "node scripts/check-purge-storage.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1091.0",

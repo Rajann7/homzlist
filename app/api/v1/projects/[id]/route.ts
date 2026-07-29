@@ -3,7 +3,7 @@ import { ok, fail } from "@/lib/api";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { getProfileById } from "@/lib/profile/service";
 import { rateLimit } from "@/lib/auth/rate-limit";
-import { getProject, updateProject, getProjectType, sanitizeProjectAttributes } from "@/lib/listings/projects";
+import { getProject, updateProject, getProjectType, sanitizeProjectAttributes, softDeleteProject } from "@/lib/listings/projects";
 import { getFieldDefinitions } from "@/lib/listings/service";
 
 /** Option lists live in the database (migration 0062) — see the create route. */
@@ -23,6 +23,10 @@ async function validBuildStatus(v: unknown): Promise<string | null> {
  *       public for projects (Doc2 §6). Non-live projects are owner-only → 404.
  * PATCH — the builder's own edit. Ownership-scoped, draws no second slot, and
  *       sends the project back to review.
+ * DELETE (migration 0079) — soft delete → 30-day trash, the mirror of
+ *       `DELETE /listings/:id`. There was no way to remove a project at all
+ *       before this: a scheme posted by mistake stayed on the profile and in
+ *       the feed for good, holding its ₹9,999 slot.
  */
 export const dynamic = "force-dynamic";
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -124,4 +128,20 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
   if (!project) return fail("NOT_FOUND");
   return ok({ project });
+}
+
+export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+  const claims = await getCurrentUser();
+  if (!claims) return fail("UNAUTHORIZED");
+  if (!UUID_RE.test(params.id)) return fail("NOT_FOUND");
+
+  // Soft, but it releases a slot when the project was never published — cap it.
+  const limited = await rateLimit(`project-delete:${claims.sub}`, 30, 3600);
+  if (!limited.allowed) return fail("RATE_LIMITED");
+
+  // Ownership is the filter inside `softDeleteProject`, so a project that isn't
+  // yours and one that doesn't exist give the same answer.
+  const deleted = await softDeleteProject(params.id, claims.sub);
+  if (!deleted) return fail("NOT_FOUND");
+  return ok({ deleted: true });
 }

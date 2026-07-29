@@ -122,21 +122,35 @@ export interface RequirementCard {
 
 export interface MyListing {
   id: string;
+  /**
+   * What this row actually IS. The manager lists a builder's projects next to
+   * properties (they share the screen and the card), and the two open different
+   * routes — so the screen is told, it never guesses from the shape.
+   */
+  subjectKind?: "listing" | "project";
   title: string | null;
   price: string;
   areaLabel: string | null;
   coverUrl: string | null;
   photoCount: number;
-  typeCode: string;
-  kind: string;
+  /** Listings only — a project has neither a property type nor a buy/rent kind. */
+  typeCode?: string;
+  kind?: string;
   status: string;
-  availability: string;
+  availability: string | null;
   badge: { kind: string; label: string };
   reviewNotes: Record<string, string> | null;
   rejectReason: string | null;
   isLocked: boolean;
   canBoost: boolean;
   canReactivate: boolean;
+  /**
+   * Projects only. The server's verdict on the two lifecycle actions a project
+   * supports, so the sheet and the endpoint can't disagree about what is
+   * allowed (a listing carries the same rule inside `status`).
+   */
+  canHide?: boolean;
+  canUnhide?: boolean;
   /** The 2-month prompt is waiting for an answer on this listing. */
   stillAvailableAsked?: boolean;
   /** Trash only — days before the purge cron removes it for good. */
@@ -267,6 +281,15 @@ export const listingsApi = {
   createProject: (payload: Record<string, unknown>) =>
     req<{ project: { id: string } }>("/projects", "POST", payload),
   myProjects: () => req<{ items: MyProject[] }>("/projects", "GET"),
+  /**
+   * The project lifecycle (migration 0079) — the mirror of the three listing
+   * calls above it. A project had none of these until now, which is why a
+   * builder could not take a scheme down or get its ₹9,999 slot back.
+   */
+  setProjectStatus: (id: string, action: "hide" | "unhide" | "restore") =>
+    req<{ project: { id: string; status: string } }>(`/projects/${id}/status`, "POST", { action }),
+  removeProject: (id: string) => req<{ deleted: boolean }>(`/projects/${id}`, "DELETE"),
+  purgeProject: (id: string) => req<{ purged: boolean }>(`/projects/${id}/purge`, "POST"),
   brochure: (projectId: string) =>
     req<{ brochure: { url: string | null; scanned: boolean } | null }>(`/projects/${projectId}/brochure`, "GET"),
   deleteBrochure: (projectId: string) =>

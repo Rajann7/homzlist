@@ -20,16 +20,44 @@ export function BuilderDashboard() {
     matched: { requirement: any; matchedTo: string; tierLabel: string | null }[];
   };
   const [data, setData] = useState<Data | null>(null);
+  // A FAILED call is not an empty dashboard. This used to collapse the two:
+  // any 401 (an access token is 15 minutes), 500 or dropped connection was
+  // written in as `{projects: [], matched: []}`, so a builder with ten schemes
+  // opened the app to "No projects yet" — a blank home telling them, wrongly,
+  // that the database has nothing of theirs.
+  const [failed, setFailed] = useState<"offline" | "error" | null>(null);
 
   const load = useCallback(async () => {
+    setFailed(null);
     const res = await feedApi.builderDashboard();
-    setData(res.ok ? (res.data as never) : { projects: [], matched: [] });
+    if (res.ok) { setData(res.data as never); return; }
+    setFailed(res.error.code === "OFFLINE" ? "offline" : "error");
+    setData(null);
   }, []);
   useEffect(() => { void load(); }, [load]);
+
+  if (failed) {
+    return (
+      <EmptyState
+        title={failed === "offline" ? "You're offline" : "Couldn't load your dashboard"}
+        subtitle={
+          failed === "offline"
+            ? "Your projects are safe — reconnect and pull to refresh."
+            : "Your projects are still there. Try again in a moment."
+        }
+        illustration={<Icon name={failed === "offline" ? "wifi-off" : "alert"} size={96} className="text-ink-disabled" />}
+        cta={{ label: "Retry", onClick: () => void load() }}
+      />
+    );
+  }
 
   if (!data) return <div className="flex flex-col gap-3 p-4"><Skeleton className="h-40 w-full rounded-12" /><Skeleton className="h-32 w-full rounded-12" /></div>;
 
   if (data.projects.length === 0 && data.matched.length === 0) {
+    // Genuinely nothing posted yet — the ONE case this copy is true for. The
+    // CTA stays on `/create` rather than jumping to the form: creation is
+    // payment-first, and `CreateEntry` shows the ₹9,999 wall BEFORE a builder
+    // with no slot fills in a multi-step project form they can't submit.
     return <EmptyState title="No projects yet" subtitle="Post a project to see stats and matching requirements here." cta={{ label: "Post a Project", onClick: () => router.push("/create") }} />;
   }
 

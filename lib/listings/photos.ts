@@ -1,6 +1,6 @@
 import "server-only";
 import { createServiceClient } from "@/lib/supabase/server";
-import { publicUrlFor, deleteObject, readObject, BUCKET } from "@/lib/storage";
+import { publicUrlFor, deleteObjectOrRecord, readObject, BUCKET } from "@/lib/storage";
 import { validateImage } from "@/lib/image-pipeline";
 
 /**
@@ -45,6 +45,56 @@ export const LISTING_PHOTOS: PhotoSubject = {
 export const PROJECT_PHOTOS: PhotoSubject = {
   table: "project_photos", column: "project_id", parent: "projects", prefix: "projects",
 };
+
+/**
+ * Delete every stored object belonging to these subjects (migration 0080).
+ *
+ * Call this BEFORE the parent rows are deleted — the photo rows cascade with
+ * their parent, and once they are gone nothing in the database knows the keys
+ * any more. That is exactly what "Delete now" and the 31st-day purge cron were
+ * doing: the row vanished, the row's photos vanished, and the files stayed in
+ * the bucket forever, unreferenced and unfindable.
+ *
+ * Every failure is recorded rather than swallowed, so the sweep can retry it.
+ * Returns how many objects were removed and how many were queued for retry.
+ */
+export async function purgeSubjectStorage(
+  subjectIds: string[],
+  subject: PhotoSubject,
+  reason: string,
+): Promise<{ deleted: number; queued: number }> {
+  if (!subjectIds.length) return { deleted: 0, queued: 0 };
+
+  const { data } = await db()
+    .from(subject.table)
+    .select("storage_key,bucket")
+    .in(subject.column, subjectIds);
+
+  let deleted = 0;
+  let queued = 0;
+  for (const row of (data ?? []) as { storage_key: string; bucket: string }[]) {
+    if (!row.storage_key) continue;
+    if (await deleteObjectOrRecord(row.storage_key, row.bucket ?? BUCKET.public, reason)) deleted++;
+    else queued++;
+  }
+
+  // A project also carries a BROCHURE, in the private bucket. It is a column on
+  // the parent rather than a photo row, so the cascade never touched it and a
+  // purged project left a private PDF behind with no owner.
+  if (subject.parent === "projects") {
+    const { data: brochures } = await db()
+      .from("projects")
+      .select("brochure_key,brochure_bucket")
+      .in("id", subjectIds)
+      .not("brochure_key", "is", null);
+    for (const b of (brochures ?? []) as { brochure_key: string; brochure_bucket: string | null }[]) {
+      if (await deleteObjectOrRecord(b.brochure_key, b.brochure_bucket ?? BUCKET.private, reason)) deleted++;
+      else queued++;
+    }
+  }
+
+  return { deleted, queued };
+}
 
 const ROLE_CAPS: Record<string, number | null> = {
   owner: 10,
@@ -176,12 +226,11 @@ async function verifyUploadedBytes(
 
       bad.push(r.id);
       await db().from(subject.table).update({ status: "failed", error: reason }).eq("id", r.id);
-      // Don't leave an unvalidated object sitting in a public bucket.
-      try {
-        await deleteObject(r.storage_key, r.bucket);
-      } catch {
-        /* the 7-day orphan sweep will catch it */
-      }
+      // Don't leave an unvalidated object sitting in a public bucket. A failed
+      // delete is RECORDED for the sweep to retry — this used to point at a
+      // "7-day orphan sweep" that had never been written, so the object was
+      // simply lost in the bucket (migration 0080).
+      await deleteObjectOrRecord(r.storage_key, r.bucket, "rejected upload");
     }),
   );
 
@@ -308,13 +357,11 @@ export async function deletePhoto(
     .maybeSingle();
   if (!data) return false;
 
-  // Best-effort object cleanup; the 7-day orphan sweep catches any miss.
-  try {
-    const row = data as { storage_key: string; bucket: string };
-    await deleteObject(row.storage_key, row.bucket);
-  } catch {
-    /* orphan cleanup will handle it */
-  }
+  // The row is already gone, so a delete that throws here would lose the key
+  // for good. It is recorded for the sweep instead of being swallowed — the
+  // "7-day orphan sweep" this comment used to name did not exist (0080).
+  const row = data as { storage_key: string; bucket: string };
+  await deleteObjectOrRecord(row.storage_key, row.bucket, "photo removed");
 
   // Close the gap so positions stay contiguous and a cover always exists.
   const remaining = await listPhotos(subjectId, subject);

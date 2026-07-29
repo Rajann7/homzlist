@@ -770,14 +770,22 @@ export async function recordListingView(listingId: string, viewerKey: string): P
  * The batch form of `isPromoted`, for lists: the profile grid draws a PROMOTED
  * chip per tile (designs/P9 S1), and asking per tile would be one query per
  * listing. Same source of truth — the `boosts` table, never a client flag.
+ *
+ * `boosts.listing_id` carries the id of WHATEVER was boosted — a listing, a
+ * project or a requirement — so the kind has to be part of the match, or a
+ * project's boost could light up a listing tile.
  */
-export async function promotedListingIds(listingIds: string[]): Promise<Set<string>> {
+export async function promotedListingIds(
+  listingIds: string[],
+  kind: "listing" | "project" | "requirement" = "listing",
+): Promise<Set<string>> {
   if (!listingIds.length) return new Set();
   const now = new Date().toISOString();
   const { data } = await db()
     .from("boosts")
     .select("listing_id")
     .in("listing_id", listingIds)
+    .eq("subject_kind", kind)
     .eq("status", "active")
     .lte("starts_at", now)
     .gt("ends_at", now);
@@ -1203,6 +1211,24 @@ export async function setListingStatus(id: string, profileId: string, action: St
  * when the listing was submitted, and deleting the evidence doesn't refund it.
  */
 export async function purgeListing(id: string, profileId: string): Promise<boolean> {
+  // The photos have to go from STORAGE first. `listing_photos` cascades on the
+  // delete below, and once those rows are gone nothing knows the object keys —
+  // which is how every purged listing used to leave its images in the bucket
+  // forever (migration 0080). Ownership is re-checked in the delete itself, so
+  // this early read cannot be used to make someone else's photos disappear:
+  // a wrong owner simply deletes nothing on the next statement.
+  const { data: owned } = await db()
+    .from("listings")
+    .select("id")
+    .eq("id", id)
+    .eq("profile_id", profileId)
+    .eq("status", "deleted")
+    .maybeSingle();
+  if (!owned) return false;
+
+  const { purgeSubjectStorage, LISTING_PHOTOS } = await import("./photos");
+  await purgeSubjectStorage([id], LISTING_PHOTOS, "listing purged");
+
   const { data } = await db()
     .from("listings")
     .delete()
@@ -1243,11 +1269,21 @@ export async function softDeleteListing(id: string, profileId: string) {
 }
 
 /**
- * Release a reserved slot and hand the listing quota back to the plan it came
- * from, so the user can post again. Also un-links the consumption trace row so
- * "What you've used" stops claiming a listing that no longer exists.
+ * Release a reserved slot and hand the quota back to the plan it came from, so
+ * the user can post again. Also un-links the consumption trace row so "What
+ * you've used" stops claiming something that no longer exists.
+ *
+ * `kind` decides WHICH counter comes back. A project slot is drawn from
+ * `project_used` (migration 0065), not `listing_used` — refunding the listing
+ * counter for a deleted project would hand a builder a listing they never
+ * bought while leaving the ₹9,999 project still marked as spent.
  */
-export async function releaseSlotAndRefundQuota(slotId: string, profileId: string, reason: string) {
+export async function releaseSlotAndRefundQuota(
+  slotId: string,
+  profileId: string,
+  reason: string,
+  kind: "listing" | "project" = "listing",
+) {
   const { data } = await db()
     .from("listing_slots")
     .select("id,user_plan_id,state")
@@ -1259,16 +1295,17 @@ export async function releaseSlotAndRefundQuota(slotId: string, profileId: strin
 
   await db().from("listing_slots").update({ state: "released", released_reason: reason }).eq("id", slotId);
 
-  // Give the quota back. `greatest(0, …)` guards against a double release.
-  const { data: plan } = await db().from("user_plans").select("listing_used").eq("id", slot.user_plan_id).maybeSingle();
-  const used = (plan as { listing_used: number } | null)?.listing_used ?? 0;
-  await db().from("user_plans").update({ listing_used: Math.max(0, used - 1) }).eq("id", slot.user_plan_id);
+  // Give the quota back. `Math.max(0, …)` guards against a double release.
+  const usedCol = kind === "project" ? "project_used" : "listing_used";
+  const { data: plan } = await db().from("user_plans").select(usedCol).eq("id", slot.user_plan_id).maybeSingle();
+  const used = (plan as Record<string, number> | null)?.[usedCol] ?? 0;
+  await db().from("user_plans").update({ [usedCol]: Math.max(0, used - 1) }).eq("id", slot.user_plan_id);
 
   await db()
     .from("plan_consumptions")
     .update({ reverted_at: new Date().toISOString(), revert_reason: reason })
     .eq("user_plan_id", slot.user_plan_id)
-    .eq("kind", "listing")
+    .eq("kind", kind)
     .is("reverted_at", null);
 }
 

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AppShell, BottomSheet, Button, Header, Icon, Skeleton, StatusBadge, useToast } from "@/components/billing/ui";
 import { BackButton, OfflineBanner, SheetOption } from "@/components/billing/primitives";
+import { ConfirmDialog } from "@/components/ui/Dialog";
 import { listingsApi, type ProjectInsights as Insights } from "@/lib/listings/client";
 import type { BadgeKind } from "@/components/ui/StatusBadge";
 import { cn } from "@/lib/utils";
@@ -25,6 +26,11 @@ export function ProjectInsights({ id }: { id: string }) {
   const [notFound, setNotFound] = useState(false);
   const [offline, setOffline] = useState(false);
   const [menu, setMenu] = useState(false);
+  // The lifecycle actions this screen gained with migration 0079. Each one is
+  // consequential (a paused boost, a released slot), so each is a confirm
+  // carrying its consequence line rather than a one-tap action.
+  const [confirm, setConfirm] = useState<"hide" | "unhide" | "delete" | null>(null);
+  const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
     const r = await listingsApi.projectInsights(id);
@@ -42,6 +48,30 @@ export function ProjectInsights({ id }: { id: string }) {
     const url = `${location.origin}/project/${id}`;
     if (navigator.share) void navigator.share({ title: p?.name ?? "", url });
     else { void navigator.clipboard?.writeText(url); toast.show("Link copied"); }
+  };
+
+  /** Hide / unhide / delete. Deleting leaves the screen — the project it was
+   *  showing is in trash, so staying here would show insights for something the
+   *  builder has just removed. */
+  const runAction = async () => {
+    if (!confirm) return;
+    setBusy(true);
+    const r = confirm === "delete"
+      ? await listingsApi.removeProject(id)
+      : await listingsApi.setProjectStatus(id, confirm);
+    setBusy(false);
+    setConfirm(null);
+    if (!r.ok) {
+      toast.show(r.error.code === "OFFLINE" ? "You're offline — try again" : "Couldn't update that project");
+      return;
+    }
+    if (confirm === "delete") {
+      toast.show("Moved to trash — restorable for 30 days");
+      router.replace("/listings");
+      return;
+    }
+    toast.show(confirm === "hide" ? "Project hidden" : "Project is live again");
+    void load();
   };
 
   if (notFound) {
@@ -186,7 +216,12 @@ export function ProjectInsights({ id }: { id: string }) {
         <Button
           variant="outline"
           className="flex-1 px-0"
-          onClick={() => router.push(p.promoted ? "/boost" : p.canBoost ? `/boost/new?listing=${p.id}&kind=project` : "/boost")}
+          // A project that can't be boosted YET (still under review) used to
+          // drop the builder on the Boosts list, which says "No boosts yet" and
+          // explains nothing — tapping Boost looked like it did nothing at all.
+          // The buy screen shows this very project dimmed with its reason, so
+          // that is where it goes in every case except an already-running boost.
+          onClick={() => router.push(p.promoted ? "/boost" : `/boost/new?listing=${p.id}&kind=project`)}
         >
           Boost
         </Button>
@@ -218,8 +253,63 @@ export function ProjectInsights({ id }: { id: string }) {
               />
             </>
           )}
+
+          {/* Hide / unhide / delete (migration 0079). None of these existed:
+              this screen could show a project but never take one down, so a
+              scheme posted by mistake was permanent and its slot with it. */}
+          {p.status === "live" && (
+            <SheetOption
+              label="Hide temporarily"
+              icon={<Icon name="wifi-off" size={20} />}
+              onClick={() => { setMenu(false); setConfirm("hide"); }}
+            />
+          )}
+          {p.status === "hidden" && (
+            <SheetOption
+              label="Unhide"
+              icon={<Icon name="home" size={20} />}
+              onClick={() => { setMenu(false); setConfirm("unhide"); }}
+            />
+          )}
+          <SheetOption
+            label="Delete project"
+            destructive
+            icon={<Icon name="close" size={20} />}
+            onClick={() => { setMenu(false); setConfirm("delete"); }}
+          />
         </div>
       </BottomSheet>
+
+      <ConfirmDialog
+        open={confirm !== null}
+        onClose={() => setConfirm(null)}
+        onConfirm={runAction}
+        loading={busy}
+        destructive={confirm === "delete"}
+        title={
+          confirm === "delete" ? "Delete this project?"
+          : confirm === "hide" ? "Hide this project?"
+          : "Unhide this project?"
+        }
+        body={
+          confirm === "delete"
+            ? "It goes to trash for 30 days — you can restore it from Recently deleted until then."
+            : confirm === "hide"
+              ? "It stops appearing in the feed and search. Any running boost pauses and keeps its unused days."
+              : "It appears in the feed and search again, and a paused boost resumes with the days it had left."
+        }
+        // The slot line is the consequence that actually costs money, so it is
+        // stated rather than implied — and it is the SERVER's rule: a project
+        // that never went live gets its ₹9,999 slot back, one that did does not.
+        consequence={
+          confirm === "delete"
+            ? p.status === "live" || p.status === "hidden"
+              ? "Your project slot is not returned."
+              : "It was never published, so your project slot comes back."
+            : undefined
+        }
+        confirmLabel={confirm === "delete" ? "Delete" : confirm === "hide" ? "Hide" : "Unhide"}
+      />
     </Shell>
   );
 }

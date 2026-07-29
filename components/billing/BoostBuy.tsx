@@ -69,8 +69,14 @@ export function BoostBuy() {
       // Preselect the first eligible listing + the best-value duration, matching
       // the design's default selection.
       const first = res.data.listings.find((l) => l.eligible);
-      setListingId((cur) => cur ?? first?.id ?? null);
-      if (!params.get("listing") && first) setSubjectKind(first.subjectKind);
+      // A subject arriving in the query string is only honoured if the SERVER
+      // says it is boostable. It used to be taken on trust, so tapping "Boost"
+      // on an under-review listing armed Continue for a checkout the server
+      // then refused — payment screen first, refusal after.
+      const asked = params.get("listing");
+      const askedEligible = asked ? res.data.listings.some((l) => l.id === asked && l.eligible) : false;
+      setListingId((cur) => (askedEligible ? cur : null) ?? first?.id ?? null);
+      if ((!asked || !askedEligible) && first) setSubjectKind(first.subjectKind);
       setDuration((cur) => cur ?? (res.data.durations.find((d) => d.bestValue)?.code ?? res.data.durations[0]?.code ?? null));
     }
   }, []);
@@ -93,7 +99,7 @@ export function BoostBuy() {
   }
 
   const d = data.data;
-  const eligible = d.listings.filter((l) => l.eligible);
+  const hasEligible = d.listings.some((l) => l.eligible);
   const selectedListing = d.listings.find((l) => l.id === listingId) ?? null;
   const selectedDuration = d.durations.find((x) => x.code === duration) ?? null;
   // Every place name comes from the server's `targetLabels` map, keyed by the
@@ -101,7 +107,16 @@ export function BoostBuy() {
   const labelsForSubject = selectedListing ? d.targetLabels[`${selectedListing.subjectKind}:${selectedListing.id}`] ?? {} : {};
   const targetLabel = labelsForSubject[targeting] ?? TARGET_TITLES[targeting].title;
 
-  if (!eligible.length) {
+  // Nothing AT ALL to boost — no listing, no project, no requirement. This is
+  // the only case the empty state is honest about: it tells the seller to
+  // publish something first, which is exactly what they have to do.
+  //
+  // It used to fire whenever nothing was ELIGIBLE, which is a different thing:
+  // a seller whose only listing was still under review was shown "publish a
+  // listing first" about a listing they had already published, and the design's
+  // dimmed "Under review" card — the one thing that would have explained it —
+  // was never drawn. The CTA also went to "/" rather than to My Listings.
+  if (!d.listings.length) {
     return (
       <Shell onInfo={() => setInfoOpen(true)}>
         <EmptyState
@@ -109,7 +124,7 @@ export function BoostBuy() {
           title="No listings to boost yet"
           subtitle="Only approved, live listings can be boosted. Publish a listing first."
           illustration={<Icon name="rocket" size={96} className="text-ink-disabled" />}
-          cta={{ label: "Go to My Listings", onClick: () => router.push("/") }}
+          cta={{ label: "Go to My Listings", onClick: () => router.push("/listings") }}
         />
         <InfoSheet open={infoOpen} onClose={() => setInfoOpen(false)} />
       </Shell>
@@ -157,7 +172,7 @@ export function BoostBuy() {
       <div className="flex flex-col gap-4 p-4">
         {/* Reclaimed days. Shown only when there are some, and only above a
             picker that has something eligible to spend them on. */}
-        {credits && credits.totalDays > 0 && (
+        {credits && credits.totalDays > 0 && hasEligible && (
           <div className="rounded-12 bg-accent-soft p-3.5">
             <div className="flex items-start gap-3">
               <Icon name="gift" size={22} className="shrink-0 text-accent" />
