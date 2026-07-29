@@ -385,8 +385,11 @@ export function MyListings() {
             </>
           )}
           {/* `hide` had no counterpart in the sheet, so a hidden listing could
-              only come back via the lifecycle cron or not at all. */}
-          {sheetFor?.status === "hidden" && !isProject(sheetFor) && (
+              only come back via the lifecycle cron or not at all. Gated on the
+              SERVER's `canUnhide` rather than on the status, because a Builder
+              may not bring a listing back at all (0067) and this row 403'd for
+              them. */}
+          {sheetFor?.canUnhide && !isProject(sheetFor) && (
             <SheetOption
               label="Unhide"
               icon={<Icon name="home" size={20} />}

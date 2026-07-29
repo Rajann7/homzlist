@@ -33,6 +33,8 @@ export interface CatalogRow {
   requirement_days: number | null;
   proposal_quota: number;
   proposals_expire_with_plan: boolean;
+  /** Does holding it unlock other people's requirements? (migration 0087) */
+  requirement_access: boolean;
   sort_order: number;
   is_active: boolean;
 }
@@ -126,6 +128,25 @@ export async function getCatalog(role: Role | null, kind?: BillingKind): Promise
   const rows = (data ?? []) as CatalogRow[];
   // Filter in code (not SQL) so a null role degrades to "nothing role-specific".
   return rows.filter((r) => (role ? r.roles.includes(role) : r.roles.length === 3));
+}
+
+/**
+ * The plan that unlocks OTHER people's requirements FOR THIS ROLE, or null when
+ * the role has no such product.
+ *
+ * The requirement wall used to hardcode `p2999` and "₹2,999/month" in two
+ * components. Since 0087 a builder cannot buy p2999 (`roles` is owner+broker),
+ * so their Unlock button led to checkout's "That plan isn't available for your
+ * account" — a dead CTA on the one screen that sells the thing. The wall now
+ * asks the catalog which plan applies, so the code AND the price on it are the
+ * DB's answer (CLAUDE.md rule 7) and a catalog edit moves both.
+ *
+ * Cheapest first: if a role somehow holds two unlocking plans, the wall offers
+ * the smaller cheque.
+ */
+export async function requirementUnlockPlan(role: Role | null): Promise<CatalogRow | null> {
+  const plans = (await getCatalog(role, "plan")).filter((p) => p.requirement_access);
+  return plans.sort((a, b) => a.price_paise - b.price_paise)[0] ?? null;
 }
 
 export async function getCatalogItem(code: string): Promise<CatalogRow | null> {

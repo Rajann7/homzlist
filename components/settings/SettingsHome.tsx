@@ -74,7 +74,11 @@ export function SettingsHome({ base = "" }: { base?: string }) {
 
   const id = data.identity;
   const roleLabel = id.role ? id.role[0].toUpperCase() + id.role.slice(1) : "";
-  const verifBadge = data.verification.rera ? "ID ✓ · RERA ✓" : data.verification.id ? "ID ✓" : null;
+  // Each level stands on its own. RERA used to imply ID — so a broker/builder
+  // with RERA approved and no ID document read "ID ✓ · RERA ✓" here while the
+  // profile chips and the Verification screen both said ID was unearned.
+  const verifBadge =
+    [data.verification.id && "ID ✓", data.verification.rera && "RERA ✓"].filter(Boolean).join(" · ") || null;
   const themeLabel = theme === "system" ? "System" : theme === "dark" ? "Dark" : "Light";
 
   return (

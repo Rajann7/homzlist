@@ -3456,3 +3456,50 @@ discovered by a real user:
 - **Admin read-only chat still has no surface** (already tracked above). Project
   threads join the same gap: reports on them will queue with everything else
   once P13-15 lands.
+
+---
+
+## Profile ⋯ menu sweep — 29 Jul 2026 (out-of-scope findings)
+
+Every row of the profile ⋯ menu was walked as a builder and as a broker, with
+the sheets and three-dot options inside each destination. Six defects were fixed
+in that pass (visitor preview, Settings verification badge, the builder's
+requirement paywall, Unhide on a builder's hidden listing, the builder's My
+Requirements controls, and rejections never reaching Account status). What was
+found and deliberately NOT changed:
+
+- **A `pending_review` requirement has no controls at all.** P8 S4 draws the
+  toggle / Edit / Mark fulfilled / ⋯ row only for `live` and `paused`, so a
+  requirement posted by mistake cannot be deleted or shared while it waits for
+  moderation — the ⋯ that holds Delete is inside the same gate. It is not a
+  permanent trap (approval or rejection moves it on), but the seller's only
+  option is to wait. Adding the ⋯ to the pending card is a design change and was
+  not made.
+
+- **My Plan shows a builder listing slots they cannot spend.** Manish Agarwal
+  (builder) holds five ₹999 Listing Plans from before 0067 and the screen prints
+  "Property listings 1 / 1" and "1 Listing slots left". The rows are real and the
+  screen is honestly reporting them, but `PostType` already hides the leftover
+  slot hint from a builder for exactly this reason, so the two screens disagree.
+  Either the plan card grows a role-aware line or those snapshots get a
+  migration; both are Rajan's call.
+
+- **A builder can still edit a listing 0067 hid.** `PATCH /listings/:id` has no
+  role guard (unlike the requirement PATCH, which refuses a content edit for a
+  builder). It is not a takedown bypass — an edit leaves `status` at `hidden`
+  and unhide is refused — so it is pointless rather than dangerous.
+
+- **Drafts is reachable from the ⋯ menu for a builder.** `/create/drafts` is a
+  PROPERTY drafts screen and `PostType` deliberately hides its "Continue from
+  drafts" link from builders. The menu row was left in place because a builder
+  with a pre-0067 draft would otherwise have no way to reach it; its empty state
+  now leads to `/create`, which for a builder is the project flow.
+
+- **Help is still P12.** The ⋯ menu's Help row raises a toast rather than
+  opening anything — unchanged, and already tracked above.
+
+Data note: the fix that makes rejections visible was proven by rejecting one of
+RK Properties' pending listings through the real staff endpoint
+(`QA PG Rent Rajkot`, reject #1). That listing is now `rejected` in the dev DB
+and RK's Account status is no longer "in good standing" — intentionally left in
+place as the seeded proof of a state that had never had a row.

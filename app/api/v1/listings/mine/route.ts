@@ -3,6 +3,8 @@ import { getCurrentUser } from "@/lib/auth/current-user";
 import { listMine, activeBoostsFor, leadCountsFor } from "@/lib/listings/service";
 import { listMyProjectCards } from "@/lib/listings/projects";
 import { myListingDTO } from "@/lib/listings/dto";
+import { getProfileById } from "@/lib/profile/service";
+import { canPostListing } from "@/lib/listings/capabilities";
 
 /**
  * GET /api/v1/listings/mine (Doc7 §56) — the owner's manager view: every
@@ -20,7 +22,22 @@ export async function GET() {
   const claims = await getCurrentUser();
   if (!claims) return fail("UNAUTHORIZED");
 
-  const [rows, projects] = await Promise.all([listMine(claims.sub), listMyProjectCards(claims.sub)]);
+  const [rows, projects, profile] = await Promise.all([
+    listMine(claims.sub),
+    listMyProjectCards(claims.sub),
+    getProfileById(claims.sub),
+  ]);
+
+  /**
+   * The three actions that put a listing back on the public surface —
+   * unhide, re-activate and restore — are refused for a Builder by
+   * POST /listings/:id/status (migration 0067 hid every one of their listings).
+   * The manager sheet was drawing "Unhide" off the STATUS alone, so a builder
+   * got the row, confirmed the dialog and collected a 403 with a generic
+   * "Couldn't update" — a dead button (CLAUDE.md rule 10). The verdict now
+   * travels with the row, from the same function the endpoint enforces with.
+   */
+  const mayRevive = canPostListing(profile?.role ?? null);
 
   // The profile grid draws a PROMOTED chip per tile (designs/P9 S1). Which
   // tiles get it comes from the `boosts` table in one batched query — never
@@ -43,6 +60,8 @@ export async function GET() {
   const items = [
     ...rows.map((r) => ({
       ...myListingDTO(r),
+      canUnhide: mayRevive && r.status === "hidden",
+      canReactivate: mayRevive && r.availability === "rented",
       subjectKind: "listing" as const,
       promoted: boosts.has(r.id),
       boost: boosts.get(r.id) ?? null,

@@ -50,6 +50,22 @@ const TABS: Record<string, string[]> = {
   builder: ["Projects"],
 };
 
+/**
+ * What "View as visitor" must show — P9 S2's tab set, not P9 S1's.
+ *
+ * A visitor has no Requirements tab (a requirement is never on a public
+ * profile) and, with the live-only filter below, sees exactly the rows
+ * `OtherProfile` renders. Before this, view-as kept the OWNER's tabs and the
+ * owner's rows: a broker "previewing" their profile counted 34 Sell / 15 Rent
+ * against the 11 a stranger can actually load, with UNDER REVIEW badges and
+ * lead counts on cards that aren't public at all.
+ */
+const VISITOR_TABS: Record<string, string[]> = {
+  owner: ["Sell", "Rent"],
+  broker: ["Sell", "Rent"],
+  builder: ["Projects"],
+};
+
 export function OwnProfile() {
   const router = useRouter();
   const { show } = useToast();
@@ -127,8 +143,19 @@ export function OwnProfile() {
   if (loading) return <ProfileSkeleton />;
   if (!p) return null;
 
-  const tabs = TABS[p.role ?? "owner"];
+  const tabs = (viewAs ? VISITOR_TABS : TABS)[p.role ?? "owner"];
+  // Requirements is index 2, which the visitor tab set doesn't have — without
+  // this, turning view-as on from that tab renders `tabs[2] === undefined`.
+  const tabIndex = Math.min(tab, tabs.length - 1);
   const roleLabel = p.role ? p.role[0].toUpperCase() + p.role.slice(1) : "";
+
+  // What a stranger's request would return: live and still available. The
+  // preview filters the same rows the public payload does, so the counts beside
+  // the tabs are the visitor's counts too.
+  const publicListings = listings === null ? null : listings.filter((l) => l.status === "live" && l.availability === "available");
+  const publicProjects = projects === null ? null : projects.filter((pr) => pr.status === "live");
+  const shownListings = viewAs ? publicListings : listings;
+  const shownProjects = viewAs ? publicProjects : projects;
 
   /** The sheet always asks the server who is signed in — it never renders a cache. */
   async function openSwitchSheet() {
@@ -281,8 +308,13 @@ export function OwnProfile() {
                 — and each opens the screen that earns it (Doc2 §11), so no chip
                 is decorative. RERA is a Broker/Builder level (Doc2 role table:
                 Owner = Phone/ID), so an owner was being shown a permanently
-                unearnable "✗ RERA" chip that led to a level they can't get. */}
-            <div className="mt-2 flex flex-wrap gap-1.5">
+                unearnable "✗ RERA" chip that led to a level they can't get.
+
+                Owner-only: the row states which levels are still UNEARNED, and
+                P9 S2 shows a stranger nothing but the earned tick (ProfileBadges
+                above). So the visitor preview drops it rather than showing a
+                "✗ ID" no visitor could ever see. */}
+            <div className={cn("mt-2 flex flex-wrap gap-1.5", viewAs && "hidden")}>
               {([["Phone", p.badges.phone], ["ID", p.badges.id],
                  ...(p.role === "broker" || p.role === "builder" ? [["RERA", p.badges.rera] as const] : []),
                 ] as const).map(([label, on]) => (
@@ -366,7 +398,7 @@ export function OwnProfile() {
       {tabs.length === 1 ? (
         <div className="chrome sticky top-header z-sticky mt-3.5 flex items-center border-b border-border bg-surface-1 px-4 py-3">
           <b className="text-15 font-semibold text-ink-primary">{tabs[0]}</b>
-          <TabCount n={tabCount(tabs[0], listings, requirements, projects)} active />
+          <TabCount n={tabCount(tabs[0], shownListings, requirements, shownProjects)} active />
         </div>
       ) : (
         <div className="chrome sticky top-header z-sticky mt-3.5 flex border-b border-border bg-surface-1">
@@ -376,12 +408,12 @@ export function OwnProfile() {
               onClick={() => setTab(i)}
               className={cn(
                 "relative flex flex-1 items-center justify-center py-3 text-15 font-semibold transition-colors",
-                i === tab ? "text-ink-primary" : "text-ink-tertiary",
+                i === tabIndex ? "text-ink-primary" : "text-ink-tertiary",
               )}
             >
               {t}
-              <TabCount n={tabCount(t, listings, requirements, projects)} active={i === tab} />
-              {i === tab && <span className="absolute inset-x-0 -bottom-px h-[2px] bg-accent" />}
+              <TabCount n={tabCount(t, shownListings, requirements, shownProjects)} active={i === tabIndex} />
+              {i === tabIndex && <span className="absolute inset-x-0 -bottom-px h-[2px] bg-accent" />}
             </button>
           ))}
         </div>
@@ -389,17 +421,18 @@ export function OwnProfile() {
 
       {/* The user's REAL listings/requirements/projects for this tab */}
       <TabContent
-        tab={tabs[tab]}
+        tab={tabs[tabIndex]}
         viewAs={viewAs}
-        listings={listings}
+        listings={shownListings}
         requirements={requirements}
-        projects={projects}
+        projects={shownProjects}
         // A tile on your OWN profile opens its insights (designs/P9 S1 →
         // `go('listingStats')`), not the public detail page — this is the
-        // seller's own view of what the listing is doing.
-        onOpenListing={(id) => router.push(`/listings/${id}/insights`)}
+        // seller's own view of what the listing is doing. In view-as it opens
+        // what the VISITOR would land on: the public detail page.
+        onOpenListing={(id) => router.push(viewAs ? `/property/${id}` : `/listings/${id}/insights`)}
         // A project tile opens its insights, exactly as a property tile does.
-        onOpenProject={(id) => router.push(`/projects/${id}/insights`)}
+        onOpenProject={(id) => router.push(viewAs ? `/project/${id}` : `/projects/${id}/insights`)}
         onOpenRequirement={(id) => router.push(`/requirements/${id}`)}
         onCreate={() =>
           router.push(
@@ -640,7 +673,9 @@ function TabContent({
   if (isProjects) {
     const items = projects ?? [];
     if (!items.length) {
-      return (
+      return viewAs ? (
+        <Empty title="No projects yet" body="This builder hasn't published a project." viewAs onCreate={onCreate} />
+      ) : (
         <Empty
           title="No projects yet"
           body="List your project and it appears on your profile and in search."
@@ -652,7 +687,9 @@ function TabContent({
     }
     return (
       <>
-        <SectionHeader label="Your projects" action={viewAs ? undefined : "Add project"} onAction={onCreate} />
+        {/* The section header is the OWNER's row (it carries "Add project"), so
+            the visitor preview doesn't draw it — P9 S2 has no such header. */}
+        {!viewAs && <SectionHeader label="Your projects" action="Add project" onAction={onCreate} />}
         <CardList>
           {items.map((pr) => (
             <ProjectCard
@@ -664,9 +701,11 @@ function TabContent({
               config={projectConfig(pr)}
               priceFrom={pr.priceFrom}
               areaLabel={pr.areaLabel}
-              badge={pr.promoted ? { kind: "promoted", label: "Boosted" } : pr.badge}
+              // Status badges and the boost strip are owner-only facts — a
+              // visitor is never told a project is boosted or under review.
+              badge={viewAs ? undefined : pr.promoted ? { kind: "promoted", label: "Boosted" } : pr.badge}
               specs={projectSpecs(pr)}
-              boost={pr.boost}
+              boost={viewAs ? undefined : pr.boost}
             />
           ))}
         </CardList>
@@ -682,7 +721,14 @@ function TabContent({
     : all;
 
   if (!items.length) {
-    return (
+    return viewAs ? (
+      <Empty
+        title="Nothing here yet"
+        body={tab === "Rent" ? "No properties listed for rent right now." : "No properties listed for sale right now."}
+        viewAs
+        onCreate={onCreate}
+      />
+    ) : (
       <Empty
         title="No listings yet"
         body="Post your first property — it stays live forever with the ₹999 plan."
@@ -695,7 +741,7 @@ function TabContent({
 
   return (
     <>
-      <SectionHeader label={`${tab} listings`} action={viewAs ? undefined : "Add listing"} onAction={onCreate} />
+      {!viewAs && <SectionHeader label={`${tab} listings`} action="Add listing" onAction={onCreate} />}
       <CardList>
         {items.map((l) => (
           <ListingCard
@@ -709,13 +755,15 @@ function TabContent({
             sqft={l.sqft}
             areaLabel={l.areaLabel}
             // A boost is what the card leads with when one is running;
-            // otherwise it states the lifecycle status the server sent.
-            badge={l.promoted ? { kind: "promoted", label: "Boosted" } : l.badge}
-            ribbon={l.availability === "sold" ? "SOLD" : l.availability === "rented" ? "RENTED" : null}
+            // otherwise it states the lifecycle status the server sent. None of
+            // it — nor the lead count — is a visitor's to see (P9 S2 strips
+            // Views/Leads server-side), so the preview drops all three.
+            badge={viewAs ? undefined : l.promoted ? { kind: "promoted", label: "Boosted" } : l.badge}
+            ribbon={viewAs || l.availability === "available" ? null : l.availability === "sold" ? "SOLD" : "RENTED"}
             // Leads, not views: the view count was dropped from this screen on
             // 29 Jul 2026. It is unchanged on the listing's own insights.
-            leads={l.leads}
-            boost={l.boost}
+            leads={viewAs ? undefined : l.leads}
+            boost={viewAs ? undefined : l.boost}
           />
         ))}
       </CardList>
@@ -755,13 +803,13 @@ function Thumb({ url, className }: { url: string | null; className?: string }) {
 
 function Empty({
   title, body, cta, viewAs, onCreate,
-}: { title: string; body: string; cta: string; viewAs: boolean; onCreate: () => void }) {
+}: { title: string; body: string; cta?: string; viewAs: boolean; onCreate: () => void }) {
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 py-16 text-center">
       <HousePlusArt />
       <h3 className="text-17 font-semibold text-ink-primary">{title}</h3>
       <p className="max-w-xs text-13 text-ink-secondary">{body}</p>
-      {!viewAs && <Button className="mt-2" onClick={onCreate}>{cta}</Button>}
+      {!viewAs && cta && <Button className="mt-2" onClick={onCreate}>{cta}</Button>}
     </div>
   );
 }

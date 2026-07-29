@@ -10,7 +10,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { Checklist } from "@/components/billing/primitives";
 import { ProposalSheet } from "@/components/listings/ProposalSheet";
 import { LoginSheet } from "./sheets";
-import { browseApi, type BrowseCard } from "@/lib/listings/client";
+import { browseApi, type BrowseCard, type UnlockPlan } from "@/lib/listings/client";
 import { cn } from "@/lib/utils";
 
 /**
@@ -20,7 +20,7 @@ import { cn } from "@/lib/utils";
  */
 export function RequirementFeed({ kind, guest = false }: { kind: "all" | "sell" | "rent"; guest?: boolean }) {
   const router = useRouter();
-  type Data = { sections: { tier: string; label: string | null; cards: BrowseCard[] }[]; unlocked: boolean; balance: { left: number; unlimited: boolean }; canPropose: boolean };
+  type Data = { sections: { tier: string; label: string | null; cards: BrowseCard[] }[]; unlocked: boolean; balance: { left: number; unlimited: boolean }; canPropose: boolean; unlockPlan: UnlockPlan | null };
   const [data, setData] = useState<Data | null>(null);
   const [paywall, setPaywall] = useState(false);
   const [loginSheet, setLoginSheet] = useState(false);
@@ -34,7 +34,7 @@ export function RequirementFeed({ kind, guest = false }: { kind: "all" | "sell" 
     setData(null);
     const res = await browseApi.list(kind === "all" ? null : kind, null);
     if (res.ok) setData(res.data as never);
-    else setData({ sections: [], unlocked: false, balance: { left: 0, unlimited: false }, canPropose: true });
+    else setData({ sections: [], unlocked: false, balance: { left: 0, unlimited: false }, canPropose: true, unlockPlan: null });
   }, [kind]);
   useEffect(() => { void load(); }, [load]);
 
@@ -59,16 +59,16 @@ export function RequirementFeed({ kind, guest = false }: { kind: "all" | "sell" 
             <div className="flex items-center gap-1.5"><Icon name="pin" size={14} className="text-ink-tertiary" /><span className="text-13 font-semibold uppercase tracking-[0.3px] text-ink-tertiary">{s.label}</span></div>
           )}
           {s.cards.map((c) => (
-            <ReqCard key={c.id} c={c} sent={sent.has(c.id) || Boolean(c.alreadySent)} canPropose={data.canPropose} onUnlock={() => guard(() => setPaywall(true))} onPropose={() => guard(() => setProposalFor(c.id))} onOpen={() => router.push(`/requirements/${c.id}`)} onPostProject={() => router.push("/create")} />
+            <ReqCard key={c.id} c={c} plan={data.unlockPlan} sent={sent.has(c.id) || Boolean(c.alreadySent)} canPropose={data.canPropose} onUnlock={() => guard(() => setPaywall(true))} onPropose={() => guard(() => setProposalFor(c.id))} onOpen={() => router.push(`/requirements/${c.id}`)} onPostProject={() => router.push("/create")} />
           ))}
         </div>
       ))}
 
       <BottomSheet open={paywall} onClose={() => setPaywall(false)} title="Unlock requirements">
         <div className="flex flex-col gap-4 pb-2">
-          <div className="rounded-12 bg-accent-soft p-4 text-center"><div className="flex items-baseline justify-center gap-1"><span className="text-24 font-bold text-ink-primary">₹2,999</span><span className="text-13 text-ink-tertiary">/month</span></div></div>
+          <div className="rounded-12 bg-accent-soft p-4 text-center"><div className="flex items-baseline justify-center gap-1"><span className="text-24 font-bold text-ink-primary">{data.unlockPlan?.price ?? ""}</span><span className="text-13 text-ink-tertiary">{data.unlockPlan?.subLabel ?? ""}</span></div></div>
           <Checklist items={["Unlock all requirements", "30 proposals included", "Direct contact after acceptance"]} />
-          <Button fullWidth onClick={() => router.push("/checkout?plan=p2999")}>Continue to Payment</Button>
+          <Button fullWidth disabled={!data.unlockPlan} onClick={() => data.unlockPlan && router.push(`/checkout?plan=${data.unlockPlan.code}`)}>Continue to Payment</Button>
           <button className="text-13 font-semibold text-accent" onClick={() => router.push("/plans")}>Compare plans</button>
         </div>
       </BottomSheet>
@@ -82,7 +82,7 @@ export function RequirementFeed({ kind, guest = false }: { kind: "all" | "sell" 
   );
 }
 
-function ReqCard({ c, sent, canPropose, onUnlock, onPropose, onOpen, onPostProject }: { c: BrowseCard; sent: boolean; canPropose: boolean; onUnlock: () => void; onPropose: () => void; onOpen: () => void; onPostProject: () => void }) {
+function ReqCard({ c, plan, sent, canPropose, onUnlock, onPropose, onOpen, onPostProject }: { c: BrowseCard; plan: UnlockPlan | null; sent: boolean; canPropose: boolean; onUnlock: () => void; onPropose: () => void; onOpen: () => void; onPostProject: () => void }) {
   const locked = c.access === "locked";
   return (
     <div className="relative overflow-hidden rounded-12 border border-border bg-surface-1 p-4 pl-5">
@@ -96,7 +96,7 @@ function ReqCard({ c, sent, canPropose, onUnlock, onPropose, onOpen, onPostProje
         <>
           <div className="relative mt-3 w-fit"><div className="select-none text-17 font-bold text-ink-primary blur-[6px]">₹00L – ₹00L</div><span className="absolute inset-0 grid place-items-center"><Icon name="lock" size={16} className="text-ink-tertiary" /></span></div>
           <div className="mt-1 text-13 text-ink-secondary">{c.summary}</div>
-          <Button fullWidth className="mt-3" onClick={onUnlock}><Icon name="lock" size={16} className="mr-1.5" /> Unlock — ₹2,999/mo</Button>
+          <Button fullWidth className="mt-3" onClick={onUnlock}><Icon name="lock" size={16} className="mr-1.5" /> Unlock{plan ? ` — ${plan.price}${plan.short}` : ""}</Button>
         </>
       ) : (
         <>

@@ -3,6 +3,9 @@ import { ok, fail } from "@/lib/api";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { browseRequirements } from "@/lib/listings/matching";
 import { proposalBalance, builderMayPropose } from "@/lib/listings/proposals";
+import { requirementUnlockPlan } from "@/lib/billing/service";
+import { requirementUnlockDTO } from "@/lib/billing/dto";
+import { getProfileById } from "@/lib/profile/service";
 
 /**
  * GET /api/v1/requirements/browse (Doc7 §63) — browse others' requirements.
@@ -36,5 +39,13 @@ export async function GET(req: NextRequest) {
   // renders the reason instead of a Send button the POST is going to refuse.
   const canPropose = claims ? await builderMayPropose(claims.sub) : true;
 
-  return ok({ sections, unlocked, cityName, balance, canPropose });
+  // WHICH plan this viewer's role can actually buy to unlock these cards. The
+  // wall hardcoded p2999, which a builder is refused at checkout (0087) — so
+  // every Unlock button on a builder's screen ended at "That plan isn't
+  // available for your account". A guest sees the owner/broker plan, which is
+  // what they'll be offered once they sign up.
+  const role = claims ? (await getProfileById(claims.sub))?.role ?? null : "owner";
+  const unlockPlan = unlocked ? null : requirementUnlockDTO(await requirementUnlockPlan(role as never));
+
+  return ok({ sections, unlocked, cityName, balance, canPropose, unlockPlan });
 }

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { AppShell, BottomSheet, Button, Chip, EmptyState, Header, Icon, Skeleton, useToast } from "@/components/billing/ui";
 import { Checklist, OfflineBanner } from "@/components/billing/primitives";
 import { ProposalSheet } from "./ProposalSheet";
-import { browseApi, type BrowseCard, type BrowseSection } from "@/lib/listings/client";
+import { browseApi, type BrowseCard, type BrowseSection, type UnlockPlan } from "@/lib/listings/client";
 import { cn } from "@/lib/utils";
 
 /**
@@ -20,7 +20,7 @@ export function RequirementsBrowse() {
   const router = useRouter();
   const toast = useToast();
 
-  type Data = { sections: BrowseSection[]; unlocked: boolean; cityName: string | null; balance: { left: number; total: number; unlimited: boolean } };
+  type Data = { sections: BrowseSection[]; unlocked: boolean; cityName: string | null; balance: { left: number; total: number; unlimited: boolean }; unlockPlan: UnlockPlan | null };
   const [data, setData] = useState<Data | null>(null);
   const [offline, setOffline] = useState(false);
   const [kind, setKind] = useState<"all" | "sell" | "rent">("all");
@@ -32,8 +32,8 @@ export function RequirementsBrowse() {
     setData(null);
     const res = await browseApi.list(kind === "all" ? null : kind, null);
     if (res.ok) { setData(res.data); setOffline(false); }
-    else if (res.error.code === "OFFLINE") { setOffline(true); setData({ sections: [], unlocked: false, cityName: null, balance: { left: 0, total: 0, unlimited: false } }); }
-    else { setData({ sections: [], unlocked: false, cityName: null, balance: { left: 0, total: 0, unlimited: false } }); }
+    else if (res.error.code === "OFFLINE") { setOffline(true); setData({ sections: [], unlocked: false, cityName: null, balance: { left: 0, total: 0, unlimited: false }, unlockPlan: null }); }
+    else { setData({ sections: [], unlocked: false, cityName: null, balance: { left: 0, total: 0, unlimited: false }, unlockPlan: null }); }
   }, [kind]);
 
   useEffect(() => { void load(); }, [load]);
@@ -68,7 +68,11 @@ export function RequirementsBrowse() {
           <Icon name="lock" size={20} className="shrink-0 text-accent" />
           <div className="flex-1">
             <div className="text-15 font-semibold text-ink-primary">Unlock all requirements</div>
-            <div className="text-11 text-ink-secondary">See full details and contact posters — ₹2,999/month</div>
+            {/* Price + period from plan_catalog, for the plan THIS role can
+                buy — a builder was shown the ₹2,999 one that checkout refuses. */}
+            <div className="text-11 text-ink-secondary">
+              See full details and contact posters{data.unlockPlan ? ` — ${data.unlockPlan.price}${suffix(data.unlockPlan)}` : ""}
+            </div>
           </div>
           <Button className="h-9 px-4 text-13" onClick={() => setPaywall(true)}>Unlock</Button>
         </div>
@@ -106,7 +110,7 @@ export function RequirementsBrowse() {
               )}
               {section.cards.map((card) =>
                 card.access === "locked" ? (
-                  <LockedCard key={card.id} card={card} onUnlock={() => setPaywall(true)} />
+                  <LockedCard key={card.id} card={card} plan={data.unlockPlan} onUnlock={() => setPaywall(true)} />
                 ) : (
                   <UnlockedCard
                     key={card.id}
@@ -127,12 +131,12 @@ export function RequirementsBrowse() {
         <div className="flex flex-col gap-4 pb-2">
           <div className="rounded-12 bg-accent-soft p-4 text-center">
             <div className="flex items-baseline justify-center gap-1">
-              <span className="text-24 font-bold text-ink-primary">₹2,999</span>
-              <span className="text-13 text-ink-tertiary">/month</span>
+              <span className="text-24 font-bold text-ink-primary">{data?.unlockPlan?.price ?? ""}</span>
+              <span className="text-13 text-ink-tertiary">{data?.unlockPlan?.subLabel ?? ""}</span>
             </div>
           </div>
           <Checklist items={["Unlock every requirement", "30 proposals included", "Instant match alerts for your areas", "Direct chat after acceptance"]} />
-          <Button fullWidth onClick={() => router.push("/checkout?plan=p2999")}>Continue to Payment</Button>
+          <Button fullWidth disabled={!data?.unlockPlan} onClick={() => data?.unlockPlan && router.push(`/checkout?plan=${data.unlockPlan.code}`)}>Continue to Payment</Button>
           <button className="text-13 font-semibold text-accent" onClick={() => router.push("/plans")}>Compare plans</button>
           <p className="text-11 text-ink-tertiary">Auto-renewal is off. You&apos;ll be reminded before expiry.</p>
         </div>
@@ -150,7 +154,12 @@ export function RequirementsBrowse() {
   );
 }
 
-function LockedCard({ card, onUnlock }: { card: BrowseCard; onUnlock: () => void }) {
+/** "/month", or " · per project · 6 months" — the catalog's own period words. */
+function suffix(p: UnlockPlan) {
+  return p.subLabel ? (p.subLabel.startsWith("/") ? p.subLabel : ` · ${p.subLabel}`) : "";
+}
+
+function LockedCard({ card, plan, onUnlock }: { card: BrowseCard; plan: UnlockPlan | null; onUnlock: () => void }) {
   return (
     <div className="relative flex flex-col gap-3 rounded-12 border border-border bg-surface-1 p-4">
       {card.isBoosted && (
@@ -182,7 +191,7 @@ function LockedCard({ card, onUnlock }: { card: BrowseCard; onUnlock: () => void
 
       <div className="text-11 text-ink-tertiary">Posted {card.postedAgo}</div>
       <Button fullWidth onClick={onUnlock}>
-        <Icon name="lock" size={16} className="mr-1.5" /> Unlock — ₹2,999/mo
+        <Icon name="lock" size={16} className="mr-1.5" /> Unlock{plan ? ` — ${plan.price}${plan.short}` : ""}
       </Button>
     </div>
   );

@@ -4,6 +4,9 @@ import { getCurrentUser } from "@/lib/auth/current-user";
 import { rateLimit, clientIp } from "@/lib/auth/rate-limit";
 import { browseRequirements } from "@/lib/listings/matching";
 import { proposalBalance, builderMayPropose } from "@/lib/listings/proposals";
+import { requirementUnlockPlan } from "@/lib/billing/service";
+import { requirementUnlockDTO } from "@/lib/billing/dto";
+import { getProfileById } from "@/lib/profile/service";
 
 /**
  * GET /api/v1/feed/requirement-mode (Doc7 §79) — requirement cards in the feed
@@ -29,5 +32,9 @@ export async function GET(req: NextRequest) {
   // Same builder rule the POST enforces (0087) — the card needs it to render a
   // reason instead of a Send button that is going to 403.
   const canPropose = claims ? await builderMayPropose(claims.sub) : true;
-  return ok({ sections, unlocked, cityName, balance, canPropose });
+  // The plan THIS role may buy to unlock these cards — p2999 is refused to a
+  // builder at checkout (0087), so the wall can't name it for everyone.
+  const role = claims ? (await getProfileById(claims.sub))?.role ?? null : "owner";
+  const unlockPlan = unlocked ? null : requirementUnlockDTO(await requirementUnlockPlan(role as never));
+  return ok({ sections, unlocked, cityName, balance, canPropose, unlockPlan });
 }

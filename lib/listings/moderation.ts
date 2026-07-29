@@ -59,6 +59,13 @@ export async function isStaff(profileId: string): Promise<boolean> {
 /** Which statuses a moderator may act on. Anything else is a no-op, not an error path. */
 const REVIEWABLE = ["pending_review", "changes_requested"];
 
+/** What the seller calls the thing, on their own Account status screen. */
+const SUBJECT_WORD: Record<ModerationSubject, string> = {
+  listing: "Listing",
+  requirement: "Requirement",
+  project: "Project",
+};
+
 const TABLE: Record<ModerationSubject, string> = {
   listing: "listings",
   requirement: "requirements",
@@ -149,6 +156,31 @@ export async function moderate(
   });
 
   const u = updated as { status: string; reject_count: number | null; is_locked: boolean | null };
+
+  /**
+   * The seller's own record of it (Doc2 §11 — the P9 "Account status" screen).
+   *
+   * `moderation_log` is the ADMIN's audit trail, keyed by subject id; the
+   * screen reads `moderation_events`, keyed by profile. Nothing has ever
+   * written a row there for a rejection, so Account status answered "Your
+   * listings are in good standing" to a broker with three rejects and a locked
+   * listing — the screen has never shown a moderation action to anybody.
+   * Approvals are not events: the screen lists what went WRONG.
+   */
+  if (input.action === "reject" || input.action === "request_changes") {
+    const rejected = input.action === "reject";
+    await db().from("moderation_events").insert({
+      profile_id: current.profile_id,
+      kind: rejected ? "rejection" : "warning",
+      severity: rejected ? "error" : "warning",
+      title: rejected
+        ? `${SUBJECT_WORD[subject]} not approved${u.is_locked ? " · no further re-submissions" : ""}`
+        : `Changes requested on your ${SUBJECT_WORD[subject].toLowerCase()}`,
+      detail: rejected
+        ? (input.reason ?? "").slice(0, 300)
+        : Object.values(input.notes ?? {}).join(" · ").slice(0, 300) || null,
+    });
+  }
 
   // Back in the feed → resume any boost that was paused while it was hidden or
   // under review, so the buyer gets those days back (Doc2 §13 pause/resume).

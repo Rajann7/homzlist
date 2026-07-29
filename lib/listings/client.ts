@@ -658,9 +658,21 @@ export interface SentProposal {
   sentAt: string; footnote: string; nonRefund: boolean; threadId: string | null;
 }
 
+/**
+ * The plan the wall must offer THIS viewer (migration 0087) — code, price and
+ * period all from `plan_catalog`, never typed into the component.
+ */
+export interface UnlockPlan {
+  code: string;
+  name: string;
+  price: string;
+  subLabel: string | null;
+  short: string;
+}
+
 export const browseApi = {
   list: (kind?: "sell" | "rent" | null, typeCode?: string | null) =>
-    req<{ sections: BrowseSection[]; unlocked: boolean; cityName: string | null; balance: { left: number; total: number; unlimited: boolean }; canPropose: boolean }>(
+    req<{ sections: BrowseSection[]; unlocked: boolean; cityName: string | null; balance: { left: number; total: number; unlimited: boolean }; canPropose: boolean; unlockPlan: UnlockPlan | null }>(
       `/requirements/browse?${new URLSearchParams({ ...(kind ? { kind } : {}), ...(typeCode ? { type: typeCode } : {}) }).toString()}`,
       "GET",
     ),

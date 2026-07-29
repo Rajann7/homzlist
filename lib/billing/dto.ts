@@ -27,6 +27,26 @@ const daysLeft = (iso: string | null) =>
 // Plans screen (P11 S1 / P5 plan wall)
 // ---------------------------------------------------------------------------
 
+/**
+ * The requirement wall's plan, for whichever role is asking (migration 0087).
+ *
+ * `sub_label` is the catalog's own suffix ("/month", "per project · 6 months"),
+ * so the wall prints what the plan actually costs and for how long instead of
+ * the "₹2,999/month" that used to be typed into two components. `short` is the
+ * button's compact form — the design's "Unlock — ₹2,999/mo".
+ */
+export function requirementUnlockDTO(c: CatalogRow | null) {
+  if (!c) return null;
+  return {
+    code: c.code,
+    name: c.name,
+    price: formatPaise(c.price_paise),
+    /** "/month" · "per project · 6 months" — straight from plan_catalog. */
+    subLabel: c.sub_label,
+    short: c.period_days === 30 ? "/mo" : "",
+  };
+}
+
 export function planCardDTO(c: CatalogRow) {
   return {
     code: c.code,

@@ -22,12 +22,28 @@ export function MyRequirements() {
 
   const [data, setData] = useState<{ items: RequirementCard[]; quota: { label: string } } | null>(null);
   const [offline, setOffline] = useState(false);
+  /**
+   * A Builder reaches requirements through the project, never by posting one
+   * (Rajan, 29 Jul 2026 — migration 0087). The server already refuses every
+   * path that would put one back on the surface: POST /requirements, and PATCH
+   * for reopen / isActive / a content edit are all FORBIDDEN for the role.
+   *
+   * This screen still drew all of them, so a builder got a "+", a quota strip
+   * promising posts they cannot spend, an Edit that bounced to Create and an
+   * active toggle that answered "Couldn't update that". The ways OUT of the
+   * state — Mark fulfilled, Delete, Share — stay, because migration 0067 left
+   * paused rows here and this is the only screen that can clear them.
+   */
+  const [mayPost, setMayPost] = useState(true);
   const [tip, setTip] = useState(false);
   const [sheetFor, setSheetFor] = useState<RequirementCard | null>(null);
   const [dialog, setDialog] = useState<{ kind: "off" | "fulfil" | "delete" | "reopen"; r: RequirementCard } | null>(null);
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
+    // The role is the SERVER's answer (the same config call the create screens
+    // read), never a guess from anything already in the browser.
+    void listingsApi.config().then((cfg) => setMayPost(!cfg.ok || cfg.data.role !== "builder"));
     const res = await listingsApi.myRequirements();
     if (res.ok) { setData(res.data as never); setOffline(false); }
     else if (res.error.code === "OFFLINE") { setOffline(true); setData({ items: [], quota: { label: "" } }); }
@@ -63,7 +79,7 @@ export function MyRequirements() {
       <Header
         left={<BackButton fallback="/requirements" />}
         title="My requirements"
-        right={<button aria-label="Post a requirement" className="grid h-11 w-11 place-items-center" onClick={() => router.push("/requirements/new")}><Icon name="plus" size={24} className="text-ink-primary" /></button>}
+        right={mayPost ? <button aria-label="Post a requirement" className="grid h-11 w-11 place-items-center" onClick={() => router.push("/requirements/new")}><Icon name="plus" size={24} className="text-ink-primary" /></button> : undefined}
       />
       {offline && <OfflineBanner />}
 
@@ -77,21 +93,25 @@ export function MyRequirements() {
           title="No requirements posted"
           subtitle="Tell us what you're looking for and matching properties will find you."
           illustration={<SearchListArt />}
-          cta={{ label: "Post a Requirement", onClick: () => router.push("/requirements/new") }}
+          cta={mayPost ? { label: "Post a Requirement", onClick: () => router.push("/requirements/new") } : undefined}
         />
       ) : (
         <div className="flex flex-col gap-4 p-4 pb-8">
-          {/* Plan strip */}
-          <div className="flex items-center gap-2 rounded-8 bg-surface-2 px-3.5 py-2.5">
-            <span className="flex-1 text-13 text-ink-secondary">{data.quota.label}</span>
-            <button aria-label="Quota info" onClick={() => setTip(true)}><Icon name="info" size={16} className="text-ink-tertiary" /></button>
-          </div>
+          {/* Plan strip — a count of posts that can still be spent, so it is not
+              drawn for a role that can't spend them. */}
+          {mayPost && (
+            <div className="flex items-center gap-2 rounded-8 bg-surface-2 px-3.5 py-2.5">
+              <span className="flex-1 text-13 text-ink-secondary">{data.quota.label}</span>
+              <button aria-label="Quota info" onClick={() => setTip(true)}><Icon name="info" size={16} className="text-ink-tertiary" /></button>
+            </div>
+          )}
 
           {data.items.map((r) => (
             <RequirementCardView
               key={r.id}
               r={r}
               busy={busy}
+              mayRevive={mayPost}
               onToggle={(on) => (on ? void setActive(r, true) : setDialog({ kind: "off", r }))}
               onProposals={() => router.push(`/requirements/${r.id}/proposals`)}
               onEdit={() => router.push(`/requirements/new?edit=${r.id}`)}
@@ -158,9 +178,11 @@ export function MyRequirements() {
 }
 
 function RequirementCardView({
-  r, busy, onToggle, onProposals, onEdit, onFulfil, onReopen, onMore, onOpenMatch,
+  r, busy, mayRevive, onToggle, onProposals, onEdit, onFulfil, onReopen, onMore, onOpenMatch,
 }: {
   r: RequirementCard; busy: boolean;
+  /** False for a Builder: reopen / turn on / edit are all 403 for that role. */
+  mayRevive: boolean;
   onToggle: (on: boolean) => void; onProposals: () => void; onEdit: () => void;
   onFulfil: () => void; onReopen: () => void; onMore: () => void; onOpenMatch: (id: string) => void;
 }) {
@@ -207,12 +229,12 @@ function RequirementCardView({
       {fulfilled && (
         <div className="flex items-center justify-between">
           <span className="text-11 text-ink-tertiary">Proposals are closed for this requirement</span>
-          <button className="text-13 font-semibold text-accent" onClick={onReopen}>Reopen</button>
+          {mayRevive && <button className="text-13 font-semibold text-accent" onClick={onReopen}>Reopen</button>}
         </div>
       )}
 
       {/* Active/paused controls */}
-      {(live || paused || expired) && (
+      {mayRevive && (live || paused || expired) && (
         <div className="flex items-center gap-3 rounded-8 bg-surface-2 p-3">
           <div className="flex-1">
             <div className="text-15 font-semibold text-ink-primary">Requirement active</div>
@@ -259,7 +281,7 @@ function RequirementCardView({
       {/* Action row */}
       {(live || paused) && (
         <div className="flex items-center gap-3 border-t border-divider pt-3">
-          <Button variant="outline" className="flex-1" onClick={onEdit}>Edit</Button>
+          {mayRevive && <Button variant="outline" className="flex-1" onClick={onEdit}>Edit</Button>}
           <Button variant="outline" className="flex-1" onClick={onFulfil}>Mark Fulfilled</Button>
           <button aria-label="More" className="grid h-11 w-11 place-items-center" onClick={onMore}><Icon name="more" size={22} className="text-ink-secondary" /></button>
         </div>
