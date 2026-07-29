@@ -114,7 +114,42 @@ export type IconName =
   | "external"
   | "shield-off"
   | "help-circle"
-  | "eye";
+  | "eye"
+  /**
+   * Property vocabulary (Rajan, 29 Jul 2026 — "Gym has a HEART icon").
+   *
+   * It was one symptom of a set with no domain glyphs in it: every amenity and
+   * every key spec had been mapped to whatever shape already existed, so the
+   * pool was a square, water was a lightbulb, parking was a grid, laundry was
+   * the refund arrow and the play area was a rocket. These are the real ones,
+   * drawn in the same 24×24 / 1.5px outline family as the rest.
+   */
+  | "car"
+  | "droplet"
+  | "rain"
+  | "dumbbell"
+  | "pool"
+  | "washer"
+  | "elevator"
+  | "wifi"
+  | "tree"
+  | "playground"
+  | "sofa"
+  | "snowflake"
+  | "utensils"
+  | "broom"
+  | "flame"
+  | "ruler"
+  | "height"
+  | "road"
+  | "temple"
+  | "truck"
+  | "door"
+  | "sprout"
+  | "percent"
+  | "map"
+  | "balcony"
+  | "shutter";
 
 interface IconProps extends React.SVGProps<SVGSVGElement> {
   name: IconName;
@@ -592,6 +627,157 @@ const PATHS: Record<IconName, (f: boolean) => React.ReactNode> = {
       <circle cx="12" cy="12" r="3" />
     </>
   ),
+
+  // ---- Property vocabulary (migration 0076 maps the data onto these) -------
+  car: () => (
+    <>
+      <path d="M3.5 17v-4l2-5h13l2 5v4" />
+      <path d="M3.5 13h17" />
+      <circle cx="7.5" cy="17" r="1.5" />
+      <circle cx="16.5" cy="17" r="1.5" />
+    </>
+  ),
+  droplet: () => <path d="M12 3s6 6.4 6 10a6 6 0 0 1-12 0c0-3.6 6-10 6-10Z" />,
+  rain: () => (
+    <>
+      <path d="M7 15a4 4 0 1 1 .8-7.9A5 5 0 0 1 18 9a3 3 0 0 1 .2 6" />
+      <path d="m8 19-1 2M12 19l-1 2M16 19l-1 2" />
+    </>
+  ),
+  dumbbell: () => <path d="M6.5 8v8M4 10v4M17.5 8v8M20 10v4M6.5 12h11" />,
+  pool: () => (
+    <>
+      <path d="M3 18c1.5 0 1.5-1 3-1s1.5 1 3 1 1.5-1 3-1 1.5 1 3 1 1.5-1 3-1" />
+      <path d="M7 15V5a2 2 0 0 1 4 0v10M13 15V5a2 2 0 0 1 4 0v10M7 8h10M7 11.5h10" />
+    </>
+  ),
+  washer: () => (
+    <>
+      <rect x="4" y="3" width="16" height="18" rx="2" />
+      <circle cx="12" cy="14" r="4" />
+      <path d="M7.5 6.5h.01M11 6.5h.01" />
+    </>
+  ),
+  elevator: () => (
+    <>
+      <rect x="5" y="3" width="14" height="18" rx="2" />
+      <path d="M9.5 10 11 8l1.5 2M13.5 14 15 16l1.5-2" />
+    </>
+  ),
+  wifi: () => (
+    <>
+      <path d="M5 12.5a10 10 0 0 1 14 0M8 15.5a6 6 0 0 1 8 0" />
+      <path d="M12 19h.01" />
+    </>
+  ),
+  tree: () => (
+    <>
+      <path d="M12 21v-5" />
+      <path d="M12 3 7 10h3l-3 4h10l-3-4h3z" />
+    </>
+  ),
+  playground: () => (
+    <>
+      <path d="M3 19h18" />
+      <path d="m5 16 14-6" />
+      <circle cx="12" cy="13" r="1.5" />
+      <path d="M12 14.5V19" />
+    </>
+  ),
+  sofa: () => (
+    <>
+      <path d="M5 11V7a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v4" />
+      <path d="M3 12a2 2 0 0 1 4 0v3h10v-3a2 2 0 0 1 4 0v6H3z" />
+    </>
+  ),
+  snowflake: () => (
+    <>
+      <path d="M12 3v18M4.2 7.5l15.6 9M19.8 7.5l-15.6 9" />
+      <path d="m9.5 5 2.5 2.5L14.5 5M9.5 19l2.5-2.5 2.5 2.5" />
+    </>
+  ),
+  utensils: () => (
+    <>
+      <path d="M7 3v8a2 2 0 0 0 4 0V3M9 11v10" />
+      <path d="M17 3c-1.5 1.5-2 3-2 5s.5 3 2 3v10" />
+    </>
+  ),
+  broom: () => (
+    <>
+      <path d="M19 4 12 11" />
+      <path d="M9 8 4 13l7 7 5-5z" />
+      <path d="m7 16 4 4" />
+    </>
+  ),
+  flame: () => (
+    <path d="M12 3c3 3.5 4.5 6 4.5 9a4.5 4.5 0 0 1-9 0c0-2 .8-3.4 2-4.6.2 1.4 1 2.1 1.8 2.1 1.4 0 1.7-3.4.7-6.5Z" />
+  ),
+  ruler: () => (
+    <>
+      <rect x="2" y="8" width="20" height="8" rx="1" />
+      <path d="M6 8v3M10 8v4M14 8v3M18 8v4" />
+    </>
+  ),
+  height: () => <path d="M12 3v18M8.5 6.5 12 3l3.5 3.5M8.5 17.5 12 21l3.5-3.5" />,
+  road: () => (
+    <>
+      <path d="M6 21 9 3M18 21 15 3" />
+      <path d="M12 5v3M12 11v3M12 17v3" />
+    </>
+  ),
+  temple: () => (
+    <>
+      <path d="M12 2 8 6h8z" />
+      <path d="M5 9h14M6 21V9h12v12" />
+      <path d="M10 21v-5a2 2 0 0 1 4 0v5" />
+    </>
+  ),
+  truck: () => (
+    <>
+      <path d="M3 16V6h11v10" />
+      <path d="M14 9h4l3 3v4h-7" />
+      <circle cx="7" cy="17.5" r="1.6" />
+      <circle cx="17" cy="17.5" r="1.6" />
+    </>
+  ),
+  door: () => (
+    <>
+      <path d="M5 21V4a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v17" />
+      <path d="M3 21h18M15 12h.01" />
+    </>
+  ),
+  sprout: () => (
+    <>
+      <path d="M12 21v-8" />
+      <path d="M12 13c0-3-2-5-5-5 0 3 2 5 5 5Z" />
+      <path d="M12 13c0-3.3 2.2-5.5 5.5-5.5C17.5 10.8 15.3 13 12 13Z" />
+    </>
+  ),
+  percent: () => (
+    <>
+      <path d="m19 5-14 14" />
+      <circle cx="7.5" cy="7.5" r="2.5" />
+      <circle cx="16.5" cy="16.5" r="2.5" />
+    </>
+  ),
+  map: () => (
+    <>
+      <path d="m9 4 6 2 5-2v14l-5 2-6-2-5 2V6z" />
+      <path d="M9 4v14M15 6v14" />
+    </>
+  ),
+  balcony: () => (
+    <>
+      <path d="M6 10V6a6 6 0 0 1 12 0v4" />
+      <path d="M4 10h16M4 10v10M20 10v10M8 13v7M12 13v7M16 13v7M3 20h18" />
+    </>
+  ),
+  shutter: () => (
+    <>
+      <rect x="3" y="4" width="18" height="16" rx="1" />
+      <path d="M3 8h18M3 12h18M3 16h18" />
+    </>
+  ),
 };
 
 export function Icon({ name, size = 24, filled = false, strokeWidth = 1.5, className, ...rest }: IconProps) {
@@ -609,7 +795,11 @@ export function Icon({ name, size = 24, filled = false, strokeWidth = 1.5, class
       className={cn("shrink-0", className)}
       {...rest}
     >
-      {PATHS[name](filled)}
+      {/* Icon names arrive from the DATABASE (amenities.icon, field_groups.icon,
+          field_config.key_specs[].icon), so an admin can name one this set has
+          never heard of. `PATHS[name](filled)` threw on that — a single bad row
+          would blank the whole detail screen. Unknown falls back to a dot. */}
+      {(PATHS[name] ?? PATHS.check)(filled)}
     </svg>
   );
 }
