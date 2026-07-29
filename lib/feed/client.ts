@@ -45,8 +45,15 @@ export interface FeedCard {
 }
 export interface FeedResult { items: FeedCard[]; nextCursor: string | null; sections: { label: string | null; items: FeedCard[] }[]; }
 
-export interface StorySegment { id: string; kind: "property" | "project"; cover: string | null; price: string; meta: string; areaLabel: string | null; available: boolean; }
-export interface StoryCircle { posterId: string; posterName: string; posterAvatar: string | null; verified: boolean; ring: "unseen" | "seen" | "project" | "boosted"; boosted: boolean; isProject: boolean; segments: StorySegment[]; }
+export interface StorySpec { icon: string; value: string; label: string }
+export interface StorySegment {
+  id: string; kind: "property" | "project"; cover: string | null; price: string; meta: string;
+  areaLabel: string | null; available: boolean;
+  /** Redesigned viewer (designs/P2A) — all server-resolved, see lib/feed/stories.ts. */
+  title: string; typeLabel: string | null; specs: StorySpec[]; negotiable: boolean;
+  subtitle: string | null; saved: boolean; postedLabel: string | null; href: string;
+}
+export interface StoryCircle { posterId: string; posterName: string; posterUsername: string | null; posterAvatar: string | null; verified: boolean; ring: "unseen" | "seen" | "project" | "boosted"; boosted: boolean; isProject: boolean; segments: StorySegment[]; }
 
 export const feedApi = {
   list: (opts: { filter?: string; sort?: string; cursor?: string | null } = {}) =>
@@ -70,6 +77,12 @@ export const interactionsApi = {
   toggleSave: (listingId: string) => req<{ saved: boolean }>("/saves", "POST", { listingId }),
   inquiry: (listingId: string, body: { message: string; intents?: string[]; shareNumber?: boolean }) =>
     req<{ sent: boolean; alreadySent: boolean }>("/inquiries", "POST", { listingId, ...body }),
+  /**
+   * The same endpoint, with a project as the subject (0084). A project chat is
+   * live immediately, so the reply carries the thread to open.
+   */
+  projectInquiry: (projectId: string, body: { message: string }) =>
+    req<{ sent: boolean; alreadySent: boolean; threadId: string | null }>("/inquiries", "POST", { projectId, ...body }),
   report: (subjectType: "listing" | "project" | "requirement", subjectId: string, reason: string, note?: string | null) =>
     req<{ reported: boolean }>("/reports", "POST", { subjectType, subjectId, reason, note }),
 };

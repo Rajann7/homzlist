@@ -116,7 +116,7 @@ export function renderAttrValue(def: FieldDefinitionRow | undefined, raw: unknow
  * inventing its own mapping. Order follows the type's field list, so the detail
  * screen reads in the same order the form was filled.
  */
-function attributeRows(
+export function attributeRows(
   attrs: Record<string, unknown>,
   type: PropertyTypeRow | null,
   defs: FieldDefinitionRow[] | undefined,
@@ -272,7 +272,12 @@ export function resolveKeySpecs(
     } else {
       value = renderAttrValue(byKey.get(s.field), raw);
     }
-    if (value === null || value === "" || value === "Yes") continue;
+    // A bare "0" is not a fact. A villa scheme stores `towers = 0`, so the
+    // strip's first tile read "Towers 0" — on the project story and on the P4
+    // detail alike. Zero counts are dropped and the next candidate takes the
+    // slot; a value that only CONTAINS a zero ("0 / 4" ground floor, "0%")
+    // still stands, because there the zero is the answer.
+    if (value === null || value === "" || value === "Yes" || value === "0") continue;
 
     out.push({ icon: s.icon, value, label, key: s.field });
     if (out.length === max) break;

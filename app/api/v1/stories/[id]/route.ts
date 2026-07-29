@@ -1,6 +1,7 @@
 import type { NextRequest } from "next/server";
 import { ok, fail } from "@/lib/api";
 import { rateLimit, clientIp } from "@/lib/auth/rate-limit";
+import { getCurrentUser } from "@/lib/auth/current-user";
 import { storySegment } from "@/lib/feed/stories";
 
 /**
@@ -18,7 +19,10 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   if (!UUID_RE.test(params.id)) return fail("NOT_FOUND");
   const limited = await rateLimit(`story-seg:${clientIp(req.headers)}`, 120, 60);
   if (!limited.allowed) return fail("RATE_LIMITED");
-  const seg = await storySegment(params.id);
+  // The viewer is only used for the segment's `saved` flag — everything else it
+  // returns is public. A guest gets the same payload with `saved:false`.
+  const claims = await getCurrentUser();
+  const seg = await storySegment(params.id, claims?.sub ?? null);
   if (!seg) return fail("NOT_FOUND");
   return ok({ segment: seg });
 }

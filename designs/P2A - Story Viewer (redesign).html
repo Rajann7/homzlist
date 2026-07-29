@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>P2A — Story Viewer (redesign v2)</title>
+<style>
+  :root{
+    --accent:#1db868; --accent-pressed:#17a05a; --warning:#ffb74d;
+    --ring-unseen-grad:linear-gradient(45deg,#1db868,#ffb74d);
+    --ring-boosted-grad:linear-gradient(45deg,#ffb74d,#ffd54f);
+    --font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  body{font-family:var(--font);background:#0b0b0c;color:#f5f5f5;padding:32px 16px 64px}
+  h1{font-size:20px;font-weight:700;text-align:center;margin-bottom:6px}
+  .sub{text-align:center;color:#8b8b90;font-size:13px;margin-bottom:28px}
+  .row{display:flex;gap:28px;flex-wrap:wrap;justify-content:center;align-items:flex-start}
+  .col{display:flex;flex-direction:column;align-items:center;gap:10px}
+  .cap{font-size:12px;color:#8b8b90;max-width:340px;text-align:center;line-height:1.5}
+  .phone{width:340px;height:720px;border-radius:38px;overflow:hidden;position:relative;
+    background:#000;box-shadow:0 24px 60px rgba(0,0,0,.6),0 0 0 8px #17171a;user-select:none}
+
+  /* ---------- photo layer: NEVER CROPPED ----------
+     back  = same image, blurred + scaled, fills the frame (no black bars)
+     front = the real photo, object-fit:contain — full photo, always            */
+  .fill{position:absolute;inset:0;background-size:cover;background-position:center;
+    filter:blur(34px) saturate(130%) brightness(.5);transform:scale(1.25)}
+  .stage{position:absolute;left:0;right:0;top:0;bottom:0;display:flex;align-items:center;justify-content:center}
+  .stage img{max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain;display:block}
+  .scrim-top{position:absolute;inset:0 0 auto 0;height:170px;pointer-events:none;
+    background:linear-gradient(to bottom,rgba(0,0,0,.66),rgba(0,0,0,.2) 55%,transparent)}
+  .scrim-bot{position:absolute;inset:auto 0 0 0;height:46%;pointer-events:none;
+    background:linear-gradient(to top,rgba(0,0,0,.82) 10%,rgba(0,0,0,.4) 45%,transparent)}
+
+  /* ---------- progress ---------- */
+  .bars{position:absolute;top:14px;left:12px;right:12px;display:flex;gap:4px;z-index:6}
+  .bar{flex:1;height:2.5px;border-radius:99px;background:rgba(255,255,255,.28);overflow:hidden}
+  .bar>i{display:block;height:100%;background:#fff;border-radius:99px;box-shadow:0 0 8px rgba(255,255,255,.5)}
+
+  /* ---------- header ---------- */
+  .head{position:absolute;top:28px;left:12px;right:8px;display:flex;align-items:center;gap:10px;z-index:6}
+  .ring{width:38px;height:38px;border-radius:50%;padding:2px;background:var(--ring-unseen-grad);flex:0 0 auto}
+  .ring.boost{background:var(--ring-boosted-grad)}
+  .ring>span{display:block;width:100%;height:100%;border-radius:50%;border:2px solid #000;background-size:cover;background-position:center}
+  .who{display:flex;flex-direction:column;min-width:0}
+  .nm{display:flex;align-items:center;gap:5px;font-size:13.5px;font-weight:650;letter-spacing:-.1px}
+  .nm b{font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px}
+  .tick{width:14px;height:14px;flex:0 0 auto}
+  .when{font-size:11px;color:rgba(255,255,255,.62);margin-top:1px}
+  .chip{font-size:9.5px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;padding:3px 7px;
+    border-radius:99px;background:rgba(255,183,77,.18);color:#ffcf8a;border:1px solid rgba(255,183,77,.35)}
+  .hbtn{margin-left:auto;width:40px;height:40px;display:grid;place-items:center;border:0;background:none;color:#fff;cursor:pointer}
+
+  /* ---------- bottom card ---------- */
+  .sheet{position:absolute;left:12px;right:12px;bottom:14px;z-index:6;border-radius:20px;padding:14px 14px 12px;
+    background:rgba(20,20,22,.55);backdrop-filter:blur(24px) saturate(140%);-webkit-backdrop-filter:blur(24px) saturate(140%);
+    border:1px solid rgba(255,255,255,.12);box-shadow:0 12px 40px rgba(0,0,0,.5)}
+  .ttl{display:flex;align-items:center;gap:6px;margin-bottom:4px}
+  .ttl h3{font-size:15.5px;font-weight:700;letter-spacing:-.2px;line-height:1.25;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0}
+  .ttl svg{opacity:.55;flex:0 0 auto}
+  .kicker{display:flex;align-items:center;gap:6px;font-size:11px;color:rgba(255,255,255,.72);margin-bottom:6px}
+  .kicker .dot{width:3px;height:3px;border-radius:50%;background:rgba(255,255,255,.45)}
+  .kicker .tag{padding:2.5px 7px;border-radius:6px;background:rgba(29,184,104,.18);color:#7ee2ab;
+    font-weight:700;font-size:10px;letter-spacing:.3px;text-transform:uppercase}
+  .price{display:flex;align-items:baseline;gap:8px}
+  .price b{font-size:23px;font-weight:800;letter-spacing:-.5px}
+  .price small{font-size:11px;color:rgba(255,255,255,.6);font-weight:600}
+
+  /* facts strip — as many columns as the type actually filled (2,3 or 4). */
+  .facts{display:flex;margin:10px 0 12px;border-radius:12px;background:rgba(255,255,255,.08);padding:8px 0}
+  .fact{flex:1;text-align:center;position:relative;min-width:0}
+  .fact+.fact::before{content:"";position:absolute;left:0;top:50%;transform:translateY(-50%);
+    width:1px;height:22px;background:rgba(255,255,255,.14)}
+  .fact u{display:flex;align-items:center;justify-content:center;gap:4px;text-decoration:none;font-size:13px;font-weight:700}
+  .fact u svg{opacity:.75;flex:0 0 auto}
+  .fact i{display:block;font-style:normal;font-size:10px;color:rgba(255,255,255,.55);margin-top:2px;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 4px}
+  .acts{display:flex;gap:8px}
+  .icobtn{width:46px;height:46px;flex:0 0 auto;border-radius:14px;border:1px solid rgba(255,255,255,.16);
+    background:rgba(255,255,255,.08);display:grid;place-items:center;color:#fff;cursor:pointer}
+  .cta{flex:1;height:46px;border:0;border-radius:14px;background:var(--accent);color:#fff;font-size:15px;
+    font-weight:700;font-family:var(--font);letter-spacing:-.1px;cursor:pointer;box-shadow:0 8px 20px rgba(29,184,104,.32)}
+  .cta:active{background:var(--accent-pressed)}
+  .view{flex:1;height:46px;border-radius:14px;border:1px solid rgba(255,255,255,.22);
+    background:rgba(255,255,255,.08);color:#fff;font-size:14px;font-weight:650;font-family:var(--font);
+    cursor:pointer;display:grid;place-items:center}
+  .cta.wide{flex:1.25}
+
+  /* ---------- sold ---------- */
+  .sold-wrap{position:absolute;inset:0;display:grid;place-items:center;z-index:5;padding:0 28px}
+  .sold{width:100%;border-radius:20px;padding:22px 18px;text-align:center;background:rgba(20,20,22,.66);
+    backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,.12)}
+  .sold .badge{width:46px;height:46px;border-radius:50%;display:grid;place-items:center;margin:0 auto 12px;background:rgba(255,255,255,.1)}
+  .sold h4{font-size:15.5px;font-weight:700;margin-bottom:4px}
+  .sold p{font-size:12.5px;color:rgba(255,255,255,.62);margin-bottom:16px}
+  .ghost{display:inline-block;padding:11px 20px;border-radius:99px;border:1px solid rgba(255,255,255,.28);
+    background:rgba(255,255,255,.08);color:#fff;font-size:13.5px;font-weight:650;cursor:pointer}
+  .dim{filter:grayscale(1);opacity:.4}
+
+  .note{max-width:900px;margin:44px auto 0;font-size:13px;line-height:1.75;color:#b6b6bb}
+  .note h3{font-size:14px;color:#fff;margin:20px 0 6px}
+  .note li{margin-left:18px}
+  .note code{background:#1c1c20;padding:1px 5px;border-radius:4px;font-size:12px}
+</style>
+</head>
+<body>
+
+<h1>P2A — Story Viewer (redesign v2)</h1>
+<div class="sub">Photo is never cropped · facts strip = the type's own key_specs, only the filled ones</div>
+
+<div class="row">
+
+  <!-- ============ 1. LANDSCAPE PHOTO — 4 filled specs ============ -->
+  <div class="col">
+  <div class="phone">
+    <div class="fill" style="background-image:url('https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=900&q=70')"></div>
+    <div class="stage"><img src="https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=900&q=70" alt="" /></div>
+    <div class="scrim-top"></div><div class="scrim-bot"></div>
+
+    <div class="bars">
+      <div class="bar"><i style="width:100%"></i></div>
+      <div class="bar"><i style="width:62%"></i></div>
+      <div class="bar"><i style="width:0"></i></div>
+      <div class="bar"><i style="width:0"></i></div>
+    </div>
+
+    <div class="head">
+      <span class="ring"><span style="background-image:url('https://images.unsplash.com/photo-1633332755192-727a05c4013d?w=200&q=60')"></span></span>
+      <span class="who">
+        <span class="nm"><b>Skyline Realty</b>
+          <svg class="tick" viewBox="0 0 24 24" fill="none"><path d="M12 2.5l2.4 1.8 3-.2 1 2.8 2.4 1.8-1 2.8 1 2.8-2.4 1.8-1 2.8-3-.2L12 21.5l-2.4-1.8-3 .2-1-2.8L3.2 15.3l1-2.8-1-2.8L5.6 7.9l1-2.8 3 .2z" fill="#1db868"/><path d="M8.6 12.2l2.3 2.3 4.5-4.6" stroke="#fff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </span>
+        <span class="when">2h ago · Bopal</span>
+      </span>
+      <span class="chip">Promoted</span>
+      <button class="hbtn" aria-label="Close"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg></button>
+    </div>
+
+    <div class="sheet">
+      <div class="ttl">
+        <h3>3 BHK in Shivalik Parkview</h3>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 5l7 7-7 7" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div class="kicker"><span class="tag">Flat</span><span class="dot"></span><span>Bopal, Ahmedabad</span></div>
+      <div class="price"><b>₹ 78.5 L</b><small>Negotiable</small></div>
+      <div class="facts">
+        <span class="fact"><u><svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M3 17v-4a2 2 0 012-2h14a2 2 0 012 2v4M3 17h18M3 17v2m18-2v2M6 11V8a1 1 0 011-1h10a1 1 0 011 1v3" stroke="#fff" stroke-width="1.7" stroke-linecap="round"/></svg>3 BHK</u><i>Bedrooms</i></span>
+        <span class="fact"><u><svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M4 12h16v3a4 4 0 01-4 4H8a4 4 0 01-4-4v-3zM7 12V6a2 2 0 014 0" stroke="#fff" stroke-width="1.7" stroke-linecap="round"/></svg>2</u><i>Baths</i></span>
+        <span class="fact"><u>1,450</u><i>Built-up sq.ft</i></span>
+        <span class="fact"><u>7 / 12</u><i>Floor</i></span>
+      </div>
+      <div class="acts">
+        <button class="icobtn" aria-label="Save"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M6 3h12a1 1 0 011 1v17l-7-4-7 4V4a1 1 0 011-1z" stroke="#fff" stroke-width="1.8" stroke-linejoin="round"/></svg></button>
+        <button class="view">View property</button>
+        <button class="cta wide">Send Inquiry</button>
+      </div>
+    </div>
+  </div>
+  <div class="cap">1 · Landscape photo — full photo visible, blurred copy fills the gap. Flat → 4 specs.</div>
+  </div>
+
+  <!-- ============ 2. PORTRAIT PHOTO — plot, only 3 specs filled ============ -->
+  <div class="col">
+  <div class="phone">
+    <div class="fill" style="background-image:url('https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=900&q=70')"></div>
+    <div class="stage"><img src="https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=700&q=70" alt="" style="max-height:100%" /></div>
+    <div class="scrim-top"></div><div class="scrim-bot"></div>
+
+    <div class="bars">
+      <div class="bar"><i style="width:100%"></i></div>
+      <div class="bar"><i style="width:35%"></i></div>
+      <div class="bar"><i style="width:0"></i></div>
+    </div>
+
+    <div class="head">
+      <span class="ring"><span style="background-image:url('https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=200&q=60')"></span></span>
+      <span class="who"><span class="nm"><b>Meera Shah</b></span><span class="when">5h ago · Sanand</span></span>
+      <button class="hbtn" aria-label="Close"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg></button>
+    </div>
+
+    <div class="sheet">
+      <div class="ttl">
+        <h3>NA plot on 40ft road, Sanand</h3>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 5l7 7-7 7" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div class="kicker"><span class="tag">Plot</span><span class="dot"></span><span>Sanand, Ahmedabad</span></div>
+      <div class="price"><b>₹ 42 L</b></div>
+      <div class="facts">
+        <span class="fact"><u>2,400</u><i>Land sq.ft</i></span>
+        <span class="fact"><u>40 ft</u><i>Frontage</i></span>
+        <span class="fact"><u>NA</u><i>NA / Kheti</i></span>
+      </div>
+      <div class="acts">
+        <button class="icobtn" aria-label="Saved"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M6 3h12a1 1 0 011 1v17l-7-4-7 4V4a1 1 0 011-1z" fill="#fff" stroke="#fff" stroke-width="1.8" stroke-linejoin="round"/></svg></button>
+        <button class="view">View property</button>
+        <button class="cta wide">Send Inquiry</button>
+      </div>
+    </div>
+  </div>
+  <div class="cap">2 · Portrait photo + a Plot: 3 columns, evenly split — never a blank 4th cell.</div>
+  </div>
+
+  <!-- ============ 3. PROJECT ============ -->
+  <div class="col">
+  <div class="phone">
+    <div class="fill" style="background-image:url('https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=900&q=70')"></div>
+    <div class="stage"><img src="https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=900&q=70" alt="" /></div>
+    <div class="scrim-top"></div><div class="scrim-bot"></div>
+
+    <div class="bars">
+      <div class="bar"><i style="width:100%"></i></div>
+      <div class="bar"><i style="width:100%"></i></div>
+      <div class="bar"><i style="width:48%"></i></div>
+      <div class="bar"><i style="width:0"></i></div>
+    </div>
+
+    <div class="head">
+      <span class="ring boost"><span style="background-image:url('https://images.unsplash.com/photo-1560250097-0b93528c311a?w=200&q=60')"></span></span>
+      <span class="who">
+        <span class="nm"><b>Anand Builders</b>
+          <svg class="tick" viewBox="0 0 24 24" fill="none"><path d="M12 2.5l2.4 1.8 3-.2 1 2.8 2.4 1.8-1 2.8 1 2.8-2.4 1.8-1 2.8-3-.2L12 21.5l-2.4-1.8-3 .2-1-2.8L3.2 15.3l1-2.8-1-2.8L5.6 7.9l1-2.8 3 .2z" fill="#1db868"/><path d="M8.6 12.2l2.3 2.3 4.5-4.6" stroke="#fff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </span>
+        <span class="when">3h ago · Shela</span>
+      </span>
+      <span class="chip">Promoted</span>
+      <button class="hbtn" aria-label="Close"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg></button>
+    </div>
+
+    <div class="sheet">
+      <div class="ttl">
+        <h3>Anand Sky Residences</h3>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 5l7 7-7 7" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div class="kicker"><span class="tag">Township</span><span class="dot"></span><span>Shela, Ahmedabad</span></div>
+      <div class="price"><b>₹ 65 L – 1.4 Cr</b><small>2, 3, 4 BHK</small></div>
+      <div class="facts">
+        <span class="fact"><u>6</u><i>Towers</i></span>
+        <span class="fact"><u>G+14</u><i>Floors</i></span>
+        <span class="fact"><u>420</u><i>Units</i></span>
+        <span class="fact"><u>Dec 27</u><i>Possession</i></span>
+      </div>
+      <div class="acts">
+        <button class="icobtn" aria-label="Save"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M6 3h12a1 1 0 011 1v17l-7-4-7 4V4a1 1 0 011-1z" stroke="#fff" stroke-width="1.8" stroke-linejoin="round"/></svg></button>
+        <button class="view">View project</button>
+        <button class="cta wide">Send Inquiry</button>
+      </div>
+    </div>
+  </div>
+  <div class="cap">3 · Project — title is the scheme name, price band + unit types, project key_specs.</div>
+  </div>
+
+  <!-- ============ 4. SOLD ============ -->
+  <div class="col">
+  <div class="phone">
+    <div class="fill" style="background-image:url('https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=900&q=70')"></div>
+    <div class="stage"><img class="dim" src="https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=900&q=70" alt="" /></div>
+    <div class="scrim-top"></div>
+
+    <div class="bars">
+      <div class="bar"><i style="width:100%"></i></div>
+      <div class="bar"><i style="width:30%"></i></div>
+    </div>
+    <div class="head">
+      <span class="ring boost"><span style="background-image:url('https://images.unsplash.com/photo-1560250097-0b93528c311a?w=200&q=60')"></span></span>
+      <span class="who"><span class="nm"><b>Anand Builders</b></span><span class="when">Yesterday · Prahladnagar</span></span>
+      <button class="hbtn" aria-label="Close"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg></button>
+    </div>
+
+    <div class="sold-wrap">
+      <div class="sold">
+        <div class="badge"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M4 20l16-16M12 3a9 9 0 100 18 9 9 0 000-18z" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/></svg></div>
+        <h4>No longer available</h4>
+        <p>This property was taken down by the poster.</p>
+        <button class="ghost">Browse similar in Prahladnagar</button>
+      </div>
+    </div>
+  </div>
+  <div class="cap">4 · Sold mid-24h — card over the dimmed photo, with a real next step.</div>
+  </div>
+
+</div>
+
+<div class="note">
+  <h3>1 · The photo is never cropped</h3>
+  <ul>
+    <li>Front layer is <code>object-fit: contain</code> — the whole photo, whatever its ratio. A 4:3 shot loses nothing; a tall shot loses nothing.</li>
+    <li>The leftover space is filled by the <b>same photo, blurred and scaled</b> — so there are no black bars and the frame still feels full-bleed.</li>
+    <li>Top/bottom scrims sit above the photo so the header and the card stay legible on a bright image.</li>
+  </ul>
+
+  <h3>2 · The facts strip is the type's own key_specs</h3>
+  <ul>
+    <li>Source is already in the DB: <code>property_types.field_config.key_specs</code> / <code>project_types…</code> — 8 candidates per type, ordered by what a buyer of that type cares about (migration 0071).</li>
+    <li>The strip takes the <b>first 4 that actually have a value</b> and renders exactly that many columns. A Plot with 3 → 3 equal columns; nothing is ever blank.</li>
+    <li>The candidate list starts with the fields that type <b>requires</b>, so the strip is effectively always full — and it is the same set the P4 detail screen shows, so the story and the detail never disagree.</li>
+    <li>Zero field names in the component. Changing a type's strip stays an admin/DB change with no deploy (CLAUDE.md rule 7).</li>
+  </ul>
+
+  <h3>3 · Title and the way out to the detail screen</h3>
+  <ul>
+    <li><b>Title</b> is the first line of the card: <code>listings.title</code> for a property, <code>projects.name</code> for a project. One line, ellipsis — the story finally says WHAT the listing is, not just its price.</li>
+    <li>The title row carries a chevron and is itself tappable → P4 detail. Same destination as the explicit <b>View property / View project</b> button in the action row, and the same as swipe-up.</li>
+    <li>Share moved out of the story (it lives on the detail screen) so the action row stays three targets: Save · View · Send Inquiry, all ≥44px.</li>
+  </ul>
+
+  <h3>4 · About a VIEW COUNT on the story</h3>
+  <ul>
+    <li>View / save / lead counts are <b>owner-only</b> today — <code>ownerExtras()</code> in <code>lib/listings/dto.ts</code> strips them for everybody else, and the story viewer's own rule is "no view-count ever exposed" (Doc2 §9.3).</li>
+    <li>So this design shows a "View property" ACTION, not a public views number. If you want the number too, it can only be shown to the poster viewing their own story — say the word and I will add an owner-only line there.</li>
+  </ul>
+
+  <h3>5 · What the /stories endpoint must start returning</h3>
+  <ul>
+    <li><code>title</code>, <code>listingId</code> / <code>projectId</code> + <code>href</code> for the detail route.</li>
+    <li><code>keySpecs: { label, value, icon }[]</code> — built by the same <code>detailBlocks</code> helper the detail DTO uses, so there is one builder, not two.</li>
+    <li><code>typeLabel</code> (Flat / Plot / Township…), <code>areaLabel</code>, <code>postedAt</code>, <code>negotiable</code>, <code>unitTypes</code> (projects), <code>saved</code>.</li>
+    <li>Nothing here is new data — every one of these already exists on the listing/project row.</li>
+  </ul>
+</div>
+
+</body>
+</html>

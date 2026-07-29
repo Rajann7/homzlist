@@ -39,7 +39,10 @@
     "test:create-flow": "node scripts/test-create-flow-live.mjs",
     "check:my-listings": "node scripts/check-my-listings-projects.mjs",
     "check:project-lifecycle": "node scripts/check-project-lifecycle.mjs",
-    "check:purge-storage": "node scripts/check-purge-storage.mjs"
+    "check:purge-storage": "node scripts/check-purge-storage.mjs",
+    "check:messages": "node scripts/check-messages-live.mjs",
+    "check:inbox": "node scripts/check-inbox-live.mjs",
+    "check:story": "node scripts/check-story-live.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1091.0",

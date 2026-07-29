@@ -3200,3 +3200,135 @@ object untouched (404), unauthenticated 401.
   database. Both now separate offline (the design's banner) from a failed read
   (an error state with Retry) from genuinely empty, and neither invents an
   answer the server never gave.
+
+---
+
+## Messages / Chat audit (Module 7 re-walk) — open items
+
+The chat module was walked line by line against the full Messages spec. What
+was broken is fixed and proven live (`npm run check:messages` — 100 checks).
+Three things are genuinely out of scope and are tracked here rather than left
+to be discovered by a real user.
+
+- **Admin read-only chat has no surface yet.** The spec says admin may read a
+  reported message's context and can NEVER send (blocked at API level, even
+  under impersonation). The API-level half is real today: every chat mutation
+  goes through `requireActive()`, which is a plain participant check with no
+  admin branch — an admin session is simply not a participant, so there is no
+  path for an admin to post. The READ side does not exist because the admin
+  module (P13-15) is not built: `reports` rows with `subject_type='message'`
+  are being written and are waiting for a queue to display them. When that
+  module lands it needs a service-role reader that shows deleted messages as
+  "deleted by user" (the tombstone data is already retained for exactly this,
+  for 30 days — `lib/chat/retention.ts`).
+
+- **"Leads grouped by source" has no design.** The spec asks for property leads
+  / requirement proposals / project leads as groups. The source is now a real,
+  correct column on every lead (migration 0081 added `project` as a source, and
+  accepting an inquiry/proposal files the row with its own kind), it is exposed
+  as `sourceLabel` on the leads payload and as a Source column in the CSV
+  export. The P8 Leads screen groups by STAGE, not source, and inventing a
+  second grouping would be a design change — needs Rajan's call.
+
+- **Chat retention purges dormant threads at 12 months.** "Chats survive
+  listing archive / expiry / deletion" is satisfied structurally
+  (`chat_threads.listing_id` is `on delete set null`, so the conversation
+  outlives the listing). Separately, `runChatRetention()` deletes threads with
+  no message in 365 days as a data-minimisation measure (Doc9 §26). That is a
+  policy decision, not a bug, but it is the one way a thread can disappear —
+  flagging it in case the intent is that chats are kept forever.
+
+---
+
+## Messages rebuilt around the subject (Rajan, 29 Jul 2026) — open items
+
+The inbox is now a list of subjects (property / project / requirement) split
+into two sections — Received (threads on my posts) and Sent (threads I opened on
+someone else's). Projects became a chat subject at the same time (migration
+0084). Proven live by `npm run check:inbox` (47 checks) with `npm run
+check:messages` still at 105/105. What is NOT done, and why:
+
+- **A project thread does not record WHICH unit the buyer asked about.** The
+  builder's card was designed to prefix every chat with its unit type ("3 BHK ·
+  Send the payment plan"). The unit exists only inside the message body today —
+  a unit-level "Enquire" prefills the message with it, which is real but not
+  queryable. Making that prefix real needs `chat_threads.unit_id` (→
+  `project_units`) and a unit picker on the inquiry sheet. Deliberately not
+  faked in the UI.
+
+- **The old 4-tab endpoint is now unreferenced by any screen.**
+  `GET /api/v1/chat/threads` and `getThreads()` (My Listings / My Inquiries /
+  Requirement Leads / My Responses) are still served, still authorised, and
+  still exercised by `check:messages` — but no component calls them since the
+  inbox replaced the tabs. They should be retired once the new home has lived
+  through a release; deleting them now would blind that suite for no gain.
+
+- **A project inquiry writes no `inquiries` row.** That table is listing-only
+  (`listing_id not null`, 0026), so a project inquiry's record IS its thread.
+  Consequence: the intent chips ("Site visit?", "Negotiable?") and the
+  share-number toggle do not exist for projects — the sheet hides them rather
+  than showing controls that would persist nothing. If the spec later wants
+  intents on a project, `inquiries` needs a nullable `listing_id` + `project_id`
+  and every reader of it needs revisiting.
+
+- **Two doors now open onto one project lead.** Tapping Call/WhatsApp on a
+  project and starting a project chat both upsert the same
+  `(owner, lead_profile, project)` row. Both now file it under source
+  `project` — that was a real inconsistency, fixed here: `recordProjectLead`
+  was writing `inquiry`, so a builder's pipeline showed project leads as
+  "Property lead" depending on which door the person came through. Migration
+  0085 repaired the 11 rows already written. Worth knowing that the row's
+  `last_activity` is whichever door was used most recently.
+
+- **Admin read-only chat still has no surface** (unchanged from the audit above)
+  — and a project thread is now another thing that queue will need to render.
+
+Found and fixed while walking this, rather than left for a user to hit:
+  * the Requests screen opened on the "Verified" tab unconditionally, so a
+    poster with five unverified requests and no verified ones saw "No message
+    requests" while the header said 5 — it now opens on the tab that has them;
+  * a project request arrived on that screen with no subject card at all
+    (`getRequests` only ever built listing/requirement cards), so the builder
+    was asked to accept a stranger with no way to see what they were asking
+    about.
+
+## P2 story viewer redesign (29 Jul 2026)
+
+Found while rebuilding the fullscreen story on designs/P2A:
+
+- **The "no longer available" state had never rendered for anybody.**
+  `getStories` only returns `availability = 'available'` rows and the viewer
+  read that list once at mount, so a listing that sold mid-window simply kept
+  showing its price. `GET /api/v1/stories/:id` — the endpoint that exists to
+  answer `available:false` — had NO caller anywhere in the app. The viewer now
+  re-reads each segment as it comes on screen (and treats a 404, i.e. taken
+  down entirely, the same way), which is what makes that screen reachable.
+
+- **A view COUNT cannot be shown on a story, by construction.** Views/saves/
+  leads are owner-only (`ownerExtras`, lib/listings/dto.ts) and Doc2 §9.3 bans
+  exposing a story view-count. An owner-only line would also be dead code:
+  `getStories` excludes the viewer's own listings (`neq profile_id`), so a
+  poster can never open their own story. If poster-side story stats are wanted,
+  they belong on P9/Insights, not in the viewer.
+
+- **A project has no Save.** `saves` is listing-scoped (`listing_id not null`),
+  so the project story shows View project + Send Inquiry and no bookmark,
+  rather than a control that would persist nothing. Saving a project needs a
+  `saves.project_id` (or a `saved_projects` table) and every reader revisited.
+
+- **Story photos are still public-bucket URLs.** Unchanged from the earlier
+  note — a private story bucket with signed 24h URLs is still the hardening.
+
+Found and fixed while walking this, rather than left for a user to hit:
+  * the cover photo was `object-cover`-ed into a 9:16 frame, so every landscape
+    listing photo lost its top and bottom in the story — it is now the whole
+    photo (`object-contain`) over a blurred copy of itself;
+  * the strip was a `bhk · sqft · area` STRING, not the type's key specs, so a
+    plot/shop/office story showed facts that type never had — it now runs the
+    same `resolveKeySpecs` + `topUpSpecs` pair as the P4 detail;
+  * a project's story printed the scheme NAME where every property printed a
+    price, and no price anywhere — it now shows the unit price band;
+  * `resolveKeySpecs` printed a bare "0" as a fact, so a villa scheme with
+    `towers = 0` opened its strip with "Towers 0" — on the project story AND on
+    the P4 project detail. Zero counts are dropped and the next candidate takes
+    the slot; "0 / 4" (ground floor) and "0%" still stand.
