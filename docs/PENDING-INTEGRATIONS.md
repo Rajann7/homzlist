@@ -3908,3 +3908,22 @@ the admin build, when Rajan gives the emails.
   had — "already refunded", "already hidden", "no device on record" — was dead
   code that fell through to "That didn't go through". Fixed in all three.
   **Worth checking in any screen written against this helper.**
+
+## Module 11 Part 8 — A15 grants
+
+- **A15 grants only trials, not the other two grant kinds.** The `grants` table
+  already holds `balance` and `credit` rows from the seed; this screen creates
+  and revokes plan trials, which is the kind with a real entitlement behind it.
+  Adjusting a wallet balance is A11's "Adjust balance" and needs the wallet
+  ledger, which does not exist yet — neither screen offers it.
+
+- **A grant is one account at a time, deliberately.** A10's bulk bar links here
+  rather than offering "grant to N": each grant needs its own plan, duration and
+  reason on its own audit row, and a bulk dialog would either invent one reason
+  for everybody or silently reuse it.
+
+- **Nothing enforces the grant when it expires except the existing plan sweep.**
+  A granted plan is an ordinary `user_plans` row with `expires_at`, so
+  `expirePlans` in lib/billing/service.ts retires it exactly like a bought one.
+  That sweep is cron-triggered work, tracked with A27 above — the grant does not
+  add a second timer, which is the point.

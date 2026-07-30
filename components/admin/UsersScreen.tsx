@@ -309,10 +309,14 @@ export function UsersScreen({
           <Btn kind="outline" style={{ height: 32, fontSize: 13 }} disabled={!canSuspend || busy} tooltip="Admin only" onClick={() => setBulk("message")}>
             Send message
           </Btn>
-          {/* Grants are A15's screen and its own quota rules — there is no
-              endpoint behind this yet, so the button is not drawn rather than
-              drawn dead. */}
-          {canGrant && null}
+          {/* A grant is per-account, with its own plan, duration and reason —
+              there is no sensible bulk shape for it, so the bulk bar sends the
+              admin to A15 rather than pretending one dialog could do N. */}
+          {canGrant && (
+            <Btn kind="outline" style={{ height: 32, fontSize: 13 }} onClick={() => router.push("/plans/grants")}>
+              Grant a plan →
+            </Btn>
+          )}
           <button type="button" onClick={() => setSelected([])} className="text-[13px] font-semibold" style={{ color: "var(--accent)" }}>
             Clear
           </button>
