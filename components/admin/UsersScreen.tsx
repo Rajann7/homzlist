@@ -539,8 +539,10 @@ export function UsersScreen({
           items={[
             { label: "Open user", onSelect: () => router.push(`/users/${menu.row.id}`) },
             {
-              label: "Impersonate (read-only)",
-              onSelect: () => show("Impersonation arrives with A31"),
+              // A31 starts from the user's own panel, where the reason field
+              // and the consequences are in front of the admin asking for it.
+              label: "Open in user view (read-only)",
+              onSelect: () => router.push(`/users/${menu.row.id}?impersonate=1`),
               disabled: !canImpersonate,
               tooltip: "Admin only",
             },

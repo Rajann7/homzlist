@@ -16,7 +16,13 @@ import { UserDetailScreen } from "@/components/admin/UserDetailScreen";
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
 
-export default async function UserDetailPage({ params }: { params: { id: string } }) {
+export default async function UserDetailPage({
+  params,
+  searchParams,
+}: {
+  params: { id: string };
+  searchParams: { impersonate?: string };
+}) {
   const session = await currentStaff();
   if (!session.ok) redirect("/login");
   if (!can(session.staff.level, "users.edit")) redirect("/");
@@ -29,6 +35,7 @@ export default async function UserDetailPage({ params }: { params: { id: string 
       detail={detail}
       can={{ users: can(session.staff.level, "users.edit"), ban: can(session.staff.level, "devicebans") }}
       suspendDurations={durations.map((d) => ({ value: d.value, label: d.label }))}
+      openImpersonate={searchParams.impersonate === "1"}
     />
   );
 }

@@ -131,7 +131,11 @@ export async function usersPage(filters: UserFilters, page = 1, pageSize = 50): 
   if (filters.q) {
     // Name, handle or phone. `or` on a quoted pattern, so a comma or a paren in
     // the search box cannot break out of the filter expression.
-    const safe = filters.q.replace(/[%,()"\\]/g, " ").trim();
+    // The value is DOUBLE-QUOTED inside the `or` expression, so a comma or a
+    // paren in the search box is just a character and cannot split the filter
+    // list. Only the quote and the backslash have to be escaped — stripping
+    // punctuation instead would silently fail to find "R.K. Properties".
+    const safe = filters.q.trim().replace(/["\\]/g, (c) => `\\${c}`);
     if (safe) q = q.or(`name.ilike."%${safe}%",username.ilike."%${safe}%",phone.ilike."%${safe}%"`);
   }
   if (filters.role) q = q.eq("role", filters.role);

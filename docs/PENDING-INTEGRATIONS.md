@@ -3845,3 +3845,34 @@ the admin build, when Rajan gives the emails.
   two.** There is no phone-verification row to read: an account cannot exist
   without passing OTP, so a phone tick would be true for every row and would be
   decoration, not data. Recorded as a deliberate deviation.
+
+## Module 11 Part 7 — A12 and A31
+
+- **A12 has the table, the chips and the filters, not the full edit panel.**
+  Doc5 asks for "row → full edit panel (every field A-Z editable — SOP banner:
+  'compliance edits only, logged')". What exists is the master table with real
+  status counts, the filters, and the two verbs that apply in any state (hide,
+  make visible again), plus links across to A4 for anything in a review state
+  and to A11 for the poster. **The A-to-Z editor is not built** — it needs the
+  same field config the create flow uses, so it should reuse Module 5's field
+  definitions rather than grow a second copy. Also not built: bulk actions,
+  saved views/columns/export on this screen, story-remove, boost pause/resume
+  and per-entity timeline.
+
+- **Trash is listed but not actionable.** The "Trash 143" chip filters to
+  `status = deleted` and shows the rows. Restore and purge are A29's screen and
+  are not wired here; the row menu deliberately refuses to hide something that
+  is already in the trash rather than offering a verb that would do nothing.
+
+- **A31 never mints a user session, and that is the design decision to know
+  about.** The admin cookie is host-only to account.<domain> (Doc9 §21); handing
+  an admin a seller session would put a real, writable identity in their browser
+  that no amount of read-only UI could take back. So "open in user view" renders
+  the user's own data — plan and quota, listings, requirement count — read-only
+  inside the panel, under an `impersonation_sessions` row, with
+  `impersonate_start` and `impersonate_end` both audited. Nothing that sends,
+  pays or messages is rendered at all.
+  **The consequence, stated plainly:** an admin cannot reproduce a bug that only
+  shows up in the real user app this way. If Rajan wants true session
+  impersonation, it is a security decision with its own design (scoped token,
+  hard expiry, a banner the user side renders itself), not a UI change.

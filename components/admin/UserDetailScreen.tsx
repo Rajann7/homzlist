@@ -27,11 +27,14 @@ export function UserDetailScreen({
   detail,
   can,
   suspendDurations,
+  openImpersonate,
 }: {
   detail: UserDetail;
   /** What this seat may do — the same map the endpoint re-checks. */
   can: { users: boolean; ban: boolean };
   suspendDurations: Array<{ value: string; label: string }>;
+  /** A10's row menu links here with ?impersonate=1 — open the dialog on arrival. */
+  openImpersonate?: boolean;
 }) {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("overview");
@@ -40,7 +43,9 @@ export function UserDetailScreen({
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [dialog, setDialog] = useState<null | "suspend" | "lift" | "role" | "message" | "ban">(null);
+  const [dialog, setDialog] = useState<null | "suspend" | "lift" | "role" | "message" | "ban" | "impersonate">(
+    openImpersonate ? "impersonate" : null,
+  );
 
   const show = (m: string) => {
     setToast(m);
@@ -82,6 +87,24 @@ export function UserDetailScreen({
     setBusy(true);
     setError(null);
     try {
+      // A31 is its own endpoint — it opens an audited session rather than
+      // changing anything about the account.
+      if (payload.action === "impersonate") {
+        const r = await fetch("/api/v1/admin/impersonation", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ action: "start", profileId: detail.id, reason: payload.reason }),
+          cache: "no-store",
+        });
+        const j = await r.json().catch(() => null);
+        if (!r.ok || !j?.ok) {
+          setError(j?.error?.code === "FORBIDDEN" ? "Your role cannot open a user view." : "That session could not be started.");
+          return false;
+        }
+        router.push(`/users/${detail.id}/view?session=${j.data.sessionId}`);
+        return true;
+      }
+
       const r = await fetch(`/api/v1/admin/users/${detail.id}/actions`, {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -176,6 +199,9 @@ export function UserDetailScreen({
         )}
         <Btn kind="outline" style={{ height: 34, fontSize: 13 }} disabled={!can.users} tooltip="Admin only" onClick={() => setDialog("role")}>
           Change role
+        </Btn>
+        <Btn kind="outline" style={{ height: 34, fontSize: 13 }} disabled={!can.users} tooltip="Admin only" onClick={() => setDialog("impersonate")}>
+          Open in user view
         </Btn>
         {can.ban && (
           <Btn kind="danger" style={{ height: 34, fontSize: 13 }} onClick={() => setDialog("ban")}>
@@ -504,7 +530,7 @@ function ActionDialog({
   onClose,
   onConfirm,
 }: {
-  kind: "suspend" | "lift" | "role" | "message" | "ban";
+  kind: "suspend" | "lift" | "role" | "message" | "ban" | "impersonate";
   name: string;
   role: string | null;
   durations: Array<{ value: string; label: string }>;
@@ -525,6 +551,11 @@ function ActionDialog({
     role: { title: `Change ${name}'s role?`, cta: "Change role", note: "The role decides which plans and quotas apply. They are notified." },
     message: { title: `Message ${name}`, cta: "Send", note: "They read this exactly as written, in their notifications." },
     ban: { title: "Ban device / IP?", cta: "Ban", note: "HomzList never stores the raw address — the ban is keyed on its salted hash." },
+    impersonate: {
+      title: `Open user view as ${name}?`,
+      cta: "Start session",
+      note: "You will see their account exactly as they do. Nothing that sends, pays or messages is rendered, and no user session is created. The session is logged with your name, and so is the moment you end it.",
+    },
   }[kind];
 
   const valid =
@@ -541,6 +572,7 @@ function ActionDialog({
     else if (kind === "lift") onConfirm({ action: "lift", reason: reason.trim() }, "Suspension lifted");
     else if (kind === "role") onConfirm({ action: "role", role: nextRole, reason: reason.trim() }, "Role changed");
     else if (kind === "message") onConfirm({ action: "message", subject: subject.trim(), body: message.trim() }, "Message sent");
+    else if (kind === "impersonate") onConfirm({ action: "impersonate", reason: reason.trim() }, "Session started");
     else onConfirm({ action: "ban_device", reason: reason.trim() }, "Device banned");
   };
 
