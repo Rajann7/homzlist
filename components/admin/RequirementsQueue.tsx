@@ -7,7 +7,6 @@ import type { QueueRow, QueueTab } from "@/lib/admin/queues";
 import type { ReviewDetail } from "@/lib/admin/review";
 import { RiskBadge, StatusBadge, SlaText, Initials } from "./queueBits";
 import {
-  Badge,
   Btn,
   Modal,
   NoteBlock,
@@ -345,17 +344,15 @@ function RequirementSheet({
           </div>
         ) : (
           <>
-            {detail.lock && !detail.lock.mine && (
-              <div className="mb-3">
-                <NoteBlock tone="warning">
-                  {detail.lock.lockedByName} is reviewing this requirement — it is read-only for you.
-                </NoteBlock>
-              </div>
-            )}
+            {/* Unlocked | Locked render tabs — the design's first element in this
+                sheet. The locked view is the server's own strip for a non-paying
+                broker, not a CSS blur.
 
-            {/* Unlocked | Locked render tabs. The masked figures are produced by
-                the same server strip a non-paying broker gets, so this really is
-                the locked view and not a CSS blur. */}
+                DEVIATION note: the "X is reviewing this" banner that used to sit
+                above the pill is gone, the same way Part 2 dropped A4's is-locked
+                banner. The design has no banner here, the table already refuses
+                to open a row another admin holds, and the footer buttons carry
+                the disabled + tooltip treatment for the race. */}
             <div className="mb-3 inline-flex rounded-full p-[3px]" style={{ background: "var(--surface-2)" }}>
               {(["unlocked", "locked"] as const).map((v) => (
                 <button
@@ -382,9 +379,6 @@ function RequirementSheet({
                   <p className="mt-2 text-[13px]" style={{ color: "var(--ink-tertiary)" }}>
                     Unlock with a plan to see full details
                   </p>
-                  <p className="mt-1 text-[11px]" style={{ color: "var(--ink-tertiary)" }}>
-                    {maskBudget(detail.preview.priceLabel)} · {detail.preview.metaLine || detail.preview.typeLine}
-                  </p>
                 </div>
               ) : (
                 <>
@@ -399,30 +393,10 @@ function RequirementSheet({
               )}
             </div>
 
-            <SecHead>Risk</SecHead>
-            <div className="rounded-8 p-3" style={{ background: "var(--error-soft)" }}>
-              <div className="mb-2">
-                <RiskBadge risk={detail.risk} />
-              </div>
-              {detail.risk.reasons.length === 0 ? (
-                <p className="text-[11px]" style={{ color: "var(--ink-secondary)" }}>
-                  Nothing flagged — this requirement scored zero.
-                </p>
-              ) : (
-                detail.risk.reasons.map((r) => (
-                  <div key={r.code} className="mb-1 flex items-center gap-2 text-[11px]" style={{ color: "var(--ink-secondary)" }}>
-                    <span style={{ color: "var(--error)" }}>
-                      <Icon name="alert" size={14} />
-                    </span>
-                    <span className="flex-1">{r.label}</span>
-                    <span className="font-bold" style={{ color: "var(--error)" }}>
-                      +{r.points}
-                    </span>
-                  </div>
-                ))
-              )}
-            </div>
-
+            {/* The design's reqdetail has exactly two sections — Submitted fields
+                and SOP checklist. The Risk block that used to sit here is gone;
+                the risk band and score stay visible in the queue table's own Risk
+                column, which is where the design puts them. */}
             <SecHead>Submitted fields</SecHead>
             {detail.fields.map((f) => (
               <div key={f.key} className="flex border-t py-[6px]" style={{ borderColor: "var(--divider)" }}>
@@ -465,31 +439,11 @@ function RequirementSheet({
               </div>
             ))}
 
-            <SecHead>Location</SecHead>
-            <p className="text-[13px]" style={{ color: "var(--ink-primary)" }}>
-              {detail.locationTrail.length ? detail.locationTrail.join(" › ") : "No location saved"}
-            </p>
-
-            {detail.history.length > 0 && (
-              <>
-                <SecHead>Prior history</SecHead>
-                <div className="text-[11px] leading-[1.8]" style={{ color: "var(--ink-tertiary)" }}>
-                  {detail.history.map((h, i) => (
-                    <div key={`${h.at}-${i}`}>
-                      {h.dateLabel} — {h.text}
-                    </div>
-                  ))}
-                  {detail.rejects.count > 0 && (
-                    <div className="mt-[6px]">
-                      <Badge bg="var(--warning-soft)" fg="var(--warning)" plain>
-                        {detail.rejects.count} of {detail.rejects.max} rejections used
-                      </Badge>
-                    </div>
-                  )}
-                </div>
-              </>
-            )}
-
+            {/* No Location section: the design's own row set already carries
+                "Preferred areas", which is the same `area_label` the trail was
+                rendering. No Prior history either — the design has no such block
+                and the reject counter it carried is re-stated inside the reject
+                dialog, where it changes the decision. */}
             <SecHead>SOP checklist</SecHead>
             {detail.sop.map((item) => (
               <label
@@ -534,14 +488,6 @@ function RequirementSheet({
       )}
     </>
   );
-}
-
-/**
- * The locked view's budget, masked exactly the way the server masks it for a
- * non-paying broker: the magnitude survives, the digits do not.
- */
-function maskBudget(label: string): string {
-  return label.replace(/\d/g, "0");
 }
 
 function RejectRequirement({

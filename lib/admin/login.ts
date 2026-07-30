@@ -6,10 +6,43 @@ import { signAdminToken, setAdminCookie, startAdminSession } from "@/lib/admin/s
 import { createServiceClient } from "@/lib/supabase/server";
 import { audit } from "@/lib/admin/audit";
 
-export const loginUrl = (params: Record<string, string>) => {
-  const base = (publicEnv.adminUrl || "http://account.localhost:3000").replace(/\/$/, "");
+/**
+ * Where the panel lives, as a base URL with no trailing slash.
+ *
+ * `NEXT_PUBLIC_ADMIN_URL` carries a port (3000 by default), so a dev server that
+ * had to take another port — autoPort in .claude/launch.json does exactly that —
+ * used to be thrown back to :3000 the moment it signed in, onto a server that is
+ * either dead or somebody else's. So when a request is in hand, the base follows
+ * the host the request ACTUALLY arrived on.
+ *
+ * It is not an open redirect: the request's host is only trusted when its
+ * hostname matches the configured admin hostname, so a spoofed Host header falls
+ * back to env. Only the port — the one part that legitimately moves in dev — can
+ * come from the request.
+ */
+export function adminBase(req?: Request): string {
+  const configured = (publicEnv.adminUrl || "http://account.localhost:3000").replace(/\/$/, "");
+  if (!req) return configured;
+  // The Host header, NOT req.url: Next normalises a rewritten request's url to
+  // the bound origin, so req.url reads "http://localhost:50674/…" and has already
+  // lost the `account.` label the browser actually asked for.
+  const host = req.headers.get("host");
+  if (!host) return configured;
+  try {
+    const want = new URL(configured);
+    if (host.split(":")[0].toLowerCase() === want.hostname) {
+      const proto = req.headers.get("x-forwarded-proto")?.split(",")[0].trim() || want.protocol.replace(":", "");
+      return `${proto}://${host}`;
+    }
+  } catch {
+    /* fall through to the configured base */
+  }
+  return configured;
+}
+
+export const loginUrl = (params: Record<string, string>, req?: Request) => {
   const q = new URLSearchParams(params).toString();
-  return `${base}/login${q ? `?${q}` : ""}`;
+  return `${adminBase(req)}/login${q ? `?${q}` : ""}`;
 };
 
 /**
@@ -17,7 +50,12 @@ export const loginUrl = (params: Record<string, string>) => {
  * is identical for live Google and DEV mode — the only difference upstream is
  * who vouched for the address.
  */
-export async function finishAdminLogin(email: string, googleSub: string, googleName: string) {
+export async function finishAdminLogin(
+  email: string,
+  googleSub: string,
+  googleName: string,
+  req?: Request,
+) {
   const found = await lookupWhitelist(email);
 
   if ("denied" in found) {
@@ -26,7 +64,7 @@ export async function finishAdminLogin(email: string, googleSub: string, googleN
       found.denied === "revoked" ? "denied_revoked" : "denied_not_whitelisted",
     );
     return NextResponse.redirect(
-      loginUrl({ error: found.denied === "revoked" ? "revoked" : "unauthorized", email }),
+      loginUrl({ error: found.denied === "revoked" ? "revoked" : "unauthorized", email }, req),
     );
   }
 
@@ -45,7 +83,7 @@ export async function finishAdminLogin(email: string, googleSub: string, googleN
 
   if (current?.google_sub && current.google_sub !== googleSub) {
     await recordLoginAttempt(email, "denied_revoked");
-    return NextResponse.redirect(loginUrl({ error: "revoked", email }));
+    return NextResponse.redirect(loginUrl({ error: "revoked", email }, req));
   }
   if (!current?.google_sub) {
     await db.from("staff").update({ google_sub: googleSub }).eq("profile_id", seat.id);
@@ -71,6 +109,5 @@ export async function finishAdminLogin(email: string, googleSub: string, googleN
     summary: `Signed in to the admin panel as ${seat.level}`,
   });
 
-  const base = (publicEnv.adminUrl || "http://account.localhost:3000").replace(/\/$/, "");
-  return NextResponse.redirect(base + "/");
+  return NextResponse.redirect(adminBase(req) + "/");
 }

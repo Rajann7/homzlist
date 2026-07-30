@@ -202,7 +202,6 @@ function VerificationSheet({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [rotation, setRotation] = useState(0);
-  const [zoom, setZoom] = useState(1);
   const [reason, setReason] = useState("");
   const [revokeReason, setRevokeReason] = useState("");
 
@@ -297,7 +296,10 @@ function VerificationSheet({
               <LevelBadge level={detail.level} label={detail.levelLabel} />
             </div>
 
-            {/* Document — zoom / rotate / open full screen / download */}
+            {/* Document — rotate, and tap to open the full-screen viewer. The
+                design's doc box carries a single 30×30 rotate button; the zoom
+                button that used to sit beside it is gone, and nothing is lost
+                because the full-screen viewer this box opens is the zoom. */}
             <div
               className="relative flex h-[180px] items-center justify-center overflow-hidden rounded-12 border"
               style={{
@@ -313,7 +315,7 @@ function VerificationSheet({
                     src={detail.docUrl}
                     alt="Submitted document"
                     className="h-full w-full object-contain"
-                    style={{ transform: `rotate(${rotation}deg) scale(${zoom})`, transition: "transform .15s ease" }}
+                    style={{ transform: `rotate(${rotation}deg)`, transition: "transform .15s ease" }}
                   />
                 </button>
               ) : (
@@ -322,8 +324,7 @@ function VerificationSheet({
                 </span>
               )}
               {detail.docUrl && (
-                <div className="absolute right-2 top-2 flex gap-1">
-                  <DocBtn label="Zoom in" icon="maximize" onClick={() => setZoom((z) => Math.min(3, z + 0.25))} />
+                <div className="absolute right-2 top-2">
                   <DocBtn label="Rotate" icon="refresh" onClick={() => setRotation((r) => (r + 90) % 360)} />
                 </div>
               )}
@@ -360,19 +361,15 @@ function VerificationSheet({
               </>
             )}
 
-            {detail.reason && (
-              <div className="mt-3">
-                <NoteBlock tone={detail.status === "revoked" ? "error" : "warning"}>
-                  Recorded reason: {detail.reason}
-                  {detail.reviewedLabel ? ` · ${detail.reviewedLabel}` : ""}
-                </NoteBlock>
-              </div>
-            )}
-            {!detail.reason && detail.reviewedLabel && (
-              <div className="mt-3">
-                <NoteBlock tone="info">Decided by {detail.reviewedLabel}.</NoteBlock>
-              </div>
-            )}
+            {/* DEVIATION, deliberate: the design's verifydetail is the pending
+                happy path, so it has no slot for a decision that already
+                happened. A rejected or revoked row DOES carry a recorded reason
+                and a decider, and deleting them would put real data out of
+                reach. They stay — but as two more `row2` rows in the design's own
+                field language, not as the coloured NoteBlocks that used to sit
+                here. */}
+            {detail.reason && <Row label="Recorded reason" value={detail.reason} />}
+            {detail.reviewedLabel && <Row label="Decided" value={detail.reviewedLabel} />}
 
             <SecHead>Checklist</SecHead>
             {detail.checklist.map((c) => (
@@ -481,7 +478,7 @@ function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Kolkata" });
 }
 
-function DocBtn({ label, icon, onClick }: { label: string; icon: "maximize" | "refresh"; onClick: () => void }) {
+function DocBtn({ label, icon, onClick }: { label: string; icon: "refresh"; onClick: () => void }) {
   return (
     <button
       type="button"

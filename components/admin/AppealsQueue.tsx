@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/Icon";
 import type { AutoFlagAppeal, RejectLockAppeal } from "@/lib/admin/appeals";
 import { Initials, Thumb } from "./queueBits";
-import { Badge, Btn, Modal, NoteBlock, SecHead, TextArea } from "./overlays";
+import { Badge, Btn, Modal, SecHead } from "./overlays";
 import { AdminToast } from "./AdminToast";
 
 /**
@@ -29,7 +29,7 @@ interface Props {
 export function AppealsQueue({ tab, counts, flagAppeals, reopenAppeals, canDecide, decideTooltip }: Props) {
   const router = useRouter();
   const [toast, setToast] = useState<string | null>(null);
-  const [confirm, setConfirm] = useState<null | { id: string; action: string; title: string; note: string }>(null);
+  const [confirm, setConfirm] = useState<null | { id: string; action: string; title: string }>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -38,14 +38,14 @@ export function AppealsQueue({ tab, counts, flagAppeals, reopenAppeals, canDecid
     window.setTimeout(() => setToast(null), 2800);
   };
 
-  const decide = async (id: string, action: string, msg: string, note?: string) => {
+  const decide = async (id: string, action: string, msg: string) => {
     setBusy(true);
     setError(null);
     try {
       const r = await fetch(`/api/v1/admin/appeals/${id}`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ action, note }),
+        body: JSON.stringify({ action }),
         cache: "no-store",
       });
       const j = await r.json().catch(() => null);
@@ -136,7 +136,7 @@ export function AppealsQueue({ tab, counts, flagAppeals, reopenAppeals, canDecid
             decideTooltip={decideTooltip}
             busy={busy}
             onDismiss={() => decide(a.id, "dismiss_flag", "Flag dismissed · content restored")}
-            onUphold={() => setConfirm({ id: a.id, action: "uphold_flag", title: "Uphold this flag?", note: "" })}
+            onUphold={() => setConfirm({ id: a.id, action: "uphold_flag", title: "Uphold this flag?" })}
           />
         ))
       ) : (
@@ -147,8 +147,8 @@ export function AppealsQueue({ tab, counts, flagAppeals, reopenAppeals, canDecid
             canDecide={canDecide}
             decideTooltip={decideTooltip}
             busy={busy}
-            onUnlock={() => setConfirm({ id: a.id, action: "unlock", title: "Unlock this listing?", note: "" })}
-            onKeep={() => setConfirm({ id: a.id, action: "keep_locked", title: "Keep it locked?", note: "" })}
+            onUnlock={() => setConfirm({ id: a.id, action: "unlock", title: "Unlock this listing?" })}
+            onKeep={() => setConfirm({ id: a.id, action: "keep_locked", title: "Keep it locked?" })}
           />
         ))
       )}
@@ -174,7 +174,6 @@ export function AppealsQueue({ tab, counts, flagAppeals, reopenAppeals, canDecid
                       : confirm.action === "keep_locked"
                         ? "Kept locked"
                         : "Flag upheld",
-                    confirm.note || undefined,
                   )
                 }
               >
@@ -189,21 +188,16 @@ export function AppealsQueue({ tab, counts, flagAppeals, reopenAppeals, canDecid
             </>
           }
         >
-          <NoteBlock tone={confirm.action === "unlock" ? "accent" : "warning"}>
+          {/* The design's unlock modal is one line of plain 13px ink2 copy and
+              two buttons — no coloured note block, and no textarea. Both are
+              gone; the decision itself is what gets logged. */}
+          <p className="text-[13px]" style={{ color: "var(--ink-secondary)" }}>
             {confirm.action === "unlock"
               ? "The poster gets one more re-submission — the listing returns to Changes requested so they can edit it. A further rejection locks it again."
               : confirm.action === "keep_locked"
                 ? "The listing stays locked and the poster is told the appeal was not accepted."
                 : "The bio stays hidden from other people. The poster is told they can edit it to make it visible again."}
-          </NoteBlock>
-          <div className="mt-3">
-            <TextArea
-              value={confirm.note}
-              onChange={(v) => setConfirm((c) => (c ? { ...c, note: v } : c))}
-              placeholder="Note for the record (optional)…"
-              height={60}
-            />
-          </div>
+          </p>
         </Modal>
       )}
 
@@ -250,15 +244,10 @@ function FlagCard({
             {appeal.poster.role ?? "—"} · appealed {appeal.appealedLabel}
           </p>
         </div>
-        {appeal.withheld ? (
-          <Badge bg="var(--warning-soft)" fg="var(--warning)" plain>
-            Hidden from public
-          </Badge>
-        ) : (
-          <Badge bg="var(--accent-soft)" fg="var(--accent)" plain>
-            Visible
-          </Badge>
-        )}
+        {/* The design's flag card header is avatar + name + "role · appealed Nh
+            ago", and stops there. The Hidden/Visible badge that used to sit on
+            the right is gone — "Dismiss flag · content restored" is what states
+            the visibility change, and it is the action, not a badge. */}
       </div>
 
       {/* The flagged content, with what matched highlighted */}
@@ -361,13 +350,9 @@ function ReopenCard({
         </p>
       )}
 
-      {!appeal.isLocked && (
-        <div className="mt-3">
-          <NoteBlock tone="info">
-            This item is not locked, so there is nothing to reopen. Keeping it locked will simply close the appeal.
-          </NoteBlock>
-        </div>
-      )}
+      {/* No "not locked" NoteBlock: the design's own meta line is
+          "ID #4477 · Locked", so an unlocked item already says "Not locked"
+          there, and the Unlock button is disabled with its tooltip. */}
 
       <div className="mt-4 flex flex-wrap gap-2">
         <Btn kind="primary" disabled={!canDecide || busy || !appeal.isLocked} tooltip={decideTooltip} onClick={onUnlock}>

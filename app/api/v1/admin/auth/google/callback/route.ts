@@ -19,14 +19,14 @@ export const dynamic = "force-dynamic";
 export async function GET(req: NextRequest) {
   const { ip } = requestMeta();
   const limited = await rateLimit(`admin-login:${ip}`, 20, 600);
-  if (!limited.allowed) return NextResponse.redirect(loginUrl({ error: "rate_limited" }));
+  if (!limited.allowed) return NextResponse.redirect(loginUrl({ error: "rate_limited" }, req));
 
   const code = req.nextUrl.searchParams.get("code") ?? "";
   const state = req.nextUrl.searchParams.get("state") ?? "";
-  if (!code || !state) return NextResponse.redirect(loginUrl({ error: "failed" }));
+  if (!code || !state) return NextResponse.redirect(loginUrl({ error: "failed" }, req));
 
   const identity = await exchangeCode(code, state);
-  if (!identity) return NextResponse.redirect(loginUrl({ error: "failed" }));
+  if (!identity) return NextResponse.redirect(loginUrl({ error: "failed" }, req));
 
-  return finishAdminLogin(identity.email, identity.sub, identity.name);
+  return finishAdminLogin(identity.email, identity.sub, identity.name, req);
 }

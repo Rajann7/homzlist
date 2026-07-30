@@ -118,6 +118,15 @@ export function BoostQueue({ rows, canDecide, decideTooltip, refundReasons }: Pr
                     <Td>
                       <div className="flex items-center gap-[6px]">
                         <span className="font-semibold">{r.price}</span>
+                        {/*
+                          DEVIATION, kept deliberately (30 Jul 2026): the design's
+                          Amount cell only ever draws "Paid ✓" because its rows are
+                          mock rows that are always paid. Not-paid is a REAL state
+                          here — a boost whose order has no successful payment — and
+                          it is the one state where approving costs us placement we
+                          were never paid for. It stays, wearing the design's own
+                          badge language (errorSoft/error, same shape as Paid ✓).
+                        */}
                         {r.payment.verified ? (
                           <Badge bg="var(--accent-soft)" fg="var(--accent)" plain>
                             Paid ✓
@@ -301,11 +310,13 @@ function BoostSheet({
           )}
         </div>
 
+        {/* The design's Targeting block is Area + Duration, nothing else. The
+            "Requested" and "Bought by" rows that used to follow are both already
+            columns of the queue table this sheet opened from — age in the
+            Requested column, the buyer under the boost title. */}
         <SecHead>Targeting</SecHead>
         <Row label="Area" value={row.targetLabel} />
         <Row label="Duration" value={`${row.durationLabel} (${row.durationDays} days)`} />
-        <Row label="Requested" value={`${ageText(row.hours)} ago`} />
-        {row.ownerName && <Row label="Bought by" value={row.ownerName} />}
 
         <SecHead>Eligibility checks</SecHead>
         {row.checks.map((c) => (
@@ -316,14 +327,9 @@ function BoostSheet({
             <span style={{ color: "var(--ink-primary)" }}>{c.label}</span>
           </div>
         ))}
-        {row.openReports > 0 && (
-          <div className="mt-2">
-            <NoteBlock tone="error">
-              This item has open reports. Decide the reports first — approving placement for reported content is what a
-              refund later cannot undo.
-            </NoteBlock>
-          </div>
-        )}
+        {/* No open-reports NoteBlock: the design's fourth check IS the report
+            state, and `boostChecks` already renders it as
+            "N open reports" with a failing tick when there are any. */}
 
         {error && (
           <p className="mt-3 rounded-8 p-[10px] text-[12px]" style={{ background: "var(--error-soft)", color: "var(--error)" }}>

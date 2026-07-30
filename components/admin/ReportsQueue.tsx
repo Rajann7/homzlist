@@ -150,16 +150,10 @@ export function ReportsQueue({ filter, counts, groups, can, warnTemplates, suspe
               <span className="text-[11px]" style={{ color: "var(--ink-tertiary)" }}>
                 {g.oldestLabel}
               </span>
-              {g.reasons.length > 1 && (
-                <button
-                  type="button"
-                  onClick={() => setSheet({ group: g, kind: "reporters" })}
-                  className="text-[11px] font-semibold"
-                  style={{ color: "var(--accent)" }}
-                >
-                  {g.reasons.length} different reasons
-                </button>
-              )}
+              {/* The design's card header is reason badge · count badge · age ·
+                  priority dot. The "N different reasons" link that used to sit
+                  here is gone; every reason is listed per reporter in the
+                  reporters sheet, reached from the dots button. */}
               {g.high && (
                 <span className="ml-auto h-2 w-2 rounded-full" style={{ background: "var(--error)" }} title="High priority" />
               )}
@@ -241,6 +235,15 @@ export function ReportsQueue({ filter, counts, groups, can, warnTemplates, suspe
         />
       )}
 
+      {/*
+        DEVIATION, kept deliberately (30 Jul 2026): the design's card has no route
+        to the individual reporters, and its dots button opens the escalate modal
+        directly. Both the internal note and the reporters list are working
+        features with real rows behind them — who reported, for what reason, with
+        what note — and this sheet is the only place that data exists. Deleting it
+        would put real rows out of reach, so the dots button keeps its menu and
+        the sheet stays. It renders in the design's own right-sheet shell.
+      */}
       {sheet?.kind === "reporters" && (
         <RightSheet title={`${sheet.group.count} report${sheet.group.count === 1 ? "" : "s"}`} onClose={() => setSheet(null)}>
           {sheet.group.reporters.map((r, i) => (

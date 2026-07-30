@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
   // next/headers `cookies()`, which attaches to THIS response — so the cookie is
   // already on the way out and only the destination needs relaying. A redirect
   // back to /login means the whitelist refused the address.
-  const res = await finishAdminLogin(identity.email, identity.sub, identity.name);
+  const res = await finishAdminLogin(identity.email, identity.sub, identity.name, req);
   const location = res.headers.get("location") ?? "/";
   const denied = location.includes("/login");
   return NextResponse.json(
