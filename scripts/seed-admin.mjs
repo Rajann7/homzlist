@@ -1688,16 +1688,16 @@ await bulk("backups", ["kind", "status", "size_bytes", "started_at", "finished_a
     };
   }));
 
-await bulk("anomaly_events", ["kind", "severity", "message", "link_screen", "metric", "detected_at", "dismissed_at", "dismissed_by"],
+await bulk("anomaly_events", ["kind", "severity", "message", "link_screen", "link_label", "metric", "detected_at", "dismissed_at", "dismissed_by"],
   [
-    ["payment_failure_spike", "error", "Payment failure spike — 14 failures in the last hour (usual: 2)", "payments", { count: 14, baseline: 2 }, 0.5, false],
-    ["otp_spike", "warning", "OTP request spike from 3 IPs — possible bot activity", "settings", { ips: 3, requests: 214 }, 1.5, false],
-    ["report_spike", "warning", "Report spike — 5 reports on one listing", "reports", { listing_reports: 5 }, 3, false],
-    ["signup_drop", "warning", "Signups down 46% vs the same day last week", "analytics", { delta: -46 }, 26, true],
-    ["queue_backlog", "error", "Notification queue backlog above 500 for 20 minutes", "cron", { depth: 540 }, 50, true],
-    ["boost_cap", "warning", "Rajkot boost cap reached — new boosts are queued", "settings", { cap: 60 }, 74, true],
-  ].map(([kind, severity, message, link, metric, hrs, dismissed]) => ({
-    kind, severity, message, link_screen: link, metric, detected_at: hoursAgo(hrs),
+    ["payment_failure_spike", "error", "Payment failure spike — 14 failures in the last hour (usual: 2)", "payments", "Open payments", { count: 14, baseline: 2 }, 0.5, false],
+    ["otp_spike", "warning", "OTP request spike from 3 IPs — possible bot activity", "settings", "View rate limits", { ips: 3, requests: 214 }, 1.5, false],
+    ["report_spike", "warning", "Report spike — 5 reports on one listing", "reports", "Open reports", { listing_reports: 5 }, 3, false],
+    ["signup_drop", "warning", "Signups down 46% vs the same day last week", "analytics", "Open analytics", { delta: -46 }, 26, true],
+    ["queue_backlog", "error", "Notification queue backlog above 500 for 20 minutes", "cron", "Open system status", { depth: 540 }, 50, true],
+    ["boost_cap", "warning", "Rajkot boost cap reached — new boosts are queued", "settings", "View rate limits", { cap: 60 }, 74, true],
+  ].map(([kind, severity, message, link, linkLabel, metric, hrs, dismissed]) => ({
+    kind, severity, message, link_screen: link, link_label: linkLabel, metric, detected_at: hoursAgo(hrs),
     dismissed_at: dismissed ? hoursAgo(hrs - 1) : null, dismissed_by: dismissed ? pick(actingStaff).id : null,
   })));
 

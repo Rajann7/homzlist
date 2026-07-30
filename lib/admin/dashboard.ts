@@ -158,6 +158,8 @@ export interface Anomaly {
   severity: string;
   message: string;
   linkScreen: string | null;
+  /** The banner's own call-to-action words ("Open payments"), from the row. */
+  linkLabel: string | null;
   detectedAt: string;
 }
 
@@ -166,7 +168,7 @@ export async function anomalies(): Promise<Anomaly[]> {
   const db = createServiceClient();
   const { data } = await db
     .from("anomaly_events")
-    .select("id, kind, severity, message, link_screen, detected_at")
+    .select("id, kind, severity, message, link_screen, link_label, detected_at")
     .is("dismissed_at", null)
     .order("detected_at", { ascending: false })
     .limit(5);
@@ -177,6 +179,7 @@ export async function anomalies(): Promise<Anomaly[]> {
     severity: r.severity as string,
     message: r.message as string,
     linkScreen: (r.link_screen as string) ?? null,
+    linkLabel: (r.link_label as string) ?? null,
     detectedAt: r.detected_at as string,
   }));
 }

@@ -28,22 +28,26 @@ export function AdminLoginCard({
   mode,
   error,
   email,
+  env,
 }: {
   mode: "live" | "dev";
   error: string | null;
   email: string | null;
+  /** "STAGING" off production — the design's top-right chip. */
+  env: string | null;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [devEmail, setDevEmail] = useState("");
   const [devError, setDevError] = useState<string | null>(null);
 
-  // State (b): revoked mid-session is a full-page message, not a card with a button.
+  // State (b): revoked mid-session is a full-page message, not a card with a
+  // button — and the design gives it no footer line either, so it has none here.
   if (error === "revoked") {
     return (
-      <Shell>
-        <div className="flex flex-col items-center gap-3 text-center">
-          <span className="grid h-16 w-16 place-items-center rounded-full" style={{ background: "var(--surface-2)", color: "var(--ink-tertiary)" }}>
+      <Shell env={env}>
+        <div className="flex max-w-[420px] flex-col items-center gap-4 text-center">
+          <span className="grid h-[72px] w-[72px] place-items-center rounded-full" style={{ background: "var(--surface-3)", color: "var(--ink-tertiary)" }}>
             <Icon name="lock" size={28} />
           </span>
           <h1 className="text-[20px] font-bold" style={{ color: "var(--ink-primary)" }}>
@@ -54,13 +58,12 @@ export function AdminLoginCard({
           </p>
           <a
             href={process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"}
-            className="mt-2 flex h-10 items-center rounded-8 border px-4 text-[15px] font-semibold"
-            style={{ borderColor: "var(--border)", color: "var(--ink-primary)" }}
+            className="flex h-11 items-center rounded-8 border px-5 text-[15px] font-semibold"
+            style={{ background: "var(--surface-1)", borderColor: "var(--border)", color: "var(--ink-primary)" }}
           >
             Back to HomzList
           </a>
         </div>
-        <Footer />
       </Shell>
     );
   }
@@ -104,18 +107,18 @@ export function AdminLoginCard({
   };
 
   return (
-    <Shell>
+    <Shell env={env}>
       <div
-        className="w-full rounded-16 border p-8"
-        style={{ maxWidth: 380, background: "var(--surface-1)", borderColor: "var(--border)", boxShadow: "0 8px 24px rgba(0,0,0,.16)" }}
+        className="w-full rounded-16 border p-8 shadow-l3 dark:shadow-none"
+        style={{ maxWidth: 380, background: "var(--surface-1)", borderColor: "var(--border)" }}
       >
         <div className="flex items-center gap-2">
-          <span className="text-[20px] font-bold tracking-[-0.02em]">
+          <span className="text-[24px] font-bold tracking-[-0.02em]">
             <span style={{ color: "var(--ink-primary)" }}>Homz</span>
             <span style={{ color: "var(--accent)" }}>List</span>
           </span>
           <span
-            className="rounded-4 px-[5px] py-[2px] text-[11px] font-semibold uppercase tracking-[0.3px]"
+            className="rounded-4 px-[7px] py-[3px] text-[11px] font-semibold uppercase tracking-[0.3px]"
             style={{ background: "var(--surface-2)", color: "var(--ink-tertiary)" }}
           >
             Admin
@@ -125,14 +128,14 @@ export function AdminLoginCard({
         <h1 className="mt-6 text-[20px] font-bold" style={{ color: "var(--ink-primary)" }}>
           Admin sign in
         </h1>
-        <p className="mt-1 text-[13px]" style={{ color: "var(--ink-secondary)" }}>
+        <p className="mt-[6px] text-[13px] leading-[1.4]" style={{ color: "var(--ink-secondary)" }}>
           Only authorised HomzList staff can access this panel.
         </p>
 
         {/* State (a): unauthorised Google account. */}
         {(error === "unauthorized" || devError) && (
-          <div className="mt-6 flex gap-2 rounded-8 p-3" style={{ background: "var(--error-soft)" }}>
-            <span style={{ color: "var(--error)" }}>
+          <div className="mt-4 flex gap-[10px] rounded-8 p-3" style={{ background: "var(--error-soft)" }}>
+            <span className="mt-[1px] flex-none" style={{ color: "var(--error)" }}>
               <Icon name="alert" size={20} />
             </span>
             <div className="min-w-0">
@@ -140,13 +143,18 @@ export function AdminLoginCard({
                 {devError ?? "This Google account doesn't have admin access"}
               </p>
               {email && (
-                <p className="mt-[2px] text-[11px]" style={{ color: "var(--ink-tertiary)" }}>
+                <p className="mt-1 text-[11px]" style={{ color: "var(--ink-tertiary)" }}>
                   Signed in as: {email}
                 </p>
               )}
-              <p className="mt-1 text-[11px]" style={{ color: "var(--ink-tertiary)" }}>
-                Contact a Super Admin
-              </p>
+              <div className="mt-2 flex gap-3">
+                <a href="/login" className="text-[11px] font-semibold" style={{ color: "var(--accent)" }}>
+                  Use a different account
+                </a>
+                <a href="mailto:support@homzlist.com" className="text-[11px] font-semibold" style={{ color: "var(--accent)" }}>
+                  Contact a Super Admin
+                </a>
+              </div>
             </div>
           </div>
         )}
@@ -189,13 +197,13 @@ export function AdminLoginCard({
           type="button"
           onClick={signIn}
           disabled={busy || (mode === "dev" && !devEmail)}
-          className="mt-6 flex h-11 w-full items-center justify-center gap-2 rounded-8 border text-[15px] font-semibold disabled:opacity-40"
-          style={{ borderColor: "var(--border)", color: "var(--ink-primary)", background: "transparent" }}
+          className="mt-6 flex h-11 w-full items-center justify-center gap-[10px] rounded-8 border text-[15px] font-semibold disabled:opacity-40"
+          style={{ borderColor: "var(--border)", color: "var(--ink-primary)", background: "var(--surface-1)" }}
         >
           {busy ? (
             <span
-              className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"
-              style={{ color: "var(--ink-tertiary)" }}
+              className="h-[18px] w-[18px] animate-spin rounded-full"
+              style={{ border: "2px solid var(--border)", borderTopColor: "var(--accent)" }}
               aria-label="Signing in"
             />
           ) : (
@@ -215,9 +223,18 @@ export function AdminLoginCard({
   );
 }
 
-function Shell({ children }: { children: React.ReactNode }) {
+/** The design's A1 page: surface-2 behind the card, not page. */
+function Shell({ children, env }: { children: React.ReactNode; env: string | null }) {
   return (
-    <div className="flex min-h-[100dvh] flex-col items-center justify-center gap-6 px-6" style={{ background: "var(--page)" }}>
+    <div className="relative flex min-h-[100dvh] flex-col items-center justify-center p-6" style={{ background: "var(--surface-2)" }}>
+      {env && (
+        <span
+          className="absolute right-4 top-4 rounded-4 px-2 py-1 text-[11px] font-bold uppercase tracking-[0.3px] text-white"
+          style={{ background: "var(--error)" }}
+        >
+          {env}
+        </span>
+      )}
       {children}
     </div>
   );
@@ -225,7 +242,7 @@ function Shell({ children }: { children: React.ReactNode }) {
 
 function Footer() {
   return (
-    <p className="text-center text-[11px]" style={{ color: "var(--ink-tertiary)" }}>
+    <p className="mt-6 max-w-[380px] text-center text-[11px]" style={{ color: "var(--ink-tertiary)" }}>
       Protected by Google authentication · All admin actions are logged
     </p>
   );

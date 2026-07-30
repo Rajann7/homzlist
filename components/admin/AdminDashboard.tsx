@@ -7,16 +7,21 @@ import { Icon, type IconName } from "@/components/ui/Icon";
 import type { Anomaly, ChartRange, OverdueItem, RevenuePoint, StatCard, SystemStrips, Tile, TileKey } from "@/lib/admin/dashboard";
 
 /**
- * A2's five rows, exactly as P13 lays them out:
- *   1 — 7 pending tiles (count 24/700 + label + oldest-age line, red past 24h)
- *   2 — 4 today-stat cards with a prior-period delta chip and a 7-bar sparkline
- *   3 — dismissible anomaly banners
- *   4 — revenue chart (7d/30d/6m + legend + tooltip) beside the SLA overdue list
- *   5 — cron / backups / uptime strips
+ * A2's five rows, measured off the design's `dashboardEl` rather than off what
+ * looked reasonable:
+ *   1 — 7 pending tiles (icon 20 accent · count 24/700 · label 13 · age 11)
+ *   2 — 4 today-stat cards: value and sparkline share a row, delta chip below
+ *   3 — dismissible anomaly banners, each with its own link label
+ *   4 — revenue chart (stacked, 140 tall) beside the SLA overdue list, 1.6fr:1fr
+ *   5 — cron / backups / uptime strips, padding 14, one row of three
+ *
+ * Grid columns follow the ADMIN breakpoints, not the user-side ones: mobile
+ * <768 · tablet 768–1439 (`md:`) · desktop ≥1440 (`desktop:`). The design's
+ * tileCols is 2/3/4 and its stat grid is 2 on mobile and 4 everywhere else.
  *
  * Every number arrives as a prop from a real query. The design's sample values
  * ("Listings 12 · oldest 26h") are the SHAPE — the count and the age are counted
- * (CLAUDE.md rule 12), which is why an age can read 5,692h on seeded data instead
+ * (CLAUDE.md rule 12), which is why an age can read 237d on seeded data instead
  * of the tidy 26h the mock drew.
  */
 
@@ -34,12 +39,18 @@ const money = (paise: number) =>
   `₹${Math.round(paise / 100).toLocaleString("en-IN")}`;
 
 /** P13: "under 12h = ink3 · 12–24h = warning · over 24h = error". */
-function ageColor(hours: number | null): string {
-  if (hours === null) return "var(--ink-tertiary)";
-  if (hours > 24) return "var(--error)";
-  if (hours >= 12) return "var(--warning)";
-  return "var(--ink-tertiary)";
+function ageTone(hours: number | null): "ink3" | "warning" | "error" {
+  if (hours === null) return "ink3";
+  if (hours > 24) return "error";
+  if (hours >= 12) return "warning";
+  return "ink3";
 }
+
+const TONE_COLOR = {
+  ink3: "var(--ink-tertiary)",
+  warning: "var(--warning)",
+  error: "var(--error)",
+} as const;
 
 function ageLabel(hours: number | null): string {
   if (hours === null) return "queue is clear";
@@ -57,6 +68,10 @@ const BANNER_FG: Record<string, string> = {
   warning: "var(--warning)",
   info: "var(--info)",
 };
+
+/** The design's card: surface1 + hairline + r12 + L1. Dark drops the shadow. */
+const CARD = "rounded-12 border shadow-l1 dark:shadow-none";
+const CARD_STYLE = { background: "var(--surface-1)", borderColor: "var(--border)" };
 
 interface Props {
   tiles: Tile[];
@@ -97,23 +112,24 @@ export function AdminDashboard({ tiles, stats, anomalies, revenue, overdue, syst
   };
 
   return (
-    <div className="flex flex-col gap-6">
-      {/* Page title + date chip + refresh */}
-      <div className="flex items-center gap-3">
+    <div>
+      {/* pageHead(hero): gap 12, flex-wrap, margin-bottom 20 */}
+      <div className="mb-5 flex flex-wrap items-center gap-3">
         <h1 className="text-[24px] font-bold" style={{ color: "var(--ink-primary)" }}>
           Dashboard
         </h1>
         <span
-          className="rounded-full px-[10px] py-[3px] text-[11px] font-semibold"
+          className="rounded-full px-[10px] py-[6px] text-[13px]"
           style={{ background: "var(--surface-2)", color: "var(--ink-secondary)" }}
         >
           Today · {today}
         </span>
+        <div className="flex-1" />
         <button
           type="button"
           onClick={() => startTransition(() => router.refresh())}
-          className="ml-auto grid h-10 w-10 place-items-center rounded-8"
-          style={{ color: "var(--ink-secondary)" }}
+          className="grid h-10 w-10 place-items-center rounded-8 border"
+          style={{ background: "var(--surface-1)", borderColor: "var(--border)", color: "var(--ink-secondary)" }}
           aria-label="Refresh"
         >
           <span className={pending ? "animate-spin" : undefined}>
@@ -123,55 +139,81 @@ export function AdminDashboard({ tiles, stats, anomalies, revenue, overdue, syst
       </div>
 
       {/* Row 1 — pending tiles */}
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
-        {tiles.map((t) => (
-          <Link
-            key={t.key}
-            href={t.screen}
-            className="rounded-12 border p-4 transition-transform active:scale-[.99]"
-            style={{ background: "var(--surface-1)", borderColor: "var(--border)", boxShadow: "0 1px 2px rgba(0,0,0,.06)" }}
-          >
-            <span style={{ color: "var(--accent)" }}>
-              <Icon name={TILE_ICON[t.key]} size={20} />
-            </span>
-            <p className="mt-2 text-[24px] font-bold leading-none" style={{ color: "var(--ink-primary)" }}>
-              {t.count}
-            </p>
-            <p className="mt-1 text-[13px]" style={{ color: "var(--ink-secondary)" }}>
-              {t.label}
-            </p>
-            <p className="mt-[2px] text-[11px]" style={{ color: ageColor(t.oldestHours) }}>
-              {ageLabel(t.oldestHours)}
-            </p>
-          </Link>
-        ))}
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 desktop:grid-cols-4">
+        {tiles.map((t) => {
+          const tone = ageTone(t.oldestHours);
+          return (
+            <Link
+              key={t.key}
+              href={t.screen}
+              className={`${CARD} p-4 transition-transform active:scale-[.99]`}
+              style={CARD_STYLE}
+            >
+              <span className="block" style={{ color: "var(--accent)" }}>
+                <Icon name={TILE_ICON[t.key]} size={20} />
+              </span>
+              <p className="mt-2 text-[24px] font-bold leading-none" style={{ color: "var(--ink-primary)" }}>
+                {t.count}
+              </p>
+              <p className="mt-1 text-[13px]" style={{ color: "var(--ink-secondary)" }}>
+                {t.label}
+              </p>
+              <p
+                className="mt-[6px] text-[11px]"
+                style={{ color: TONE_COLOR[tone], fontWeight: tone === "ink3" ? 400 : 600 }}
+              >
+                {ageLabel(t.oldestHours)}
+              </p>
+            </Link>
+          );
+        })}
       </div>
 
-      {/* Row 2 — today stats */}
-      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+      <div className="h-6" />
+
+      {/* Row 2 — today stats. Value and sparkline share one row; the delta chip
+          sits under them, which is the design's order. */}
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         {stats.map((s) => {
           const up = (s.deltaPct ?? 0) >= 0;
           const peak = Math.max(1, ...s.spark);
           return (
-            <div
-              key={s.key}
-              className="rounded-12 border p-4"
-              style={{ background: "var(--surface-1)", borderColor: "var(--border)", boxShadow: "0 1px 2px rgba(0,0,0,.06)" }}
-            >
+            <div key={s.key} className={`${CARD} p-4`} style={CARD_STYLE}>
               <p className="text-[13px]" style={{ color: "var(--ink-secondary)" }}>
                 {s.label}
               </p>
-              <p className="mt-1 text-[24px] font-bold leading-none" style={{ color: "var(--ink-primary)" }}>
-                {s.isMoney ? money(s.value) : s.value.toLocaleString("en-IN")}
-              </p>
-              <div className="mt-2 flex items-center gap-2">
+              {/* flex-wrap is the only addition to the design's row: at 768 the
+                  content column is 513px, and four cards of ~123px cannot hold a
+                  24px "₹30,131" AND the 47px sparkline on one line — the number
+                  was being cut off. Wrapping drops the sparkline under the value
+                  instead of clipping the figure the card exists to show. Nothing
+                  moves at any width where both already fit. */}
+              <div className="mt-[6px] flex flex-wrap items-end justify-between gap-2">
+                <p className="shrink-0 text-[24px] font-bold" style={{ color: "var(--ink-primary)" }}>
+                  {s.isMoney ? money(s.value) : s.value.toLocaleString("en-IN")}
+                </p>
+                <span className="flex h-7 shrink-0 items-end gap-[2px]" aria-hidden>
+                  {s.spark.map((v, i) => (
+                    <span
+                      key={i}
+                      className="w-[5px] rounded-[2px]"
+                      style={{
+                        height: `${Math.max(2, (v / peak) * 28)}px`,
+                        background: "var(--accent)",
+                        opacity: 0.35 + i * 0.09,
+                      }}
+                    />
+                  ))}
+                </span>
+              </div>
+              <div className="mt-2">
                 {s.deltaPct === null ? (
                   <span className="text-[11px]" style={{ color: "var(--ink-tertiary)" }}>
                     no prior week
                   </span>
                 ) : (
                   <span
-                    className="rounded-4 px-[5px] py-[2px] text-[11px] font-semibold"
+                    className="inline-flex items-center rounded-4 px-[7px] py-[3px] text-[11px] font-semibold"
                     style={{
                       background: up ? "var(--accent-soft)" : "var(--error-soft)",
                       color: up ? "var(--accent)" : "var(--error)",
@@ -180,118 +222,112 @@ export function AdminDashboard({ tiles, stats, anomalies, revenue, overdue, syst
                     {up ? "▲" : "▼"} {Math.abs(s.deltaPct)}% vs last week
                   </span>
                 )}
-                <span className="ml-auto flex h-6 items-end gap-[2px]" aria-hidden>
-                  {s.spark.map((v, i) => (
-                    <span
-                      key={i}
-                      className="w-[3px] rounded-[2px]"
-                      style={{ height: `${Math.max(2, (v / peak) * 24)}px`, background: i === s.spark.length - 1 ? "var(--accent)" : "var(--surface-3)" }}
-                    />
-                  ))}
-                </span>
               </div>
             </div>
           );
         })}
       </div>
 
+      <div className="h-5" />
+
       {/* Row 3 — anomaly banners */}
-      {banners.length > 0 && (
-        <div className="flex flex-col gap-2">
-          {banners.map((b) => (
-            <div key={b.id} className="flex items-center gap-[10px] rounded-8 px-[14px] py-3" style={{ background: BANNER_BG[b.severity] ?? "var(--surface-2)" }}>
-              <span style={{ color: BANNER_FG[b.severity] ?? "var(--ink-secondary)" }}>
-                <Icon name="alert" size={20} />
-              </span>
-              <p className="min-w-0 flex-1 text-[13px] font-semibold" style={{ color: "var(--ink-primary)" }}>
-                {b.message}
-              </p>
-              {b.linkScreen && (
-                <Link href={b.linkScreen} className="shrink-0 text-[13px] font-semibold" style={{ color: "var(--accent)" }}>
-                  Open
-                </Link>
-              )}
-              <button type="button" onClick={() => dismiss(b.id)} aria-label="Dismiss" style={{ color: "var(--ink-tertiary)" }}>
-                <Icon name="close" size={18} />
-              </button>
-            </div>
-          ))}
+      {banners.map((b) => (
+        <div
+          key={b.id}
+          className="mb-2 flex items-center gap-[10px] rounded-8 px-[14px] py-3"
+          style={{ background: BANNER_BG[b.severity] ?? "var(--surface-2)" }}
+        >
+          <span className="flex-none" style={{ color: BANNER_FG[b.severity] ?? "var(--ink-secondary)" }}>
+            <Icon name="alert" size={20} />
+          </span>
+          <p className="min-w-0 flex-1 text-[13px] font-semibold" style={{ color: "var(--ink-primary)" }}>
+            {b.message}
+          </p>
+          {b.linkScreen && b.linkLabel && (
+            <Link href={b.linkScreen} className="shrink-0 whitespace-nowrap text-[13px] font-semibold" style={{ color: "var(--accent)" }}>
+              {b.linkLabel}
+            </Link>
+          )}
+          <button type="button" onClick={() => dismiss(b.id)} aria-label="Dismiss" className="flex flex-none" style={{ color: "var(--ink-tertiary)" }}>
+            <Icon name="close" size={16} />
+          </button>
         </div>
-      )}
+      ))}
+
+      <div className="h-2" />
 
       {/* Row 4 — revenue chart + SLA overdue */}
-      <div className="grid gap-3 lg:grid-cols-[1.6fr_1fr]">
-        <div className="rounded-12 border p-4" style={{ background: "var(--surface-1)", borderColor: "var(--border)", boxShadow: "0 1px 2px rgba(0,0,0,.06)" }}>
-          <div className="flex items-center gap-2">
-            <h2 className="text-[15px] font-semibold" style={{ color: "var(--ink-primary)" }}>
+      {/* minmax(0,…) rather than a bare 1fr: a grid track's default minimum is
+          min-content, so at 768 the overdue card's longest title pushed the row
+          8px past `main` and put a horizontal scrollbar under the whole page.
+          Same 1.6:1 ratio, same look — the track is just allowed to shrink. */}
+      <div className="grid gap-4 md:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+        <div className={`${CARD} p-4`} style={CARD_STYLE}>
+          <div className="mb-4 flex items-center gap-2">
+            <h2 className="flex-1 text-[15px] font-semibold" style={{ color: "var(--ink-primary)" }}>
               Revenue · {range === "7d" ? "last 7 days" : range === "30d" ? "last 30 days" : "last 6 months"}
             </h2>
-            <div className="ml-auto flex gap-1">
-              {(["7d", "30d", "6m"] as ChartRange[]).map((r) => (
-                <button
-                  key={r}
-                  type="button"
-                  onClick={() => changeRange(r)}
-                  className="rounded-full px-[10px] py-[3px] text-[11px] font-semibold"
-                  style={{
-                    background: r === range ? "var(--accent-soft)" : "var(--surface-2)",
-                    color: r === range ? "var(--accent)" : "var(--ink-secondary)",
-                  }}
-                >
-                  {r}
-                </button>
-              ))}
-            </div>
+            {(["7d", "30d", "6m"] as ChartRange[]).map((r) => (
+              <Chip key={r} label={r} active={r === range} onClick={() => changeRange(r)} />
+            ))}
           </div>
 
           <RevenueChart points={points} busy={chartBusy} />
 
-          <div className="mt-3 flex flex-wrap gap-3">
+          <div className="mt-[14px] flex flex-wrap gap-[14px]">
             {[
               ["Plans", "var(--accent)"],
               ["Boosts", "var(--info)"],
               ["Top-ups", "var(--warning)"],
             ].map(([label, color]) => (
               <span key={label} className="flex items-center gap-[6px] text-[11px]" style={{ color: "var(--ink-secondary)" }}>
-                <span className="h-[8px] w-[8px] rounded-full" style={{ background: color }} />
+                <span className="h-[10px] w-[10px] rounded-[3px]" style={{ background: color }} />
                 {label}
               </span>
             ))}
           </div>
         </div>
 
-        <div className="rounded-12 border p-4" style={{ background: "var(--surface-1)", borderColor: "var(--border)", boxShadow: "0 1px 2px rgba(0,0,0,.06)" }}>
-          <div className="flex items-center gap-2">
-            <h2 className="text-[15px] font-semibold" style={{ color: "var(--ink-primary)" }}>
+        <div className={`${CARD} p-4`} style={CARD_STYLE}>
+          <div className="mb-3 flex items-center gap-2">
+            <h2 className="flex-1 text-[15px] font-semibold" style={{ color: "var(--ink-primary)" }}>
               Overdue (&gt;24h)
             </h2>
             {overdue.length > 0 && (
-              <span className="rounded-4 px-[6px] py-[2px] text-[11px] font-semibold" style={{ background: "var(--error-soft)", color: "var(--error)" }}>
+              <span
+                className="inline-flex items-center rounded-4 px-[7px] py-[3px] text-[11px] font-semibold tracking-[0.3px]"
+                style={{ background: "var(--error-soft)", color: "var(--error)" }}
+              >
                 {overdue.length}
               </span>
             )}
           </div>
           {overdue.length === 0 ? (
-            <p className="mt-3 text-[13px]" style={{ color: "var(--ink-tertiary)" }}>
+            <p className="text-[13px]" style={{ color: "var(--ink-tertiary)" }}>
               Nothing has been waiting more than a day.
             </p>
           ) : (
-            <ul className="mt-2 flex flex-col">
-              {overdue.map((o) => (
-                <li key={`${o.kind}-${o.id}`}>
-                  <Link href={o.kind === "listing" ? `/queues/listings/${o.id}` : `/queues/requirements/${o.id}`} className="flex h-12 items-center gap-2">
-                    <span className="h-8 w-8 shrink-0 overflow-hidden rounded-4" style={{ background: "var(--surface-3)" }}>
+            <ul>
+              {overdue.map((o, i) => (
+                <li key={`${o.kind}-${o.id}`} style={{ borderTop: i ? "1px solid var(--divider)" : "none" }}>
+                  <Link
+                    href={o.kind === "listing" ? `/queues/listings/${o.id}` : `/queues/requirements/${o.id}`}
+                    className="flex items-center gap-[10px] py-2"
+                  >
+                    <span className="h-9 w-9 shrink-0 overflow-hidden rounded-8 border" style={{ borderColor: "var(--border)", background: "var(--surface-3)" }}>
                       {o.coverUrl ? <img src={o.coverUrl} alt="" className="h-full w-full object-cover" /> : null}
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-[13px] font-semibold" style={{ color: "var(--ink-primary)" }}>
                         {o.title}
                       </span>
-                      <span className="block text-[11px]" style={{ color: "var(--error)" }}>
+                      <span className="block text-[11px] font-semibold" style={{ color: "var(--error)" }}>
                         {o.hours < 48 ? `${o.hours}h in queue` : `${Math.floor(o.hours / 24)}d in queue`}
                       </span>
                     </span>
-                    <Icon name="chevron-right" size={16} />
+                    <span style={{ color: "var(--ink-tertiary)" }}>
+                      <Icon name="chevron-right" size={16} />
+                    </span>
                   </Link>
                 </li>
               ))}
@@ -299,6 +335,8 @@ export function AdminDashboard({ tiles, stats, anomalies, revenue, overdue, syst
           )}
         </div>
       </div>
+
+      <div className="h-4" />
 
       {/* Row 5 — system strips */}
       <div className="grid gap-3 md:grid-cols-3">
@@ -338,21 +376,36 @@ function when(iso: string | null): string {
   return new Date(iso).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
 }
 
+/** The design's `chip()` — h32, r999, accent border + accentSoft when active. */
+function Chip({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="inline-flex h-8 shrink-0 items-center gap-1 whitespace-nowrap rounded-full border px-3 text-[13px]"
+      style={{
+        borderColor: active ? "var(--accent)" : "var(--border)",
+        background: active ? "var(--accent-soft)" : "var(--surface-1)",
+        color: active ? "var(--accent)" : "var(--ink-secondary)",
+        fontWeight: active ? 600 : 400,
+      }}
+    >
+      {label}
+    </button>
+  );
+}
+
 function Strip({ ok, title, detail, href }: { ok: boolean; title: string; detail: string; href: string }) {
   return (
-    <Link
-      href={href}
-      className="flex items-start gap-2 rounded-12 border p-4"
-      style={{ background: "var(--surface-1)", borderColor: "var(--border)", boxShadow: "0 1px 2px rgba(0,0,0,.06)" }}
-    >
-      <span style={{ color: ok ? "var(--accent)" : "var(--error)" }}>
+    <Link href={href} className={`${CARD} flex items-center gap-[10px] p-[14px]`} style={CARD_STYLE}>
+      <span className="flex-none" style={{ color: ok ? "var(--accent)" : "var(--error)" }}>
         <Icon name={ok ? "check" : "alert"} size={20} />
       </span>
       <span className="min-w-0">
         <span className="block text-[13px] font-semibold" style={{ color: "var(--ink-primary)" }}>
           {title}
         </span>
-        <span className="block text-[11px]" style={{ color: "var(--ink-tertiary)" }}>
+        <span className="mt-[2px] block text-[12px]" style={{ color: "var(--ink-secondary)" }}>
           {detail}
         </span>
       </span>
@@ -360,47 +413,37 @@ function Strip({ ok, title, detail, href }: { ok: boolean; title: string; detail
   );
 }
 
-/** Stacked bars, accent/info/warning per P13's legend, with a ₹ hover tooltip. */
+/**
+ * Stacked bars — plans on top, boosts, top-ups at the bottom, matching the
+ * design's stack order and its legend. The ₹ breakdown rides on the column's
+ * `title`, which is the tooltip the design itself uses.
+ */
 function RevenueChart({ points, busy }: { points: RevenuePoint[]; busy: boolean }) {
-  const [hover, setHover] = useState<number | null>(null);
   const totals = points.map((p) => p.plans + p.boosts + p.topups);
   const peak = Math.max(1, ...totals);
+  const h = (v: number) => (v / peak) * 110;
 
   return (
-    <div className="relative mt-4">
-      <div className="flex h-[160px] items-end gap-[6px]" style={{ opacity: busy ? 0.5 : 1, transition: "opacity .15s" }}>
-        {points.map((p, i) => {
-          const total = totals[i];
-          const h = (v: number) => (v / peak) * 150;
-          return (
-            <div
-              key={`${p.label}-${i}`}
-              className="flex min-w-0 flex-1 flex-col items-center justify-end gap-[2px]"
-              onMouseEnter={() => setHover(i)}
-              onMouseLeave={() => setHover(null)}
-            >
-              {hover === i && (
-                <div
-                  className="absolute z-10 -translate-y-2 rounded-8 border px-2 py-1 text-[11px]"
-                  style={{ background: "var(--surface-1)", borderColor: "var(--border)", color: "var(--ink-primary)", boxShadow: "0 4px 12px rgba(0,0,0,.10)" }}
-                >
-                  <strong>{money(total)}</strong> · plans {money(p.plans)} · boosts {money(p.boosts)} · top-ups {money(p.topups)}
-                </div>
-              )}
-              <span className="w-full rounded-t-[2px]" style={{ height: h(p.topups), background: "var(--warning)" }} />
-              <span className="w-full" style={{ height: h(p.boosts), background: "var(--info)" }} />
-              <span className="w-full" style={{ height: h(p.plans), background: "var(--accent)" }} />
-            </div>
-          );
-        })}
-      </div>
-      <div className="mt-2 flex gap-[6px]">
-        {points.map((p, i) => (
-          <span key={`${p.label}-l-${i}`} className="min-w-0 flex-1 truncate text-center text-[11px]" style={{ color: "var(--ink-tertiary)" }}>
+    <div
+      className="flex h-[140px] items-end gap-2 px-1 md:gap-4"
+      style={{ opacity: busy ? 0.5 : 1, transition: "opacity .15s" }}
+    >
+      {points.map((p, i) => (
+        <div key={`${p.label}-${i}`} className="flex min-w-0 flex-1 flex-col items-center gap-[6px]">
+          <div
+            title={`${money(totals[i])} · plans ${money(p.plans)} · boosts ${money(p.boosts)} · top-ups ${money(p.topups)}`}
+            className="flex w-full max-w-[34px] cursor-pointer flex-col justify-end"
+            style={{ height: 110 }}
+          >
+            <span style={{ height: h(p.plans), background: "var(--accent)", borderRadius: "3px 3px 0 0" }} />
+            <span style={{ height: h(p.boosts), background: "var(--info)" }} />
+            <span style={{ height: h(p.topups), background: "var(--warning)", borderRadius: "0 0 3px 3px" }} />
+          </div>
+          <span className="w-full truncate text-center text-[11px]" style={{ color: "var(--ink-tertiary)" }}>
             {p.label}
           </span>
-        ))}
-      </div>
+        </div>
+      ))}
     </div>
   );
 }

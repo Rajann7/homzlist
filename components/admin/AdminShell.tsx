@@ -253,7 +253,7 @@ export function AdminShell({ staff, nav, badges, online, bell, env, maintenance,
   return (
     // Design: `height:100%;width:100%;display:flex;overflow:hidden`. The page does
     // not scroll — `main` does.
-    <div className="flex h-[100dvh] overflow-hidden" style={{ background: "var(--page)" }}>
+    <div className="flex h-[100dvh] overflow-hidden" style={{ background: "var(--bg-page)" }}>
       {/* SIDEBAR (tablet + desktop) — `showSidebar = !mobile` */}
       <aside
         className="admin-sidebar hidden shrink-0 flex-col border-r md:flex"
@@ -398,8 +398,8 @@ export function AdminShell({ staff, nav, badges, online, bell, env, maintenance,
                 <>
                   <button type="button" className="fixed inset-0 z-40 cursor-default" aria-hidden onClick={() => setAvatarMenu(false)} />
                   <div
-                    className="absolute right-0 z-50 mt-2 w-56 overflow-hidden rounded-12 border py-1"
-                    style={{ background: "var(--surface-1)", borderColor: "var(--border)", boxShadow: "var(--shadow-3, 0 8px 24px rgba(0,0,0,.16))" }}
+                    className="absolute right-0 z-50 mt-2 w-56 overflow-hidden rounded-12 border py-1 shadow-l3 dark:shadow-none"
+                    style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
                   >
                     <div className="px-3 py-2">
                       <div className="truncate text-[13px] font-semibold" style={{ color: "var(--ink-primary)" }}>
@@ -427,7 +427,7 @@ export function AdminShell({ staff, nav, badges, online, bell, env, maintenance,
 
         {/* THE SCROLL CONTAINER. Inner pad 16 mobile / 24 up, max-width 1200 centred
             — the design's `mainPadStyle`. */}
-        <main className="flex-1 overflow-y-auto" style={{ background: "var(--page)" }}>
+        <main className="flex-1 overflow-y-auto" style={{ background: "var(--bg-page)" }}>
           <div className="mx-auto w-full max-w-[1200px] p-4 md:p-6">{children}</div>
         </main>
       </div>

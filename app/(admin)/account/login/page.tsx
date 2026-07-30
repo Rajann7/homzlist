@@ -28,6 +28,10 @@ export default async function AdminLoginPage({
       mode={googleMode()}
       error={searchParams.error ?? null}
       email={searchParams.email ?? null}
+      // The design puts the same env chip the shell wears at top-right of A1,
+      // so it is obvious BEFORE signing in which environment this is. Decided
+      // by the same rule the shell uses.
+      env={process.env.NODE_ENV === "production" ? null : "STAGING"}
     />
   );
 }

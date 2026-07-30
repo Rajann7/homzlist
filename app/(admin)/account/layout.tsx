@@ -9,5 +9,5 @@
  * forgetting to add a check.
  */
 export default function AdminZoneLayout({ children }: { children: React.ReactNode }) {
-  return <div className="min-h-[100dvh]" style={{ background: "var(--page)" }}>{children}</div>;
+  return <div className="min-h-[100dvh]" style={{ background: "var(--bg-page)" }}>{children}</div>;
 }
