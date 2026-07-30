@@ -11,7 +11,8 @@
  */
 
 const isServer = typeof window === "undefined";
-const isProd = process.env.NODE_ENV === "production";
+/** Exported so the dev-only code paths (admin DEV sign-in) can refuse to run in prod. */
+export const isProd = process.env.NODE_ENV === "production";
 
 /** Public config — safe to reference from client components. */
 export const publicEnv = {
@@ -97,5 +98,10 @@ export function assertProdSecrets(): string[] {
   if (!e.jwt.accessSecret) missing.push("JWT_ACCESS_SECRET");
   // Audit M1: the dev OTP provider must never ship to production.
   if (e.otp.provider !== "msg91") missing.push("OTP_PROVIDER=msg91 (dev OTP provider is not allowed in production)");
+  // Doc3 §1.1: admin sign-in is Google-only. Without a real OAuth client the
+  // panel falls back to its DEV sign-in, which must never reach production —
+  // lib/admin/google.ts also refuses it at runtime, this is the deploy-time half.
+  if (!e.googleOauth.clientId) missing.push("GOOGLE_OAUTH_CLIENT_ID (admin panel is Google-only)");
+  if (!e.googleOauth.clientSecret) missing.push("GOOGLE_OAUTH_CLIENT_SECRET (admin panel is Google-only)");
   return missing;
 }

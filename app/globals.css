@@ -290,6 +290,27 @@
   }
 }
 
+/* Dialog entrance (P12 `.dlg`): 200ms scale-in from 96%. */
+@keyframes hz-pop {
+  from {
+    transform: scale(0.96);
+    opacity: 0;
+  }
+}
+
+/* P12 S2 ticket-created check: the circle draws in 500ms, the tick follows at
+   400ms — the design's exact two-stage `chk-draw`. Reuses hz-draw above. */
+.hz-check .hz-check-c1 {
+  stroke-dasharray: 166;
+  stroke-dashoffset: 166;
+  animation: hz-draw 0.5s cubic-bezier(0.2, 0, 0, 1) forwards;
+}
+.hz-check .hz-check-c2 {
+  stroke-dasharray: 48;
+  stroke-dashoffset: 48;
+  animation: hz-draw 0.35s 0.4s cubic-bezier(0.2, 0, 0, 1) forwards;
+}
+
 /* Pending-approval node pulse on the P6 success timeline */
 @keyframes hz-pulse {
   0%,
@@ -357,3 +378,74 @@ input[type="range"].hz-rng::-moz-range-thumb {
   from { opacity: 0; }
   to { opacity: 1; }
 }
+
+/* ---------------------------------------------------------------------------
+   Admin panel (designs/P13-14-15). Admin ships its own three device layouts —
+   these rules are scoped to the admin shell and never touch the user-side
+   mobile design (CLAUDE.md design lock §4).
+   Sidebar row: 20px icon + 15/400 label, active = accentSoft bg + 3px accent
+   left bar + ink1 text, count badge pushed to the end.
+--------------------------------------------------------------------------- */
+.admin-nav-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 400;
+  line-height: 1.2;
+  color: var(--ink-secondary);
+  background: transparent;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  user-select: none;
+}
+.admin-nav-row:hover { background: var(--surface-2); }
+.admin-nav-row[data-active] {
+  background: var(--accent-soft);
+  color: var(--ink-primary);
+}
+.admin-nav-row[data-collapsed] { justify-content: center; padding: 9px 0; }
+.admin-nav-child { padding-left: 42px; font-size: 13px; }
+.admin-nav-bar {
+  position: absolute;
+  left: 0;
+  top: 6px;
+  bottom: 6px;
+  width: 3px;
+  border-radius: 999px;
+  background: var(--accent);
+}
+.admin-nav-badge {
+  margin-left: auto;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--surface-3);
+  color: var(--ink-secondary);
+  font-size: 11px;
+  font-weight: 700;
+}
+/* Admin tables/cards: 56px rows, hairline dividers, sticky header. */
+.admin-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; line-height: 1.4; }
+.admin-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--surface-2);
+  color: var(--ink-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+  padding: 12px 16px;
+  white-space: nowrap;
+}
+.admin-table tbody td { padding: 12px 16px; border-top: 1px solid var(--divider); height: 56px; }
+.admin-table tbody tr:hover { background: var(--surface-2); }

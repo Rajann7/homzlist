@@ -161,7 +161,22 @@ export type IconName =
   | "nav-search"
   | "nav-create"
   | "nav-message"
-  | "nav-profile";
+  | "nav-profile"
+  // Module 12 — P12 help / legal / blog / system pages / components gallery
+  | "pause"
+  | "cloud-off"
+  | "wrench"
+  | "paperclip"
+  | "refresh"
+  | "book"
+  | "zap"
+  | "calendar"
+  | "inbox"
+  | "ban"
+  | "maximize"
+  | "wallet"
+  | "rupee"
+  | "sliders";
 
 interface IconProps extends React.SVGProps<SVGSVGElement> {
   name: IconName;
@@ -831,6 +846,86 @@ const PATHS: Record<IconName, (f: boolean) => React.ReactNode> = {
     <>
       <rect x="3" y="4" width="18" height="16" rx="1" />
       <path d="M3 8h18M3 12h18M3 16h18" />
+    </>
+  ),
+  /* ---- Module 12 (designs/P12): help, legal, blog, system pages, gallery ----
+   * Paths taken from P12's own <symbol> defs so the icons on those screens are
+   * the ones the design draws. Same outline family, 24×24, 1.5px. */
+  pause: () => (
+    <>
+      <rect x="6" y="4" width="4" height="16" rx="1" />
+      <rect x="14" y="4" width="4" height="16" rx="1" />
+    </>
+  ),
+  "cloud-off": () => (
+    <>
+      <path d="M22.61 16.95A5 5 0 0 0 18 10h-1.26a8 8 0 0 0-7.05-6M5 5a8 8 0 0 0 4 15h9a5 5 0 0 0 1.7-.3" />
+      <path d="m1 1 22 22" />
+    </>
+  ),
+  wrench: () => (
+    <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
+  ),
+  paperclip: () => (
+    <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+  ),
+  refresh: () => (
+    <>
+      <path d="M21 12a9 9 0 1 1-2.64-6.36L21 8" />
+      <path d="M21 3v5h-5" />
+    </>
+  ),
+  book: () => (
+    <>
+      <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
+      <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
+    </>
+  ),
+  zap: () => <path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z" />,
+  calendar: () => (
+    <>
+      <rect x="3" y="4" width="18" height="18" rx="2" />
+      <path d="M16 2v4M8 2v4M3 10h18" />
+    </>
+  ),
+  inbox: () => (
+    <>
+      <path d="M22 12h-6l-2 3h-4l-2-3H2" />
+      <path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" />
+    </>
+  ),
+  ban: () => (
+    <>
+      <circle cx="12" cy="12" r="10" />
+      <path d="m4.9 4.9 14.2 14.2" />
+    </>
+  ),
+  maximize: () => (
+    <>
+      <path d="M8 3H5a2 2 0 0 0-2 2v3" />
+      <path d="M21 8V5a2 2 0 0 0-2-2h-3" />
+      <path d="M3 16v3a2 2 0 0 0 2 2h3" />
+      <path d="M16 21h3a2 2 0 0 0 2-2v-3" />
+    </>
+  ),
+  wallet: () => (
+    <>
+      <path d="M21 12V7H5a2 2 0 0 1 0-4h14v4" />
+      <path d="M3 5v14a2 2 0 0 0 2 2h16v-5" />
+      <path d="M18 12a2 2 0 0 0 0 4h4v-4z" />
+    </>
+  ),
+  rupee: () => (
+    <>
+      <path d="M6 3h12M6 8h12" />
+      <path d="m6 13 8.5 8" />
+      <path d="M6 13h3a5 5 0 0 0 5-5V3" />
+    </>
+  ),
+  sliders: () => (
+    <>
+      <path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3" />
+      <path d="M1 14h6M9 8h6M17 16h6" />
     </>
   ),
 };

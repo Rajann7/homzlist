@@ -7,6 +7,7 @@ import { COOKIE, signAccess, signRegisterToken, createRefreshSession, setSession
 import { absorbOutgoingSession } from "@/lib/auth/account-pool";
 import { cookies } from "next/headers";
 import { clientIp, hashIp } from "@/lib/auth/rate-limit";
+import { findActiveBan } from "@/lib/admin/deviceBans";
 import { toUserDTO } from "@/lib/auth/dto";
 
 /**
@@ -24,6 +25,17 @@ export async function POST(req: NextRequest) {
   }
   if (!body.otpSession || !/^\d{6}$/.test(body.code ?? "")) return fail("VALIDATION_ERROR");
 
+  /**
+   * A banned device or address does not get in (Doc3 §1.6 — A9's Ban device/IP).
+   *
+   * Checked BEFORE the code is verified, so a ban cannot be probed by watching
+   * which codes are accepted, and a banned client burns no OTP attempts. The
+   * response is deliberately generic — telling someone their device is banned
+   * tells them which device to change.
+   */
+  const ban = await findActiveBan(req.headers);
+  if (ban) return fail("NUMBER_LOCKED");
+
   const result = await verifyOtp(body.otpSession, body.code!);
 
   if (!result.ok) {
@@ -36,9 +48,15 @@ export async function POST(req: NextRequest) {
   const phone = result.phone!;
   const { profile } = await resolveProfileForLogin(phone);
 
-  if (profile.state === "deactivated") {
+  // P12 S6. A deactivation is undone simply by logging in ("everything comes back").
+  // A scheduled DELETION is not: the user must see the grace screen and choose
+  // "Cancel deletion" explicitly, otherwise the purge date would be silently
+  // dropped and the account left in an inconsistent half-deleted state.
+  const pendingDeletion = await getScheduledDeletion(profile.id);
+  if (profile.state === "deactivated" && !pendingDeletion) {
     const db = createServiceClient();
     await db.from("profiles").update({ state: "active" }).eq("id", profile.id);
+    await cancelDeactivationRecord(profile.id);
     profile.state = "active";
   }
 
@@ -61,6 +79,35 @@ export async function POST(req: NextRequest) {
   await absorbOutgoingSession(profile.id, outgoing);
   await touchLastActive(profile.id);
 
-  const next = profile.state === "suspended" ? "suspended" : "seller";
-  return ok({ isNew: false, user: toUserDTO(profile), next });
+  const next = profile.state === "suspended" ? "suspended" : pendingDeletion ? "grace" : "seller";
+  return ok({
+    isNew: false,
+    user: toUserDTO(profile),
+    next,
+    ...(pendingDeletion ? { deletionPurgeAt: pendingDeletion } : {}),
+  });
+}
+
+/** The purge date of an open deletion, or null. */
+async function getScheduledDeletion(profileId: string): Promise<string | null> {
+  const db = createServiceClient();
+  const { data } = await db
+    .from("account_actions")
+    .select("purge_at")
+    .eq("profile_id", profileId)
+    .eq("kind", "delete")
+    .eq("status", "scheduled")
+    .maybeSingle();
+  return (data?.purge_at as string) ?? null;
+}
+
+/** Close out the deactivation row that logging back in has just undone. */
+async function cancelDeactivationRecord(profileId: string): Promise<void> {
+  const db = createServiceClient();
+  await db
+    .from("account_actions")
+    .update({ status: "cancelled", cancelled_at: new Date().toISOString() })
+    .eq("profile_id", profileId)
+    .eq("kind", "deactivate")
+    .eq("status", "scheduled");
 }

@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { verifyAccessEdge } from "@/lib/auth/edge";
+import { verifyAccessEdge, verifyAdminEdge } from "@/lib/auth/edge";
 
 /**
  * Subdomain routing + session isolation + login-bypass sealing (Doc6 §4, Doc9 §28).
@@ -16,6 +16,8 @@ const ACCESS_COOKIE = "hz_at";
 const REFRESH_COOKIE = "hz_rt";
 /** Multi-account pool (lib/auth/account-pool) — treated exactly like hz_rt. */
 const POOL_COOKIE = "hz_accts";
+/** The admin zone signs in separately (lib/admin/session) — its own cookie. */
+const ADMIN_COOKIE = "hz_ast";
 
 type Zone = "public" | "seller" | "admin";
 function getZone(host: string): Zone {
@@ -103,9 +105,18 @@ export async function middleware(request: NextRequest) {
     return NextResponse.rewrite(url);
   }
 
-  // admin — Google-auth whitelist enforced server-side (Module 11)
-  if (isLogin && user) return NextResponse.redirect(new URL("/", request.url));
-  if (!isLogin && !user) return NextResponse.redirect(new URL("/login", request.url));
+  // admin — its own identity, not the seller session. Gating this branch on
+  // `user` meant an admin holding a valid hz_ast was bounced to /login while any
+  // signed-in seller sailed past the gate; the whitelist behind it still said no,
+  // but the front door was reading the wrong badge. hz_ast is host-only to
+  // account.<host>, so the two sessions cannot see each other (Doc9 §21).
+  //
+  // This is the cheap edge check only. The (shell) layout and every /api/v1/admin
+  // route re-read the seat from `staff` on each request, which is what makes
+  // Doc3 §1.1's instant revocation real — middleware cannot reach the DB here.
+  const admin = await verifyAdminEdge(request.cookies.get(ADMIN_COOKIE)?.value);
+  if (isLogin && admin) return NextResponse.redirect(new URL("/", request.url));
+  if (!isLogin && !admin) return NextResponse.redirect(new URL("/login", request.url));
   url.pathname = `/account${pathname === "/" ? "" : pathname}`;
   return NextResponse.rewrite(url);
 }

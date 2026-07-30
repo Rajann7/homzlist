@@ -195,11 +195,37 @@ export async function moderate(
   // three rows; this is what writes them.
   await notifyModerationDecision(subject, id, current.profile_id, input, u.status, Boolean(u.is_locked));
 
-  // A requirement going live is what brokers and builders in that city are
-  // waiting for (Doc2 §14 "matching requirement"). Capped at 3/day each.
+  /**
+   * A requirement going live is what brokers and builders in that city are
+   * waiting for (Doc2 §14 "matching requirement"). Capped at 3/day each.
+   *
+   * NOT awaited, deliberately. The fan-out walks up to 500 pros and makes up to
+   * three `claim()` round-trips each — measured at over 30 seconds on the dev
+   * database. Awaiting it put that inside the caller's request, which broke two
+   * things at once: an admin's Approve button hung until the browser gave up,
+   * and because the caller's audit write comes AFTER this returns, an aborted
+   * request left the requirement live with no audit row — the one thing
+   * lib/admin/audit.ts exists to prevent.
+   *
+   * The decision and the fan-out are separate concerns: the requirement is
+   * already live in the database, and telling other users about it is not part
+   * of that transaction. Failures are logged rather than thrown so they cannot
+   * reach back into a completed decision.
+   *
+   * Durability caveat, tracked in docs/PENDING-INTEGRATIONS.md: a process that
+   * dies mid-fan-out drops the remaining notifications. The `matching` BullMQ
+   * queue and the "Requirement matching · On approve/edit" cron row both exist
+   * for this and are waiting on Redis (gap B5).
+   */
   if (subject === "requirement" && u.status === "live") {
-    const { notifyMatchingRequirement } = await import("@/lib/notifications/jobs");
-    await notifyMatchingRequirement(id);
+    void (async () => {
+      try {
+        const { notifyMatchingRequirement } = await import("@/lib/notifications/jobs");
+        await notifyMatchingRequirement(id);
+      } catch (err) {
+        console.error(`[moderation] requirement match fan-out failed for ${id}`, err);
+      }
+    })();
   }
 
   return { ok: true, status: u.status, locked: Boolean(u.is_locked), rejectCount: u.reject_count ?? 0 };

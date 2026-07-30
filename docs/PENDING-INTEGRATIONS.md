@@ -1,18 +1,18 @@
 # PENDING — everything not finished, and exactly what to do when it unblocks
 
-Status as of **24 Jul 2026**.
+Status as of **30 Jul 2026**.
 
 Three kinds of pending work, in priority order:
 
 | # | Item | Blocked on | Costs money / breaks a flow? |
 |---|---|---|---|
-| **A1** | Boost approval never happens | **Module 11 — Admin Panel** (P13-14-15), not credentials | 🟡 Money is now safe (auto-refund after 48h), but boosts still can't go live |
-| **A2** | Trial grants unreachable | Module 11 — Admin Panel (P13-14-15) | No — feature simply unusable |
-| **A5** | Nothing a seller posts ever goes live | **Module 11 — Admin Panel** (P13-14-15) | 🔴 YES — see below |
+| ~~A1~~ | ~~Boost approval never happens~~ | ✅ **CLOSED 30 Jul 2026 — Module 11 P2, A6.** `/api/v1/admin/boosts/[id]` + the Boost queue. Verified live: an eligible boost went `active` with real `starts_at`/`ends_at` and notified the poster; an ineligible one auto-rejected and queued its refund. | — |
+| **A2** | Trial grants unreachable | Module 11 — Admin Panel (**P4**, A15 Grants) | No — feature simply unusable |
+| ~~A5~~ | ~~Nothing a seller posts ever goes live~~ | ✅ **CLOSED 30 Jul 2026 — Module 11 P2, A3+A4+A5.** Approve/Request-changes/Reject all verified against the DB, including the third-reject lock. | — |
 | **B1** | Razorpay webhook secret | Rajan (dashboard) | 🔴 YES — late payments never settle |
 | **B2** | Cron not scheduled in prod | Deploy step (`CRON_SECRET` on host) | 🔴 YES — expiry/refund/reminders never run |
 | **A3** | Boost never appears in feed/search | **Module 9 — Boost placement** | 🟡 Even an approved boost would show nowhere |
-| **A4** | Profile Block + Report buttons do nothing | **Module 7** (block) / **Module 11** (reports) | 🟡 UI claims success; nothing is saved |
+| **A4** | Profile Block button does nothing | **Module 7** (block). The REPORT half is closed: A9 decides reports and notifies reporters (30 Jul 2026). | 🟡 UI claims success; nothing is saved |
 | **B3** | Reminder delivery (push/email) | FCM + Resend keys (**Module 10 — Notifications**) | No — reminders are recorded, not delivered |
 | **B4** | Cloudflare R2 | Rajan (keys) | No — Supabase Storage is the interim store |
 | **B5** | Redis / MSG91 / Resend / FCM | Rajan (keys) | Varies — see table at the end |
@@ -20,7 +20,14 @@ Three kinds of pending work, in priority order:
 | ~~C3~~ | ~~Quota charged for a requirement/listing that was never created~~ | ✅ FIXED 23 Jul 2026, migration 0024 | — |
 | **C2** | Checkout shows CGST+SGST, design shows one GST row | Rajan's decision | No |
 | **M6.3** | Story media never expires (public bucket, so signing is a no-op) | **B4 (R2 / private bucket)** | No — anti-scrape only; story viewer works |
-| **M6.4** | Same gap as A1, seen from Module 6 | **Module 11 — Admin Panel** | 🟡 Boost ranks correctly once active — it just can't get there |
+| ~~M6.4~~ | ~~Same gap as A1, seen from Module 6~~ | ✅ **CLOSED 30 Jul 2026 with A1** — A6 can put a boost into `active`. | — |
+| **M11.1** | `validate.ts` has its own hardcoded 4-pattern number detector and never reads `number_patterns` | Module 4 | 🟡 A listing can pass submit-time detection using a pattern an admin configured — see below |
+| **M11.2** | Report reasons are written by three different hardcoded vocabularies | Module 4 / 7 | No — A9 normalises for display; the stored values stay inconsistent |
+| **M11.3** | `ownership_proof_name` and the ID number are never captured at upload | Module 5 (forms) | No — A4/A7 say "not captured" instead of faking the comparison |
+| **M11.4** | Requirement match fan-out is best-effort, not durable | **B5 (Redis)** | 🟡 A process dying mid-fan-out drops the rest — see below |
+| **M11.5** | An unmatched HTTP method returns 405 across the whole API, confirming a route exists | Small shared fix | No — informational leak only |
+| **M11.6** | `urgency` labels are hardcoded in `RequirementForm.tsx` as well as config | Module 4 | No — both agree today |
+| **M11.7** | Three USER-side files use radius class names this project does not generate | Rajan's call (mobile design is locked) | 🟡 Those elements render square — see below |
 
 **Module 6 is NOT 100% closed** — M6.3 + M6.4 above are the only two left, and
 neither can be closed from inside Module 6. See the closure table in §A0-M6.
@@ -28,6 +35,141 @@ neither can be closed from inside Module 6. See the closure table in §A0-M6.
 Everything below **fails closed** — nothing runs insecurely, the feature is just off.
 
 ---
+
+---
+
+# M11-P2. Module 11 Part 2 (A4–A9) — what was found — 30 Jul 2026
+
+The six screens are built, DB-verified and reverted. What follows is the
+hidden-issue hunt: things the prompt did not list, found by walking PROOF.md's six
+questions against A4–A9. **Fixed in P2** first, then what is left.
+
+## Fixed in P2 (found, not asked for)
+
+1. **A requirement decision could lose its audit row.** `moderate()` awaited the
+   matching fan-out — up to 500 pros × 3 `claim()` round-trips, measured at over
+   30 seconds. The admin's Approve hung until the browser gave up, and because the
+   audit write happens after `moderate()` returns, an aborted request left the
+   requirement LIVE with no audit row. Proven: the requirement went live, 39
+   notifications were written, and `admin_audit_log` had nothing.
+   The fan-out is no longer awaited (`lib/listings/moderation.ts`); the decision
+   now returns in ~6s and the audit row lands every time.
+2. **The bio auto-flag withheld nothing.** `updateOwnProfile` wrote a
+   `moderation_events` row and left the bio public, so a phone number sat on the
+   profile for the whole time the appeal waited — and A8's "Dismiss flag · content
+   restored" had nothing to restore. Migration 0106 makes the flag real state and
+   `publicProfileDTO` strips the bio while it is open (server-side, per Doc9 §17).
+   Editing the bio clean now closes the appeal without an admin.
+3. **Three rejections was a dead-end.** Nothing in the product could clear
+   `is_locked`. A8's unlock does, and deliberately sets `reject_count = MAX-1` so
+   it is "one more try", not a clean slate — verified end to end.
+4. **A boost's fourth eligibility check did not exist.** The design draws "No
+   active reports"; nothing computed it, so a boost could be approved onto content
+   three people had just reported. Now queried and surfaced.
+5. **`device_bans` was enforced by nothing.** A9's Ban device/IP wrote a row and
+   the person signed in again ten seconds later. `lib/admin/deviceBans.ts` now
+   checks it at the OTP gate, keyed on the SALTED HASH of the address so the ban
+   works without HomzList ever storing an IP. Verified: banned hash → refused
+   before the code is even checked; clean hash → normal flow.
+6. **`number_patterns` was a dead config table.** Ten configured patterns
+   (Gujarati/Devanagari digits, leetspeak, wa.me links) that nothing read.
+   `lib/admin/textFlags.ts` reads it, so A4/A5/A8 highlight everything the config
+   claims to catch and name the pattern that matched.
+7. **`/assign` leaked its own existence.** An anonymous POST with an unknown
+   action got a 422 before any auth check. The seat is now resolved first, and the
+   POST-only routes answer GET with 404 instead of 405.
+8. **Small lies the screens told**: `queues.ts` tested `kind === 'sale'` when the
+   enum is `'sell'`, so every sale row printed "Flat / sell"; `posterPanel`
+   selected `avatar_url` (the column is `photo_url`), which silently blanked the
+   whole poster block; `doc_key = 'pending-upload'` counted as "1 file";
+   `ownership_proof_type` printed the raw code; `flagged_reason` printed
+   `number_in_notes`; `urgency` printed `exploring`. All resolved from config now.
+
+## The radius bug — every corner in the admin panel was square (fixed 30 Jul 2026)
+
+`tailwind.config.ts` sets **`theme.borderRadius`**, not `theme.extend.borderRadius`,
+so it REPLACES Tailwind's default scale with Doc1's tokens:
+`none · 4 · 6 · 8 · 12 · 16 · full`.
+
+That means `rounded-lg`, `rounded-xl`, `rounded-2xl`, `rounded-md`, `rounded-sm` and
+bare `rounded` **generate no CSS at all** — they are silently dropped, and the
+element renders with square corners. Nothing errors; the class just does nothing.
+
+Measured on A1 before the fix: login card `0px` (design 16), email input `0px` (8),
+Sign-in button `0px` (8), ADMIN chip `0px` (4).
+
+106 classes across 15 admin files were remapped onto the token that carries the
+design's value. Proof after: **530 elements with a radius class on A3, zero still
+computing `0px`**; modal 16px, bottom-sheet top corners 16px, table wrapper 12px,
+chips 9999px, badges 4px, sidebar collapse button 6px.
+
+Arbitrary values (`rounded-[3px]` for the design's number-highlight) were left
+alone — those compile regardless of the scale.
+
+**M11.7 — the same bug exists on the USER side**, in three files:
+`components/listings/Preview.tsx`, `components/search/FilterSheet.tsx`,
+`components/search/SearchResults.tsx`. Those elements are square today. Not fixed
+without a decision, because the mobile design is LOCKED and repairing this changes
+how those screens look (from square back to the intended radius) — CLAUDE.md's
+design lock says a fix must not change appearance, so this one needs Rajan's word.
+A `rounded-lg → rounded-8` sweep over those three files is the whole change.
+
+**Guard worth adding:** an ESLint rule (or a `grep` in CI) that fails on
+`rounded-(sm|md|lg|xl|2xl|3xl)` anywhere in the repo, so a class that silently does
+nothing cannot be written again.
+
+## Left open, and why
+
+- **M11.1 — the submit-time detector and the config table disagree.**
+  `lib/listings/validate.ts` keeps its own four hardcoded regexes and never reads
+  `number_patterns`, so a seller can pass submission using a pattern an admin
+  configured. The admin side is honest (it reads the table), which means the queue
+  will show a highlight the submit step did not catch. *Fix:* make
+  `detectNumberInText` async over `lib/admin/textFlags.ts`'s compiled patterns and
+  update its three callers. Module 4, not P2.
+- **M11.2 — three report-reason vocabularies.** `lib/feed/interactions.ts` writes
+  codes, `lib/chat/thread.ts` writes sentences, `lib/chat/service.ts` writes a
+  third set, so the same complaint is stored two ways (`wrong_price` and "Wrong
+  price" both exist today). A9 normalises for DISPLAY via
+  `moderation_action_options` kind=`report_reason`; the stored values are still
+  inconsistent. *Fix:* one shared reason table the three writers read.
+- **M11.3 — two fields the design compares are never captured.** A4 asks a
+  reviewer to check "Name on doc" against "Name on account", and A7 shows a masked
+  ID number. Neither is collected at upload. Columns exist
+  (`listings.ownership_proof_name`, `verifications.rera_number` for the ID case)
+  and both screens print "Not captured at upload — read it from the document"
+  rather than inventing a match. A4 also WITHHOLDS the mismatch badge instead of
+  claiming "no mismatch". *Fix:* add the field to the Module 5 upload step.
+- **M11.4 — the fan-out is best-effort.** Not awaiting it fixed the hang and the
+  lost audit row, but a process that dies mid-fan-out drops the remaining
+  notifications. The `matching` BullMQ queue and the disabled
+  "Requirement matching · On approve/edit" cron row both exist for this and are
+  waiting on **B5 (Redis)**.
+- **M11.5 — 405 confirms a route exists.** Fixed on the six P2 routes for GET;
+  DELETE and PUT still 405 here and everywhere else in the API. *Fix:* one shared
+  handler, or a middleware rule for the admin host — not worth patching route by
+  route.
+- **M11.6 — `urgency` labels exist twice.** Now in `field_definitions` (0102) AND
+  still hardcoded in `components/listings/RequirementForm.tsx`. They agree today.
+
+## Seed inconsistencies (not code bugs, but they hid whole paths)
+
+These made real code paths unprovable until they were seeded by hand. Worth
+fixing in `scripts/seed-admin.mjs` so they stay exercised:
+
+- Every `verifications.doc_key` is the literal `'pending-upload'`, so the document
+  viewer / zoom / rotate / download path had **never** run against a real object.
+  Proven by uploading one real file, then reverted.
+- Every `reports` row with `subject_type = 'message'` points at a `chat_messages`
+  id that does not exist, so the read-only chat context had **never** rendered.
+  Proven by repointing one at a real message, then reverted.
+- 3 of the 4 reject-lock appeals are against listings that are **not locked**, and
+  no `moderation_log` reject rows exist for any of them, so the rejection timeline
+  is empty. A8 states both facts plainly rather than pretending.
+- No `pending_review` listing had `reject_count = 2`, so the third-reject lock had
+  never fired. Seeded, proven (`is_locked = true`, poster told "no further
+  re-submissions"), reverted.
+
 
 # A-VERIFY. Deep multi-role live verification — 25 Jul 2026
 
@@ -3559,3 +3701,60 @@ screens read them.
 exist as DATA (so audit, ticket assignee, exports "by" and the Staff screen are
 populated) but nobody can log in with them. Real admin accounts get created with
 the admin build, when Rajan gives the emails.
+
+## Module 11 Part 1 (admin foundation) — found while building
+
+- **Google OAuth client not provisioned.** `GOOGLE_OAUTH_CLIENT_ID` /
+  `GOOGLE_OAUTH_CLIENT_SECRET` are absent, so admin sign-in runs the DEV
+  provider (address checked straight against the `staff` whitelist — the
+  authorisation half is identical, only Google's proof of the address is
+  skipped). The live OIDC path is written and typed but has never round-tripped
+  against Google. `assertProdSecrets()` now refuses a production deploy without
+  both, and `devSignIn()` refuses to run when `NODE_ENV=production`.
+  **Blocked on:** a Google Cloud OAuth client + the redirect URI
+  `https://account.homzlist.com/api/v1/admin/auth/google/callback`.
+
+- ~~**Seeded audit rows speak a different vocabulary than the code.**~~ **FIXED in 0098.**
+  `scripts/seed-admin.mjs` wrote `admin_audit_log.actor_role` as labels
+  ("Super Admin", "Staff") and `action` as prose ("Plan edit", "Suspend"),
+  while `lib/admin/audit.ts` writes canonical codes (`super`, `login`,
+  `role_change`). A26's action/severity filter chips will silently miss the
+  seeded half unless the rows are normalised. **Fix in P6 with A26** — normalise
+  the seed rows in the same migration that builds the screen, don't teach the
+  filter to accept both.
+  → Done: 600 seeded rows normalised to canonical codes (actor_role Super Admin→super,
+  action "Plan edit"→edit …). `select count(*) where action <> lower(action)` = 0.
+
+- **`staff.state` and `staff.is_active` overlap.** `is_active` is the gate
+  (isStaff, permissions, the new `staff_active_needs_email` constraint);
+  `state` only distinguishes an invited seat that has never signed in ("Pending
+  first login" in A25). 0096 put them back in step. A25 must keep them in step
+  when it adds/removes seats.
+
+- **Admin chat read-only is not yet enforced** — no admin chat endpoint exists
+  to enforce it on. Doc9 requires it at the API, including during impersonation.
+  **Due in P3** (A11 Chats tab + A31).
+
+## Module 11 Part 2 — issues found and fixed during the A3 build
+
+- **`reject_templates` primary key was `code` alone**, though the table has a
+  `subject_type` column so each queue can have its own reasons. The same code
+  ('contact', 'other', 'dup') therefore could not exist for both listings and
+  requirements — A5's reject dialog could never have been populated. PK is now
+  (code, subject_type) and the requirement set exists (0098).
+
+- **Reject reason wording differed between the design and the database.** A4's
+  dialog draws eight specific reasons; the seed had eight different ones. The
+  design is locked and the poster is shown whichever reason is picked, so the
+  table now carries the design's wording. **Three seeded reasons the design does
+  not draw — "Ownership proof invalid", "Incomplete details", "Wrong location" —
+  are DEACTIVATED, not deleted.** `doc` in particular is arguably needed given
+  A4's whole ownership-document block. One `is_active` flip brings any of them
+  back; flagging it for Rajan's call.
+
+- **A2's tile disagreed with the queue it linked to.** The Listings tile counted
+  every `pending_review` row (70) while A3's Pending tab excludes items edited
+  after approval (69) — so tapping a tile showing 70 landed on a queue showing
+  69. The tile now uses the same predicate as the tab it deep-links to, which is
+  also how the design reads it (A2 "Listings 12" = A3 "Pending 12", with
+  "Updated after edit 2" as its own tab outside the tile).

@@ -139,8 +139,8 @@ export function SettingsHome({ base = "" }: { base?: string }) {
 
       <Section title="Support">
         <Row icon="help-circle" label="Help centre" onClick={() => go("/help")} />
-        <Row icon="headset" label="Contact support" onClick={() => go("/help/contact")} />
-        <Row icon="flag" label="Report a problem" onClick={() => go("/help/contact?topic=problem")} />
+        <Row icon="headset" label="Contact support" onClick={() => go("/support/new")} />
+        <Row icon="flag" label="Report a problem" onClick={() => go("/support/new?category=report")} />
       </Section>
 
       <Section title="About">
@@ -149,14 +149,14 @@ export function SettingsHome({ base = "" }: { base?: string }) {
         <Row icon="file" label="Refund Policy" onClick={() => go("/legal/refund")} />
         <Row icon="user" label="Grievance Officer" onClick={() => go("/legal/grievance")} />
         <Row icon="help-circle" label="About HomzList" onClick={() => go("/legal/about")} />
-        <Row icon="download" label="Download your data" onClick={() => go("/help/contact?topic=data")} />
+        <Row icon="download" label="Download your data" onClick={() => go("/data")} />
         <Row icon="star" label="Rate us on Google" trail={<Icon name="external" size={18} className="text-ink-tertiary" />} onClick={() => toast.show("Opening Google Play…")} />
       </Section>
 
       <Section title="Danger zone">
         <Row icon="log-out" label="Log out" destructive onClick={() => setLogoutOpen(true)} />
-        <Row icon="shield-off" label="Deactivate account" destructive onClick={() => go("/help/contact?topic=deactivate")} />
-        <Row icon="trash" label="Delete account" destructive onClick={() => go("/help/contact?topic=delete")} />
+        <Row icon="shield-off" label="Deactivate account" destructive onClick={() => go("/account")} />
+        <Row icon="trash" label="Delete account" destructive onClick={() => go("/account")} />
       </Section>
 
       <div className="px-4 pb-[calc(28px+env(safe-area-inset-bottom))] pt-7 text-center">

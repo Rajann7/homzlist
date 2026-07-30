@@ -1,14 +1,33 @@
-import { EmptyState, Wordmark } from "@/components";
+import { redirect } from "next/navigation";
+import { currentStaff } from "@/lib/admin/auth";
+import { googleMode } from "@/lib/admin/google";
+import { AdminLoginCard } from "@/components/admin/AdminLoginCard";
 
 /**
- * Admin login placeholder — Google-only, whitelist-checked server-side (Module 11).
- * Non-whitelisted / revoked emails are rejected server-side and logged (Doc9 §21).
+ * A1 — Admin login (P13 Part B / Doc5 A1).
+ *
+ * Google-only by construction: there is no password field on this screen and no
+ * endpoint behind it that would accept one (Doc3 §1.1). The two designed error
+ * states are driven by ?error= from the callback, which is also what the
+ * heartbeat redirects to when a seat is revoked mid-session.
  */
-export default function AdminLogin() {
+export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
+
+export default async function AdminLoginPage({
+  searchParams,
+}: {
+  searchParams: { error?: string; email?: string };
+}) {
+  // Already signed in — don't show a sign-in screen to someone who is.
+  const session = await currentStaff();
+  if (session.ok) redirect("/");
+
   return (
-    <div className="mx-auto flex min-h-[100dvh] max-w-admin flex-col items-center justify-center gap-4 px-6">
-      <Wordmark className="text-24" />
-      <EmptyState title="Admin sign-in" subtitle="Google auth (whitelist) arrives in Module 11." />
-    </div>
+    <AdminLoginCard
+      mode={googleMode()}
+      error={searchParams.error ?? null}
+      email={searchParams.email ?? null}
+    />
   );
 }

@@ -9,6 +9,7 @@ import { listingsApi, type Photo, type MyListing } from "@/lib/listings/client";
 import { InquirySheet, MoreSheet, ShareSheet, ReportSheet, LoginSheet } from "@/components/feed/sheets";
 import { interactionsApi, type FeedCard } from "@/lib/feed/client";
 import { DETAIL_PAD, DetailHero, DetailRow, DetailSection, DetailSeparator, PropertyDetailBody } from "./detailBody";
+import { RecordRecentlyViewed } from "@/components/system/RecordRecentlyViewed";
 import { cn } from "@/lib/utils";
 
 /**
@@ -175,6 +176,13 @@ export function ListingDetail({ id, isGuest = false }: { id: string; isGuest?: b
 
   return (
     <Shell>
+      {/* P12 S7 — remember this listing so the offline page has a real
+          "Recently viewed" rail instead of an empty promise. */}
+      <RecordRecentlyViewed
+        id={id}
+        priceLabel={listing.priceOnly ?? listing.price ?? ""}
+        subtitle={[listing.typeLabel, listing.areaLabel].filter(Boolean).join(" · ")}
+      />
       <DetailHeader
         title={listing.title ?? listing.typeLabel ?? ""}
         saved={saved}

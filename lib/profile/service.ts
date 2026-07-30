@@ -26,6 +26,10 @@ export interface FullProfile {
   state: string;
   is_registered: boolean;
   created_at: string;
+  /** Bio auto-flag state (migration 0106) — an open flag withholds the bio. */
+  bio_flagged_at: string | null;
+  bio_flag_reason: string | null;
+  bio_flag_outcome: "dismissed" | "upheld" | null;
 }
 
 export interface VerificationRow {
@@ -39,7 +43,7 @@ export interface VerificationRow {
 }
 
 const SELECT =
-  "id,username,phone,role,name,city_id,photo_url,bio,email,company_logo_url,established_year,projects_done,office_address,areas_covered,response_label,state,is_registered,created_at";
+  "id,username,phone,role,name,city_id,photo_url,bio,email,company_logo_url,established_year,projects_done,office_address,areas_covered,response_label,state,is_registered,created_at,bio_flagged_at,bio_flag_reason,bio_flag_outcome";
 
 export async function getProfileById(id: string): Promise<FullProfile | null> {
   const db = createServiceClient();
@@ -143,15 +147,58 @@ export async function updateOwnProfile(profileId: string, patch: ProfilePatch): 
   const { data, error } = await db.from("profiles").update(update).eq("id", profileId).select(SELECT).single();
   if (error) throw error;
 
-  // Bio auto-flag → admin queue (Doc2 §11).
-  if (patch.bio && (NUMBER_RE.test(patch.bio) || URL_RE.test(patch.bio))) {
-    await db.from("moderation_events").insert({
-      profile_id: profileId,
-      kind: "bio_flag",
-      severity: "info",
-      title: "Bio flagged for review",
-      detail: "Bio contains a phone number or link.",
-    });
+  /**
+   * Bio auto-flag → admin queue (Doc2 §11, reviewed on A8's auto-flag tab).
+   *
+   * This used to write only the event row, which meant the flag had no effect:
+   * the number stayed on the public profile while the appeal waited, and A8's
+   * "Dismiss flag · content restored" had nothing to restore. `bio_flagged_at`
+   * is the state that withholds it (migration 0106); the DTO strips the bio from
+   * other people's payloads while it is set and unresolved.
+   *
+   * Editing the bio re-opens the flag: a previously dismissed bio that now has a
+   * number in it is a new flag, not a settled one.
+   */
+  if (patch.bio !== undefined) {
+    const flagged = Boolean(patch.bio) && (NUMBER_RE.test(patch.bio) || URL_RE.test(patch.bio));
+    if (flagged) {
+      await db
+        .from("profiles")
+        .update({
+          bio_flagged_at: new Date().toISOString(),
+          bio_flag_reason: "Bio contains a phone number or link",
+          bio_flag_outcome: null,
+          bio_flag_resolved_at: null,
+          bio_flag_resolved_by: null,
+        })
+        .eq("id", profileId);
+      await db.from("moderation_events").insert({
+        profile_id: profileId,
+        kind: "bio_flag",
+        severity: "info",
+        title: "Bio hidden pending review",
+        detail: "Your bio contains a phone number or link, so it is hidden from other people until we review it.",
+      });
+    } else if (data && (data as FullProfile).bio_flagged_at) {
+      // The user removed the offending text themselves — the fastest and least
+      // annoying resolution, and it must not need an admin.
+      await db
+        .from("profiles")
+        .update({
+          bio_flagged_at: null,
+          bio_flag_reason: null,
+          bio_flag_outcome: null,
+          bio_flag_resolved_at: null,
+          bio_flag_resolved_by: null,
+        })
+        .eq("id", profileId);
+      await db
+        .from("moderation_appeals")
+        .update({ status: "upheld", resolution: "Withdrawn — the user edited the bio", resolved_at: new Date().toISOString() })
+        .eq("subject", "auto_flag")
+        .eq("subject_id", profileId)
+        .eq("status", "open");
+    }
   }
 
   return data as FullProfile;

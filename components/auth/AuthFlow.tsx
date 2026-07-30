@@ -18,7 +18,7 @@ import { getSavedAccounts, rememberAccount, type SavedAccountHint } from "@/lib/
  * session? home : (onboarding first-run) → Login. New user OTP → Role → Details
  * → Coach → home.
  */
-type Screen = "splash" | "onboarding" | "savedAccounts" | "login" | "otp" | "role" | "details" | "coach" | "browserUnsupported" | "guest" | "legal";
+type Screen = "splash" | "onboarding" | "savedAccounts" | "login" | "otp" | "role" | "details" | "coach" | "browserUnsupported" | "guest";
 
 /** Best-effort hint from a verified user DTO (server stays the source of truth). */
 function hintFromUser(phone: string, user: unknown): SavedAccountHint | null {
@@ -39,7 +39,6 @@ export function AuthFlow() {
   const [offline, setOffline] = useState(false);
   const [flow, setFlow] = useState<{ phone: string; otpSession: string; devCode?: string; role?: string }>({ phone: "", otpSession: "" });
   const [saved, setSaved] = useState<SavedAccountHint[]>([]);
-  const legalRef = useRef<"terms" | "privacy">("terms");
   // /login?add=1 — arriving from the P9 switch sheet to sign a SECOND account
   // into this device. The server keeps both sessions (lib/auth/account-pool).
   // Read on every render, NOT via useState: this component is server-rendered
@@ -147,9 +146,10 @@ export function AuthFlow() {
             go("otp");
           }}
           onGuest={() => go("guest")}
+          // P12 S3 shipped the real readers — the signup consent line now opens
+          // the live Terms / Privacy documents instead of a placeholder.
           onLegal={(which) => {
-            legalRef.current = which;
-            go("legal");
+            window.location.href = which === "terms" ? "/legal/terms" : "/legal/privacy";
           }}
         />
       )}
@@ -164,7 +164,11 @@ export function AuthFlow() {
             else {
               const hint = hintFromUser(flow.phone, res.user);
               if (hint) rememberAccount(hint);
-              goHome();
+              // P12 S6 — a deletion is still pending: land on the grace screen so
+              // the user can cancel it, rather than dropping them into the app
+              // with a purge date they never saw.
+              if (res.next === "grace") window.location.href = "/account/grace";
+              else goHome();
             }
           }}
         />
@@ -191,7 +195,6 @@ export function AuthFlow() {
       {screen === "coach" && <Coach onDone={goHome} />}
       {screen === "browserUnsupported" && <BrowserUnsupported />}
       {screen === "guest" && <Placeholder title="Feed — coming in Batch P2" onBack={back} />}
-      {screen === "legal" && <Placeholder title={`${legalRef.current === "terms" ? "Terms" : "Privacy Policy"} — coming in Batch P12`} onBack={back} />}
     </div>
   );
 }

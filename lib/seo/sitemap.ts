@@ -121,12 +121,45 @@ export async function sitemapFor(type: SitemapType): Promise<UrlEntry[]> {
     }));
   }
 
-  // static — the pages that exist regardless of inventory.
+  // static — the pages that exist regardless of inventory. Legal, help and blog
+  // (P12) belong here: they are guest-readable, SSR and indexable (Doc10
+  // implementation notes), and they come from the CMS rather than a literal list
+  // so publishing a document or a post puts it in the sitemap by itself.
   const today = new Date().toISOString();
-  return [
+  const out: UrlEntry[] = [
     { loc: "/", lastmod: today, changefreq: "daily", priority: 1.0 },
     { loc: "/search", lastmod: today, changefreq: "weekly", priority: 0.5 },
+    { loc: "/legal", lastmod: today, changefreq: "monthly", priority: 0.4 },
+    { loc: "/help", lastmod: today, changefreq: "weekly", priority: 0.6 },
+    { loc: "/blog", lastmod: today, changefreq: "weekly", priority: 0.7 },
   ];
+
+  const { data: pages } = await db()
+    .from("cms_pages").select("slug, updated_at").eq("is_published", true);
+  for (const p of (pages ?? []) as Array<{ slug: string; updated_at: string }>) {
+    out.push({ loc: `/legal/${p.slug}`, lastmod: p.updated_at, changefreq: "monthly", priority: 0.4 });
+  }
+
+  const { data: cats } = await db()
+    .from("help_categories").select("slug").eq("is_active", true);
+  for (const c of (cats ?? []) as Array<{ slug: string }>) {
+    out.push({ loc: `/help/category/${c.slug}`, lastmod: today, changefreq: "weekly", priority: 0.5 });
+  }
+
+  const { data: articles } = await db()
+    .from("faqs").select("slug, updated_at").eq("is_active", true).not("slug", "is", null);
+  for (const a of (articles ?? []) as Array<{ slug: string; updated_at: string }>) {
+    out.push({ loc: `/help/a/${a.slug}`, lastmod: a.updated_at, changefreq: "monthly", priority: 0.5 });
+  }
+
+  const { data: posts } = await db()
+    .from("blog_posts").select("slug, updated_at").eq("status", "published")
+    .lte("published_at", today);
+  for (const p of (posts ?? []) as Array<{ slug: string; updated_at: string }>) {
+    out.push({ loc: `/blog/${p.slug}`, lastmod: p.updated_at, changefreq: "monthly", priority: 0.7 });
+  }
+
+  return out;
 }
 
 export async function sitemapLastmod(type: SitemapType): Promise<string> {

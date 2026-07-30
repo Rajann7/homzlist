@@ -368,13 +368,29 @@ export interface BoostQueueRow {
   subjectId: string;
   subjectTitle: string;
   ownerName: string | null;
+  ownerId: string;
   price: string;
+  pricePaise: number;
   durationLabel: string;
+  durationDays: number;
   targetLabel: string;
   paidAt: string | null;
   createdAt: string;
   /** the eligibility checks the P13-15 boost panel lists */
   checks: { label: string; pass: boolean }[];
+  // ---- what A6's table and detail sheet render (Doc5 A6) -------------------
+  /** The boosted thing's cover, for the row thumb and the promoted-card preview. */
+  coverUrl: string | null;
+  /** The subject's own status — A6's "Listing" column. */
+  subjectStatus: string | null;
+  /** The subject's headline price, for the promoted-card preview. */
+  subjectPrice: string | null;
+  /** Payment identity for the payment block, and the row to deep-link to. */
+  payment: { id: string | null; ref: string | null; method: string | null; verified: boolean };
+  /** Hours the request has been waiting, for the SLA colour A6 shares with A3. */
+  hours: number;
+  /** Open reports on the boosted thing — the design's fourth eligibility check. */
+  openReports: number;
 }
 
 /** The pending-approval queue, oldest first (review is FIFO). */
@@ -387,34 +403,109 @@ export async function boostQueue(limit = 50): Promise<BoostQueueRow[]> {
     .limit(limit);
 
   const rows = (data ?? []) as Record<string, any>[];
-  const out: BoostQueueRow[] = [];
 
-  for (const b of rows) {
-    const subject = await getBoostSubject(b.profile_id, b.subject_kind, b.listing_id);
-    const { data: prof } = await db().from("profiles").select("name").eq("id", b.profile_id).maybeSingle();
-    const { data: pay } = await db()
-      .from("payments").select("status,created_at").eq("order_id", b.order_id ?? "").eq("status", "success").maybeSingle();
-    const cap = await cityCapUsage(b.target_city_id);
+  /**
+   * Each row needs five reads (subject, poster, payment, city cap, open reports).
+   * Done in a serial `for` loop that was 17 rows × 5 sequential round-trips and A6
+   * took 18 seconds to paint — the N+1 rule in Doc3 §5, which this file's own
+   * comments cite, broken by the reader itself.
+   *
+   * The rows are independent, so they resolve together. The city cap is memoised
+   * across them because a queue is mostly one city and that query counts every
+   * live boost in it.
+   */
+  const capCache = new Map<string, Promise<{ used: number; cap: number }>>();
+  const capFor = (cityId: string | null) => {
+    const key = cityId ?? "-";
+    let p = capCache.get(key);
+    if (!p) {
+      p = cityCapUsage(cityId);
+      capCache.set(key, p);
+    }
+    return p;
+  };
 
-    out.push({
+  // Poster names, payments and open-report counts are three queries TOTAL rather
+  // than three per row — the pattern lib/admin/queues.ts already uses. Only the
+  // subject read stays per-row, because it is scoped to its owner by design.
+  const posterIds = [...new Set(rows.map((b) => b.profile_id as string).filter(Boolean))];
+  const orderIds = [...new Set(rows.map((b) => b.order_id as string).filter(Boolean))];
+  const subjectIds = [...new Set(rows.map((b) => b.listing_id as string).filter(Boolean))];
+
+  const [{ data: profs }, { data: pays }, { data: reportRows }] = await Promise.all([
+    posterIds.length
+      ? db().from("profiles").select("id,name").in("id", posterIds)
+      : Promise.resolve({ data: [] as Record<string, unknown>[] }),
+    orderIds.length
+      ? db()
+          .from("payments")
+          .select("id,order_id,razorpay_payment_id,method,status,created_at")
+          .in("order_id", orderIds)
+          .eq("status", "success")
+      : Promise.resolve({ data: [] as Record<string, unknown>[] }),
+    // The design's fourth eligibility check: "No active reports". It was drawn
+    // but never computed, so a boost could be approved onto content that three
+    // people had just reported.
+    subjectIds.length
+      ? db().from("reports").select("subject_type,subject_id").in("subject_id", subjectIds).in("status", ["open", "reviewing"])
+      : Promise.resolve({ data: [] as Record<string, unknown>[] }),
+  ]);
+
+  const nameById = new Map(((profs ?? []) as Record<string, unknown>[]).map((p) => [p.id as string, (p.name as string) ?? null]));
+  const payByOrder = new Map(((pays ?? []) as Record<string, unknown>[]).map((p) => [p.order_id as string, p]));
+  const reportCounts = new Map<string, number>();
+  for (const r of (reportRows ?? []) as Record<string, unknown>[]) {
+    const k = `${r.subject_type}:${r.subject_id}`;
+    reportCounts.set(k, (reportCounts.get(k) ?? 0) + 1);
+  }
+
+  const out = await Promise.all(rows.map(async (b): Promise<BoostQueueRow> => {
+    const [subject, cap] = await Promise.all([
+      getBoostSubject(b.profile_id, b.subject_kind, b.listing_id),
+      capFor(b.target_city_id),
+    ]);
+    const openReports = reportCounts.get(`${b.subject_kind}:${b.listing_id}`) ?? 0;
+
+    const payment = (payByOrder.get(b.order_id as string) ?? null) as Record<string, unknown> | null;
+    const posterName = nameById.get(b.profile_id as string) ?? null;
+    const word = labelForKind(b.subject_kind);
+
+    return {
       id: b.id,
       boostId: b.id,
       subjectKind: b.subject_kind,
       subjectId: b.listing_id,
       subjectTitle: subject?.title ?? "(no longer available)",
-      ownerName: (prof as { name: string | null } | null)?.name ?? null,
+      ownerName: posterName,
+      ownerId: b.profile_id,
       price: `₹${(b.price_paise / 100).toLocaleString("en-IN")}`,
+      pricePaise: b.price_paise,
       durationLabel: b.duration_days >= 30 ? "1 Month" : `${b.duration_days} Days`,
+      durationDays: b.duration_days,
       targetLabel: b.target_label,
-      paidAt: (pay as { created_at: string } | null)?.created_at ?? null,
+      paidAt: (payment?.created_at as string) ?? null,
       createdAt: b.created_at,
       checks: [
-        { label: `${labelForKind(b.subject_kind)} is live`, pass: !!subject?.eligible },
-        { label: "Payment verified", pass: !!pay },
+        { label: `${word} is live`, pass: !!subject?.eligible },
+        { label: "Payment verified", pass: !!payment },
+        { label: openReports === 0 ? "No active reports" : `${openReports} open report${openReports === 1 ? "" : "s"}`, pass: openReports === 0 },
         { label: `City boost cap: ${cap.used} of ${cap.cap} used`, pass: cap.used < cap.cap },
       ],
-    });
-  }
+      coverUrl: subject?.coverUrl ?? null,
+      // `lockLabel` is the reason a subject is NOT eligible ("Under review",
+      // "Sold"); when it is eligible the subject is live by definition.
+      subjectStatus: subject ? (subject.eligible ? "Live" : (subject.lockLabel ?? "Not eligible")) : null,
+      subjectPrice: subject?.priceLabel ?? null,
+      payment: {
+        id: (payment?.id as string) ?? null,
+        ref: (payment?.razorpay_payment_id as string) ?? null,
+        method: (payment?.method as string) ?? null,
+        verified: Boolean(payment),
+      },
+      hours: Math.floor((Date.now() - new Date(b.created_at as string).getTime()) / 3_600_000),
+      openReports,
+    };
+  }));
   return out;
 }
 

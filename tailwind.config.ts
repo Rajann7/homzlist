@@ -49,6 +49,26 @@ const config: Config = {
       full: "9999px", // chips, pills, avatars, rings, FAB
     },
     extend: {
+      /**
+       * The admin design's three device states, as breakpoints.
+       *
+       * designs/P13-14-15 renders inside a device frame whose width IS the state:
+       * mobile 390px, tablet 768px, desktop 1440px. Its layout switches are written
+       * against those states (`twoCol = !mobile && !tablet`), not against CSS
+       * breakpoints — so reproducing the admin design needs the same three bands:
+       *
+       *   mobile   <768px          (default, unprefixed)
+       *   tablet   768px – 1439px  (`md:`, which already means ≥768)
+       *   desktop  ≥1440px         (`desktop:`)
+       *
+       * `desktop` is ADDED rather than replacing `screens`, so every existing
+       * sm/md/lg/xl/2xl class on the user side keeps its meaning. Admin screens use
+       * `md:` and `desktop:` only, so a 1280px laptop gets the design's TABLET
+       * layout — which is what the design specifies (Rajan confirmed, 30 Jul 2026).
+       */
+      screens: {
+        desktop: "1440px",
+      },
       // Default Tailwind spacing (1=4px…8=32px = Doc1's 4/8/12/16/24/32) is kept,
       // so component dimensions (h-11=44px touch target, h-9, h-12, w-5…) work.
       // Only these fixed layout constants are added (Doc1 §3). Usage discipline:

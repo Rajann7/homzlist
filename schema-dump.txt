@@ -1,0 +1,49 @@
+== ENUMS ==
+account_state: active|suspended|deactivated|deleted|archived
+billing_kind: plan|topup|boost
+boost_status: pending_payment|pending_approval|active|expired|rejected|stopped|cancelled|paused
+consumption_kind: listing|requirement|proposal|project
+coupon_scope: plans|boosts|both
+inquiry_status: sent|accepted|declined
+lead_source: inquiry|proposal|visit|project
+lead_stage: new|contacted|visit|negotiation|closed_won|closed_lost
+listing_availability: available|sold|rented|completed
+listing_kind: sell|rent
+listing_state: draft|payment_pending|pending_review|changes_requested|rejected|live|hidden|archived|deleted
+message_kind: text|photo|system|number_request|number_card|visit_proposal|visit_confirmed|continuity|link
+notification_type: inquiry_received|proposal_received|chat_accepted|number_requested|number_shared|new_message|saved_search_match|boost_approved|boost_rejected|boost_expiring|boost_expired|boost_stopped|listing_approved|listing_rejected|listing_changes_requested|proposal_accepted|proposal_declined|proposal_expired|price_drop|saved_listing_status|requirement_match|still_available|requirement_expiring|plan_expiring|plan_expired|trial_ending|payment_success|payment_failed|refund_processed|suspension_lifted|report_outcome|performance_nudge|area_added|new_device_login|weekly_digest|city_launched|chat_declined
+number_req_status: requested|allowed|denied
+order_status: created|pending|paid|failed|expired|refunded
+payment_status: pending|success|failed|refunded|chargeback
+proposal_mode: listing|chat
+proposal_status: pending|accepted|declined|not_relevant|expired|fulfilled
+report_status: open|reviewing|actioned|dismissed
+report_subject: listing|project|requirement|message|user
+request_status: pending|approved|rejected
+requirement_state: draft|pending_review|changes_requested|rejected|live|paused|fulfilled|expired|deleted
+requirement_urgency: immediate|1_3_months|exploring
+slot_state: reserved|released|consumed
+thread_kind: inquiry|proposal
+thread_role: buyer|poster
+thread_status: pending|accepted|declined
+user_plan_status: active|expired|revoked
+user_role: owner|broker|builder
+verify_level: phone|id|rera
+verify_status: not_started|pending|approved|rejected|revoked
+visit_outcome: done|cancelled
+visit_status: proposed|confirmed|completed|cancelled
+
+== TABLES ==
+
+[staff]
+  profile_id uuid NOT NULL
+  level text NOT NULL default 'staff'::text
+  is_active bool NOT NULL default true
+  created_at timestamptz NOT NULL default now()
+  email text
+  display_name text
+  added_by uuid
+  invited_at timestamptz
+  last_login_at timestamptz
+  is_online bool NOT NULL default false
+  state text NOT NULL default 'active'::text

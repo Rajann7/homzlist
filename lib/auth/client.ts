@@ -42,7 +42,11 @@ export const authApi = {
   requestOtp: (phone: string, hp = "") =>
     post<{ otpSession: string; resendIn: number; attemptsLeft: number; devCode?: string }>("/otp/request", { phone, hp }),
   verifyOtp: (otpSession: string, code: string) =>
-    post<{ isNew: true; next: "role" } | { isNew: false; user: unknown; next: "seller" | "suspended" }>("/otp/verify", { otpSession, code }),
+    post<
+      | { isNew: true; next: "role" }
+      // "grace" — a scheduled deletion is still inside its 30-day window (P12 S6).
+      | { isNew: false; user: unknown; next: "seller" | "suspended" | "grace"; deletionPurgeAt?: string }
+    >("/otp/verify", { otpSession, code }),
   resendOtp: (otpSession: string) => post<{ resendIn: number; devCode?: string }>("/otp/resend", { otpSession }),
   register: (input: { role: string; name: string; cityId: string; email?: string | null; consent18: boolean; consentDpdp: boolean; hp?: string }) =>
     post<{ user: unknown; redirect: string }>("/register", input),

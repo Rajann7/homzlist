@@ -27,14 +27,14 @@ export async function POST(req: NextRequest) {
   }
 
   const key = typeof body.key === "string" ? body.key : "";
-  const kind = body.kind as "avatar" | "logo" | "doc" | "chat";
-  if (!key || !["avatar", "logo", "doc", "chat"].includes(kind)) return fail("VALIDATION_ERROR");
+  const kind = body.kind as "avatar" | "logo" | "doc" | "chat" | "support";
+  if (!key || !["avatar", "logo", "doc", "chat", "support"].includes(kind)) return fail("VALIDATION_ERROR");
   // Registration window: profile photo only, never logos/docs/chat.
   if (!registerScopeAllows(uploader, kind)) return fail("UNAUTHORIZED");
 
   // The key must sit under THIS user's prefix — a crafted key pointing at
   // someone else's object can't be claimed.
-  const expected = `${kind === "doc" ? "docs" : kind === "logo" ? "logos" : kind === "chat" ? "chat" : "avatars"}/${uploader.id}/`;
+  const expected = `${kind === "doc" ? "docs" : kind === "logo" ? "logos" : kind === "chat" ? "chat" : kind === "support" ? "support" : "avatars"}/${uploader.id}/`;
   if (!key.startsWith(expected)) return fail("VALIDATION_ERROR", { field: "key" });
 
   const bucket = kind === "doc" ? BUCKET.private : BUCKET.public;
@@ -56,7 +56,9 @@ export async function POST(req: NextRequest) {
 
   // Chat photos are public and returned to the composer to send as a bubble;
   // they attach to no profile column.
-  if (kind === "chat") {
+  // Support screenshots behave exactly like chat photos: public URL handed back
+  // to the form, attached to the ticket by the support endpoint, not here.
+  if (kind === "chat" || kind === "support") {
     return ok({ url: publicUrlFor(key, bucket) });
   }
 

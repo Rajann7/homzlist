@@ -23,6 +23,22 @@ function memberSince(iso: string): string {
   return new Date(iso).toLocaleDateString("en-IN", { month: "short", year: "numeric" });
 }
 
+/**
+ * An auto-flagged bio is WITHHELD from other people until an admin decides the
+ * appeal (migration 0106, A8's auto-flag tab).
+ *
+ * The flag used to be advisory only — a `moderation_events` row — so a bio with a
+ * phone number in it stayed on the public profile the entire time it sat in the
+ * queue, which is exactly what the number rule exists to stop. Stripped here, in
+ * the payload, not hidden by the client (Doc9 §17): a viewer opening DevTools
+ * finds nothing, because nothing was sent.
+ *
+ * The OWNER always sees their own text — they have to be able to edit it.
+ */
+function bioFlagOpen(p: FullProfile): boolean {
+  return Boolean(p.bio_flagged_at) && p.bio_flag_outcome !== "dismissed";
+}
+
 /** Full own profile (server is the gating truth). Stats come from listings later. */
 export function ownProfileDTO(
   p: FullProfile,
@@ -39,7 +55,17 @@ export function ownProfileDTO(
     name: p.name,
     role: p.role,
     photoUrl: p.photo_url,
+    // The owner's own view keeps the text (they must be able to edit it) and is
+    // told it is under review, so a hidden bio is never a silent change.
     bio: p.bio,
+    bioFlag: p.bio_flagged_at
+      ? {
+          flaggedAt: p.bio_flagged_at,
+          reason: p.bio_flag_reason,
+          outcome: p.bio_flag_outcome,
+          withheld: bioFlagOpen(p),
+        }
+      : null,
     email: p.email,
     cityId: p.city_id,
     cityName,
@@ -64,7 +90,7 @@ export function publicProfileDTO(p: FullProfile, v: VerificationRow[], cityName:
     name: p.name,
     role: p.role,
     photoUrl: p.photo_url,
-    bio: p.bio,
+    bio: bioFlagOpen(p) ? null : p.bio,
     cityName,
     memberSince: memberSince(p.created_at),
     responseLabel: p.response_label,
