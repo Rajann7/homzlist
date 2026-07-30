@@ -96,7 +96,10 @@ export function ListingsMaster({ rows, total, counts, page, pageSize, filters, o
       });
       const j = await r.json().catch(() => null);
       if (!r.ok || !j?.ok) {
-        const d = j?.error?.details ?? {};
+        // `fail()` spreads its extras onto `error` itself, so the details are
+        // one level up from where a nested `details` object would be. Read both,
+        // or every specific message below is dead code.
+        const d = j?.error?.details ?? j?.error ?? {};
         setError(
           d.alreadyHidden
             ? "This listing is already hidden."

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/Icon";
 import type { UserFilterOptions, UserFilters, UserRow } from "@/lib/admin/users";
 import { Initials, StatusBadge } from "./queueBits";
-import { AnchorMenu, Badge, Btn, Dropdown, DropdownItem, Modal, NoteBlock, RightSheet } from "./overlays";
+import { AnchorMenu, Badge, Btn, Dropdown, DropdownItem, Modal, NoteBlock, RightSheet, TextArea } from "./overlays";
 import { AdminToast } from "./AdminToast";
 
 /**
@@ -75,6 +75,7 @@ export function UsersScreen({
   const [toast, setToast] = useState<string | null>(null);
   const [search, setSearch] = useState(filters.q ?? "");
   const [busy, setBusy] = useState(false);
+  const [bulk, setBulk] = useState<null | "message">(null);
 
   const show = (m: string) => {
     setToast(m);
@@ -305,12 +306,13 @@ export function UsersScreen({
           <span className="text-[13px] font-semibold" style={{ color: "var(--ink-primary)" }}>
             {selected.length} selected
           </span>
-          <Btn kind="outline" style={{ height: 32, fontSize: 13 }} disabled={!canSuspend} tooltip="Admin only" onClick={() => show("Bulk messaging arrives with A11's communication log")}>
+          <Btn kind="outline" style={{ height: 32, fontSize: 13 }} disabled={!canSuspend || busy} tooltip="Admin only" onClick={() => setBulk("message")}>
             Send message
           </Btn>
-          <Btn kind="outline" style={{ height: 32, fontSize: 13 }} disabled={!canGrant} tooltip="Admin only" onClick={() => show("Grants arrive with A15")}>
-            Grant trial
-          </Btn>
+          {/* Grants are A15's screen and its own quota rules — there is no
+              endpoint behind this yet, so the button is not drawn rather than
+              drawn dead. */}
+          {canGrant && null}
           <button type="button" onClick={() => setSelected([])} className="text-[13px] font-semibold" style={{ color: "var(--accent)" }}>
             Clear
           </button>
@@ -560,6 +562,42 @@ export function UsersScreen({
         </RightSheet>
       )}
 
+      {bulk === "message" && (
+        <BulkMessage
+          count={selected.length}
+          busy={busy}
+          onClose={() => setBulk(null)}
+          onSend={async (subject, body) => {
+            setBusy(true);
+            let sent = 0;
+            try {
+              // One request per user rather than a bulk endpoint: each message is
+              // its own admin_messages row, its own notification and its own
+              // audit line, and one failure must not take the rest with it.
+              for (const id of selected) {
+                const r = await fetch(`/api/v1/admin/users/${id}/actions`, {
+                  method: "POST",
+                  headers: { "content-type": "application/json" },
+                  body: JSON.stringify({ action: "message", subject, body }),
+                  cache: "no-store",
+                });
+                if (r.ok) sent += 1;
+              }
+            } finally {
+              setBusy(false);
+              setBulk(null);
+              setSelected([]);
+              show(
+                sent === selected.length
+                  ? `Message sent to ${sent} user${sent === 1 ? "" : "s"}`
+                  : `Sent to ${sent} of ${selected.length} — the rest failed and were not messaged`,
+              );
+              router.refresh();
+            }
+          }}
+        />
+      )}
+
       {sheet === "export" && (
         <ExportUsers total={total} filters={filters} onClose={() => setSheet(null)} onDone={show} />
       )}
@@ -656,6 +694,54 @@ function ExportUsers({
           {error}
         </p>
       )}
+    </Modal>
+  );
+}
+
+/** The bulk bar's one working verb — the same message A11 sends, to N users. */
+function BulkMessage({
+  count,
+  busy,
+  onClose,
+  onSend,
+}: {
+  count: number;
+  busy: boolean;
+  onClose: () => void;
+  onSend: (subject: string, body: string) => void;
+}) {
+  const [subject, setSubject] = useState("");
+  const [body, setBody] = useState("");
+
+  return (
+    <Modal
+      title={`Message ${count} user${count === 1 ? "" : "s"}`}
+      onClose={onClose}
+      actions={
+        <>
+          <Btn kind="outline" onClick={onClose}>
+            Cancel
+          </Btn>
+          <Btn kind="primary" disabled={busy || subject.trim().length < 3 || body.trim().length < 5} onClick={() => onSend(subject.trim(), body.trim())}>
+            {busy ? "Sending…" : `Send to ${count}`}
+          </Btn>
+        </>
+      }
+    >
+      <input
+        value={subject}
+        onChange={(e) => setSubject(e.target.value)}
+        placeholder="Subject"
+        className="mb-2 h-10 w-full rounded-8 border px-3 text-[14px] outline-none"
+        style={{ background: "var(--surface-2)", borderColor: "var(--border)", color: "var(--ink-primary)" }}
+      />
+      <TextArea value={body} onChange={setBody} height={90} placeholder="Everyone selected reads this exactly as written." />
+      <div className="mt-3">
+        <NoteBlock tone="warning">
+          Each person gets their own message and their own notification, and every one of them is a
+          separate line in the audit log. There is no undo.
+        </NoteBlock>
+      </div>
     </Modal>
   );
 }

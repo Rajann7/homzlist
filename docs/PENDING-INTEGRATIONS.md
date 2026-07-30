@@ -3876,3 +3876,35 @@ the admin build, when Rajan gives the emails.
   shows up in the real user app this way. If Rajan wants true session
   impersonation, it is a security decision with its own design (scoped token,
   hard expiry, a banner the user side renders itself), not a UI change.
+
+## Module 11 Part 8 — A17/A18, and what could not be proven
+
+- **The refund's success path cannot be exercised on seeded data.** The endpoint
+  calls Razorpay FIRST and only writes if the gateway returns a refund id, so a
+  seeded `razorpay_payment_id` — which does not exist at Razorpay — always comes
+  back refused. That half IS proven live: the gateway refused, and the payment,
+  the order and the plan were all still untouched afterwards, which is the
+  guarantee that matters (money never moves without the thing it bought, and
+  nothing is written when the money did not move). The DB half is
+  `refundAndRevoke`, Module 9's existing path, the same one the boost
+  auto-refund uses. **To prove the whole chain end to end, one real Razorpay
+  test-mode payment is needed.** Not fakeable from here.
+
+- **Partial refunds do not exist.** Full amount only, because Doc2 §4.3 has no
+  partial case and a half-refunded plan has no defined entitlement. If Rajan
+  wants them, the question to answer first is what the user keeps.
+
+- **A17 has no export and no saved views.** A13 Plans, A14 Coupons, A15 Grants
+  and A16 Finance are still unbuilt — Part 8's other four screens.
+
+- **A10's bulk bar sends one request per user, not a bulk endpoint.** Each
+  message is its own row, its own notification and its own audit line, and one
+  failure cannot take the rest with it; the toast says how many actually went.
+  It is capped only by the page size — a real "message 500 users" needs a job,
+  not a loop, and that belongs with A21's broadcast.
+
+- **`fail()` puts its extras on `error` itself, not on `error.details`.** Three
+  new screens were reading `error.details.*`, so every specific message they
+  had — "already refunded", "already hidden", "no device on record" — was dead
+  code that fell through to "That didn't go through". Fixed in all three.
+  **Worth checking in any screen written against this helper.**
