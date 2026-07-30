@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { currentStaff } from "@/lib/admin/auth";
 import { can } from "@/lib/admin/permissions";
 import { queuePage, LISTING_TABS } from "@/lib/admin/queues";
+import { queueFilterOptions } from "@/lib/admin/queueFilters";
 import { QueueScreen } from "@/components/admin/QueueScreen";
 
 /**
@@ -17,7 +18,7 @@ export const fetchCache = "force-no-store";
 export default async function ListingsQueuePage({
   searchParams,
 }: {
-  searchParams: { tab?: string; risk?: string; type?: string; city?: string };
+  searchParams: { tab?: string; risk?: string; type?: string; city?: string; role?: string; since?: string };
 }) {
   const session = await currentStaff();
   if (!session.ok) redirect("/login");
@@ -26,19 +27,27 @@ export default async function ListingsQueuePage({
   const tab = LISTING_TABS.some((t) => t.key === searchParams.tab) ? searchParams.tab! : "pending";
   const risk = searchParams.risk;
 
-  const page = await queuePage("listing", {
-    tab,
-    staff: session.staff,
-    filters: {
-      type: searchParams.type ?? null,
-      cityId: searchParams.city ?? null,
-      risk: risk === "low" || risk === "medium" || risk === "high" ? risk : null,
-      role: null,
-      since: null,
-    },
-  });
+  const [page, filterOptions] = await Promise.all([
+    queuePage("listing", {
+      tab,
+      staff: session.staff,
+      filters: {
+        type: searchParams.type ?? null,
+        cityId: searchParams.city ?? null,
+        risk: risk === "low" || risk === "medium" || risk === "high" ? risk : null,
+        role: searchParams.role ?? null,
+        since: searchParams.since ?? null,
+      },
+    }),
+    // The design's filter sheet offers Type / City / Risk. Real rows, not the
+    // mock's hardcoded five (rule 7).
+    queueFilterOptions(),
+  ]);
 
-  const rows = risk ? page.rows.filter((r) => r.risk.band === risk) : page.rows;
+  // Risk and role are applied inside `queuePage` now — it widens its own read
+  // first, so a computed filter searches the whole reviewable set instead of the
+  // first page of it. Filtering here as well would just cut the same rows twice.
+  const rows = page.rows;
 
   return (
     <QueueScreen
@@ -51,6 +60,7 @@ export default async function ListingsQueuePage({
       rows={rows}
       canDecide={can(session.staff.level, "queues.decide")}
       queueKey="listings"
+      filterOptions={filterOptions}
     />
   );
 }

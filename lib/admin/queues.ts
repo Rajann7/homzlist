@@ -154,10 +154,23 @@ export async function queuePage(
   if (opts.filters.cityId) q = q.eq("city_id", opts.filters.cityId);
   if (opts.filters.since) q = q.gte("submitted_at", opts.filters.since);
 
-  // Oldest first from the database; the risk-first ordering is applied after the
-  // score exists, because risk is computed from four tables and cannot be an
-  // ORDER BY on this one.
-  const { data } = await q.order("submitted_at", { ascending: true, nullsFirst: false }).limit(limit);
+  /**
+   * Risk and role cannot be a WHERE clause: risk is scored from four tables and
+   * role lives on the poster, so both can only be applied AFTER this query.
+   *
+   * That is why the fetch has to widen when either is set. With the flat 50-row
+   * cap, "Risk: medium" searched only the oldest 50 of 69 pending listings and
+   * showed 3 of the 4 that actually match — a filter quietly under-reporting,
+   * which is worse than one that fails. When a computed filter is on we read the
+   * whole reviewable set (capped for safety), score it, filter, and only then
+   * take `limit`.
+   */
+  const computedFilter = Boolean(opts.filters.risk || opts.filters.role);
+  const SCAN_CAP = 500;
+
+  const { data } = await q
+    .order("submitted_at", { ascending: true, nullsFirst: false })
+    .limit(computedFilter ? SCAN_CAP : limit);
   const rows = (data ?? []) as Array<Record<string, unknown>>;
 
   const ids = rows.map((r) => r.id as string);
@@ -223,7 +236,18 @@ export async function queuePage(
   // Doc3 §1.4: risk desc, then oldest first.
   out.sort((a, b) => b.risk.score - a.risk.score || b.hours - a.hours);
 
-  return { rows: out, counts: await tabCounts(subject), total: out.length };
+  // The two computed filters, applied here because neither could be a WHERE.
+  // `total` is the count AFTER filtering and BEFORE the page cut, so the screen can
+  // say how many actually match rather than how many it happened to draw.
+  let filtered = out;
+  if (opts.filters.risk) filtered = filtered.filter((r) => r.risk.band === opts.filters.risk);
+  if (opts.filters.role) {
+    const want = opts.filters.role.toLowerCase();
+    filtered = filtered.filter((r) => (r.poster.role ?? "").toLowerCase() === want);
+  }
+  const total = filtered.length;
+
+  return { rows: filtered.slice(0, limit), counts: await tabCounts(subject), total };
 }
 
 function typeLabel(typeCode: string | null, kind: string | null): string | null {

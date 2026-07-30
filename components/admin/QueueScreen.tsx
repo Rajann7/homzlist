@@ -5,13 +5,24 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Icon } from "@/components/ui/Icon";
 import type { QueueRow, QueueTab } from "@/lib/admin/queues";
+import type { QueueFilterOptions } from "@/lib/admin/queueFilters";
 import { RiskBadge, StatusBadge, SlaText, Thumb, Initials } from "./queueBits";
+import { Btn, Chip, Dropdown, DropdownItem, Modal, NoteBlock, RightSheet } from "./overlays";
+import { AdminToast } from "./AdminToast";
 
 /**
- * A3's screen, built to the design exactly (P13 A3 / designs listingsEl):
+ * A3's screen, built to the design exactly (P13 A3 / designs `listingsEl`):
  * page head + count chip + saved views/columns/export · sub-tabs with dots and
- * counts · filter chips + Clear all · bulk bar (max 20) · desktop table with the
- * documented columns / mobile cards · empty + skeleton.
+ * counts · filter chips + Clear all · bulk bar (max 20) · table from tablet up,
+ * cards at mobile only · empty + skeleton.
+ *
+ * Each control wears the SHAPE the design gives it, which is not all the same:
+ *   saved views → an anchored DROPDOWN (no scrim)
+ *   columns     → a RIGHT-SHEET with one full-width "Done"
+ *   filters     → a RIGHT-SHEET of chip groups with Clear + Apply
+ *   export      → a MODAL with Format radios and a Fields list
+ *   bulk, risk  → MODALs
+ * They were all Modals here, which flattened four different affordances into one.
  *
  * The numbers are the only departure from the mock, and it is the required one:
  * the design hardcodes "12 pending"; these are counted (CLAUDE.md rule 12).
@@ -28,12 +39,25 @@ interface Props {
   canDecide: boolean;
   /** admin_saved_views.queue / exports.entity key for this screen. */
   queueKey: string;
+  /** Real option rows for the filter sheet (lib/admin/queueFilters). */
+  filterOptions: QueueFilterOptions;
 }
 
 const BULK_MAX = 20;
 
 /** The design's column list for A3, in its order. */
 const COLUMNS = ["Listing", "Type", "Location", "Poster", "Risk", "In queue", "Status"] as const;
+
+/** The design's export field list, in its order. */
+const EXPORT_FIELDS = ["Listing ID", "Title", "Type", "Location", "Poster", "Risk", "Status", "In queue"] as const;
+
+/** The design's filter groups: which option list feeds which query param. */
+const FACETS = [
+  { key: "types", param: "type", label: "Type" },
+  { key: "cities", param: "city", label: "City" },
+  { key: "risks", param: "risk", label: "Risk" },
+  { key: "roles", param: "role", label: "Role" },
+] as const satisfies ReadonlyArray<{ key: keyof QueueFilterOptions; param: string; label: string }>;
 
 interface SavedView {
   id: string;
@@ -43,7 +67,7 @@ interface SavedView {
   mine: boolean;
 }
 
-export function QueueScreen({ title, subject, basePath, tabs, tab, counts, rows, canDecide, queueKey }: Props) {
+export function QueueScreen({ title, subject, basePath, tabs, tab, counts, rows, canDecide, queueKey, filterOptions }: Props) {
   const router = useRouter();
   const params = useSearchParams();
   const [selected, setSelected] = useState<string[]>([]);
@@ -53,6 +77,16 @@ export function QueueScreen({ title, subject, basePath, tabs, tab, counts, rows,
   const [views, setViews] = useState<SavedView[]>([]);
   const [format, setFormat] = useState<"csv" | "xlsx">("csv");
   const [hidden, setHidden] = useState<string[]>([]);
+  const [toast, setToast] = useState<string | null>(null);
+  /** Filter sheet selections, staged until Apply. */
+  const [draft, setDraft] = useState<Record<string, string | null>>({});
+  /** Export field selection — the design pre-ticks the first six. */
+  const [fields, setFields] = useState<string[]>(() => EXPORT_FIELDS.slice(0, 6));
+
+  const show = (msg: string) => {
+    setToast(msg);
+    window.setTimeout(() => setToast(null), 2800);
+  };
 
   const activeView = params.get("view") ?? `All ${tab}`;
 
@@ -126,8 +160,11 @@ export function QueueScreen({ title, subject, basePath, tabs, tab, counts, rows,
   const runExport = async () => {
     setBusy(true);
     try {
-      const filters: Record<string, string> = { tab };
-      for (const k of ["risk", "type", "city"]) {
+      // `fields` rides in the filters jsonb: the design offers a field list, and an
+      // export row has to record what was actually asked for or the list is
+      // decoration. A30 (P6) reads it when it builds the file.
+      const filters: Record<string, unknown> = { tab, fields };
+      for (const k of ["risk", "type", "city", "role"]) {
         const v = params.get(k);
         if (v) filters[k] = v;
       }
@@ -143,7 +180,11 @@ export function QueueScreen({ title, subject, basePath, tabs, tab, counts, rows,
         }),
         cache: "no-store",
       });
-      if (r.ok) setSheet(null);
+      if (r.ok) {
+        setSheet(null);
+        // The design's toast, and it is the truth: the file is collected in A30.
+        show("Export ready — check Exports Centre");
+      }
     } finally {
       setBusy(false);
     }
@@ -198,16 +239,62 @@ export function QueueScreen({ title, subject, basePath, tabs, tab, counts, rows,
           {countChip}
         </span>
         <div className="flex-1" />
+        {/* Design: gap 8, a 36px-high labelled button then two 36×36 icon buttons. */}
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setSheet("views")}
-            className="flex h-9 items-center gap-[6px] rounded-8 border px-3 text-[13px] font-semibold"
-            style={{ borderColor: "var(--border)", background: "var(--surface-1)", color: "var(--ink-primary)" }}
-          >
-            {activeView}
-            <Icon name="chevron-down" size={16} />
-          </button>
+          {/* The saved-views dropdown is anchored to its own button, so this wrapper
+              is `relative` — the design's absolute top:150/right:60 is the same
+              picture inside its fixed frame. */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setSheet(sheet === "views" ? null : "views")}
+              aria-expanded={sheet === "views"}
+              aria-haspopup="menu"
+              className="flex h-9 items-center gap-[6px] rounded-8 border px-3 text-[13px] font-semibold"
+              style={{ borderColor: "var(--border)", background: "var(--surface-1)", color: "var(--ink-primary)" }}
+            >
+              {activeView}
+              <Icon name="chevron-down" size={16} />
+            </button>
+
+            {sheet === "views" && (
+              <Dropdown onClose={() => setSheet(null)}>
+                <DropdownItem
+                  onSelect={() => {
+                    setSheet(null);
+                    router.push(`${basePath}?tab=${tab}`);
+                  }}
+                >
+                  All {tab}
+                </DropdownItem>
+                {views.map((v) => (
+                  <DropdownItem
+                    key={v.id}
+                    onSelect={() => {
+                      setSheet(null);
+                      applyView(v);
+                    }}
+                  >
+                    <span className="min-w-0 flex-1 truncate">{v.name}</span>
+                    {!v.shared && (
+                      <span className="shrink-0 text-[11px]" style={{ color: "var(--ink-tertiary)" }}>
+                        private
+                      </span>
+                    )}
+                  </DropdownItem>
+                ))}
+                {views.length === 0 && (
+                  <p className="px-3 py-2 text-[13px]" style={{ color: "var(--ink-tertiary)" }}>
+                    No saved views yet.
+                  </p>
+                )}
+                <DropdownItem accent topBorder disabled={busy} onSelect={saveCurrentView}>
+                  + Save current view
+                </DropdownItem>
+              </Dropdown>
+            )}
+          </div>
+
           <IconBtn label="Columns" icon="sliders" onClick={() => setSheet("columns")} />
           <IconBtn label="Export" icon="download" onClick={() => setSheet("export")} />
         </div>
@@ -544,10 +631,8 @@ export function QueueScreen({ title, subject, basePath, tabs, tab, counts, rows,
           onClose={() => setSheet(null)}
           actions={
             <>
-              <GhostBtn onClick={() => setSheet(null)}>Cancel</GhostBtn>
-              <PrimaryBtn disabled={busy} onClick={() => runBulk("approve")}>
-                {busy ? "Approving…" : `Approve ${selected.length}`}
-              </PrimaryBtn>
+              <Btn kind="outline" onClick={() => setSheet(null)}>Cancel</Btn>
+              <Btn kind="primary" disabled={busy} onClick={() => runBulk("approve")}>{busy ? "Approving…" : `Approve ${selected.length}`}</Btn>
             </>
           }
         >
@@ -567,105 +652,65 @@ export function QueueScreen({ title, subject, basePath, tabs, tab, counts, rows,
         </Modal>
       )}
 
-      {/* Saved views — real rows from admin_saved_views (Doc3 §1.4) */}
-      {sheet === "views" && (
-        <Modal title="Saved views" onClose={() => setSheet(null)}>
-          <div className="flex flex-col">
-            <button
-              type="button"
-              onClick={() => {
-                setSheet(null);
-                router.push(`${basePath}?tab=${tab}`);
-              }}
-              className="rounded-8 px-3 py-[10px] text-left text-[14px] hover:bg-[var(--surface-2)]"
-              style={{ color: "var(--ink-primary)" }}
-            >
-              All {tab}
-            </button>
-            {views.map((v) => (
-              <button
-                key={v.id}
-                type="button"
-                onClick={() => {
-                  setSheet(null);
-                  applyView(v);
-                }}
-                className="flex items-center gap-2 rounded-8 px-3 py-[10px] text-left text-[14px] hover:bg-[var(--surface-2)]"
-                style={{ color: "var(--ink-primary)" }}
-              >
-                <span className="min-w-0 flex-1 truncate">{v.name}</span>
-                {!v.shared && (
-                  <span className="shrink-0 text-[11px]" style={{ color: "var(--ink-tertiary)" }}>
-                    private
-                  </span>
-                )}
-              </button>
-            ))}
-            {views.length === 0 && (
-              <p className="px-3 py-2 text-[13px]" style={{ color: "var(--ink-tertiary)" }}>
-                No saved views yet.
-              </p>
-            )}
-            <div className="mt-1 border-t pt-1" style={{ borderColor: "var(--divider)" }}>
-              <button
-                type="button"
-                onClick={saveCurrentView}
-                disabled={busy}
-                className="w-full rounded-8 px-3 py-[10px] text-left text-[14px] font-semibold disabled:opacity-40"
-                style={{ color: "var(--accent)" }}
-              >
-                + Save current view
-              </button>
-            </div>
-          </div>
-        </Modal>
-      )}
-
-      {/* Columns — a display preference, so localStorage is the right home (rule 3) */}
+      {/*
+        Columns — the design puts this in a RIGHT-SHEET with a single full-width
+        "Done", not a modal. Rows are `padding:10px 0` at 14px with a divider
+        under each. Visibility stays a display preference in localStorage
+        (CLAUDE.md rule 3 permits UI prefs there).
+      */}
       {sheet === "columns" && (
-        <Modal
+        <RightSheet
           title="Columns"
           onClose={() => setSheet(null)}
-          actions={<PrimaryBtn onClick={() => setSheet(null)}>Done</PrimaryBtn>}
+          actions={
+            <Btn kind="primary" style={{ flex: 1 }} onClick={() => setSheet(null)}>
+              Done
+            </Btn>
+          }
         >
-          <div className="flex flex-col">
-            {COLUMNS.map((c) => (
-              <label
-                key={c}
-                className="flex cursor-pointer items-center gap-2 border-b py-[10px] text-[14px]"
-                style={{ borderColor: "var(--divider)", color: "var(--ink-primary)" }}
-              >
-                <input
-                  type="checkbox"
-                  checked={hidden.indexOf(c) === -1}
-                  onChange={() => toggleColumn(c)}
-                  style={{ accentColor: "var(--accent)" }}
-                />
-                {c}
-              </label>
-            ))}
-          </div>
-        </Modal>
+          {COLUMNS.map((c) => (
+            <label
+              key={c}
+              className="flex cursor-pointer items-center gap-2 border-b py-[10px] text-[14px]"
+              style={{ borderColor: "var(--divider)", color: "var(--ink-primary)" }}
+            >
+              <input
+                type="checkbox"
+                checked={hidden.indexOf(c) === -1}
+                onChange={() => toggleColumn(c)}
+                style={{ accentColor: "var(--accent)" }}
+              />
+              {c}
+            </label>
+          ))}
+        </RightSheet>
       )}
 
-      {/* Export — queues a real row in `exports`, collected in A30 */}
+      {/*
+        Export — a modal, as the design has it: a Format radio pair then a Fields
+        checkbox list. The chosen fields ride along in the `exports.filters` jsonb,
+        so A30 (P6) collects a row that records what was actually asked for rather
+        than a list that looked selectable and changed nothing.
+      */}
       {sheet === "export" && (
         <Modal
-          title="Export listings"
+          title={`Export ${title.replace(" queue", "").toLowerCase()}`}
           onClose={() => setSheet(null)}
           actions={
             <>
-              <GhostBtn onClick={() => setSheet(null)}>Cancel</GhostBtn>
-              <PrimaryBtn disabled={busy} onClick={runExport}>
+              <Btn kind="outline" onClick={() => setSheet(null)}>
+                Cancel
+              </Btn>
+              <Btn kind="primary" disabled={busy} onClick={runExport}>
                 {busy ? "Queueing…" : `Export ${rows.length} rows`}
-              </PrimaryBtn>
+              </Btn>
             </>
           }
         >
           <p className="mb-2 text-[13px]" style={{ color: "var(--ink-tertiary)" }}>
             Format
           </p>
-          <div className="mb-3 flex gap-4">
+          <div className="mb-[14px] flex gap-4">
             {(["csv", "xlsx"] as const).map((f) => (
               <label key={f} className="flex cursor-pointer items-center gap-[6px] text-[13px]" style={{ color: "var(--ink-primary)" }}>
                 <input type="radio" name="fmt" checked={format === f} onChange={() => setFormat(f)} style={{ accentColor: "var(--accent)" }} />
@@ -673,43 +718,95 @@ export function QueueScreen({ title, subject, basePath, tabs, tab, counts, rows,
               </label>
             ))}
           </div>
-          <p className="rounded-8 p-[10px] text-[11px]" style={{ background: "var(--info-soft)", color: "var(--ink-secondary)" }}>
-            Every export is logged with your name and is available for 48 hours in the Exports Centre.
+
+          <p className="mb-2 text-[13px]" style={{ color: "var(--ink-tertiary)" }}>
+            Fields
           </p>
+          {EXPORT_FIELDS.map((f) => (
+            <label
+              key={f}
+              className="flex cursor-pointer items-center gap-2 py-1 text-[13px]"
+              style={{ color: "var(--ink-primary)" }}
+            >
+              <input
+                type="checkbox"
+                checked={fields.includes(f)}
+                onChange={() => setFields((s) => (s.includes(f) ? s.filter((x) => x !== f) : [...s, f]))}
+                style={{ accentColor: "var(--accent)" }}
+              />
+              {f}
+            </label>
+          ))}
+          <div className="mt-3">
+            <NoteBlock tone="info">
+              Every export is logged with your name and is available for 48 hours in the Exports Centre.
+            </NoteBlock>
+          </div>
         </Modal>
       )}
 
+      {/*
+        Filters — a RIGHT-SHEET in the design, one chip group per facet, with
+        Clear + Apply as two equal footer buttons. Selections are staged locally and
+        committed on Apply, which is what "Apply" has to mean.
+      */}
       {sheet === "filter" && (
-        <Modal title="Filters" onClose={() => setSheet(null)}>
-          {(
-            <div className="flex flex-col gap-3">
-              <p className="text-[13px] font-semibold" style={{ color: "var(--ink-tertiary)" }}>
-                Risk
-              </p>
-              <div className="flex gap-2">
-                {(["low", "medium", "high"] as const).map((b) => (
-                  <button
-                    key={b}
-                    type="button"
-                    onClick={() => {
-                      setSheet(null);
-                      go({ risk: riskFilter === b ? null : b });
-                    }}
-                    className="h-8 rounded-full border px-3 text-[13px] capitalize"
-                    style={{
-                      borderColor: riskFilter === b ? "var(--accent)" : "var(--border)",
-                      background: riskFilter === b ? "var(--accent-soft)" : "var(--surface-1)",
-                      color: riskFilter === b ? "var(--accent)" : "var(--ink-secondary)",
-                    }}
-                  >
-                    {b}
-                  </button>
-                ))}
+        <RightSheet
+          title="Filters"
+          onClose={() => setSheet(null)}
+          actions={
+            <>
+              <Btn
+                kind="outline"
+                style={{ flex: 1 }}
+                onClick={() => {
+                  setDraft({});
+                  setSheet(null);
+                  router.push(`${basePath}?tab=${tab}`);
+                }}
+              >
+                Clear
+              </Btn>
+              <Btn
+                kind="primary"
+                style={{ flex: 1 }}
+                onClick={() => {
+                  setSheet(null);
+                  go(draft);
+                }}
+              >
+                Apply
+              </Btn>
+            </>
+          }
+        >
+          {FACETS.map((facet) => {
+            const options = filterOptions[facet.key];
+            if (!options.length) return null;
+            const current = draft[facet.param] !== undefined ? draft[facet.param] : params.get(facet.param);
+            return (
+              <div key={facet.param} className="mb-4">
+                <p className="mb-2 text-[13px] font-semibold" style={{ color: "var(--ink-tertiary)" }}>
+                  {facet.label}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {options.map((o) => (
+                    <Chip
+                      key={o.value}
+                      label={o.label}
+                      active={current === o.value}
+                      // Tapping the active chip clears that facet — the design's
+                      // chips are a single choice per group.
+                      onClick={() => setDraft((d) => ({ ...d, [facet.param]: current === o.value ? null : o.value }))}
+                    />
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
-        </Modal>
+            );
+          })}
+        </RightSheet>
       )}
+      <AdminToast message={toast} />
     </div>
   );
 }
@@ -752,61 +849,6 @@ function IconBtn({ label, icon, onClick }: { label: string; icon: "sliders" | "d
       style={{ borderColor: "var(--border)", background: "var(--surface-1)", color: "var(--ink-secondary)" }}
     >
       <Icon name={icon} size={18} />
-    </button>
-  );
-}
-
-export function Modal({
-  title,
-  children,
-  actions,
-  onClose,
-}: {
-  title: string;
-  children: React.ReactNode;
-  actions?: React.ReactNode;
-  onClose: () => void;
-}) {
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" role="dialog" aria-modal="true">
-      <button type="button" className="absolute inset-0 bg-black/40" aria-label="Close" onClick={onClose} />
-      <div
-        className="relative w-full max-w-[420px] rounded-16 p-5"
-        style={{ background: "var(--surface-1)", boxShadow: "0 8px 24px rgba(0,0,0,.16)" }}
-      >
-        <h2 className="mb-3 text-[17px] font-semibold" style={{ color: "var(--ink-primary)" }}>
-          {title}
-        </h2>
-        {children}
-        <div className="mt-4 flex justify-end gap-2">{actions ?? <GhostBtn onClick={onClose}>Close</GhostBtn>}</div>
-      </div>
-    </div>
-  );
-}
-
-export function GhostBtn({ children, onClick }: { children: React.ReactNode; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="h-10 rounded-8 border px-4 text-[15px] font-semibold"
-      style={{ borderColor: "var(--border)", color: "var(--ink-primary)" }}
-    >
-      {children}
-    </button>
-  );
-}
-
-export function PrimaryBtn({ children, onClick, disabled }: { children: React.ReactNode; onClick: () => void; disabled?: boolean }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className="h-10 rounded-8 px-4 text-[15px] font-semibold text-white disabled:opacity-40"
-      style={{ background: "var(--accent)" }}
-    >
-      {children}
     </button>
   );
 }

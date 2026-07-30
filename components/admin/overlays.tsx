@@ -126,6 +126,83 @@ export function RightSheet({
   );
 }
 
+/**
+ * The design's anchored dropdown (its `savedviews` overlay / `topDrop` shape):
+ *
+ *   a click-catcher over the whole frame with NO dark scrim
+ *   panel  width 240 · surface-1 · radius 12 · border · shadow L3 · padding 6
+ *   items  padding 10px 12px · 14px · ink1 · radius 8
+ *
+ * The design hard-codes `top:150; right:60` because it paints inside a fixed
+ * device frame. Anchoring to the trigger gives the same picture at any width, so
+ * the caller wraps this in a `relative` element.
+ */
+export function Dropdown({
+  children,
+  onClose,
+  width = 240,
+}: {
+  children: React.ReactNode;
+  onClose: () => void;
+  width?: number;
+}) {
+  useDismiss(onClose);
+  return (
+    <>
+      {/* No scrim — the design dims nothing for a dropdown. */}
+      <button type="button" className="fixed inset-0 z-[110] cursor-default" aria-label="Close" onClick={onClose} />
+      <div
+        className="absolute right-0 z-[111] mt-2 border p-[6px]"
+        style={{
+          width,
+          maxWidth: "calc(100vw - 24px)",
+          background: "var(--surface-1)",
+          borderColor: "var(--border)",
+          borderRadius: 12,
+          boxShadow: "0 8px 24px rgba(0,0,0,.16)",
+        }}
+        role="menu"
+      >
+        {children}
+      </div>
+    </>
+  );
+}
+
+/** One row of a Dropdown — the design's `padding:10px 12px; 14px; radius 8`. */
+export function DropdownItem({
+  children,
+  onSelect,
+  accent,
+  disabled,
+  topBorder,
+}: {
+  children: React.ReactNode;
+  onSelect: () => void;
+  /** The design's "+ Save current view": accent, 600. */
+  accent?: boolean;
+  disabled?: boolean;
+  /** The design puts a divider above the save row, with 4px of space. */
+  topBorder?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      role="menuitem"
+      onClick={onSelect}
+      disabled={disabled}
+      className="flex w-full items-center gap-2 rounded-8 px-3 py-[10px] text-left text-[14px] disabled:opacity-40 hover:bg-[var(--surface-2)]"
+      style={{
+        color: accent ? "var(--accent)" : "var(--ink-primary)",
+        fontWeight: accent ? 600 : 400,
+        ...(topBorder ? { borderTop: "1px solid var(--divider)", marginTop: 4, borderRadius: 0 } : {}),
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
 export interface SheetItem {
   label: string;
   onSelect: () => void;

@@ -44,7 +44,9 @@ export default async function RequirementsQueuePage({
     },
   });
 
-  const rows = risk ? page.rows.filter((r) => r.risk.band === risk) : page.rows;
+  // `queuePage` applies the risk band itself (and widens its read so a computed
+  // filter searches the whole set, not just the first page) — see lib/admin/queues.
+  const rows = page.rows;
 
   return (
     <RequirementsQueue
