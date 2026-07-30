@@ -3812,18 +3812,18 @@ the admin build, when Rajan gives the emails.
 
 ## Module 11 Part 7 — A10/A11, what is built and what is not
 
-- **A11 draws three tabs, not Doc5's nine.** Overview, Plans and Notes read real
-  rows and work. Payments, Listings, Leads, Chats, Communication log and
-  Timeline are **not drawn at all** rather than drawn empty — a tab that opens
-  onto nothing is worse than a tab that is not there yet. Overview's stat row
-  already shows the counts each of them will drill into, so the numbers are
-  visible even before the tabs exist. **Next commit in Part 7.**
+- **A11 now draws all nine tabs and its action bar.** Overview, Listings,
+  Plans, Payments, Leads, Chats, Communication, Notes and Timeline all read real
+  rows; Send message / Suspend / Lift / Change role / Ban device all write and
+  are audited. Still missing from Doc5's list: **Edit** (inline profile editing),
+  **Delete**, **Adjust balance**, **Grant trial** and **Impersonate**. Grants
+  belong to A15 and impersonation to A31; the other three want their own
+  confirm-and-consequence design. None of them is drawn.
 
-- **A11's action bar is not built.** Doc5 lists Edit / Suspend / Lift / Delete /
-  Role change / Grant trial / Adjust balance / Send message / Impersonate / Ban
-  device. Suspend and Ban already have endpoints (they are what A9's report
-  actions call); the rest need theirs. Until then A11 shows no action bar at all
-  rather than buttons that do nothing. **Next commit in Part 7.**
+- **A11's Chats tab lists threads and never opens one.** Deliberate: Doc9 keeps
+  message bodies out of the panel unless a message was reported, and a reported
+  message is read on A9 with its context. There is no composer anywhere in the
+  screen. A full read-only thread viewer would be a decision, not a fix.
 
 - **A10's bulk bar can select but not yet act.** Ticking rows shows the count and
   the "bulk actions are logged" note, and Send message / Grant trial are

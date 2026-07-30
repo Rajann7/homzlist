@@ -21,6 +21,7 @@ export type NotificationType =
   // listing lifecycle & moderation
   | "listing_approved" | "listing_changes_requested" | "listing_rejected" | "still_available"
   | "saved_listing_status" | "price_drop" | "report_outcome" | "suspension_lifted"
+  | "account_suspended" | "admin_message" | "role_changed"
   | "performance_nudge" | "area_added" | "weekly_digest" | "city_launched"
   // identity verification — the badge A7 grants, refuses and revokes (0104/0105)
   | "verification_approved" | "verification_rejected" | "verification_revoked"

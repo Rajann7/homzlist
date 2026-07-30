@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { currentStaff } from "@/lib/admin/auth";
 import { can } from "@/lib/admin/permissions";
 import { userDetail } from "@/lib/admin/userDetail";
+import { actionOptions } from "@/lib/admin/reviewConfig";
 import { UserDetailScreen } from "@/components/admin/UserDetailScreen";
 
 /**
@@ -20,8 +21,14 @@ export default async function UserDetailPage({ params }: { params: { id: string 
   if (!session.ok) redirect("/login");
   if (!can(session.staff.level, "users.edit")) redirect("/");
 
-  const detail = await userDetail(params.id);
+  const [detail, durations] = await Promise.all([userDetail(params.id), actionOptions("suspend_duration")]);
   if (!detail) notFound();
 
-  return <UserDetailScreen detail={detail} />;
+  return (
+    <UserDetailScreen
+      detail={detail}
+      can={{ users: can(session.staff.level, "users.edit"), ban: can(session.staff.level, "devicebans") }}
+      suspendDurations={durations.map((d) => ({ value: d.value, label: d.label }))}
+    />
+  );
 }
