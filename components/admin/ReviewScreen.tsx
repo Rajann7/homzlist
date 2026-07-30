@@ -227,8 +227,11 @@ export function ReviewScreen({ detail, canDecide, decideTooltip, basePath, siteU
       {/* Design: `gridTemplateColumns: twoCol ? '3fr 2fr' : '1fr'` where
           `twoCol = !mobile && !tablet` — two columns at DESKTOP ONLY. */}
       <div className="grid items-start gap-6 desktop:grid-cols-[3fr_2fr]">
-        {/* ---------- LEFT: the user's view ---------- */}
-        <div>
+        {/* ---------- LEFT: the user's view ----------
+            min-w-0: a grid item defaults to min-width:auto, so at 390 the
+            carousel's intrinsic width pushed this column 20px past the 358 the
+            track actually had and put a scrollbar under the whole review. */}
+        <div className="min-w-0">
           <div
             className="mb-3 inline-flex rounded-full p-[3px]"
             style={{ background: "var(--surface-2)" }}
@@ -260,7 +263,7 @@ export function ReviewScreen({ detail, canDecide, decideTooltip, basePath, siteU
         </div>
 
         {/* ---------- RIGHT: the review panel ---------- */}
-        <div style={{ opacity: lockedByOther ? 0.6 : 1, pointerEvents: lockedByOther ? "none" : "auto" }}>
+        <div className="min-w-0" style={{ opacity: lockedByOther ? 0.6 : 1, pointerEvents: lockedByOther ? "none" : "auto" }}>
           <SecHead>Risk</SecHead>
           <div className="rounded-8 p-[14px]" style={{ background: "var(--error-soft)" }}>
             <div className="mb-[10px]">
@@ -433,7 +436,13 @@ export function ReviewScreen({ detail, canDecide, decideTooltip, basePath, siteU
 
           {/* ------------------------------------------------- action bar */}
           <div
-            className="sticky bottom-0 mt-5 flex gap-2 border-t pb-1 pt-3"
+            /* flex-wrap for 390 only: the three labelled buttons are nowrap, so
+               flex:1 cannot shrink them below "Request changes", and the row
+               needed 382px of the 358 it had — the dots button hung 20px past
+               main. Above 390 everything still fits on one line and nothing
+               moves; at 390 the dots button drops to a second row instead of
+               overflowing. */
+            className="sticky bottom-0 mt-5 flex flex-wrap gap-2 border-t pb-1 pt-3"
             style={{ background: "var(--bg-page)", borderColor: "var(--divider)" }}
           >
             <Btn kind="primary" style={{ flex: 1 }} disabled={readOnly || busy} tooltip={decideTooltip} onClick={() => setOverlay("approve")}>

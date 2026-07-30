@@ -3758,3 +3758,54 @@ the admin build, when Rajan gives the emails.
   69. The tile now uses the same predicate as the tab it deep-links to, which is
   also how the design reads it (A2 "Listings 12" = A3 "Pending 12", with
   "Updated after edit 2" as its own tab outside the tile).
+
+## Module 11 Parts 4–6 — issues found during the conformance pass
+
+- **`var(--page)` is not a variable that exists.** The admin shell, its `main`
+  scroll container and `app/(admin)/account/layout.tsx` all set
+  `background: var(--page)` — the design's token name, not ours (`--bg-page`).
+  Three backgrounds were resolving to nothing and inheriting body's by luck.
+  Fixed. `var(--shadow-3, …)` on the avatar menu was the same shape of mistake:
+  the variable never existed, so it always took its light-mode fallback and
+  would have painted a shadow in dark mode. Both are now real tokens /
+  `shadow-l3 dark:shadow-none`. **Worth a sweep in every later part** — a
+  design-name variable that does not exist fails silently.
+
+- **Two grid tracks that could not shrink.** A2's chart row (`1.6fr 1fr`) and
+  A4's two-column body both used bare `fr`/auto grid items, whose default
+  minimum is min-content. At 768 the overdue card and at 390 the review
+  carousel each pushed `main` past its own width and put a horizontal scrollbar
+  under the page. Now `minmax(0,…)` / `min-w-0`. **Any later grid in the panel
+  needs the same treatment** — it is invisible at desktop and only shows up when
+  the content is long.
+
+- **A4's action bar did not fit at 390.** Approve / Request changes / Reject are
+  `whitespace-nowrap`, so `flex:1` could not shrink them: the row wanted 382px
+  of the 358 it had and the dots button hung outside. The row wraps now. The
+  design's own `btn()` has the same nowrap, so **every later action bar of four
+  or more controls will do this at 390.**
+
+- **Anomaly banners had a hardcoded "Open".** The design draws a different call
+  to action per banner. It is a column now (0108) with a check constraint, but
+  **nothing writes `anomaly_events` except the seed** — there is no detector job
+  behind any of the three anomaly kinds. The banners are real rows rendered
+  honestly; what is missing is the thing that would create them in production.
+  **Due with A27 (cron) / A28 (analytics).**
+
+- **Reject-lock appeals are seeded without the state they appeal against.** Of
+  the four rows in A8's reopen tab, three are `Not locked` and every one of them
+  reports "No rejection was ever logged against this item". The screen handles it
+  honestly, but the reopen flow has never been exercised against a listing that
+  really hit its rejection limit. **Seed a genuine 3-of-3 rejected + locked
+  listing** before A8 can be called proven.
+
+- **The designs use `border-radius:10px` in 15 places across 9 files** and Doc1's
+  scale has no 10 (4/6/8/12/16/full). The user-side classes that tried to spell
+  it (`rounded-10`) compiled to nothing and rendered square. They take 12 for
+  now. **Rajan's call**: add a 10 token, or accept the nearest one.
+
+- **Boost auto-reject leaves the refund to a sweep that nothing calls here.**
+  Approving a boost whose subject is no longer live correctly rejects it and
+  writes `reject_reason`, leaving `refunded_at` null for the hourly reconcile in
+  `lib/billing/reconcile.ts` to claim. Verified live during the Part 6 probe.
+  The sweep itself is still cron-triggered work — tracked above with A27.
