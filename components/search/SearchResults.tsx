@@ -191,7 +191,7 @@ export function SearchResults({ basePath = "", isGuest = false }: { basePath?: s
                 )}
               >
                 {t.label}
-                {tab === t.key && <span className="absolute inset-x-3.5 bottom-0 h-[1.5px] rounded-sm bg-accent" />}
+                {tab === t.key && <span className="absolute inset-x-3.5 bottom-0 h-[1.5px] rounded-full bg-accent" />}
               </button>
             ))}
           </div>

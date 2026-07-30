@@ -657,7 +657,7 @@ function MessageItem({ m, prev, view, isDivider, dividerRef, onLong, onAllow, on
             ) : m.meta?.domain ? (
               <div className="mb-1 rounded-8 bg-surface-1 p-2">
                 <p className="text-11 text-ink-tertiary">{m.meta.domain}</p>
-                {m.meta.external && <p className="mt-1 rounded bg-warning-soft px-1.5 py-0.5 text-11 text-warning">External link — open with care</p>}
+                {m.meta.external && <p className="mt-1 rounded-4 bg-warning-soft px-1.5 py-0.5 text-11 text-warning">External link — open with care</p>}
               </div>
             ) : null}
             <p className="whitespace-pre-wrap break-words">{m.body}</p>

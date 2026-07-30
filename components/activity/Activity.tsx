@@ -36,7 +36,7 @@ export function Activity({ base = "" }: { base?: string }) {
     return (
       <AppShell header={header}>
         <div className="p-4"><Skeleton className="h-4 w-32" /></div>
-        <div className="flex gap-3 px-4">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-28 w-28 shrink-0 rounded-10" />)}</div>
+        <div className="flex gap-3 px-4">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-28 w-28 shrink-0 rounded-12" />)}</div>
         <div className="mt-6 space-y-3 px-4">{[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-12 w-full rounded-8" />)}</div>
       </AppShell>
     );
@@ -79,7 +79,7 @@ export function Activity({ base = "" }: { base?: string }) {
           <div className="no-scrollbar flex gap-3 overflow-x-auto px-4 pb-1">
             {recentlyViewed.map((r) => (
               <button key={r.listingId} onClick={() => go(`/property/${r.listingId}`)} className="w-28 shrink-0 text-left">
-                <span className="block aspect-square overflow-hidden rounded-10 bg-surface-3">
+                <span className="block aspect-square overflow-hidden rounded-12 bg-surface-3">
                   {r.coverUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={r.coverUrl} alt="" data-protected="true" className="h-full w-full object-cover" />

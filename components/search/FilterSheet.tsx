@@ -339,7 +339,7 @@ function LocationSheet({
             return (
               <button key={a.id} onClick={() => onToggle(a.id)} className="flex h-13 w-full items-center gap-3 border-b border-divider py-3.5 text-left">
                 <span className={cn(
-                  "grid h-[22px] w-[22px] shrink-0 place-items-center rounded-md",
+                  "grid h-[22px] w-[22px] shrink-0 place-items-center rounded-6",
                   on ? "border border-accent bg-accent" : "border-[1.5px] border-border bg-transparent",
                 )}>
                   {on && <Icon name="check" size={13} strokeWidth={3} className="text-white" />}

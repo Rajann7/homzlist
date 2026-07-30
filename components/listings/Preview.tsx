@@ -347,7 +347,7 @@ function Tabs({
           className={cn("relative h-11 flex-1 text-15 font-semibold", tab === t ? "text-ink-primary" : "text-ink-tertiary")}
         >
           {labels[i]}
-          {tab === t && <span className="absolute inset-x-4 bottom-0 h-0.5 rounded-sm bg-accent" />}
+          {tab === t && <span className="absolute inset-x-4 bottom-0 h-0.5 rounded-full bg-accent" />}
         </button>
       ))}
     </div>
