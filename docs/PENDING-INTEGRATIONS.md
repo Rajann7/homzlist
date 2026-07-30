@@ -3809,3 +3809,39 @@ the admin build, when Rajan gives the emails.
   writes `reject_reason`, leaving `refunded_at` null for the hourly reconcile in
   `lib/billing/reconcile.ts` to claim. Verified live during the Part 6 probe.
   The sweep itself is still cron-triggered work — tracked above with A27.
+
+## Module 11 Part 7 — A10/A11, what is built and what is not
+
+- **A11 draws three tabs, not Doc5's nine.** Overview, Plans and Notes read real
+  rows and work. Payments, Listings, Leads, Chats, Communication log and
+  Timeline are **not drawn at all** rather than drawn empty — a tab that opens
+  onto nothing is worse than a tab that is not there yet. Overview's stat row
+  already shows the counts each of them will drill into, so the numbers are
+  visible even before the tabs exist. **Next commit in Part 7.**
+
+- **A11's action bar is not built.** Doc5 lists Edit / Suspend / Lift / Delete /
+  Role change / Grant trial / Adjust balance / Send message / Impersonate / Ban
+  device. Suspend and Ban already have endpoints (they are what A9's report
+  actions call); the rest need theirs. Until then A11 shows no action bar at all
+  rather than buttons that do nothing. **Next commit in Part 7.**
+
+- **A10's bulk bar can select but not yet act.** Ticking rows shows the count and
+  the "bulk actions are logged" note, and Send message / Grant trial are
+  disabled with their reason. They light up when A11's messaging and A15's
+  grants land.
+
+- **Nothing generates an export file.** `POST /api/v1/admin/exports` writes a
+  real `exports` row in `processing` with the requester, the reason and the PII
+  flag — and there is no worker that turns it into a file, so every export sits
+  in `processing` for ever. Verified during Part 7. **Due with A30.**
+
+- **`locations` has 104,612 city rows and the Supabase client caps a read at
+  1000.** A10's first cut read "all cities" to label the City column and every
+  row came back "—". It now reads only the ids on the page. **Any later screen
+  that maps ids to names must do the same** — the failure is silent, and it
+  looks like missing data rather than a truncated read.
+
+- **The design's verification cluster has three ticks (phone, ID, RERA); ours has
+  two.** There is no phone-verification row to read: an account cannot exist
+  without passing OTP, so a phone tick would be true for every row and would be
+  decoration, not data. Recorded as a deliberate deviation.

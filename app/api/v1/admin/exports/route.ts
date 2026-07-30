@@ -24,7 +24,11 @@ export const dynamic = "force-dynamic";
 const ENTITIES: Record<string, { cap: Parameters<typeof can>[1]; pii: boolean; needsReason: boolean }> = {
   listings: { cap: "queues.view", pii: false, needsReason: false },
   requirements: { cap: "queues.view", pii: false, needsReason: false },
-  users: { cap: "users.edit", pii: true, needsReason: false },
+  // A10's export dialog asks what the file is for and will not submit without
+  // it. A rule the browser enforces is not a rule, so the server requires it
+  // too: this file is names and phone numbers, the same class of data as the
+  // payments and audit exports Doc5 A30 already gates this way.
+  users: { cap: "users.edit", pii: true, needsReason: true },
   payments: { cap: "refunds", pii: true, needsReason: true },
   coupons: { cap: "coupons", pii: false, needsReason: false },
   finance: { cap: "refunds", pii: false, needsReason: false },
