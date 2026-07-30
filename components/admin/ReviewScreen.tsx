@@ -17,7 +17,7 @@ import {
   RadioList,
   RightSheet,
   SecHead,
-  SheetMenu,
+  AnchorMenu,
   Select,
   TextArea,
 } from "./overlays";
@@ -54,6 +54,8 @@ export function ReviewScreen({ detail, canDecide, decideTooltip, basePath, siteU
   const router = useRouter();
   const [tab, setTab] = useState<"card" | "full">("card");
   const [overlay, setOverlay] = useState<Overlay>(null);
+  // The element a menu was opened from, so it can render at that control.
+  const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -456,7 +458,7 @@ export function ReviewScreen({ detail, canDecide, decideTooltip, basePath, siteU
             </Btn>
             <button
               type="button"
-              onClick={() => setOverlay("more")}
+              onClick={(e) => { setMenuAnchor(e.currentTarget); setOverlay("more"); }}
               aria-label="More actions"
               className="grid h-10 w-10 shrink-0 place-items-center rounded-8 border"
               style={{ borderColor: "var(--border)", background: "var(--surface-1)", color: "var(--ink-secondary)" }}
@@ -514,7 +516,8 @@ export function ReviewScreen({ detail, canDecide, decideTooltip, basePath, siteU
         />
       )}
       {overlay === "more" && (
-        <SheetMenu
+        <AnchorMenu
+          anchor={menuAnchor}
           onClose={() => setOverlay(null)}
           items={[
             {

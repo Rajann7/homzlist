@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Icon } from "@/components/ui/Icon";
 
 /**
@@ -203,6 +203,118 @@ export function DropdownItem({
   );
 }
 
+/**
+ * A menu that opens AT the control that opened it, on every viewport.
+ *
+ * Rajan's call (30 Jul 2026), and it overrides the design here: the design's
+ * `sheetMenu()` slides every kebab menu up from the bottom of the screen, so a
+ * dots button on row 14 of a table answered 600px away from your finger. These
+ * menus now anchor to their own trigger, the way the saved-views dropdown
+ * already did.
+ *
+ * Positioned `fixed` off the trigger's own rect rather than `absolute` inside a
+ * relative parent, because most of these triggers live inside the queue tables'
+ * `overflow-x-auto` wrapper, which would clip an absolutely-positioned menu.
+ * It flips above the trigger when there is no room below, and stays inside the
+ * viewport on both axes.
+ */
+export function AnchorMenu({
+  anchor,
+  items,
+  onClose,
+  width = 240,
+}: {
+  /** The element the menu belongs to — usually the dots button. */
+  anchor: HTMLElement | null;
+  items: Array<SheetItem | null>;
+  onClose: () => void;
+  width?: number;
+}) {
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+
+  // Escape closes it. Unlike the sheets this does NOT lock body scroll: a
+  // dropdown is not modal, and locking would jump the page behind it.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        onClose();
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  // Measure after paint, when the menu's real height is known, so the flip
+  // decision is made against the height it actually has.
+  useLayoutEffect(() => {
+    if (!anchor) return;
+    const place = () => {
+      const a = anchor.getBoundingClientRect();
+      const h = menuRef.current?.offsetHeight ?? 0;
+      const gap = 6;
+      const below = window.innerHeight - a.bottom;
+      const top = below >= h + gap + 8 || a.top < h + gap + 8 ? a.bottom + gap : a.top - h - gap;
+      // Right-aligned to the trigger, which is what a kebab at the end of a row
+      // wants, then clamped so it can never hang off either edge.
+      const left = Math.min(Math.max(8, a.right - width), window.innerWidth - width - 8);
+      setPos({ top: Math.max(8, Math.min(top, window.innerHeight - h - 8)), left });
+    };
+    place();
+    window.addEventListener("resize", place);
+    // Any scroll, including inside the table wrapper, moves the trigger.
+    window.addEventListener("scroll", place, true);
+    return () => {
+      window.removeEventListener("resize", place);
+      window.removeEventListener("scroll", place, true);
+    };
+  }, [anchor, width, items.length]);
+
+  const shown = items.filter((i): i is SheetItem => Boolean(i));
+
+  return (
+    <>
+      {/* No scrim — a menu dims nothing. The overlay only catches the next click. */}
+      <button type="button" className="fixed inset-0 z-[110] cursor-default" aria-label="Close" onClick={onClose} />
+      <div
+        ref={menuRef}
+        role="menu"
+        className="fixed z-[111] border p-[6px]"
+        style={{
+          top: pos?.top ?? -9999,
+          left: pos?.left ?? -9999,
+          width,
+          maxWidth: "calc(100vw - 16px)",
+          visibility: pos ? "visible" : "hidden",
+          background: "var(--surface-1)",
+          borderColor: "var(--border)",
+          borderRadius: 12,
+          boxShadow: "0 8px 24px rgba(0,0,0,.16)",
+        }}
+      >
+        {shown.map((it) => (
+          <button
+            key={it.label}
+            type="button"
+            role="menuitem"
+            disabled={it.disabled}
+            title={it.disabled ? it.tooltip : undefined}
+            onClick={() => {
+              onClose();
+              it.onSelect();
+            }}
+            className="block w-full rounded-8 px-3 py-[10px] text-left text-[14px] hover:bg-[var(--surface-2)] disabled:opacity-40"
+            style={{ color: it.danger ? "var(--error)" : "var(--ink-primary)" }}
+          >
+            {it.label}
+          </button>
+        ))}
+      </div>
+    </>
+  );
+}
+
 export interface SheetItem {
   label: string;
   onSelect: () => void;
@@ -210,39 +322,6 @@ export interface SheetItem {
   disabled?: boolean;
   /** Shown as a title attribute when disabled — the role-gate tooltip. */
   tooltip?: string;
-}
-
-/** The bottom action sheet (A4's ⋯, A9's escalate, every row menu in P14). */
-export function SheetMenu({ items, onClose }: { items: Array<SheetItem | null>; onClose: () => void }) {
-  useDismiss(onClose);
-  return (
-    <div className="fixed inset-0 z-[120] flex items-end justify-center bg-black/40" role="dialog" aria-modal="true">
-      <button type="button" className="absolute inset-0" aria-label="Close" onClick={onClose} />
-      <div
-        className="relative w-full rounded-t-16 p-2 md:mb-6 md:w-[380px]"
-        style={{ background: "var(--surface-1)", boxShadow: "0 8px 24px rgba(0,0,0,.16)" }}
-      >
-        <div className="p-[6px]">
-          {items.filter((i): i is SheetItem => Boolean(i)).map((it) => (
-            <button
-              key={it.label}
-              type="button"
-              disabled={it.disabled}
-              title={it.disabled ? it.tooltip : undefined}
-              onClick={() => {
-                onClose();
-                it.onSelect();
-              }}
-              className="block w-full rounded-8 px-3 py-[10px] text-left text-[14px] disabled:opacity-40 hover:bg-[var(--surface-2)]"
-              style={{ color: it.danger ? "var(--error)" : "var(--ink-primary)" }}
-            >
-              {it.label}
-            </button>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
 }
 
 /** The full-screen document viewer (A4's doc block, A7's certificate). */

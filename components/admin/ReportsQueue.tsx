@@ -6,7 +6,7 @@ import { Icon } from "@/components/ui/Icon";
 import type { ReportFilter, ReportGroup } from "@/lib/admin/reports";
 import type { ActionOption } from "@/lib/admin/reviewConfig";
 import { Initials, Thumb } from "./queueBits";
-import { Badge, Btn, Chip, Field, Modal, NoteBlock, RadioList, RightSheet, SecHead, Select, SheetMenu, TextArea } from "./overlays";
+import { AnchorMenu, Badge, Btn, Chip, Field, Modal, NoteBlock, RadioList, RightSheet, SecHead, Select, TextArea } from "./overlays";
 import { AdminToast } from "./AdminToast";
 
 /**
@@ -44,7 +44,7 @@ export function ReportsQueue({ filter, counts, groups, can, warnTemplates, suspe
   const [toast, setToast] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [sheet, setSheet] = useState<null | { group: ReportGroup; kind: "warn" | "suspend" | "more" | "note" | "reporters" | "confirm"; action?: string }>(null);
+  const [sheet, setSheet] = useState<null | { group: ReportGroup; kind: "warn" | "suspend" | "more" | "note" | "reporters" | "confirm"; action?: string; anchor?: HTMLElement }>(null);
 
   const show = (msg: string) => {
     setToast(msg);
@@ -207,7 +207,7 @@ export function ReportsQueue({ filter, counts, groups, can, warnTemplates, suspe
               )}
               <button
                 type="button"
-                onClick={() => setSheet({ group: g, kind: "more" })}
+                onClick={(e) => setSheet({ group: g, kind: "more", anchor: e.currentTarget })}
                 aria-label="More actions"
                 className="grid h-[34px] w-[34px] place-items-center rounded-8 border"
                 style={{ borderColor: "var(--border)", background: "var(--surface-1)", color: "var(--ink-secondary)" }}
@@ -225,7 +225,8 @@ export function ReportsQueue({ filter, counts, groups, can, warnTemplates, suspe
 
       {/* ------------------------------------------------------------ overlays */}
       {sheet?.kind === "more" && (
-        <SheetMenu
+        <AnchorMenu
+          anchor={sheet.anchor ?? null}
           onClose={() => setSheet(null)}
           items={[
             { label: "Escalate to Super Admin", onSelect: () => setSheet({ group: sheet.group, kind: "confirm", action: "escalate" }) },
