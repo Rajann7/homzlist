@@ -10,7 +10,7 @@ type-check.
 | P0 | Design system — icons, primitives, shell, panel stack, overlays, toast, device bands | ✅ done (scope note below) |
 | P1a | Admin session/guard/audit + list engine + endpoints | ✅ done |
 | P1b | The list controls as UI | ✅ done |
-| P2 | A1 Login + A2 Dashboard | ⬜ |
+| P2 | A1 Login + A2 Dashboard | ✅ done |
 | P3 | A3–A9 queues + review detail | ⬜ |
 | P4 | A10, A11, A12, A31 | ⬜ |
 | P5 | A13–A18 | ⬜ |
@@ -216,3 +216,90 @@ staff role attempting an export → 403
 Nothing here is mounted on a screen yet: the audit resource these were proven
 against is A26, which belongs to P7. The controls get their pixel-diff,
 click-flow and 5-gate proof when P3 stands up the first queue screen.
+
+## P2 — the shell mounts, and the pixel-diff starts running
+
+The first part that puts a screen on a route, so §9's five remaining gates have
+something to run against for the first time.
+
+| File | What it owns |
+|---|---|
+| `app/(admin)/account/login/page.tsx` + `components/admin/login/` | A1, template 34-71 — all four states |
+| `app/(admin)/account/(panel)/layout.tsx` | the gate + the shell's server data, once for every screen below |
+| `app/(admin)/account/(panel)/page.tsx` + `components/admin/dashboard/` | A2, template 491-595 |
+| `app/(admin)/account/(panel)/[...screen]/page.tsx` | the design's own placeholder (951-957) for every screen P3-P7 has not built |
+| `components/admin/panel/` | the shell's three header surfaces: bell sheet · global search · avatar menu → My profile / Switch account / Log out |
+| `lib/admin/dashboard.ts` | every number on A2 |
+| `lib/admin/{notifications,search,panel,account-pool,environment,display,identity,oauth,edge}.ts` | the server halves |
+| `supabase/migrations/0093_admin_p2.sql` | staff.phone + the two preference columns, and the indexes the tiles scan |
+| `supabase/migrations/0094_admin_dashboard_functions.sql` | queue tiles · daily metrics · revenue series, as SQL |
+
+### The design's controls, made real
+
+- **7d / 30d / 6m** re-queries per range (day · week · month buckets), it does
+  not re-slice one payload.
+- **Banner ×** persists to `anomaly_events.dismissed_at` with the admin's id and
+  an audit row. The design dismisses into component state, which would have come
+  back on reload and been per-admin.
+- **My profile** writes name, phone and both switches to `staff`; email and role
+  are read-only in the sheet AND ignored by the endpoint — they are the
+  whitelist.
+- **Switch account** is a real device-local pool (`hz_admin_accts`) mirroring
+  lib/auth/account-pool: park, list against live KV sessions, rotate in.
+- **Overdue rows / tiles / banners / bell rows** all deep-link; nothing 404s,
+  because unbuilt screens render the design's placeholder.
+
+### Pixel diff — the first run, all three bands
+
+```
+21-admin-login-mobile      0.39%      22-admin-dashboard-mobile   5.18%
+21-admin-login-tablet      0.17%      22-admin-dashboard-tablet   5.76%
+21-admin-login-desktop     0.09%      22-admin-dashboard-desktop  5.92%
+23-admin-login-unauth      0.09%      24-admin-login-revoked      0.06%
+```
+
+`npm run design:diff -- admin` (needs `next dev`). A1's three states are driven
+by setting the same one-shot `hz_admin_login` flash cookie the server sets, so
+what is diffed is the real screen.
+
+The dashboard's residual ~5-6% is **data**, not layout: the design draws 12
+pending listings, three banners and a ₹18,940 day; the app draws 70, two and ₹0,
+because that is what the database holds today. The diff image shows every box,
+column and row aligned, with the text inside them different.
+
+**Two harness fixes were needed first**, and both would have corrupted every
+later admin diff:
+- P13 floats its frame on a 24px "desk" and P13's DEV panel is `position:
+  absolute; z-index:200` — the generic z-500 sweep never saw it. Flattened and
+  hidden the way `check-p13-bands.mjs` already does.
+- **The app's global reset sets `line-height: 1.5`; the design assumes the
+  browser default.** A 15px nav row measured 41px against the design's 38 — a
+  3px error repeated down every row of every admin screen. `.admin-scope` in
+  `admin.css` restores `normal` for the admin subtree only. This alone took A1
+  from 3.06% to 0.39% at mobile.
+
+### Proof
+
+`npm run check:admin-p2` — every dashboard number re-derived with a second,
+independently written query and compared against what the page returns.
+
+```
+A1        not whitelisted / revoked / ok — all three outcomes, 3 attempts logged
+tiles     listings 70 · requirements 23 · boosts 16 · verifications 29
+          appeals 7 · reports 34 · tickets 29   (each = a second query)
+stats     signups/listings/inquiries/revenue today = live IST queries
+chart     7d 7 buckets ₹87,083.03 · 30d 5 buckets ₹278,582.17 · 6m 6 buckets
+          ₹695,877.96 — API totals equal the SQL totals; range=all-time → 422
+search    masked phones only; under 2 chars returns nothing
+anon      accounts · search · revenue · me · read-all · maintenance → 401
+staff     no PAYMENTS group · maintenance/off 403 · switch to an unparked
+          account 404
+bundle    service_role / JWT secret / Razorpay secret / DB password → 0 hits
+          in .next/static
+```
+
+Live-verified in the browser as well: sign-in → dashboard, the three chart
+ranges, banner dismiss (row + audit row shown), bell badge 1 → mark all read →
+0, global search, profile save (`staff` row shown before/after), account switch
+(park → list → rotate, via a cookie jar), and log out (`staff_sessions.ended_at`
+set + audit row).

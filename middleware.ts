@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { verifyAccessEdge } from "@/lib/auth/edge";
+import { verifyAdminAccessEdge } from "@/lib/admin/edge";
 
 /**
  * Subdomain routing + session isolation + login-bypass sealing (Doc6 §4, Doc9 §28).
@@ -16,6 +17,9 @@ const ACCESS_COOKIE = "hz_at";
 const REFRESH_COOKIE = "hz_rt";
 /** Multi-account pool (lib/auth/account-pool) — treated exactly like hz_rt. */
 const POOL_COOKIE = "hz_accts";
+/** The ADMIN session — a different cookie name on a different host (Doc9 §21). */
+const ADMIN_ACCESS_COOKIE = "hz_admin_at";
+const ADMIN_REFRESH_COOKIE = "hz_admin_rt";
 
 type Zone = "public" | "seller" | "admin";
 function getZone(host: string): Zone {
@@ -103,9 +107,25 @@ export async function middleware(request: NextRequest) {
     return NextResponse.rewrite(url);
   }
 
-  // admin — Google-auth whitelist enforced server-side (Module 11)
-  if (isLogin && user) return NextResponse.redirect(new URL("/", request.url));
-  if (!isLogin && !user) return NextResponse.redirect(new URL("/login", request.url));
+  // admin — the ADMIN session decides here, never the user one. hz_at is
+  // host-only to the public/seller hosts and can never be present on
+  // account.*, so gating on `user` locked every signed-in admin out of the
+  // panel. The whitelist, the role and the revoked check are still enforced
+  // server-side on every request by requireAdmin(); this only routes.
+  const admin = await verifyAdminAccessEdge(request.cookies.get(ADMIN_ACCESS_COOKIE)?.value);
+  if (isLogin && admin) return NextResponse.redirect(new URL("/", request.url));
+  if (!isLogin && !admin) {
+    // The 30-minute access token has expired but the 12-hour refresh may not
+    // have. Rotate it and come back, rather than throwing a working session
+    // out to the login screen halfway through a review. KV and Supabase are
+    // unreachable from the Edge, so the rotation itself is a Node route.
+    if (request.cookies.has(ADMIN_REFRESH_COOKIE)) {
+      const to = new URL("/api/v1/admin/auth/refresh", request.url);
+      to.searchParams.set("next", `${pathname}${url.search}`);
+      return NextResponse.redirect(to);
+    }
+    return NextResponse.redirect(new URL("/login", request.url));
+  }
   url.pathname = `/account${pathname === "/" ? "" : pathname}`;
   return NextResponse.rewrite(url);
 }

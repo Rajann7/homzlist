@@ -44,7 +44,8 @@
     "check:inbox": "node scripts/check-inbox-live.mjs",
     "check:story": "node scripts/check-story-live.mjs",
     "check:builder-req": "node scripts/check-builder-requirements-live.mjs",
-    "seed:admin": "node scripts/seed-admin.mjs"
+    "seed:admin": "node scripts/seed-admin.mjs",
+    "check:admin-p2": "node scripts/check-admin-p2-live.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1091.0",

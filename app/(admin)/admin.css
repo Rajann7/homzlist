@@ -133,6 +133,24 @@
   }
 }
 
+/* --------------------------------------------------------------------------
+   The design's baseline line-height.
+
+   P13 sets a line-height exactly where it wants one (1.4 on the login
+   subtitle, 1.5 on the fine print, 1.9 in the risk breakdown) and otherwise
+   relies on the browser default. The app's global reset sets 1.5 on <body>,
+   which every admin row then inherits: a 15px nav row measured 41px against
+   the design's 38, a 3px error repeated down every list, every table row and
+   every card in the panel.
+
+   Restoring `normal` for the admin subtree is what makes the panel match what
+   was drawn. It is scoped to admin, so the user side keeps its own baseline.
+   -------------------------------------------------------------------------- */
+.admin-scope,
+.admin-portal {
+  line-height: normal;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .admin-root *,
   .admin-portal * {

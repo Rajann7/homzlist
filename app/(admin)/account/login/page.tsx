@@ -1,14 +1,29 @@
-import { EmptyState, Wordmark } from "@/components";
+import { redirect } from "next/navigation";
+import { AdminLoginScreen } from "@/components/admin/login/AdminLoginScreen";
+import { currentAdmin } from "@/lib/admin/guard";
+import { readLoginOutcome } from "@/lib/admin/login-outcome";
+import { isStagingEnv, supportEmail } from "@/lib/admin/environment";
 
 /**
- * Admin login placeholder — Google-only, whitelist-checked server-side (Module 11).
- * Non-whitelisted / revoked emails are rejected server-side and logged (Doc9 §21).
+ * A1 — Admin login (Doc5 A1, template 34-71).
+ *
+ * Middleware already bounces a signed-in admin away from here, but that gate
+ * only checks the token's signature. This re-checks the way every other admin
+ * surface does — `currentAdmin()` re-reads the staff row — so an admin revoked
+ * a second ago lands on the login screen instead of being sent into a panel
+ * that would then refuse them.
  */
-export default function AdminLogin() {
+export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
+
+export default async function AdminLoginPage() {
+  if (await currentAdmin()) redirect("/");
+
   return (
-    <div className="mx-auto flex min-h-[100dvh] max-w-admin flex-col items-center justify-center gap-4 px-6">
-      <Wordmark className="text-24" />
-      <EmptyState title="Admin sign-in" subtitle="Google auth (whitelist) arrives in Module 11." />
-    </div>
+    <AdminLoginScreen
+      outcome={readLoginOutcome()}
+      staging={isStagingEnv()}
+      supportEmail={await supportEmail()}
+    />
   );
 }

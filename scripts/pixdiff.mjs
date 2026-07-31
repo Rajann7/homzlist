@@ -16,12 +16,13 @@ import fs from "node:fs";
 import path from "node:path";
 import { launchChrome, Session, sleep } from "./lib/cdp.mjs";
 import { diff, contactSheet } from "./lib/pixels.mjs";
-import { connect } from "./lib/dbx.mjs";
+import { connect, env } from "./lib/dbx.mjs";
 import { makeClient } from "./lib/session.mjs";
 
 const PORT = process.env.PORT ?? "55233";
 const APP_PUBLIC = `http://localhost:${PORT}`;
 const APP_SELLER = `http://seller.localhost:${PORT}`;
+const APP_ADMIN = `http://account.localhost:${PORT}`;
 const DESIGN = `http://localhost:${PORT}/_dx`;
 const OUT = "_shots";
 const VW = 390, VH = 760;
@@ -82,6 +83,31 @@ const DESIGN_DRIVER = `
   return true;
 })()`;
 
+/**
+ * P13 only — the admin prototype floats its frame on a 24px "desk" and caps it
+ * at calc(100vh - 48px) (template 416). That desk is the PREVIEW's chrome, not
+ * the design: left in place a 1440 browser renders a 1392-wide "desktop" with
+ * rounded corners and a drop shadow, and every one of those pixels counts as a
+ * deviation. scripts/check-p13-bands.mjs flattens it for the same reason.
+ */
+const NORMALIZE_ADMIN_FRAME = `
+(() => {
+  const desk = document.querySelector('[data-theme]');
+  const frame = desk && desk.firstElementChild;
+  if (!desk || !frame) return false;
+  desk.style.padding = '0';
+  desk.style.background = 'var(--page)';
+  desk.style.minHeight = '100vh';
+  frame.style.width = '100%';
+  frame.style.maxWidth = 'none';
+  frame.style.height = '100vh';
+  frame.style.maxHeight = 'none';
+  frame.style.borderRadius = '0';
+  frame.style.boxShadow = 'none';
+  frame.style.border = 'none';
+  return true;
+})()`;
+
 // The prototype ships a floating DEV panel that is not part of the design.
 const HIDE_DEV_TOOLBAR = `
 (() => {
@@ -111,12 +137,28 @@ async function captureDesign(sess, spec) {
   if (!gotInstance) throw new Error(`could not reach the ${spec.page} prototype state`);
   // `viewport` is the prototype's own device state, not the browser's — set it
   // alongside the screen so the design side renders the band we are diffing.
-  const state = { screen: spec.screen, viewport: spec.band ?? "mobile", ...(spec.designState ?? {}) };
+  const state = {
+    screen: spec.screen,
+    viewport: spec.band ?? "mobile",
+    // P13's DEV panel is its own React state, and it is absolutely positioned
+    // at z-index 200 — the generic z-500 sweep below never sees it.
+    ...(spec.page === "P13" ? { dev: false } : {}),
+    ...(spec.designState ?? {}),
+  };
   await sess.eval(`window.__dc.setState(${JSON.stringify(state)}); true`);
   await sleep(500);
   if (spec.designAfter) { await sess.eval(spec.designAfter); await sleep(400); }
   await sess.eval(FREEZE);
   await sess.eval(HIDE_DEV_TOOLBAR); // after the last render, or it comes back
+  if (spec.page === "P13") {
+    await sess.eval(NORMALIZE_ADMIN_FRAME);
+    // `dev:false` leaves the small "DEV" re-open button in the corner.
+    await sess.eval(`
+      for (const b of document.querySelectorAll('button')) {
+        if (b.textContent.trim() === 'DEV') b.style.display = 'none';
+      }
+      true`);
+  }
   await sleep(250);
   return sess.screenshot();
 }
@@ -274,7 +316,46 @@ function screenMap(fx) {
     { id: "20-error-404",       page: "P4", screen: "error",    as: "guest",
       designState: { errKind: "404" },
       url: `${APP_PUBLIC}/property/00000000-0000-0000-0000-000000000000` },
+
+    // ---- P13 · ADMIN (Module 11 P2) -------------------------------------
+    // The admin design writes its own three device states rather than using
+    // breakpoints, so each admin screen is shot at all three bands. `as:
+    // "admin"` swaps the user session for the ADMIN one, on the admin host.
+    //
+    // A1's three outcomes are driven the way the server drives them: the
+    // one-shot `hz_admin_login` flash cookie. The harness sets exactly the
+    // cookie the sign-in path would have set, so what is diffed is the real
+    // screen and not a prop someone invented for the shot.
+    ...["mobile", "tablet", "desktop"].flatMap((band) => [
+      { id: `21-admin-login-${band}`, page: "P13", screen: "login", band, as: "none",
+        designState: { loginState: "default" }, url: `${APP_ADMIN}/login` },
+      { id: `22-admin-dashboard-${band}`, page: "P13", screen: "dashboard", band, as: "admin",
+        // The prototype's dashboard defaults to `appState:'normal'` with no
+        // banner dismissed; pin both so a previous state cannot leak in.
+        designState: { appState: "normal", dismissed: [], chartTab: "7d" },
+        url: `${APP_ADMIN}/` },
+    ]),
+    { id: "23-admin-login-unauth", page: "P13", screen: "login", band: "desktop", as: "none",
+      designState: { loginState: "unauth" },
+      cookies: [adminLoginFlash("not_whitelisted", "nirav@gmail.com")],
+      url: `${APP_ADMIN}/login` },
+    { id: "24-admin-login-revoked", page: "P13", screen: "login", band: "desktop", as: "none",
+      designState: { loginState: "revoked" },
+      cookies: [adminLoginFlash("revoked", "nidhi@homzlist.com")],
+      url: `${APP_ADMIN}/login` },
   ];
+}
+
+/** The exact flash cookie lib/admin/login-outcome.ts writes on a refusal. */
+function adminLoginFlash(kind, email) {
+  return {
+    name: "hz_admin_login",
+    value: Buffer.from(JSON.stringify({ kind, email })).toString("base64url"),
+    domain: "account.localhost",
+    path: "/",
+    httpOnly: true,
+    secure: false,
+  };
 }
 
 // -------------------------------------------------------------- fixtures -----
@@ -374,6 +455,32 @@ for (const [label, phone] of Object.entries(ACTORS)) {
   catch (e) { console.log(`  ! login ${label} (${phone}): ${e.message}`); }
 }
 
+/**
+ * An ADMIN session for the P13 shots — the dev provider, which still faces the
+ * whitelist, the revoked check and the audit log (lib/admin/auth-provider.ts).
+ * Empty if it fails, and the dashboard shots then report REDIRECTED rather than
+ * quietly diffing the login screen against the dashboard design.
+ */
+const adminJar = new Map();
+{
+  const email = process.env.ADMIN_DEV_EMAIL ?? env.ADMIN_DEV_EMAIL;
+  if (!email) {
+    console.log("  ! ADMIN_DEV_EMAIL is not set — the P13 dashboard shots will bounce to /login");
+  } else {
+    const res = await fetch(`${APP_ADMIN}/api/v1/admin/auth/dev`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email }),
+    }).catch(() => null);
+    for (const c of res?.headers.getSetCookie?.() ?? []) {
+      const pair = c.split(";")[0];
+      const i = pair.indexOf("=");
+      adminJar.set(pair.slice(0, i).trim(), pair.slice(i + 1).trim());
+    }
+    console.log(`admin session: ${adminJar.size ? `${email} ok` : "FAILED"}`);
+  }
+}
+
 // `next dev` compiles a route on its first request; without a warm-up pass the
 // first screenshot of each screen is whatever renders during that compile.
 const specs = screenMap(fx).filter((s) => (!only.length || only.some((f) => s.id.includes(f))) && s.url);
@@ -404,9 +511,19 @@ for (const spec of screenMap(fx)) {
   await appSess.setViewport(band.w, band.h);
   try {
     const s = sessions[spec.as];
+    // Admin cookies are host-only to account.localhost and named differently
+    // from the user ones — handing a screen both would prove nothing about
+    // either. `spec.cookies` (the A1 flash) is merged in, not replaced.
+    const sessionCookies =
+      spec.as === "admin"
+        ? cookiesFor(adminJar, "account.localhost")
+        : s
+          ? [...cookiesFor(s.jar, "seller.localhost"), ...cookiesFor(s.jar, "localhost")]
+          : [];
+    const cookies = [...sessionCookies, ...(spec.cookies ?? [])];
     const r = await captureApp(appSess, spec.url, {
       ...spec,
-      cookies: s ? [...cookiesFor(s.jar, "seller.localhost"), ...cookiesFor(s.jar, "localhost")] : null,
+      cookies: cookies.length ? cookies : null,
     });
     appPng = r.png;
     settled = r.settled;

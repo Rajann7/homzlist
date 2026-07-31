@@ -110,6 +110,23 @@ export async function consumeAdminRefresh(
   }
 }
 
+/**
+ * Is this refresh token still live? Read-only — used by the account pool to
+ * decide whether a parked account may still be offered, without spending the
+ * token that switching into it will need.
+ */
+export async function peekAdminRefresh(
+  raw: string,
+): Promise<{ staffId: string; sessionId: string } | null> {
+  const stored = await kv.get(refreshKey(hash(raw)));
+  if (!stored) return null;
+  try {
+    return JSON.parse(stored) as { staffId: string; sessionId: string };
+  } catch {
+    return null;
+  }
+}
+
 export async function revokeAdminRefresh(raw: string): Promise<void> {
   await kv.del(refreshKey(hash(raw)));
 }

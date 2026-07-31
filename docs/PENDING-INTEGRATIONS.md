@@ -3577,3 +3577,52 @@ and only outside production — `adminAuthProviderKind()`, `devIdentity()` and t
 **To finish:** put the two credentials in the environment. The provider flips to
 Google automatically; `googleAuthorizeUrl()` / `googleIdentityFromCode()` are
 already written and no other code changes.
+
+## Module 11 · P2 — what A1 + A2 found and left open
+
+Four gaps the dashboard's own copy implies but P2 does not own. None of them is
+key-blocked; each belongs to a screen a later part builds.
+
+**1. Nothing DETECTS an anomaly.** The dashboard's banner row reads
+`anomaly_events` and the × now persists a real dismissal — but the only rows in
+that table were written by `seed-admin.mjs`. No job watches for a payment-failure
+spike, an OTP spike or a report spike, so a real spike tomorrow puts nothing on
+the screen. The detector belongs with A27 Cron & System (**P7**): it is a cron
+job plus three thresholds, and the table, the banner, the link and the dismissal
+are already there waiting for it.
+
+**2. The two profile preferences are stored, not acted on.** "Email me on
+escalations" and "Daily queue digest" write to `staff.notify_escalations` /
+`staff.daily_digest` and read back (proven). Nothing sends either message —
+there is no escalation mail and no digest job. Delivery needs Resend (**B5**)
+and a cron entry, and the digest's contents are the queue tiles this part
+already computes (`lib/admin/dashboard.ts`). Until then the switches are honest
+about what they are: a stored preference.
+
+**3. The super alert is a bell row, not an alert.** Doc5 A1 says "5+ failed
+attempts → super alert". P2 raises a real `admin_notifications` row, once per
+15-minute window, and it appears in the bell (proven live: 6 failures → 1 row).
+Reaching a super admin who is NOT looking at the panel is email/push, i.e. the
+same delivery gap as (2).
+
+**4. Maintenance can be turned OFF from the banner, not ON.** The shell's red
+banner is real (`maintenance_settings`) and its "Turn off" link works, super
+only, audited. Turning it on, the message, the ETA and the bypass roles are A22
+Settings (**P7**) — the banner would otherwise offer a link that does nothing.
+
+### Two defects P2 fixed that were NOT in its prompt
+
+- **The admin panel was unreachable after signing in.** `middleware.ts` gated
+  the admin zone on the USER session (`hz_at`), which is host-only to the public
+  and seller hosts and can therefore never be present on account.* — every
+  successful admin sign-in was redirected straight back to /login. The zone now
+  verifies the admin cookie (`lib/admin/edge.ts`).
+- **Nothing ever spent the admin refresh token.** Access is 30 minutes,
+  refresh is 12 hours, and `refreshAdminSession()` had no caller: half an hour
+  into a shift an admin was thrown out to the login screen with a valid session
+  in the jar. Middleware now rotates through `/api/v1/admin/auth/refresh`.
+  Building that also surfaced that `req.url` inside a route handler reports the
+  INTERNAL origin (localhost), so redirects built from it landed on the public
+  host — including the OAuth `redirect_uri`, which would have failed against
+  Google in production. Both now use the request's own Host / a relative
+  Location (`lib/admin/oauth.ts`).
