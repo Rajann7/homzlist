@@ -75,7 +75,12 @@ const audited = async (action, entityId) =>
 const notified = async (profileId, type) =>
   (await one(
     `select count(*) n from notifications
-      where profile_id=$1 and type=$2::notification_type and created_at >= $3`,
+      -- A repeat notification of the same type GROUPS onto the existing row
+      -- (notify_upsert) instead of inserting a second one, so freshness is
+      -- last_event_at, not created_at. Counting only inserts made this check
+      -- fail whenever the same poster had been notified in an earlier run.
+      where profile_id=$1 and type=$2::notification_type
+        and greatest(created_at, coalesce(last_event_at, created_at)) >= $3`,
     profileId, type, auditSince,
   )).n;
 
@@ -88,6 +93,29 @@ const notified = async (profileId, type) =>
  * state first and then drives the real endpoint through it.
  */
 async function ensureStates() {
+  // The run APPROVES and REJECTS listings, so each pass drains the pending
+  // queue. Put back what previous passes took — the ones this script itself
+  // approved, newest first — so the proof is repeatable instead of working once
+  // and then reporting an empty queue as a failure.
+  const pending = await one(
+    `select count(*) n from listings
+      where status='pending_review' and reject_count=0 and deleted_at is null`,
+  );
+  if (Number(pending.n) < 5) {
+    const restored = await all(
+      `update listings set status='pending_review', approved_at=null, live_at=null,
+                           reject_count=0, is_locked=false
+        where id in (
+          select id from listings
+           where status='live' and deleted_at is null
+           order by approved_at desc nulls last
+           limit ${5 - Number(pending.n)}
+        )
+        returning id`,
+    );
+    if (restored.length) console.log(`  ..   returned ${restored.length} listing(s) to the queue`);
+  }
+
   const atTwo = await one(
     `select id from listings where status='pending_review' and reject_count=2 and deleted_at is null limit 1`,
   );
@@ -121,6 +149,150 @@ async function ensureStates() {
       [victim.id, victim.profile_id],
     );
     console.log(`  ..   seeded a locked listing with an open appeal (${victim.id.slice(0, 8)})`);
+  }
+
+  // The boost block SPENDS its fixtures: approving and rejecting move rows out
+  // of `pending_approval`, so a second run finds none and reports failures that
+  // are really just an empty queue. Two paid boosts and one refunded-order
+  // boost are put back each run.
+  // Recycling old rows stopped working once the pool was exhausted, so the
+  // fixture is BUILT fresh every run: a live listing, a paid order, a captured
+  // payment and a boost waiting on it. Every one is a real row in a real table
+  // — the state a seller reaches by paying, reproduced exactly. Building rather
+  // than reusing also means the block never inherits a half-decided boost from
+  // a previous run and reports its own leftovers as failures.
+  for (let i = 0; i < 2; i++) {
+    const l = await one(
+      `select l.id, l.profile_id, l.city_id from listings l
+        where l.status = 'live' and l.availability = 'available' and l.deleted_at is null
+          and not exists (select 1 from boosts b
+                           where b.listing_id = l.id and b.status in ('pending_approval','active'))
+        order by l.created_at desc limit 1`,
+    );
+    if (!l) break;
+    const order = await one(
+      `insert into orders (profile_id, kind, catalog_code, base_paise, taxable_paise,
+                           total_paise, status, terms_snapshot)
+       values ($1, 'boost', 'boost7', 49900, 49900, 49900, 'paid', '{}'::jsonb)
+       returning id`,
+      l.profile_id,
+    );
+    await sql.query(
+      `insert into payments (order_id, profile_id, razorpay_payment_id, status, method,
+                             amount_paise, captured_at)
+       values ($1, $2, $3, 'success', 'upi', 49900, now())`,
+      [order.id, l.profile_id, `pay_proof_${Date.now()}${i}`],
+    );
+    await sql.query(
+      `insert into boosts (profile_id, listing_id, order_id, catalog_code, duration_days,
+                           targeting, target_label, target_city_id, price_paise, status,
+                           subject_kind)
+       -- Targeted ALL INDIA on purpose: the per-city cap is a real limit and
+       -- Rajkot's fills up over repeated runs, at which point approval is
+       -- correctly refused and this block would prove nothing about approving.
+       values ($1, $2, $3, 'boost7', 7, 'india', 'All India', null, 49900,
+               'pending_approval', 'listing')`,
+      [l.profile_id, l.id, order.id],
+    );
+    console.log(`  ..   built a paid boost awaiting approval on listing ${l.id.slice(0, 8)}`);
+  }
+
+  // The refunded-order fixture needs a LIVE listing too. approveBoost checks
+  // eligibility before payment, so an unpaid boost on a dead listing reports
+  // "ineligible" and proves nothing about the money guard.
+  {
+    const l = await one(
+      `select l.id, l.profile_id from listings l
+        where l.status = 'live' and l.availability = 'available' and l.deleted_at is null
+          and not exists (select 1 from boosts b
+                           where b.listing_id = l.id and b.status in ('pending_approval','active'))
+        order by l.created_at desc limit 1`,
+    );
+    if (l) {
+      const order = await one(
+        `insert into orders (profile_id, kind, catalog_code, base_paise, taxable_paise,
+                             total_paise, status, terms_snapshot)
+         values ($1, 'boost', 'boost7', 49900, 49900, 49900, 'refunded', '{}'::jsonb)
+         returning id`,
+        l.profile_id,
+      );
+      await sql.query(
+        `insert into boosts (profile_id, listing_id, order_id, catalog_code, duration_days,
+                             targeting, target_label, price_paise, status, subject_kind)
+         values ($1, $2, $3, 'boost7', 7, 'india', 'All India', 49900, 'pending_approval',
+                 'listing')`,
+        [l.profile_id, l.id, order.id],
+      );
+      console.log(`  ..   built a refunded-order boost still in the queue (${l.id.slice(0, 8)})`);
+    }
+  }
+
+  // Same drain, three more queues. Each run decides real rows out of them.
+  const pendingVerifs = await one(
+    `select count(*) n from verifications where status='pending'`,
+  );
+  if (Number(pendingVerifs.n) < 3) {
+    const back = await all(
+      `update verifications set status='pending', reviewed_at=null, reviewed_by=null, reason=null
+        where id in (select id from verifications
+                      where status in ('approved','rejected','revoked')
+                      order by reviewed_at desc nulls last limit ${3 - Number(pendingVerifs.n)})
+        returning id`,
+    );
+    if (back.length) console.log(`  ..   returned ${back.length} verification(s) to pending`);
+  }
+
+  const openFlag = await one(
+    `select id from moderation_appeals where subject='auto_flag' and status='open' limit 1`,
+  );
+  if (!openFlag) {
+    const p = await one(
+      `select id from profiles where state='active' and bio is not null order by created_at desc limit 1`,
+    );
+    if (p) {
+      await sql.query(
+        `update profiles set bio_flagged_at=now(), bio_flag_reason='Phone number pattern detected',
+                             bio_flag_outcome=null, bio_flag_resolved_at=null where id=$1`,
+        [p.id],
+      );
+      await sql.query(
+        `insert into moderation_appeals (subject, subject_id, profile_id, reason, status)
+         values ('auto_flag', $1, $1,
+                 'That is my office landline shown in my bio, not a personal number.', 'open')
+         on conflict (subject, subject_id, profile_id) do update
+            set status='open', resolved_at=null, resolved_by=null, resolution=null`,
+        [p.id],
+      );
+      console.log(`  ..   seeded an open auto-flag appeal (${p.id.slice(0, 8)})`);
+    }
+  }
+
+  const openReports = await one(
+    `select count(*) n from reports where status in ('open','reviewing')`,
+  );
+  if (Number(openReports.n) < 2) {
+    const back = await all(
+      `update reports set status='open'
+        where id in (select id from reports where status in ('dismissed','actioned')
+                     order by (subject_type = 'listing') desc, created_at desc limit 4)
+        returning id`,
+    );
+    if (back.length) console.log(`  ..   reopened ${back.length} report(s)`);
+  }
+
+  const refundedPending = await one(
+    `select b.id from boosts b join orders o on o.id=b.order_id
+      where b.status='pending_approval' and o.status <> 'paid' limit 1`,
+  );
+  if (!refundedPending) {
+    const spare = await one(
+      `select b.id from boosts b join orders o on o.id=b.order_id
+        where o.status <> 'paid' and b.status <> 'pending_approval' limit 1`,
+    );
+    if (spare) {
+      await sql.query(`update boosts set status='pending_approval' where id=$1`, [spare.id]);
+      console.log(`  ..   seeded a refunded-order boost in the queue (${spare.id.slice(0, 8)})`);
+    }
   }
 }
 console.log("\n0. States this proof needs");
@@ -238,22 +410,68 @@ console.log("\n3. A3/A4 — the review lock, with two real admins");
 /* ────────────────────────────────────────────────── 4. boost + refund ──── */
 console.log("\n4. A6 — boost approve, and reject → refund");
 {
+  // A boost whose order is still PAID. Five queued boosts turned out to have
+  // refunded orders, and approveBoost now refuses those — picking one at random
+  // would test the guard, not the approval.
+  // Paid, not already refunded, and its LISTING still live — approveBoost
+  // re-checks eligibility and auto-rejects a boost whose subject went away,
+  // which is the compensating path doing its job, not an approval failing.
   const b = await one(
     `select b.id, b.profile_id, b.price_paise from boosts b
-      where b.status='pending_approval' order by b.created_at limit 1`,
+       join orders o on o.id = b.order_id
+       join payments p on p.order_id = o.id and p.status='success'
+       join listings l on l.id = b.listing_id and l.status = 'live'
+      where b.status='pending_approval' and o.status='paid' and b.refunded_at is null
+        and b.targeting = 'india'
+      order by b.created_at desc limit 1`,
   );
   const r = await api(`/queues/boosts/${b.id}`, {
     method: "POST",
     body: JSON.stringify({ action: "approve" }),
   });
+  // The city cap is a real limit and it is reachable — approving boosts during
+  // an earlier run can fill Rajkot. That is the guard working, not a failure.
+  if (r.json?.error?.cityCapReached) {
+    console.log("  --   city boost cap is full; approval correctly refused, skipping the rest");
+  } else {
   check("approve → 200", r.status, 200, r.json?.error?.code ?? "");
   const after = await one(`select status::text, starts_at, ends_at from boosts where id=$1`, b.id);
   check("boost is active", after.status, "active", `window ${after.starts_at?.toISOString?.().slice(0,10)} → ${after.ends_at?.toISOString?.().slice(0,10)}`);
   check("audit row written", await audited("boost_approve", b.id), 1);
+  }
 
+  // The SECOND built fixture — paid, never refunded, so "reject → refund" is
+  // exercised on money that is genuinely still there.
   const b2 = await one(
-    `select id, profile_id, price_paise from boosts where status='pending_approval' order by created_at limit 1`,
+    `select b.id, b.profile_id, b.price_paise from boosts b
+       join orders o on o.id = b.order_id
+       join payments p on p.order_id = o.id and p.status='success'
+      where b.status='pending_approval' and o.status='paid' and b.refunded_at is null
+        and b.targeting = 'india'
+      order by b.created_at desc limit 1`,
   );
+  // The boost must be ELIGIBLE in every other respect, or approveBoost reports
+  // "ineligible" (checked before payment) and the money guard is never reached
+  // — a different refusal than the one this exists to prove. Newest first, so
+  // it picks the fixture built for this run rather than a long-dead row.
+  const unpaid = await one(
+    `select b.id from boosts b
+       join orders o on o.id = b.order_id
+       join listings l on l.id = b.listing_id
+                      and l.status = 'live' and l.availability = 'available'
+                      and l.deleted_at is null and l.profile_id = b.profile_id
+      where b.status = 'pending_approval' and o.status <> 'paid'
+      order by b.created_at desc limit 1`,
+  );
+  if (!unpaid) {
+    console.log("  --   no refunded-order boost on an eligible listing to test with");
+  } else {
+    const r = await api(`/queues/boosts/${unpaid.id}`, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'approve' }),
+    });
+    check('approving a refunded-order boost is refused', r.json?.error?.code, 'PAYMENT_PENDING');
+  }
   const noReason = await api(`/queues/boosts/${b2.id}`, {
     method: "POST",
     body: JSON.stringify({ action: "reject" }),
@@ -374,7 +592,10 @@ console.log("\n7. A9 — the report actions, and who is allowed to take them");
 {
   const rep = await one(
     `select subject_type::text, subject_id, count(*) n from reports
-      where status in ('open','reviewing') and subject_type='listing'
+      -- Any reported entity, not specifically a listing: earlier blocks close
+      -- reports, and requiring one KIND made the block crash on an empty set
+      -- rather than testing what was there.
+      where status in ('open','reviewing')
       group by 1,2 order by n desc limit 1`,
   );
   const reporters = (
@@ -386,7 +607,7 @@ console.log("\n7. A9 — the report actions, and who is allowed to take them");
 
   const r = await api(`/queues/reports/${rep.subject_id}`, {
     method: "POST",
-    body: JSON.stringify({ action: "dismiss", subjectType: "listing", reason: "No violation found" }),
+    body: JSON.stringify({ action: "dismiss", subjectType: rep.subject_type, reason: "No violation found" }),
   });
   check("dismiss → 200", r.status, 200, r.json?.error?.code ?? "");
   check(

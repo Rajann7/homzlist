@@ -11,7 +11,7 @@ type-check.
 | P1a | Admin session/guard/audit + list engine + endpoints | ✅ done |
 | P1b | The list controls as UI | ✅ done |
 | P2 | A1 Login + A2 Dashboard | ✅ done |
-| P3 | A3–A9 queues + review detail | ⬜ |
+| P3 | A3–A9 queues + review detail | ✅ done |
 | P4 | A10, A11, A12, A31 | ⬜ |
 | P5 | A13–A18 | ⬜ |
 | P6 | A19–A21 | ⬜ |
@@ -303,3 +303,103 @@ ranges, banner dismiss (row + audit row shown), bell badge 1 → mark all read �
 0, global search, profile save (`staff` row shown before/after), account switch
 (park → list → rotate, via a cookie jar), and log out (`staff_sessions.ended_at`
 set + audit row).
+
+## P3 — the six queues and the review screen
+
+| Screen | File | Decisions behind it |
+|---|---|---|
+| A3 Listings | `components/admin/queues/ListingsQueue.tsx` | 5 sub-tabs, filters, bulk (cap 20), lock column |
+| A4 Review | `components/admin/queues/ReviewDetail.tsx` | approve · request changes · reject · A/R/→ · auto-advance |
+| A5 Requirements | `RequirementsQueue.tsx` | same three, in a right sheet |
+| A6 Boosts | `BoostsQueue.tsx` | approve · reject & refund |
+| A7 Verifications | `VerificationsQueue.tsx` | approve+badge · reject · revoke |
+| A8 Appeals | `AppealsQueue.tsx` | dismiss/uphold flag · unlock/keep locked |
+| A9 Reports | `ReportsQueue.tsx` | dismiss · hide · warn · suspend · ban · escalate |
+
+The server was built and proven BEFORE any of it had a button
+(`npm run check:admin-p3` — 50 checks, repeatable). Each queue reuses the state
+machine that already exists (`moderate()`, `approveBoost`/`rejectBoost`) rather
+than growing a second one; A7/A8/A9 had none, so `lib/admin/decisions.ts` is
+theirs.
+
+**The panel could never have called the old endpoints.** `/api/v1/admin/moderate`
+authorizes with the USER session, which is host-only to the public and seller
+hosts and is never present on account.*. Same shape as the middleware gate P2
+fixed. The new `/api/v1/admin/queues/:queue/:id` authorizes with the ADMIN
+session and calls the same libraries.
+
+### Four bugs the gates caught (none in the prompt)
+
+1. **Every link in the panel 404'd.** `SCREEN_ROUTES` was built on `/account`,
+   the internal rewrite target, so each href rewrote a second time to
+   `/account/account/…`. Invisible through P2 because every screen had been
+   reached by TYPING its URL; the first click-driven navigation (A4's
+   auto-advance) found it. Now swept by `npm run check:admin-links`.
+2. **Every unbuilt screen threw.** The placeholder route read `SCREEN_TITLES`
+   and `SCREEN_MIN_ROLE` from `admin-context`, a `"use client"` module — a
+   Server Component gets a client reference, not a value. The screen tables
+   moved to `screens.ts`, which has no client boundary.
+3. **A refunded boost was still approvable.** Ten queued boosts, five with
+   orders in `refunded`. `approveBoost` checked state, eligibility and the city
+   cap but never that the money was still there. It does now, and the queue
+   shows Paid/Unpaid from the real payment join.
+4. **Two screens re-fetched forever.** Passing the filter-key array as a literal
+   made a new array each render, which recomputed the query, refired the fetch
+   and re-rendered. Both screens rendered permanently empty. `useAdminList` now
+   depends on the array's CONTENTS.
+
+### The review lock
+
+`review_locks` + `hz_claim_review_lock` (migration 0097). The claim is one
+statement, so two admins opening the same listing cannot both be told they hold
+it; the loser is told who does. It is ADVISORY — the decision endpoints do not
+require it, because a lock that could block an approval turns a crashed browser
+into a listing nobody can ever action. The state machine stops double decisions;
+the lock only stops wasted work.
+
+Releasing does NOT happen on unmount: the page claims the lock while it renders
+on the server, and React does not guarantee the old instance unmounts before the
+new one mounts, so the release raced the claim and left the item unlocked while
+it was open on screen. It releases where LEAVING happens, with a 10-minute TTL
+as the backstop.
+
+### P3 gates
+
+```
+npm run check:admin-p3      50 checks, 3 consecutive green runs (it rebuilds
+                            every state it consumes, so it is repeatable)
+npm run check:admin-links   27 destinations + the internal path, all resolve
+tsc --noEmit                clean
+next lint components/admin  no warnings or errors
+
+pixel diff (390 / 768 / 1440)
+  listings       3.65 / 3.78 / 9.63 %
+  requirements   1.52 / 2.08 / 4.04 %
+  boosts         1.35 / 1.70 / 2.98 %
+  verifications  1.33 / 1.93 / 3.55 %
+  appeals        1.40 / 2.15 / 4.47 %
+  reports        3.71 / 3.16 / 5.81 %
+  review         6.73 / 10.06 / 20.47 %
+
+security  anon → 401 on every list and every decision endpoint
+          staff → 200 on the queues, 403 on audit, 404 on users
+          staff → 403 on suspend and on ban device
+          unknown uuid → 404 · non-uuid → 404
+          no secret VALUE from .env.local appears in the client bundle
+```
+
+The residual percentages are DATA, not layout: the design's fixtures ("3 BHK
+Flat, Shree Residency", 12 pending) against whatever the database holds. The
+review screen is the outlier for two compounding reasons, both correct:
+
+- the design draws a hatched **placeholder** where the app renders a real photo;
+- the design's mock of the feed card predates the card's own redesign
+  (28 Jul 2026). A4's spec is "exact user-render — same components as app", so
+  the screen mounts the REAL `FeedCard`. The prototype's copy is the stale one,
+  and it must not be matched.
+
+**A harness bug this run found.** `waitForContent` waits on `.animate-shimmer`
+or `[aria-busy="true"]`; the admin `Shimmer` had neither, so every admin list
+was screenshotted mid-load — A3's first capture was an empty table reported as
+a 2.84% "pass". `Shimmer` now sets `aria-busy`, which is also what a screen
+reader needs.

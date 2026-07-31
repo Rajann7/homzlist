@@ -122,6 +122,8 @@ async function boostDecision(id: string, me: AdminIdentity, body: Body) {
       return fail("LISTING_STATE_LOCKED", { autoRejected: true, refunding: true });
     }
     if (res.reason === "city_cap") return fail("LISTING_STATE_LOCKED", { cityCapReached: true });
+    // The order was never paid, or has since been refunded — see approveBoost.
+    if (res.reason === "unpaid") return fail("PAYMENT_PENDING", { unpaid: true });
     return fail("LISTING_STATE_LOCKED", { alreadyDecided: true });
   }
 

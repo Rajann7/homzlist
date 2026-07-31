@@ -1,6 +1,13 @@
 # PENDING — everything not finished, and exactly what to do when it unblocks
 
-Status as of **24 Jul 2026**.
+Status as of **31 Jul 2026**.
+
+> **Module 11 P3 closed A1, A5 and the reports half of A4.** Listings,
+> requirements, boosts, verifications, appeals and reports now have working
+> queues with real decisions behind them, so a seller's post can go live and a
+> paid boost can start. `npm run check:admin-p3` proves each one against real
+> rows. What P3 *found* is below as **M11.x** — those are new, and none of them
+> were in the prompt.
 
 Three kinds of pending work, in priority order:
 
@@ -24,6 +31,44 @@ Three kinds of pending work, in priority order:
 
 **Module 6 is NOT 100% closed** — M6.3 + M6.4 above are the only two left, and
 neither can be closed from inside Module 6. See the closure table in §A0-M6.
+
+---
+
+## Found by Module 11 P3 (31 Jul 2026)
+
+| # | Item | Belongs to | Costs money / breaks a flow? |
+|---|---|---|---|
+| **M11.1** | `number_patterns` has no reader anywhere in the app | A19 Master data (**P6**) | 🟡 The A19 "Number-regex editor (test box)" will edit a table that changes nothing |
+| **M11.2** | Anomaly banners have no DETECTOR | A27 Cron (**P7**) | 🟡 A2 shows real `anomaly_events`, but only the seed ever writes one |
+| **M11.3** | `device_bans` had no reader; now enforced at OTP only | Module 1 / A22 | ✅ Enforced — but only at sign-in, and only by hashed IP + push device label |
+| **M11.4** | Five queued boosts had **refunded** orders | ✅ FIXED — `approveBoost` now refuses | 🔴 Would have started paid placement for refunded money |
+| **M11.5** | A9's "High priority" needs ≥3 reports on one entity; the data has max 2 | data, not code | No — the chip is correct and simply reads 0 |
+
+**M11.1 — the trap, so P6 does not walk into it.** The rows in
+`number_patterns` are JavaScript regexes (`\b`, `(?i)`). Postgres uses POSIX
+ARE, where `\b` is a BACKSPACE, so every pattern in that table returns FALSE
+against the very sample it was written for. Confirmed:
+
+```sql
+select 'Call me at 9825012345' ~ '\b[6-9]\d{9}\b';   -- false  (JS dialect)
+select 'Call me at 9825012345' ~ '\y[6-9][0-9]{9}\y'; -- true   (POSIX)
+```
+
+Wiring A19 up means deciding WHERE the patterns run (Node, where `\b` works, or
+SQL, where it does not) and storing a dialect that matches. Migration 0096 has
+the POSIX translation of the four detectors that actually run today.
+
+**M11.2 — what to build.** `anomaly_events` is read by A2 and dismissed by a
+real endpoint, both proven. Nothing DETECTS one. The three the design draws are
+payment-failure spike, OTP spike and report spike; each is a windowed count that
+belongs in the A27 job table alongside the existing crons.
+
+**M11.3 — the limits, stated plainly.** A9's "Ban device/IP" now writes real
+rows and `requestOtp` refuses a banned hashed IP (fail-open on error, so a
+lookup failure can never lock out every user at once). It bans the IP hash
+recorded at signup consent and any registered push-token device label — the app
+stores no user session table, so there is nothing else to ban. An account with
+neither is reported to the admin rather than silently "banned".
 
 Everything below **fails closed** — nothing runs insecurely, the feature is just off.
 

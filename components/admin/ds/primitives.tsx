@@ -185,6 +185,12 @@ export function Shimmer({
 }) {
   return (
     <div
+      // `aria-busy` is what a screen reader needs, and it is also the signal the
+      // pixel-diff harness waits on (scripts/pixdiff.mjs `waitForContent`). This
+      // component carried neither that nor the user side's `.animate-shimmer`
+      // class, so the harness thought every admin list had finished loading and
+      // screenshotted the skeleton — A3 was captured as an empty table.
+      aria-busy="true"
       style={{
         height: h,
         width: w,

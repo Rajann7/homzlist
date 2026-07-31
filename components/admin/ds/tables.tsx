@@ -52,7 +52,15 @@ const TD_STYLE: CSSProperties = {
    not scrollable. `auto` clips identically to `hidden` whenever the content
    fits, so nothing about how it looks changes; it only stops the overflow case
    from being a dead end.                                                      */
-export function QueueTable<R extends { sla?: "ok" | "warn" | "over" }>({
+/**
+ * `R` is any row shape. It was constrained to `{ sla?: … }`, which reads as
+ * "rows may carry an SLA" but is a WEAK TYPE: TypeScript rejects any row that
+ * has no property in common with it, so every real queue row failed to compile
+ * against a table it renders perfectly. The SLA is read defensively instead —
+ * a row that has one gets the design's red left border, a row that does not
+ * gets a transparent one.
+ */
+export function QueueTable<R>({
   cols,
   rows,
   onRow,
@@ -61,6 +69,7 @@ export function QueueTable<R extends { sla?: "ok" | "warn" | "over" }>({
   rows: R[];
   onRow?: (row: R) => void;
 }) {
+  const slaOf = (row: R) => (row as { sla?: "ok" | "warn" | "over" }).sla;
   return (
     <div
       style={{
@@ -90,7 +99,7 @@ export function QueueTable<R extends { sla?: "ok" | "warn" | "over" }>({
                 borderTop: "1px solid var(--divider)",
                 cursor: onRow ? "pointer" : "default",
                 borderLeft:
-                  r.sla === "over" ? "3px solid var(--error)" : "3px solid transparent",
+                  slaOf(r) === "over" ? "3px solid var(--error)" : "3px solid transparent",
               }}
             >
               {cols.map((c, j) => (

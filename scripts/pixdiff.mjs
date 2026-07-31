@@ -343,6 +343,34 @@ function screenMap(fx) {
       designState: { loginState: "revoked" },
       cookies: [adminLoginFlash("revoked", "nidhi@homzlist.com")],
       url: `${APP_ADMIN}/login` },
+
+    // ---- P13 · P3 queues -------------------------------------------------
+    // Six queues and the review screen, each at all three bands. The admin
+    // design writes its own device state rather than using breakpoints, so a
+    // screen shot at one width proves one of three layouts (see BANDS above).
+    ...["mobile", "tablet", "desktop"].flatMap((band) => [
+      { id: `25-admin-listings-${band}`, page: "P13", screen: "listings", band, as: "admin",
+        designState: { appState: "normal", listTab: "pending", selected: [] },
+        url: `${APP_ADMIN}/queues/listings` },
+      { id: `26-admin-requirements-${band}`, page: "P13", screen: "requirements", band, as: "admin",
+        url: `${APP_ADMIN}/queues/requirements` },
+      { id: `27-admin-boosts-${band}`, page: "P13", screen: "boosts", band, as: "admin",
+        url: `${APP_ADMIN}/queues/boosts` },
+      { id: `28-admin-verifications-${band}`, page: "P13", screen: "verifications", band, as: "admin",
+        designState: { verTab: "pending" },
+        url: `${APP_ADMIN}/queues/verifications` },
+      { id: `29-admin-appeals-${band}`, page: "P13", screen: "appeals", band, as: "admin",
+        designState: { appealTab: "flag" },
+        url: `${APP_ADMIN}/queues/appeals` },
+      { id: `30-admin-reports-${band}`, page: "P13", screen: "reports", band, as: "admin",
+        designState: { reportFilter: "all" },
+        url: `${APP_ADMIN}/queues/reports` },
+      // A4 needs a real listing to review; `fx.adminReviewId` is resolved with
+      // the other fixtures so the shot is never of an empty screen.
+      { id: `31-admin-review-${band}`, page: "P13", screen: "review", band, as: "admin",
+        designState: { appState: "normal", reviewTab: "card", reviewIdx: 0 },
+        url: fx.adminReviewId && `${APP_ADMIN}/queues/listings/${fx.adminReviewId}?tab=pending` },
+    ]),
   ];
 }
 
@@ -387,10 +415,20 @@ async function fixtures(sql) {
   );
   // The listing plan, not the cheapest catalog row (that is a proposal top-up).
   const plan = await one(`select code from plan_catalog where is_active and listing_quota > 0 order by price_paise asc limit 1`);
+  // A4's shot needs the listing the QUEUE would open first — same predicate and
+  // same order as the queue screen's default (risk high-first), so the review
+  // screenshot is of the row a moderator actually lands on.
+  const adminReview = await one(
+    `select id from admin_listing_queue
+      where status = 'pending_review'
+      order by risk_score desc, created_at asc limit 1`,
+  );
+
   return {
     live, sold, review, draft, proj, req, planCode: plan.code,
     liveListingId: live.id, soldListingId: sold.id, reviewListingId: review.id,
     draftId: draft.id, liveProjectId: proj.id, liveRequirementId: req.id,
+    adminReviewId: adminReview.id ?? null,
   };
 }
 

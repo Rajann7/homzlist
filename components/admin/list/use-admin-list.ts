@@ -74,6 +74,16 @@ export function useAdminList<R = Record<string, unknown>>(
   const [nonce, setNonce] = useState(0);
   const loadedOnce = useRef(false);
 
+  /**
+   * `filterKeys` is depended on by the query below, and a screen that passes an
+   * ARRAY LITERAL passes a new one on every render — which recomputes the
+   * query, refires the fetch, sets state, and renders again, forever. Two P3
+   * screens did exactly that and rendered permanently empty while hammering the
+   * endpoint. Depending on the CONTENTS rather than the identity makes the trap
+   * impossible to re-arm.
+   */
+  const filterKey = filterKeys.join(",");
+
   const query = useMemo(() => {
     const out = new URLSearchParams();
     for (const key of filterKeys) for (const v of params.getAll(key)) out.append(key, v);
@@ -83,7 +93,8 @@ export function useAdminList<R = Record<string, unknown>>(
       else if (key === "tab" && defaultTab) out.set("tab", defaultTab);
     }
     return out.toString();
-  }, [params, filterKeys, defaultTab]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params, filterKey, defaultTab]);
 
   useEffect(() => {
     let cancelled = false;
@@ -138,7 +149,8 @@ export function useAdminList<R = Record<string, unknown>>(
       if (values.length) out[key] = values;
     }
     return out;
-  }, [params, filterKeys]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params, filterKey]);
 
   return {
     data,

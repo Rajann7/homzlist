@@ -460,7 +460,10 @@ export type BoostDecision =
   | { ok: true; status: "active"; startsAt: string; endsAt: string; queuedAfter: string | null }
   | { ok: true; status: "rejected"; reason: string }
   | { ok: true; status: "paused" | "active_resumed" | "stopped" }
-  | { ok: false; reason: "not_found" | "bad_state" | "ineligible" | "city_cap" | "validation" };
+  | {
+      ok: false;
+      reason: "not_found" | "bad_state" | "ineligible" | "city_cap" | "validation" | "unpaid";
+    };
 
 /**
  * Approve → the boost goes LIVE.
@@ -491,7 +494,34 @@ export async function approveBoost(boostId: string, actorId: string): Promise<Bo
     return { ok: false, reason: "ineligible" };
   }
 
-  // (3) city cap
+  // (3) THE MONEY IS STILL HERE.
+  // Reaching `pending_approval` is supposed to mean "paid", and the normal flow
+  // only gets here through the webhook. It is not sufficient: A6 surfaced ten
+  // queued boosts of which FIVE had an order in `refunded` — the money had
+  // already gone back and the boost was still sitting there, approvable.
+  // Approving one starts a paid placement for a payment that no longer exists.
+  // A queue that a human clicks through has to check this at the click.
+  const { data: order } = await db()
+    .from("orders")
+    .select("id, status")
+    .eq("id", boost.order_id)
+    .maybeSingle();
+  const paidNow =
+    (order as { status: string } | null)?.status === "paid" &&
+    Boolean(
+      (
+        await db()
+          .from("payments")
+          .select("id")
+          .eq("order_id", boost.order_id)
+          .eq("status", "success")
+          .limit(1)
+          .maybeSingle()
+      ).data,
+    );
+  if (!paidNow) return { ok: false, reason: "unpaid" };
+
+  // (4) city cap
   const cap = await cityCapUsage(boost.target_city_id);
   if (cap.used >= cap.cap) return { ok: false, reason: "city_cap" };
 
