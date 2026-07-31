@@ -18,6 +18,7 @@ const PAGES = {
   P4: "designs/P4 - Detail Screens.html",
   P5: "designs/P5 - Creation A (Plan wall → Form → Photos).html",
   P6: "designs/P6 - Creation B (Preview → Payment → Forms → Drafts).html",
+  P13: "designs/P13-14-15 - ADMIN DASH FULL.html",
 };
 const OUT = "public/_dx";
 
@@ -40,6 +41,11 @@ for (const [key, file] of Object.entries(PAGES)) {
   const manifest = JSON.parse(grab(src, "manifest"));
   const ext = JSON.parse(grab(src, "ext_resources") ?? "[]");
   const html = JSON.parse(grab(src, "template"));
+
+  // The decoded template is the readable spec for the module: markup plus the
+  // React render methods that decide every layout, size, colour and branch.
+  fs.mkdirSync("designs/_unpacked", { recursive: true });
+  fs.writeFileSync(path.join("designs/_unpacked", `${key}.template.html`), html);
 
   // uuid -> vendored filename, for the resources the runtime pulls from a CDN
   const byUuid = new Map(ext.map((e) => [e.uuid, VENDOR[e.id]]));

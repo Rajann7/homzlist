@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="81071589-2d14-4557-aedf-c598a0eb9d88"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+
+<style>
+  body{margin:0;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+  *{box-sizing:border-box}
+  input,button,textarea,select{font-family:inherit}
+  .hz-scroll{overflow-y:auto;-webkit-overflow-scrolling:touch}
+  .hz-scroll::-webkit-scrollbar{width:0;height:0}
+  .hz-x{overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+  .hz-x::-webkit-scrollbar{display:none}
+  .hz-press:active{transform:scale(.98)}
+  input:focus,textarea:focus{outline:none;border-color:var(--accent) !important;box-shadow:0 0 0 1px var(--accent)}
+  @keyframes hzSheet{from{transform:translateY(100%)}to{transform:translateY(0)}}
+  @keyframes hzScrim{from{opacity:0}to{opacity:1}}
+  @keyframes hzToast{from{transform:translate(-50%,140%);opacity:0}to{transform:translate(-50%,0);opacity:1}}
+  @keyframes hzPop{from{opacity:0;transform:scale(.92)}to{opacity:1;transform:scale(1)}}
+  @keyframes hzFade{from{opacity:0}to{opacity:1}}
+  @keyframes hzReveal{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
+  @keyframes hzSpin{to{transform:rotate(360deg)}}
+  @keyframes hzDraw{to{stroke-dashoffset:0}}
+  @keyframes hzPulse{0%,100%{box-shadow:0 0 0 0 rgba(15,157,88,.4)}50%{box-shadow:0 0 0 6px rgba(15,157,88,0)}}
+  .hz-spin{animation:hzSpin .8s linear infinite}
+  .hz-check{stroke-dasharray:48;stroke-dashoffset:48;animation:hzDraw .6s ease-out .2s forwards}
+  .hz-ring{stroke-dasharray:150;stroke-dashoffset:150;animation:hzDraw .5s ease-out forwards}
+  @media (prefers-reduced-motion:reduce){*{animation-duration:.001ms !important;transition-duration:.001ms !important}}
+</style>
+</helmet>
+
+<div style="{{ rootStyle }}">
+  <!-- DEV -->
+  <div style="{{ devWrapStyle }}">
+    <button sc-camel-on-click="{{ toggleDev }}" style="display:flex;align-items:center;gap:6px;height:30px;padding:0 10px;background:#2a2a2a;color:#e5e5e5;border:none;border-radius:7px;font:600 12px/1 -apple-system;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.3)"><svg width="14" height="14" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="3"></circle><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"></path></svg>DEV</button>
+    <sc-if value="{{ devOpen }}" hint-placeholder-val="{{ false }}"><div class="hz-scroll" style="margin-top:6px;width:232px;max-width:calc(100vw - 20px);max-height:82vh;overflow-x:hidden;background:#232323;border:1px solid #3a3a3a;border-radius:9px;padding:10px;box-shadow:0 8px 28px rgba(0,0,0,.45)"><sc-for list="{{ devGroups }}" as="g" hint-placeholder-count="6"><div style="font:600 10px/1 -apple-system;letter-spacing:.4px;color:#8a8a8a;text-transform:uppercase;margin:2px 0 6px">{{ g.title }}</div><div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px"><sc-for list="{{ g.items }}" as="d" hint-placeholder-count="3"><button sc-camel-on-click="{{ d.go }}" style="{{ d.style }}">{{ d.label }}</button></sc-for></div></sc-for></div></sc-if>
+  </div>
+
+  <div style="{{ colStyle }}">
+    <sc-if value="{{ isOffline }}" hint-placeholder-val="{{ false }}"><div style="flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:8px 16px;background:var(--warningSoft);border-bottom:1px solid var(--border)"><svg width="16" height="16" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--warning)" stroke-width="1.8" stroke-linecap="round"><path d="M12 3C7 3 3 6 1 9M9 17a4 4 0 0 1 6 0M2 2l20 20"></path></svg><span style="flex:1;font:400 13px/1.3 -apple-system;color:var(--ink1)">No internet — draft saved locally.</span></div></sc-if>
+
+    <!-- ===== S1 PREVIEW ===== -->
+    <sc-if value="{{ isPreview }}" hint-placeholder-val="{{ true }}">
+      <div style="display:flex;flex-direction:column;height:100%;background:var(--page)">
+        <div style="{{ topbar }}"><button sc-camel-on-click="{{ goBack }}" class="hz-press" style="{{ iconBtn }}"><svg width="22" height="22" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink1)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"></path></svg></button><span style="{{ topTitle }}">Preview</span><button sc-camel-on-click="{{ openSubmit }}" style="width:auto;padding:0 8px;border:none;background:none;color:var(--accent);font:600 13px/1 -apple-system;cursor:pointer">Submit for review</button></div>
+        <div style="flex:0 0 auto;display:flex;padding:0 8px;border-bottom:1px solid var(--divider);background:var(--surface1)"><sc-for list="{{ previewTabs }}" as="t" hint-placeholder-count="2"><button sc-camel-on-click="{{ t.go }}" style="{{ t.style }}">{{ t.label }}<span style="{{ t.underline }}"></span></button></sc-for></div>
+        <div class="hz-scroll" style="flex:1;min-height:0;background:{{ previewBg }}">
+          <!-- FEED CARD -->
+          <sc-if value="{{ tabFeed }}" hint-placeholder-val="{{ true }}">
+            <div style="padding:16px">
+              <div style="background:var(--surface1);border:1px solid var(--border);border-radius:12px;overflow:hidden;box-shadow:var(--l1)">
+                <div style="position:relative;aspect-ratio:4/5;background:#000"><div style="position:absolute;inset:0;background-image:{{ heroPhoto }};background-size:cover;background-position:center"></div><span style="position:absolute;top:10px;right:10px;background:rgba(0,0,0,.6);color:#fff;font:600 11px/1 -apple-system;padding:4px 8px;border-radius:999px">1/6</span><div style="position:absolute;bottom:10px;left:0;right:0;display:flex;justify-content:center;gap:5px"><sc-for list="{{ feedDots }}" as="d" hint-placeholder-count="6"><span style="{{ d }}"></span></sc-for></div></div>
+                <div style="padding:12px 14px 14px"><div style="display:flex;align-items:center;gap:8px"><span style="font:700 17px/1.2 -apple-system;color:var(--ink1)">₹85 Lakh</span><span style="background:var(--accentSoft);color:var(--accent);font:600 11px/1 -apple-system;letter-spacing:.3px;text-transform:uppercase;padding:4px 7px;border-radius:4px">For Sale</span></div><div style="font:400 13px/1.4 -apple-system;color:var(--ink2);margin-top:5px">3 BHK · 1,450 sqft · ₹5,862/sqft</div><div style="display:flex;align-items:center;gap:4px;margin-top:4px"><svg width="14" height="14" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink3)" stroke-width="1.6"><path d="M12 21s7-6.2 7-11a7 7 0 1 0-14 0c0 4.8 7 11 7 11Z"></path><circle cx="12" cy="10" r="2.2"></circle></svg><span style="font:400 13px/1.3 -apple-system;color:var(--ink3)">Mavdi, Rajkot</span></div><div style="display:flex;align-items:center;gap:8px;margin-top:10px;padding-top:10px;border-top:1px solid var(--divider)"><div style="width:24px;height:24px;border-radius:999px;background-image:{{ posterAv }};background-size:cover"></div><span style="font:600 13px/1 -apple-system;color:var(--ink1)">RK Properties</span><svg width="14" height="14" sc-camel-view-box="0 0 24 24" fill="var(--accent)"><path d="M12 2l2.4 1.8 3 .2.9 2.8 2.2 2-1 2.9 1 2.9-2.2 2-.9 2.8-3 .2L12 22l-2.4-1.8-3-.2-.9-2.8-2.2-2 1-2.9-1-2.9 2.2-2 .9-2.8 3-.2z"></path><path d="m8.5 12 2.4 2.4 4.6-4.8" stroke="#fff" stroke-width="1.8" fill="none"></path></svg><span style="font:400 11px/1 -apple-system;color:var(--ink3);background:var(--surface2);padding:3px 6px;border-radius:4px">Broker</span></div><div style="display:flex;align-items:center;gap:8px;margin-top:12px"><span style="width:44px;height:44px;display:grid;place-items:center;background:var(--surface2);border:1px solid var(--border);border-radius:8px"><svg width="20" height="20" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink1)" stroke-width="1.7"><path d="M6 3h12a1 1 0 0 1 1 1v17l-7-4-7 4V4a1 1 0 0 1 1-1Z"></path></svg></span><span style="flex:1;height:44px;display:grid;place-items:center;background:var(--surface1);border:1px solid var(--border);border-radius:8px;font:600 15px/1 -apple-system;color:var(--ink1)">View Property</span><span style="flex:1;height:44px;display:grid;place-items:center;background:var(--accent);border-radius:8px;font:600 15px/1 -apple-system;color:#fff">Inquiry</span></div></div>
+              </div>
+              <div style="text-align:center;font:400 11px/1.3 -apple-system;color:var(--ink3);margin-top:12px">This is how your listing appears in the feed.</div>
+            </div>
+          </sc-if>
+          <!-- FULL LISTING -->
+          <sc-if value="{{ tabFull }}" hint-placeholder-val="{{ false }}">
+            <div style="background:var(--page)">
+              <div style="position:relative;aspect-ratio:4/3;background:#000"><div style="position:absolute;inset:0;background-image:{{ heroPhoto }};background-size:cover;background-position:center"></div><span style="position:absolute;top:10px;right:10px;background:rgba(0,0,0,.6);color:#fff;font:600 11px/1 -apple-system;padding:4px 8px;border-radius:999px">1/6</span></div>
+              <div style="padding:16px">
+                <div style="display:flex;align-items:center;gap:8px"><span style="font:700 24px/1 -apple-system;color:var(--ink1)">₹85 Lakh</span><span style="background:var(--accentSoft);color:var(--accent);font:600 11px/1 -apple-system;text-transform:uppercase;padding:5px 8px;border-radius:4px">For Sale</span></div>
+                <div style="font:600 17px/1.3 -apple-system;color:var(--ink1);margin-top:12px">3 BHK Flat in Shree Residency</div>
+                <div style="display:flex;align-items:center;gap:5px;margin-top:5px"><svg width="15" height="15" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink3)" stroke-width="1.6"><path d="M12 21s7-6.2 7-11a7 7 0 1 0-14 0c0 4.8 7 11 7 11Z"></path><circle cx="12" cy="10" r="2.2"></circle></svg><span style="font:400 13px/1.3 -apple-system;color:var(--ink2)">Mavdi, Rajkot – 360004</span></div>
+                <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:2px;background:var(--surface2);border-radius:12px;padding:14px 8px;margin-top:16px"><sc-for list="{{ specStrip }}" as="s" hint-placeholder-count="4"><div style="text-align:center"><div style="font:600 13px/1.1 -apple-system;color:var(--ink1)">{{ s.v }}</div><div style="font:400 11px/1.2 -apple-system;color:var(--ink3);margin-top:3px">{{ s.k }}</div></div></sc-for></div>
+                <div style="font:600 13px/1 -apple-system;color:var(--ink2);margin:20px 0 12px">Details</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px 16px"><sc-for list="{{ detailPairs }}" as="d" hint-placeholder-count="6"><div><div style="font:400 11px/1 -apple-system;color:var(--ink3)">{{ d.k }}</div><div style="font:400 15px/1.3 -apple-system;color:var(--ink1);margin-top:3px">{{ d.v }}</div></div></sc-for></div>
+                <div style="font:600 13px/1 -apple-system;color:var(--ink2);margin:20px 0 12px">Amenities</div>
+                <div style="display:flex;flex-wrap:wrap;gap:8px"><sc-for list="{{ amenityList }}" as="a" hint-placeholder-count="5"><span style="height:32px;padding:0 12px;display:inline-flex;align-items:center;background:var(--surface2);border:1px solid var(--border);border-radius:999px;font:600 13px/1 -apple-system;color:var(--ink1)">{{ a }}</span></sc-for></div>
+                <div style="font:600 13px/1 -apple-system;color:var(--ink2);margin:20px 0 8px">Description</div>
+                <div style="font:400 15px/1.5 -apple-system;color:var(--ink2)">Spacious 3 BHK in a well-maintained society close to 150 Feet Ring Road. Corner flat with cross ventilation and a large balcony overlooking the garden.</div>
+                <div style="display:flex;align-items:center;gap:8px;margin-top:16px;padding:12px 14px;background:var(--surface2);border-radius:8px"><svg width="16" height="16" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink3)" stroke-width="1.7"><path d="M6 3h3l2 5-2.5 1.5a11 11 0 0 0 5 5L21 15v3a2 2 0 0 1-2 2A16 16 0 0 1 4 5a2 2 0 0 1 2-2Z"></path></svg><span style="font:400 13px/1.3 -apple-system;color:var(--ink2)">{{ contactPreview }}</span></div>
+                <div style="display:flex;gap:8px;margin-top:12px;padding:12px 14px;background:var(--warningSoft);border-radius:8px"><svg width="16" height="16" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--warning)" stroke-width="1.7" style="flex:0 0 auto;margin-top:1px"><path d="M12 3l7 3v6c0 4-3 7-7 9-4-2-7-5-7-9V6z"></path></svg><span style="font:400 11px/1.5 -apple-system;color:var(--ink2)">Never pay token or advance before a site visit.</span></div>
+              </div>
+            </div>
+          </sc-if>
+        </div>
+        <div style="{{ stickyBar }}"><div style="display:flex;gap:12px"><button sc-camel-on-click="{{ editForm }}" class="hz-press" style="flex:1;height:44px;background:var(--surface1);border:1px solid var(--border);border-radius:8px;font:600 15px/1 -apple-system;color:var(--ink1);cursor:pointer">Edit</button><button sc-camel-on-click="{{ openSubmit }}" class="hz-press" style="flex:1.4;height:44px;background:var(--accent);border:none;border-radius:8px;font:600 15px/1 -apple-system;color:#fff;cursor:pointer">Submit for Review</button></div></div>
+      </div>
+    </sc-if>
+
+    <!-- ===== S2 CHECKOUT ===== -->
+    <sc-if value="{{ isCheckout }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;flex-direction:column;height:100%;background:var(--page)">
+        <div style="{{ topbar }}"><button sc-camel-on-click="{{ goBack }}" class="hz-press" style="{{ iconBtn }}"><svg width="22" height="22" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink1)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"></path></svg></button><span style="{{ topTitle }}">Checkout</span><span style="width:44px;display:grid;place-items:center"><svg width="18" height="18" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink3)" stroke-width="1.7"><rect x="5" y="11" width="14" height="10" rx="2"></rect><path d="M8 11V7a4 4 0 0 1 8 0v4"></path></svg></span></div>
+        <!-- payment overlays -->
+        <sc-if value="{{ payPending }}" hint-placeholder-val="{{ false }}">
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center"><svg width="88" height="88" sc-camel-view-box="0 0 96 96" fill="none" stroke="var(--info)" stroke-width="2"><circle cx="48" cy="48" r="34"></circle><path d="M48 30v18l12 8" stroke-linecap="round"></path></svg><div style="font:700 20px/1.3 -apple-system;color:var(--ink1);margin-top:20px">Payment processing…</div><div style="font:400 15px/1.45 -apple-system;color:var(--ink2);margin-top:8px;max-width:280px">This can take up to 10 minutes. You can safely close this page — we'll notify you when it's done.</div><svg class="hz-spin" width="24" height="24" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2.4" style="margin-top:16px"><path d="M12 3a9 9 0 1 0 9 9" stroke-linecap="round"></path></svg><button sc-camel-on-click="{{ checkStatus }}" class="hz-press" style="margin-top:20px;height:44px;padding:0 24px;background:var(--surface1);border:1px solid var(--border);border-radius:8px;font:600 15px/1 -apple-system;color:var(--ink1);cursor:pointer">Check status</button><button sc-camel-on-click="{{ goMyListings }}" style="margin-top:14px;border:none;background:none;color:var(--accent);font:600 15px/1 -apple-system;cursor:pointer">Go to My Listings</button></div>
+        </sc-if>
+        <sc-if value="{{ payFailed }}" hint-placeholder-val="{{ false }}">
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center"><span style="width:88px;height:88px;border-radius:999px;background:var(--errorSoft);display:grid;place-items:center"><svg width="44" height="44" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--error)" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"></circle><path d="M15 9l-6 6M9 9l6 6"></path></svg></span><div style="font:700 20px/1.3 -apple-system;color:var(--ink1);margin-top:20px">Payment failed</div><div style="font:400 15px/1.45 -apple-system;color:var(--ink2);margin-top:8px;max-width:290px">Your money wasn't deducted. If it was, it will be refunded automatically within 5–7 days.</div><button sc-camel-on-click="{{ retryPay }}" class="hz-press" style="margin-top:20px;height:44px;padding:0 28px;background:var(--accent);border:none;border-radius:8px;font:600 15px/1 -apple-system;color:#fff;cursor:pointer">Retry Payment</button><button sc-camel-on-click="{{ contactSupport }}" style="margin-top:14px;border:none;background:none;color:var(--accent);font:600 15px/1 -apple-system;cursor:pointer">Contact Support</button><div style="font:400 11px/1.4 -apple-system;color:var(--ink3);margin-top:14px">Your listing is saved as a draft.</div></div>
+        </sc-if>
+        <sc-if value="{{ payForm }}" hint-placeholder-val="{{ true }}">
+          <div class="hz-scroll" style="flex:1;min-height:0;padding:16px 16px 96px">
+            <sc-if value="{{ doublePay }}" hint-placeholder-val="{{ false }}"><div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;padding:12px 14px;background:var(--warningSoft);border-radius:8px"><span style="flex:1;font:400 13px/1.35 -apple-system;color:var(--ink1)">You already paid for this plan 4 minutes ago. Please wait before paying again.</span><button sc-camel-on-click="{{ checkStatus }}" style="border:none;background:none;color:var(--accent);font:600 13px/1 -apple-system;cursor:pointer">Check status</button></div></sc-if>
+            <div style="background:var(--surface1);border:1px solid var(--border);border-radius:12px;padding:16px">
+              <div style="font:600 17px/1.2 -apple-system;color:var(--ink1)">{{ planName }}</div>
+              <div style="font:400 11px/1 -apple-system;color:var(--ink3);margin-top:3px">{{ planSub }}</div>
+              <div style="display:flex;flex-direction:column;gap:8px;margin:14px 0"><sc-for list="{{ orderFeats }}" as="f" hint-placeholder-count="3"><div style="display:flex;align-items:center;gap:8px"><svg width="15" height="15" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round"><path d="M20 6 9 17l-5-5"></path></svg><span style="font:400 13px/1.3 -apple-system;color:var(--ink1)">{{ f }}</span></div></sc-for></div>
+              <div style="height:1px;background:var(--divider);margin:12px 0"></div>
+              <sc-for list="{{ orderRows }}" as="r" hint-placeholder-count="3"><div style="display:flex;justify-content:space-between;padding:5px 0"><span style="font:{{ r.kFont }};color:{{ r.kColor }}">{{ r.k }}</span><span style="font:{{ r.vFont }};color:{{ r.vColor }}">{{ r.v }}</span></div></sc-for>
+            </div>
+            <sc-if value="{{ couponApplied }}" hint-placeholder-val="{{ true }}"><div style="display:flex;align-items:center;gap:8px;height:48px;padding:0 14px;background:var(--accentSoft);border-radius:8px;margin-top:12px"><span style="flex:1;font:600 13px/1 -apple-system;color:var(--accent)">SAVE20 applied — ₹200 off</span><button sc-camel-on-click="{{ removeCoupon }}" style="width:24px;height:24px;display:grid;place-items:center;border:none;background:none;cursor:pointer"><svg width="14" height="14" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2.2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div></sc-if>
+            <sc-if value="{{ couponClosed }}" hint-placeholder-val="{{ false }}"><div style="display:flex;gap:8px;margin-top:12px"><input value="{{ couponInput }}" sc-camel-on-input="{{ onCoupon }}" placeholder="Coupon code" style="flex:1;height:48px;padding:0 14px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;font:400 15px/1 -apple-system;color:var(--ink1)"><button sc-camel-on-click="{{ applyCoupon }}" class="hz-press" style="height:48px;padding:0 18px;background:var(--surface2);border:1px solid var(--accent);border-radius:8px;font:600 15px/1 -apple-system;color:var(--accent);cursor:pointer">Apply</button></div></sc-if>
+            <sc-if value="{{ gstinClosed }}" hint-placeholder-val="{{ true }}"><button sc-camel-on-click="{{ openGstin }}" style="display:block;margin-top:14px;border:none;background:none;color:var(--accent);font:600 13px/1 -apple-system;cursor:pointer;padding:0">Add GSTIN for business invoice</button></sc-if>
+            <sc-if value="{{ gstinOpen }}" hint-placeholder-val="{{ false }}"><div style="margin-top:12px;animation:hzReveal .2s ease-out"><input placeholder="GSTIN" style="width:100%;height:44px;padding:0 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;font:400 15px/1 -apple-system;color:var(--ink1)"><div style="{{ helper }}">For claiming input tax credit.</div></div></sc-if>
+            <div style="font:600 13px/1 -apple-system;color:var(--ink2);margin:20px 0 8px">Payment method</div>
+            <div style="display:flex;flex-direction:column;gap:8px"><sc-for list="{{ payMethods }}" as="m" hint-placeholder-count="3"><div sc-camel-on-click="{{ m.pick }}" style="display:flex;align-items:center;gap:12px;height:52px;padding:0 14px;background:var(--surface2);border:1px solid {{ m.borderColor }};border-radius:8px;cursor:pointer"><span style="{{ m.radio }}"><sc-if value="{{ m.on }}" hint-placeholder-val="{{ true }}"><span style="width:10px;height:10px;border-radius:999px;background:var(--accent)"></span></sc-if></span><div style="flex:1"><div style="font:600 15px/1.1 -apple-system;color:var(--ink1)">{{ m.title }}</div><div style="font:400 11px/1.2 -apple-system;color:var(--ink3);margin-top:2px">{{ m.sub }}</div></div></div></sc-for></div>
+            <div style="font:400 11px/1.4 -apple-system;color:var(--ink3);margin-top:10px">Payments are processed securely by Razorpay.</div>
+            <div style="font:400 11px/1.4 -apple-system;color:var(--ink3);margin-top:16px">By paying you agree to our <a href="#" style="color:var(--accent)">Terms</a> and <a href="#" style="color:var(--accent)">No-Refund Policy</a>.</div>
+          </div>
+          <div style="{{ stickyBar }}"><button sc-camel-on-click="{{ pay }}" class="hz-press" style="width:100%;height:44px;background:var(--accent);border:none;border-radius:8px;font:600 15px/1 -apple-system;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center">{{ payButtonInner }}</button></div>
+        </sc-if>
+      </div>
+    </sc-if>
+
+    <!-- ===== S3 SUCCESS ===== -->
+    <sc-if value="{{ isSuccess }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;flex-direction:column;height:100%;background:var(--page)">
+        <div class="hz-scroll" style="flex:1;min-height:0;display:flex;flex-direction:column;align-items:center;padding:48px 24px 24px;text-align:center">
+          <svg width="72" height="72" sc-camel-view-box="0 0 72 72" fill="none"><circle class="hz-ring" cx="36" cy="36" r="32" stroke="var(--accent)" stroke-width="4" stroke-linecap="round"></circle><path class="hz-check" d="M22 37l10 10 18-20" stroke="var(--accent)" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+          <div style="font:700 24px/1.25 -apple-system;color:var(--ink1);margin-top:20px">{{ successTitle }}</div>
+          <div style="font:400 15px/1.45 -apple-system;color:var(--ink2);margin-top:8px;max-width:290px">{{ successSub }}</div>
+          <div style="width:100%;max-width:320px;margin:24px 0 8px;display:flex;flex-direction:column;gap:0;text-align:left">
+            <sc-for list="{{ timeline }}" as="n" hint-placeholder-count="3"><div style="display:flex;gap:12px"><div style="display:flex;flex-direction:column;align-items:center"><span style="{{ n.node }}"><sc-if value="{{ n.done }}" hint-placeholder-val="{{ false }}"><svg width="12" height="12" sc-camel-view-box="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"><path d="M20 6 9 17l-5-5"></path></svg></sc-if></span><sc-if value="{{ n.line }}" hint-placeholder-val="{{ true }}"><span style="width:2px;flex:1;min-height:26px;background:{{ n.lineColor }}"></span></sc-if></div><div style="padding-bottom:20px"><div style="font:600 13px/1.2 -apple-system;color:var(--ink1)">{{ n.label }}</div><div style="font:400 11px/1.2 -apple-system;color:var(--ink3);margin-top:3px">{{ n.sub }}</div></div></div></sc-for>
+          </div>
+          <div style="width:100%;max-width:320px;display:flex;align-items:center;gap:8px;padding:12px 14px;background:var(--surface2);border-radius:8px"><svg width="16" height="16" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink3)" stroke-width="1.7" style="flex:0 0 auto"><circle cx="12" cy="12" r="9"></circle><path d="M12 11v5M12 8h.01" stroke-linecap="round"></path></svg><span style="font:400 11px/1.4 -apple-system;color:var(--ink3);text-align:left">You'll get a notification and email when it's approved.</span></div>
+        </div>
+        <div style="{{ stickyBar }}"><button sc-camel-on-click="{{ goMyListings }}" class="hz-press" style="width:100%;height:44px;background:var(--accent);border:none;border-radius:8px;font:600 15px/1 -apple-system;color:#fff;cursor:pointer">Go to My Listings</button><button sc-camel-on-click="{{ toPreview }}" style="display:block;margin:12px auto 0;border:none;background:none;color:var(--accent);font:600 15px/1 -apple-system;cursor:pointer">Preview listing</button></div>
+      </div>
+    </sc-if>
+
+    <!-- ===== S4 REQUIREMENT FORM ===== -->
+    <sc-if value="{{ isReqForm }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;flex-direction:column;height:100%;background:var(--page)">
+        <div style="{{ topbar }}"><button sc-camel-on-click="{{ openUnsaved }}" class="hz-press" style="{{ iconBtn }}"><svg width="20" height="20" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink1)" stroke-width="1.9" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"></path></svg></button><span style="{{ topTitle }}">Post a requirement</span><button sc-camel-on-click="{{ saveDraft }}" style="width:auto;padding:0 8px;border:none;background:none;color:var(--accent);font:600 13px/1 -apple-system;cursor:pointer">Save draft</button></div>
+        <div class="hz-scroll" style="flex:1;min-height:0;padding:16px 16px 96px">
+          <div style="{{ secHdr }}">Looking for</div>
+          <div style="display:flex;gap:8px;margin-bottom:16px"><sc-for list="{{ reqBuyRent }}" as="c" hint-placeholder-count="2"><button sc-camel-on-click="{{ c.pick }}" style="{{ c.style }}">{{ c.label }}</button></sc-for></div>
+          <div style="{{ fLabel }}">Property type</div>
+          <div sc-camel-on-click="{{ openReqType }}" style="{{ selectRow }}"><span style="flex:1;font:400 15px/1 -apple-system;color:var(--ink1)">{{ reqType }}</span><svg width="18" height="18" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink3)" stroke-width="1.8" stroke-linecap="round"><path d="m6 9 6 6 6-6"></path></svg></div>
+          <sc-if value="{{ reqShowBHK }}" hint-placeholder-val="{{ true }}"><div style="{{ fLabel }};margin-top:16px">BHK</div><div style="display:flex;gap:8px;margin-top:8px"><sc-for list="{{ reqBHK }}" as="c" hint-placeholder-count="5"><button sc-camel-on-click="{{ c.pick }}" style="{{ c.style }}">{{ c.label }}</button></sc-for></div></sc-if>
+
+          <div style="{{ secHdr }};margin-top:24px">Budget</div>
+          <div style="display:flex;gap:12px"><div style="flex:1"><div style="{{ fLabel }}">Min budget</div><div style="{{ budgetWrap }}"><span style="padding-left:12px;font:600 15px/1 -apple-system;color:var(--ink2)">₹</span><input value="{{ minBudget }}" sc-camel-on-input="{{ onMinBudget }}" inputmode="numeric" placeholder="0" style="flex:1;height:44px;padding:0 12px;background:transparent;border:none;font:400 15px/1 -apple-system;color:var(--ink1)"></div></div><div style="flex:1"><div style="{{ fLabel }}">Max budget</div><div style="{{ budgetWrap }}"><span style="padding-left:12px;font:600 15px/1 -apple-system;color:var(--ink2)">₹</span><input value="{{ maxBudget }}" sc-camel-on-input="{{ onMaxBudget }}" inputmode="numeric" placeholder="0" style="flex:1;height:44px;padding:0 12px;background:transparent;border:none;font:400 15px/1 -apple-system;color:var(--ink1)"></div></div></div>
+          <sc-if value="{{ budgetWord }}" hint-placeholder-val="{{ false }}"><div style="font:400 13px/1 -apple-system;color:var(--accent);margin-top:8px">{{ budgetWord }}</div></sc-if>
+          <sc-if value="{{ budgetError }}" hint-placeholder-val="{{ false }}"><div style="{{ errLine }}"><svg width="14" height="14" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--error)" stroke-width="1.9"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v4M12 16h.01" stroke-linecap="round"></path></svg>Max budget must be higher than min</div></sc-if>
+
+          <div style="{{ secHdr }};margin-top:24px">Preferred areas</div>
+          <div sc-camel-on-click="{{ openAreas }}" style="{{ selectRow }};margin-top:0"><span style="flex:1;font:400 15px/1 -apple-system;color:{{ areasColor }}">{{ areasLabel }}</span><svg width="18" height="18" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink3)" stroke-width="1.8" stroke-linecap="round"><path d="m6 9 6 6 6-6"></path></svg></div>
+          <sc-if value="{{ hasAreas }}" hint-placeholder-val="{{ true }}"><div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px"><sc-for list="{{ selectedAreas }}" as="a" hint-placeholder-count="2"><span style="display:flex;align-items:center;gap:6px;height:32px;padding:0 8px 0 12px;background:var(--accentSoft);border-radius:999px;font:600 13px/1 -apple-system;color:var(--accent)">{{ a.label }}<button sc-camel-on-click="{{ a.remove }}" style="width:20px;height:20px;display:grid;place-items:center;border:none;background:none;cursor:pointer"><svg width="11" height="11" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2.6" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></span></sc-for></div></sc-if>
+          <div style="{{ helper }}">We'll also show you matches from nearby areas.</div>
+
+          <div style="{{ secHdr }};margin-top:24px">Urgency</div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px"><sc-for list="{{ urgencyChips }}" as="c" hint-placeholder-count="3"><button sc-camel-on-click="{{ c.pick }}" style="{{ c.style }}">{{ c.label }}</button></sc-for></div>
+
+          <div style="{{ secHdr }};margin-top:24px">Notes</div>
+          <textarea value="{{ reqNotes }}" sc-camel-on-input="{{ onReqNotes }}" placeholder="Any specific needs — facing, floor, furnishing, school nearby…" style="width:100%;height:96px;padding:12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;font:400 15px/1.45 -apple-system;color:var(--ink1);resize:none"></textarea>
+          <div style="display:flex;justify-content:flex-end;font:400 11px/1 -apple-system;color:var(--ink3);margin-top:6px">{{ reqNotesCount }} / 500</div>
+          <sc-if value="{{ reqPhoneWarn }}" hint-placeholder-val="{{ false }}"><div style="display:flex;align-items:flex-start;gap:6px;margin-top:8px;padding:8px 12px;background:var(--warningSoft);border-radius:8px"><svg width="14" height="14" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--warning)" stroke-width="1.9" style="flex:0 0 auto;margin-top:1px"><path d="M12 3l9 16H3z"></path><path d="M12 10v4M12 17h.01" stroke-linecap="round"></path></svg><span style="font:400 11px/1.4 -apple-system;color:var(--ink1)">Phone numbers aren't allowed here. Verified members will contact you in-app.</span></div></sc-if>
+
+          <sc-if value="{{ reqHasQuota }}" hint-placeholder-val="{{ true }}"><div style="display:flex;align-items:center;gap:8px;margin-top:20px;padding:12px 14px;background:var(--surface2);border-radius:8px"><span style="flex:1;font:600 13px/1.3 -apple-system;color:var(--accent)">1 requirement post available · 30 days validity</span><button sc-camel-on-click="{{ showTip }}" style="width:24px;height:24px;display:grid;place-items:center;border:none;background:none;cursor:pointer"><svg width="18" height="18" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink3)" stroke-width="1.8"><circle cx="12" cy="12" r="9"></circle><path d="M12 11v5M12 8h.01" stroke-linecap="round"></path></svg></button></div></sc-if>
+          <sc-if value="{{ reqNoQuota }}" hint-placeholder-val="{{ false }}"><div style="display:flex;align-items:center;gap:8px;margin-top:20px;padding:12px 14px;background:var(--warningSoft);border-radius:8px"><span style="flex:1;font:400 13px/1.3 -apple-system;color:var(--ink1)">No requirement posts left — buy a plan</span><button sc-camel-on-click="{{ goPlans }}" style="border:none;background:none;color:var(--accent);font:600 13px/1 -apple-system;cursor:pointer">View Plans</button></div></sc-if>
+        </div>
+        <div style="{{ stickyBar }}"><button sc-camel-on-click="{{ submitReq }}" class="hz-press" style="width:100%;height:44px;background:var(--accent);border:none;border-radius:8px;font:600 15px/1 -apple-system;color:#fff;cursor:pointer">Submit for Review</button></div>
+      </div>
+    </sc-if>
+
+    <!-- ===== S5 PROJECT FORM ===== -->
+    <sc-if value="{{ isProjForm }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;flex-direction:column;height:100%;background:var(--page)">
+        <div style="{{ topbar }}"><button sc-camel-on-click="{{ openUnsaved }}" class="hz-press" style="{{ iconBtn }}"><svg width="20" height="20" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink1)" stroke-width="1.9" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"></path></svg></button><span style="{{ topTitle }}">Post a project</span><span style="width:44px"></span></div>
+        <div style="flex:0 0 auto;padding:10px 16px;background:var(--surface1);border-bottom:1px solid var(--divider)"><div style="display:flex;justify-content:space-between;font:600 11px/1 -apple-system;color:var(--ink2);margin-bottom:6px"><span>{{ projStepLabel }}</span><span style="color:var(--ink3)">{{ projStepName }}</span></div><div style="height:4px;background:var(--surface3);border-radius:999px;overflow:hidden"><div style="{{ projBarStyle }}"></div></div></div>
+        <div class="hz-scroll" style="flex:1;min-height:0;padding:16px 16px 96px">
+          <!-- Step 1 -->
+          <sc-if value="{{ projStep1 }}" hint-placeholder-val="{{ true }}">
+            <div style="{{ fLabel }}">Project name</div><input placeholder="e.g. Green Valley Heights" style="{{ inputStyle }}">
+            <div style="{{ fLabel }};margin-top:16px">Project type</div><div sc-camel-on-click="{{ pOpen1 }}" style="{{ selectRow }}"><span style="flex:1;font:400 15px/1 -apple-system;color:var(--ink1)">{{ projType }}</span><svg width="18" height="18" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink3)" stroke-width="1.8" stroke-linecap="round"><path d="m6 9 6 6 6-6"></path></svg></div>
+            <div style="{{ fLabel }};margin-top:16px">Status</div><div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px"><sc-for list="{{ projStatusChips }}" as="c" hint-placeholder-count="3"><button sc-camel-on-click="{{ c.pick }}" style="{{ c.style }}">{{ c.label }}</button></sc-for></div>
+            <div style="{{ fLabel }};margin-top:16px">Possession</div><div sc-camel-on-click="{{ pOpenPoss }}" style="{{ selectRow }}"><span style="flex:1;font:400 15px/1 -apple-system;color:var(--ink1)">{{ projPoss }}</span><svg width="18" height="18" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink3)" stroke-width="1.8" stroke-linecap="round"><path d="m6 9 6 6 6-6"></path></svg></div>
+            <div style="display:flex;gap:12px;margin-top:16px"><div style="flex:1"><div style="{{ fLabel }}">Towers</div><input inputmode="numeric" placeholder="3" style="{{ inputStyle }}"></div><div style="flex:1"><div style="{{ fLabel }}">Floors</div><input inputmode="numeric" placeholder="G+7" style="{{ inputStyle }}"></div></div>
+            <div style="display:flex;gap:12px;margin-top:16px"><div style="flex:1"><div style="{{ fLabel }}">Total units</div><input inputmode="numeric" placeholder="84" style="{{ inputStyle }}"></div><div style="flex:1"><div style="{{ fLabel }}">Available units</div><input inputmode="numeric" placeholder="26" style="{{ inputStyle }}"></div></div>
+            <div style="margin-top:20px;padding:16px;background:var(--accentSoft);border-radius:8px"><div style="{{ fLabel }}">RERA number</div><input placeholder="PR/GJ/RAJKOT/…" style="{{ inputStyle }}"><div style="{{ helper }}">Required for projects — buyers look for this.</div><div style="display:flex;align-items:center;justify-content:space-between;margin-top:12px"><span style="font:400 15px/1 -apple-system;color:var(--ink1)">RERA exempt</span><button sc-camel-on-click="{{ toggleRera }}" style="{{ reraTrack }}"><span style="{{ reraKnob }}"></span></button></div><sc-if value="{{ reraExempt }}" hint-placeholder-val="{{ false }}"><div style="margin-top:12px;animation:hzReveal .2s ease-out"><div style="{{ fLabel }}">Exemption reason</div><div sc-camel-on-click="{{ pOpenExempt }}" style="{{ selectRow }}"><span style="flex:1;font:400 15px/1 -apple-system;color:{{ exemptColor }}">{{ exemptReason }}</span><svg width="18" height="18" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink3)" stroke-width="1.8" stroke-linecap="round"><path d="m6 9 6 6 6-6"></path></svg></div></div></sc-if></div>
+          </sc-if>
+          <!-- Step 2 -->
+          <sc-if value="{{ projStep2 }}" hint-placeholder-val="{{ false }}">
+            <div style="{{ secHdr }}">Unit types</div>
+            <sc-for list="{{ unitCards }}" as="u" hint-placeholder-count="2"><div style="display:flex;align-items:center;gap:10px;padding:12px;background:var(--surface1);border:1px solid var(--border);border-radius:12px;margin-bottom:10px"><div style="flex:1"><div style="font:600 15px/1.2 -apple-system;color:var(--ink1)">{{ u.title }}</div><div style="font:400 11px/1.3 -apple-system;color:var(--ink3);margin-top:2px">{{ u.sub }}</div></div><button sc-camel-on-click="{{ u.edit }}" style="width:36px;height:36px;display:grid;place-items:center;border:none;background:none;cursor:pointer"><svg width="18" height="18" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink2)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"></path></svg></button><button sc-camel-on-click="{{ u.del }}" style="width:36px;height:36px;display:grid;place-items:center;border:none;background:none;cursor:pointer"><svg width="18" height="18" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--error)" stroke-width="1.7" stroke-linecap="round"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13h10l1-13"></path></svg></button></div></sc-for>
+            <button sc-camel-on-click="{{ openAddUnit }}" class="hz-press" style="width:100%;display:flex;align-items:center;justify-content:center;gap:8px;padding:14px;border:1.5px dashed var(--border);border-radius:8px;background:none;cursor:pointer;font:600 15px/1 -apple-system;color:var(--accent)"><svg width="18" height="18" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>Add unit type</button>
+          </sc-if>
+          <!-- Step 3 -->
+          <sc-if value="{{ projStep3 }}" hint-placeholder-val="{{ false }}">
+            <div style="{{ secHdr }}">Photos</div>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px"><sc-for list="{{ projPhotos }}" as="p" hint-placeholder-count="4"><div style="position:relative;aspect-ratio:1;border-radius:8px;overflow:hidden;background-image:{{ p.bg }};background-size:cover;background-position:center"><sc-if value="{{ p.cover }}" hint-placeholder-val="{{ false }}"><span style="position:absolute;top:6px;left:6px;background:var(--accentSoft);color:var(--accent);font:600 11px/1 -apple-system;text-transform:uppercase;padding:3px 6px;border-radius:4px">Cover</span></sc-if><button sc-camel-on-click="{{ p.menu }}" style="position:absolute;top:6px;right:6px;width:28px;height:28px;display:grid;place-items:center;background:rgba(0,0,0,.6);border:none;border-radius:999px;cursor:pointer"><svg width="15" height="15" sc-camel-view-box="0 0 24 24" fill="#fff"><circle cx="5" cy="12" r="2"></circle><circle cx="12" cy="12" r="2"></circle><circle cx="19" cy="12" r="2"></circle></svg></button></div></sc-for><div sc-camel-on-click="{{ addProjPhoto }}" class="hz-press" style="aspect-ratio:1;border:1.5px dashed var(--border);border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;cursor:pointer"><svg width="24" height="24" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink3)" stroke-width="1.7" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg><span style="font:400 11px/1 -apple-system;color:var(--ink3)">Add</span></div></div>
+            <div style="{{ secHdr }};margin-top:20px">Brochure</div>
+            <sc-if value="{{ brochureNone }}" hint-placeholder-val="{{ true }}"><div sc-camel-on-click="{{ uploadBrochure }}" class="hz-press" style="display:flex;align-items:center;gap:10px;padding:14px;border:1.5px dashed var(--border);border-radius:8px;cursor:pointer"><svg width="22" height="22" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--error)" stroke-width="1.6"><path d="M6 2h9l5 5v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Z"></path><path d="M14 2v6h6"></path></svg><span style="font:400 13px/1 -apple-system;color:var(--ink3)">Upload brochure (PDF, max 10 MB)</span></div></sc-if>
+            <sc-if value="{{ brochureReady }}" hint-placeholder-val="{{ false }}"><div style="display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--surface2);border-radius:8px"><svg width="22" height="22" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--error)" stroke-width="1.6"><path d="M6 2h9l5 5v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Z"></path><path d="M14 2v6h6"></path></svg><div style="flex:1"><div style="font:600 15px/1.2 -apple-system;color:var(--ink1)">GreenValley-Brochure.pdf</div><div style="font:400 11px/1 -apple-system;color:{{ brochureMetaColor }};margin-top:2px">{{ brochureMeta }}</div></div><sc-if value="{{ brochureScanning }}" hint-placeholder-val="{{ false }}"><svg class="hz-spin" width="18" height="18" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink3)" stroke-width="2"><path d="M12 3a9 9 0 1 0 9 9" stroke-linecap="round"></path></svg></sc-if></div></sc-if>
+          </sc-if>
+          <!-- Step 4 -->
+          <sc-if value="{{ projStep4 }}" hint-placeholder-val="{{ false }}">
+            <div style="{{ secHdr }}">Amenities</div>
+            <div style="display:flex;flex-wrap:wrap;gap:8px"><sc-for list="{{ projAmenities }}" as="c" hint-placeholder-count="8"><button sc-camel-on-click="{{ c.pick }}" style="{{ c.style }}">{{ c.label }}</button></sc-for></div>
+            <div style="{{ secHdr }};margin-top:24px">Bank approvals</div>
+            <div style="display:flex;flex-wrap:wrap;gap:8px"><sc-for list="{{ projBanks }}" as="c" hint-placeholder-count="5"><button sc-camel-on-click="{{ c.pick }}" style="{{ c.style }}">{{ c.label }}</button></sc-for></div>
+            <div style="{{ helper }}">Approved banks help buyers get loans faster.</div>
+          </sc-if>
+          <!-- Step 5 -->
+          <sc-if value="{{ projStep5 }}" hint-placeholder-val="{{ false }}">
+            <div style="{{ secHdr }}">Location</div>
+            <sc-for list="{{ projLocRows }}" as="r" hint-placeholder-count="5"><div style="margin-bottom:12px"><div style="{{ fLabel }}">{{ r.label }}</div><div sc-camel-on-click="{{ r.open }}" style="{{ r.style }}"><span style="flex:1;font:400 15px/1 -apple-system;color:{{ r.valColor }}">{{ r.value }}</span><svg width="18" height="18" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink3)" stroke-width="1.8" stroke-linecap="round"><path d="m6 9 6 6 6-6"></path></svg></div></div></sc-for>
+            <div style="{{ fLabel }}">Pincode</div><input value="{{ projPincode }}" sc-camel-on-input="{{ onProjPincode }}" inputmode="numeric" maxlength="6" style="{{ inputStyle }}">
+            <div style="{{ secHdr }};margin-top:24px">Review</div>
+            <div style="background:var(--surface1);border:1px solid var(--border);border-radius:12px;padding:14px"><sc-for list="{{ reviewRows }}" as="r" hint-placeholder-count="4"><div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--divider)"><div><div style="font:400 11px/1 -apple-system;color:var(--ink3)">{{ r.k }}</div><div style="font:400 15px/1.2 -apple-system;color:var(--ink1);margin-top:2px">{{ r.v }}</div></div><button sc-camel-on-click="{{ r.jump }}" style="border:none;background:none;color:var(--accent);font:600 13px/1 -apple-system;cursor:pointer">Edit</button></div></sc-for></div>
+            <div style="display:flex;align-items:center;gap:8px;margin-top:16px;padding:12px 14px;background:var(--surface2);border-radius:8px"><svg width="16" height="16" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.7"><path d="M3 21V7l6-4 6 4v14M9 21V11h6"></path></svg><span style="flex:1;font:600 13px/1.3 -apple-system;color:var(--accent)">₹9,999 · 6 months · 1 project</span></div>
+          </sc-if>
+        </div>
+        <div style="{{ stickyBar }}"><div style="display:flex;gap:12px"><sc-if value="{{ projCanBack }}" hint-placeholder-val="{{ false }}"><button sc-camel-on-click="{{ projBack }}" class="hz-press" style="flex:0 0 auto;height:44px;padding:0 20px;background:var(--surface1);border:1px solid var(--border);border-radius:8px;font:600 15px/1 -apple-system;color:var(--ink1);cursor:pointer">Back</button></sc-if><button sc-camel-on-click="{{ projNext }}" class="hz-press" style="flex:1;height:44px;background:var(--accent);border:none;border-radius:8px;font:600 15px/1 -apple-system;color:#fff;cursor:pointer">{{ projNextLabel }}</button></div></div>
+      </div>
+    </sc-if>
+
+    <!-- ===== S6 DRAFTS ===== -->
+    <sc-if value="{{ isDrafts }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;flex-direction:column;height:100%;background:var(--page)">
+        <div style="{{ topbar }}"><button sc-camel-on-click="{{ goBack }}" class="hz-press" style="{{ iconBtn }}"><svg width="22" height="22" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink1)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"></path></svg></button><span style="{{ topTitle }}">Drafts</span><span style="width:auto;padding:0 8px;font:400 13px/1 -apple-system;color:var(--ink3)">{{ draftCounter }}</span></div>
+        <div class="hz-scroll" style="flex:1;min-height:0;padding:16px">
+          <sc-if value="{{ draftsEmpty }}" hint-placeholder-val="{{ false }}"><div style="padding:48px 24px;text-align:center;display:flex;flex-direction:column;align-items:center"><svg width="96" height="96" sc-camel-view-box="0 0 96 96" fill="none" stroke="var(--ink3)" stroke-width="2"><rect x="26" y="20" width="44" height="60" rx="4"></rect><rect x="38" y="14" width="20" height="10" rx="3"></rect><path d="M36 40h24M36 52h24M36 64h14" stroke-linecap="round"></path></svg><div style="font:600 17px/1.3 -apple-system;color:var(--ink1);margin-top:16px">No drafts</div><div style="font:400 13px/1.45 -apple-system;color:var(--ink2);margin-top:4px;max-width:250px">Start a listing and it'll be saved here automatically.</div><button sc-camel-on-click="{{ createListing }}" class="hz-press" style="margin-top:20px;height:44px;padding:0 24px;background:var(--accent);border:none;border-radius:8px;font:600 15px/1 -apple-system;color:#fff;cursor:pointer">Create Listing</button></div></sc-if>
+          <sc-if value="{{ draftsList }}" hint-placeholder-val="{{ true }}">
+            <sc-for list="{{ drafts }}" as="d" hint-placeholder-count="2"><div sc-camel-on-click="{{ d.open }}" style="display:flex;align-items:center;gap:12px;padding:12px;background:var(--surface1);border:1px solid var(--border);border-radius:12px;margin-bottom:12px;cursor:pointer"><div style="{{ d.thumb }}"><sc-if value="{{ d.noPhoto }}" hint-placeholder-val="{{ false }}"><svg width="22" height="22" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink3)" stroke-width="1.6"><rect x="3" y="3" width="18" height="18" rx="2"></rect><circle cx="9" cy="9" r="2"></circle><path d="m21 15-5-5L5 21"></path></svg></sc-if></div><div style="flex:1;min-width:0"><div style="font:600 15px/1.2 -apple-system;color:{{ d.titleColor }}">{{ d.title }}</div><div style="font:400 11px/1.3 -apple-system;color:var(--ink3);margin-top:3px">{{ d.progress }}</div><span style="{{ d.expiryStyle }}">{{ d.expiry }}</span></div><button sc-camel-on-click="{{ d.menu }}" style="width:44px;height:44px;display:grid;place-items:center;border:none;background:none;cursor:pointer"><svg width="20" height="20" sc-camel-view-box="0 0 24 24" fill="var(--ink2)"><circle cx="5" cy="12" r="2"></circle><circle cx="12" cy="12" r="2"></circle><circle cx="19" cy="12" r="2"></circle></svg></button></div></sc-for>
+            <div style="display:flex;align-items:center;gap:8px;margin-top:8px;padding:12px 14px;background:var(--surface2);border-radius:8px"><svg width="16" height="16" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink3)" stroke-width="1.7" style="flex:0 0 auto"><circle cx="12" cy="12" r="9"></circle><path d="M12 11v5M12 8h.01" stroke-linecap="round"></path></svg><span style="font:400 11px/1.4 -apple-system;color:var(--ink3)">You can keep up to 3 drafts. Drafts are deleted after 90 days of inactivity.</span></div>
+          </sc-if>
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- ===== S7 EDIT / STATUS ===== -->
+    <sc-if value="{{ isEdit }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;flex-direction:column;height:100%;background:var(--page)">
+        <div style="{{ topbar }}"><button sc-camel-on-click="{{ goBack }}" class="hz-press" style="{{ iconBtn }}"><svg width="22" height="22" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink1)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"></path></svg></button><span style="{{ topTitle }}">Edit listing</span><button sc-camel-on-click="{{ saveEdit }}" style="width:auto;padding:0 8px;border:none;background:none;color:var(--accent);font:600 13px/1 -apple-system;cursor:pointer">Save</button></div>
+        <!-- status banners -->
+        <sc-if value="{{ bannerChanges }}" hint-placeholder-val="{{ false }}"><div style="flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:10px 16px;background:var(--warningSoft)"><svg width="16" height="16" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--warning)" stroke-width="1.8"><path d="M12 3l9 16H3z"></path><path d="M12 10v4M12 17h.01" stroke-linecap="round"></path></svg><span style="flex:1;font:600 13px/1.3 -apple-system;color:var(--ink1)">Admin requested changes</span></div></sc-if>
+        <sc-if value="{{ bannerRejected }}" hint-placeholder-val="{{ false }}"><div style="flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:10px 16px;background:var(--errorSoft)"><svg width="16" height="16" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--error)" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"></circle><path d="M15 9l-6 6M9 9l6 6"></path></svg><span style="flex:1;font:600 13px/1.3 -apple-system;color:var(--ink1)">Listing rejected: Duplicate listing</span></div></sc-if>
+        <sc-if value="{{ bannerRented }}" hint-placeholder-val="{{ false }}"><div style="flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:10px 16px;background:var(--warningSoft)"><span style="flex:1;font:600 13px/1.3 -apple-system;color:var(--ink1)">This listing is marked as rented</span></div></sc-if>
+        <sc-if value="{{ bannerReReview }}" hint-placeholder-val="{{ true }}"><div style="flex:0 0 auto;display:flex;align-items:flex-start;gap:8px;padding:10px 16px;background:var(--infoSoft)"><svg width="16" height="16" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--info)" stroke-width="1.8" style="flex:0 0 auto;margin-top:1px"><circle cx="12" cy="12" r="9"></circle><path d="M12 11v5M12 8h.01" stroke-linecap="round"></path></svg><span style="flex:1;font:400 11px/1.4 -apple-system;color:var(--ink2)">Changes to photos, price or location need admin re-approval. Your current listing stays live meanwhile.</span></div></sc-if>
+        <div class="hz-scroll" style="flex:1;min-height:0;padding:16px 16px 96px">
+          <sc-if value="{{ stillAvailable }}" hint-placeholder-val="{{ false }}"><div style="padding:14px;background:var(--infoSoft);border-radius:8px;margin-bottom:16px"><div style="display:flex;align-items:center;gap:8px"><svg width="16" height="16" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--info)" stroke-width="1.8"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2" stroke-linecap="round"></path></svg><span style="font:600 15px/1.2 -apple-system;color:var(--ink1)">Is this property still available?</span></div><div style="font:400 11px/1.4 -apple-system;color:var(--ink2);margin-top:6px">We ask every 2 months to keep listings fresh. If you don't respond within 15 days, it will be hidden automatically.</div><div style="display:flex;gap:8px;margin-top:12px"><button sc-camel-on-click="{{ markSoldFromPrompt }}" class="hz-press" style="flex:1;height:40px;background:var(--surface1);border:1px solid var(--border);border-radius:8px;font:600 13px/1 -apple-system;color:var(--ink1);cursor:pointer">No, it's sold</button><button sc-camel-on-click="{{ stillAvailYes }}" class="hz-press" style="flex:1;height:40px;background:var(--accent);border:none;border-radius:8px;font:600 13px/1 -apple-system;color:#fff;cursor:pointer">Yes, still available</button></div></div></sc-if>
+          <sc-if value="{{ bannerRejected }}" hint-placeholder-val="{{ false }}"><div style="padding:12px 14px;background:var(--errorSoft);border-radius:8px;margin-bottom:16px"><span style="font:400 11px/1.5 -apple-system;color:var(--ink2)">You can edit and resubmit. After 3 rejections, the listing is locked and you'll need to contact support.</span></div></sc-if>
+
+          <div style="{{ secHdr }}">Basics</div>
+          <div style="{{ fLabel }}">Title</div><input value="3 BHK Flat in Shree Residency" style="{{ inputStyle }}">
+          <div style="{{ secHdr }};margin-top:24px">Price</div>
+          <div style="{{ fLabel }}">Price</div><input value="₹85,00,000" style="{{ inputStyle }}"><div style="{{ helper }}">Price changes are auto-approved.</div>
+          <sc-if value="{{ noteChanges }}" hint-placeholder-val="{{ false }}"><div style="margin-top:10px;padding:12px 14px;background:var(--warningSoft);border-radius:8px"><span style="font:400 11px/1.5 -apple-system;color:var(--ink2)">Price seems unusually low for this area — please confirm.</span></div></sc-if>
+          <div style="{{ secHdr }};margin-top:24px">Location</div>
+          <div style="{{ fLabel }}">Area</div><div style="{{ selectRow }}"><span style="flex:1;font:400 15px/1 -apple-system;color:var(--ink1)">Mavdi, Rajkot</span><svg width="18" height="18" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink3)" stroke-width="1.8" stroke-linecap="round"><path d="m6 9 6 6 6-6"></path></svg></div>
+          <div style="{{ secHdr }};margin-top:24px">Photos</div>
+          <div sc-camel-on-click="{{ goPhotos }}" style="{{ selectRow }};margin-top:0"><span style="flex:1;font:400 15px/1 -apple-system;color:var(--ink1)">6 photos</span><svg width="18" height="18" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink3)" stroke-width="1.8" stroke-linecap="round"><path d="m9 6 6 6-6 6"></path></svg></div>
+          <div style="{{ helper }}">Photo changes need re-review.</div>
+          <sc-if value="{{ noteChanges }}" hint-placeholder-val="{{ false }}"><div style="margin-top:10px;padding:14px;background:var(--warningSoft);border-radius:8px"><span style="font:400 11px/1.5 -apple-system;color:var(--ink2)">Photos are too dark — please re-upload daylight photos. — HomzList Team</span></div></sc-if>
+        </div>
+        <!-- bottom action bar (varies) -->
+        <div style="{{ stickyBar }}">
+          <sc-if value="{{ actionResubmit }}" hint-placeholder-val="{{ false }}"><button sc-camel-on-click="{{ resubmit }}" class="hz-press" style="width:100%;height:44px;background:var(--accent);border:none;border-radius:8px;font:600 15px/1 -apple-system;color:#fff;cursor:pointer">{{ resubmitLabel }}</button></sc-if>
+          <sc-if value="{{ actionRented }}" hint-placeholder-val="{{ false }}"><button sc-camel-on-click="{{ openReactivate }}" class="hz-press" style="width:100%;height:44px;background:var(--accent);border:none;border-radius:8px;font:600 15px/1 -apple-system;color:#fff;cursor:pointer">Re-activate listing</button></sc-if>
+          <sc-if value="{{ actionArchived }}" hint-placeholder-val="{{ false }}"><button sc-camel-on-click="{{ openRestore }}" class="hz-press" style="width:100%;height:44px;background:var(--accent);border:none;border-radius:8px;font:600 15px/1 -apple-system;color:#fff;cursor:pointer">Restore listing</button></sc-if>
+          <sc-if value="{{ actionLive }}" hint-placeholder-val="{{ true }}"><div style="display:flex;gap:8px"><button sc-camel-on-click="{{ openSold }}" class="hz-press" style="flex:1;height:44px;background:var(--surface1);border:1px solid var(--border);border-radius:8px;font:600 13px/1 -apple-system;color:var(--ink1);cursor:pointer">Mark as Sold</button><button sc-camel-on-click="{{ openRented }}" class="hz-press" style="flex:1;height:44px;background:var(--surface1);border:1px solid var(--border);border-radius:8px;font:600 13px/1 -apple-system;color:var(--ink1);cursor:pointer">Mark as Rented</button><button sc-camel-on-click="{{ boost }}" class="hz-press" style="flex:1;height:44px;background:var(--surface1);border:1px solid var(--border);border-radius:8px;font:600 13px/1 -apple-system;color:var(--ink1);cursor:pointer">Boost</button></div></sc-if>
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- PLACEHOLDER -->
+    <sc-if value="{{ isPlaceholder }}" hint-placeholder-val="{{ false }}"><div style="display:flex;flex-direction:column;height:100%;background:var(--page)"><div style="{{ topbar }}"><button sc-camel-on-click="{{ goBack }}" class="hz-press" style="{{ iconBtn }}"><svg width="22" height="22" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink1)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"></path></svg></button><span style="{{ topTitle }}"></span><span style="width:44px"></span></div><div style="flex:1;display:grid;place-items:center;padding:24px;text-align:center"><div style="font:400 15px/1.5 -apple-system;color:var(--ink3)">{{ placeholderText }}</div></div></div></sc-if>
+  </div>
+
+  <!-- SCRIM -->
+  <sc-if value="{{ scrimOpen }}" hint-placeholder-val="{{ false }}"><div sc-camel-on-click="{{ closeSheet }}" style="position:fixed;inset:0;z-index:150;background:rgba(0,0,0,.4);animation:hzScrim .25s ease-out"></div></sc-if>
+
+  <!-- GENERIC SELECT SHEET -->
+  <sc-if value="{{ selectSheet }}" hint-placeholder-val="{{ false }}">
+    <div style="{{ sheetShell }}"><div style="flex:0 0 auto"><div style="width:36px;height:4px;border-radius:999px;background:var(--border);margin:8px auto 8px"></div><div style="display:flex;align-items:center;padding:4px 16px 12px"><span style="flex:1;font:600 17px/1.2 -apple-system;color:var(--ink1)">{{ selectTitle }}</span><button sc-camel-on-click="{{ closeSheet }}" style="width:44px;height:44px;display:grid;place-items:center;border:none;background:none;cursor:pointer;margin-right:-12px"><svg width="20" height="20" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink1)" stroke-width="1.9" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div><sc-if value="{{ selectSearch }}" hint-placeholder-val="{{ false }}"><div style="padding:0 16px 8px"><div style="display:flex;align-items:center;gap:8px;height:40px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:0 12px"><svg width="16" height="16" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink3)" stroke-width="1.8"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.2-3.2" stroke-linecap="round"></path></svg><input value="{{ selectQuery }}" sc-camel-on-input="{{ onSelectQuery }}" placeholder="Search…" style="flex:1;border:none;background:transparent;font:400 15px/1 -apple-system;color:var(--ink1)"></div></div></sc-if></div>
+      <div class="hz-scroll" style="flex:1;min-height:0;padding:0 16px 8px"><sc-for list="{{ selectOptions }}" as="o" hint-placeholder-count="5"><div sc-camel-on-click="{{ o.pick }}" style="{{ o.row }}"><sc-if value="{{ o.checkbox }}" hint-placeholder-val="{{ false }}"><span style="{{ o.box }}"><sc-if value="{{ o.on }}" hint-placeholder-val="{{ false }}"><svg width="13" height="13" sc-camel-view-box="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"><path d="M20 6 9 17l-5-5"></path></svg></sc-if></span></sc-if><span style="flex:1;font:400 15px/1 -apple-system;color:var(--ink1)">{{ o.label }}</span><sc-if value="{{ o.radioCheck }}" hint-placeholder-val="{{ false }}"><sc-if value="{{ o.on }}" hint-placeholder-val="{{ false }}"><svg width="18" height="18" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2.2" stroke-linecap="round"><path d="M20 6 9 17l-5-5"></path></svg></sc-if></sc-if></div></sc-for>
+        <sc-if value="{{ selectRequestArea }}" hint-placeholder-val="{{ false }}"><div sc-camel-on-click="{{ openRequestArea }}" style="display:flex;align-items:center;gap:8px;height:52px;cursor:pointer"><svg width="18" height="18" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg><span style="font:600 15px/1 -apple-system;color:var(--accent)">Can't find your area? Request it</span></div></sc-if>
+      </div>
+      <sc-if value="{{ selectApply }}" hint-placeholder-val="{{ false }}"><div style="flex:0 0 auto;padding:12px 16px;background:var(--surface1);border-top:1px solid var(--border)"><button sc-camel-on-click="{{ closeSheet }}" class="hz-press" style="width:100%;height:44px;background:var(--accent);border:none;border-radius:8px;font:600 15px/1 -apple-system;color:#fff;cursor:pointer">Apply</button></div></sc-if>
+    </div>
+  </sc-if>
+
+  <!-- ADD UNIT SHEET -->
+  <sc-if value="{{ addUnitSheet }}" hint-placeholder-val="{{ false }}">
+    <div style="{{ sheetTall }}"><div style="flex:0 0 auto"><div style="width:36px;height:4px;border-radius:999px;background:var(--border);margin:8px auto 8px"></div><div style="display:flex;align-items:center;padding:4px 16px 12px;border-bottom:1px solid var(--divider)"><span style="flex:1;font:600 17px/1.2 -apple-system;color:var(--ink1)">Add unit type</span><button sc-camel-on-click="{{ closeSheet }}" style="width:44px;height:44px;display:grid;place-items:center;border:none;background:none;cursor:pointer;margin-right:-12px"><svg width="20" height="20" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink1)" stroke-width="1.9" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div></div>
+      <div class="hz-scroll" style="flex:1;min-height:0;padding:16px"><div style="{{ fLabel }}">Unit name</div><div sc-camel-on-click="{{ openUnitName }}" style="{{ selectRow }}"><span style="flex:1;font:400 15px/1 -apple-system;color:{{ unitNameColor }}">{{ unitName }}</span><svg width="18" height="18" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink3)" stroke-width="1.8" stroke-linecap="round"><path d="m6 9 6 6 6-6"></path></svg></div><div style="{{ fLabel }};margin-top:16px">Built-up area</div><input inputmode="numeric" placeholder="1,100 sq ft" style="{{ inputStyle }}"><div style="{{ fLabel }};margin-top:16px">Carpet area</div><input inputmode="numeric" placeholder="920 sq ft" style="{{ inputStyle }}"><div style="{{ fLabel }};margin-top:16px">Price from</div><div style="{{ budgetWrap }}"><span style="padding-left:12px;font:600 15px/1 -apple-system;color:var(--ink2)">₹</span><input value="{{ unitPrice }}" sc-camel-on-input="{{ onUnitPrice }}" inputmode="numeric" placeholder="45,00,000" style="flex:1;height:44px;padding:0 12px;background:transparent;border:none;font:400 15px/1 -apple-system;color:var(--ink1)"></div><sc-if value="{{ unitPriceWord }}" hint-placeholder-val="{{ false }}"><div style="font:400 13px/1 -apple-system;color:var(--accent);margin-top:6px">{{ unitPriceWord }}</div></sc-if><div style="display:flex;align-items:center;justify-content:space-between;margin-top:16px"><span style="font:600 13px/1 -apple-system;color:var(--ink2)">Units available</span><div style="display:flex;align-items:center;gap:14px"><button sc-camel-on-click="{{ unitDec }}" style="width:36px;height:36px;border-radius:999px;border:1px solid var(--border);background:var(--surface2);color:var(--ink1);font:600 18px/1 -apple-system;cursor:pointer">−</button><span style="min-width:20px;text-align:center;font:600 15px/1 -apple-system;color:var(--ink1)">{{ unitAvail }}</span><button sc-camel-on-click="{{ unitInc }}" style="width:36px;height:36px;border-radius:999px;border:1px solid var(--border);background:var(--surface2);color:var(--ink1);font:600 18px/1 -apple-system;cursor:pointer">+</button></div></div><div style="{{ fLabel }};margin-top:16px">Floor plan</div><div sc-camel-on-click="{{ uploadPlan }}" style="display:flex;flex-direction:column;align-items:center;gap:6px;margin-top:8px;padding:20px;border:1.5px dashed var(--border);border-radius:8px;cursor:pointer"><svg width="24" height="24" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink3)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5M5 20h14"></path></svg><span style="font:400 13px/1 -apple-system;color:var(--ink3)">Upload floor plan</span></div></div>
+      <div style="flex:0 0 auto;padding:12px 16px;background:var(--surface1);border-top:1px solid var(--border)"><button sc-camel-on-click="{{ addUnit }}" class="hz-press" style="width:100%;height:44px;background:var(--accent);border:none;border-radius:8px;font:600 15px/1 -apple-system;color:#fff;cursor:pointer">Add unit</button></div>
+    </div>
+  </sc-if>
+
+  <!-- REQUEST AREA SHEET -->
+  <sc-if value="{{ requestAreaSheet }}" hint-placeholder-val="{{ false }}">
+    <div sc-camel-on-click="{{ closeRequestArea }}" style="position:fixed;inset:0;z-index:180;background:rgba(0,0,0,.4);animation:hzScrim .25s ease-out"></div>
+    <div style="{{ sheetAuto2 }}"><div style="width:36px;height:4px;border-radius:999px;background:var(--border);margin:8px auto 8px"></div><div style="display:flex;align-items:center;padding:4px 16px 12px"><span style="flex:1;font:600 17px/1.2 -apple-system;color:var(--ink1)">Request an area</span><button sc-camel-on-click="{{ closeRequestArea }}" style="width:44px;height:44px;display:grid;place-items:center;border:none;background:none;cursor:pointer;margin-right:-12px"><svg width="20" height="20" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink1)" stroke-width="1.9" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div><div style="padding:0 16px 16px"><div style="{{ fLabel }}">Area name</div><input placeholder="e.g. Nana Mava" style="{{ inputStyle }}"><div style="{{ fLabel }};margin-top:12px">City</div><input value="Rajkot" style="{{ inputStyle }}"><button sc-camel-on-click="{{ sendAreaRequest }}" class="hz-press" style="width:100%;height:44px;margin-top:16px;background:var(--accent);border:none;border-radius:8px;font:600 15px/1 -apple-system;color:#fff;cursor:pointer">Send Request</button></div></div>
+  </sc-if>
+
+  <!-- TILE SHEET (photos) -->
+  <sc-if value="{{ tileSheet }}" hint-placeholder-val="{{ false }}">
+    <div style="{{ sheetAuto }}"><div style="width:36px;height:4px;border-radius:999px;background:var(--border);margin:8px auto 8px"></div>
+      <div sc-camel-on-click="{{ setCover }}" style="display:flex;align-items:center;gap:14px;height:52px;padding:0 18px;cursor:pointer"><svg width="20" height="20" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink1)" stroke-width="1.7"><rect x="3" y="3" width="18" height="18" rx="2"></rect><path d="M3 15l5-5 4 4 3-3 6 6" stroke-linecap="round" stroke-linejoin="round"></path></svg><span style="font:400 15px/1 -apple-system;color:var(--ink1)">Set as cover</span></div>
+      <div sc-camel-on-click="{{ closeSheet }}" style="display:flex;align-items:center;gap:14px;height:52px;padding:0 18px;cursor:pointer"><svg width="20" height="20" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink1)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"></path></svg><span style="font:400 15px/1 -apple-system;color:var(--ink1)">Edit photo</span></div>
+      <div sc-camel-on-click="{{ deleteProjPhoto }}" style="display:flex;align-items:center;gap:14px;height:52px;padding:0 18px;cursor:pointer"><svg width="20" height="20" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--error)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13h10l1-13"></path></svg><span style="font:400 15px/1 -apple-system;color:var(--error)">Delete</span></div>
+      <div style="height:12px"></div>
+    </div>
+  </sc-if>
+
+  <!-- DRAFT ROW SHEET -->
+  <sc-if value="{{ draftSheet }}" hint-placeholder-val="{{ false }}">
+    <div style="{{ sheetAuto }}"><div style="width:36px;height:4px;border-radius:999px;background:var(--border);margin:8px auto 8px"></div>
+      <div sc-camel-on-click="{{ resumeDraft }}" style="display:flex;align-items:center;gap:14px;height:52px;padding:0 18px;cursor:pointer"><svg width="20" height="20" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink1)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"></path></svg><span style="font:400 15px/1 -apple-system;color:var(--ink1)">Resume editing</span></div>
+      <div sc-camel-on-click="{{ openDeleteDraft }}" style="display:flex;align-items:center;gap:14px;height:52px;padding:0 18px;cursor:pointer"><svg width="20" height="20" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--error)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13h10l1-13"></path></svg><span style="font:400 15px/1 -apple-system;color:var(--error)">Delete draft</span></div>
+      <div style="height:12px"></div>
+    </div>
+  </sc-if>
+
+  <!-- TOOLTIP -->
+  <sc-if value="{{ tipOpen }}" hint-placeholder-val="{{ false }}"><div sc-camel-on-click="{{ closeTip }}" style="position:fixed;inset:0;z-index:210;animation:hzScrim .15s ease-out"><div style="position:absolute;left:50%;top:42%;transform:translateX(-50%);width:250px;background:var(--ink1);color:var(--page);border-radius:8px;padding:12px 14px;font:400 13px/1.4 -apple-system;box-shadow:var(--l3)">{{ tipText }}</div></div></sc-if>
+
+  <!-- DIALOG -->
+  <sc-if value="{{ dialog }}" hint-placeholder-val="{{ false }}">
+    <div sc-camel-on-click="{{ closeSheet }}" style="position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.4);display:grid;place-items:center;padding:32px;animation:hzScrim .2s ease-out"><div sc-camel-on-click="{{ stop }}" style="width:320px;max-width:100%;background:var(--surface1);border-radius:16px;padding:20px;box-shadow:var(--l3);animation:hzPop .2s ease-out"><div style="font:600 17px/1.3 -apple-system;color:var(--ink1)">{{ dialogTitle }}</div><div style="font:400 13px/1.45 -apple-system;color:var(--ink2);margin-top:8px;text-wrap:pretty">{{ dialogBody }}</div><div style="display:flex;align-items:center;gap:12px;margin-top:20px;justify-content:flex-end"><sc-if value="{{ dialogThird }}" hint-placeholder-val="{{ false }}"><button sc-camel-on-click="{{ dialogThirdFn }}" style="border:none;background:none;color:var(--error);font:600 15px/1 -apple-system;cursor:pointer;padding:10px;margin-right:auto">{{ dialogThird }}</button></sc-if><button sc-camel-on-click="{{ closeSheet }}" style="height:40px;padding:0 14px;background:var(--surface2);border:none;border-radius:8px;font:600 15px/1 -apple-system;color:var(--ink1);cursor:pointer">{{ dialogCancel }}</button><button sc-camel-on-click="{{ dialogConfirm }}" class="hz-press" style="{{ dialogConfirmStyle }}">{{ dialogConfirmLabel }}</button></div></div></div>
+  </sc-if>
+
+  <!-- TOAST -->
+  <sc-if value="{{ toast }}" hint-placeholder-val="{{ false }}"><div style="{{ toastStyle }}">{{ toast }}</div></sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script="" data-props="{&quot;$preview&quot;:{&quot;width&quot;:390,&quot;height&quot;:760}}">
+const PHOTO = [
+  'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=800&q=80&auto=format&fit=crop',
+  'https://images.unsplash.com/photo-1512918728675-ed5a9ecdebfd?w=800&q=80&auto=format&fit=crop',
+  'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=800&q=80&auto=format&fit=crop',
+  'https://images.unsplash.com/photo-1484154218962-a197022b5858?w=800&q=80&auto=format&fit=crop',
+  'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=800&q=80&auto=format&fit=crop'
+];
+const AV = 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&q=80&auto=format&fit=crop';
+const url = u => `url('${u}')`;
+
+class Component extends DCLogic {
+  state = {
+    screen: 'preview', theme: 'light', device: 'mobile', devOpen: false,
+    pay: 'success', listingStatus: 'live', role: 'owner',
+    previewTab: 'feed', contact: 'private',
+    coupon: 'applied', couponInput: '', gstin: 'closed', payMethod: 'upi', paying: false,
+    successKind: 'listing',
+    reqBuyRent: 'buy', reqType: 'Flat', reqBHK: '3', minBudget: '4000000', maxBudget: '6000000',
+    reqAreas: ['Mavdi', 'University Road'], urgency: 'imm', reqNotes: '', reqQuota: true,
+    projStep: 1, projType: 'Residential', projStatus: 'uc', projPoss: 'Dec 2026', reraExempt: false, exemptReason: '',
+    units: [{ name: '2 BHK', title: '2 BHK · 1,100 sqft · ₹45 L onwards', sub: 'Carpet 920 sqft · 12 available' }, { name: '3 BHK', title: '3 BHK · 1,450 sqft · ₹62 L onwards', sub: 'Carpet 1,180 sqft · 8 available' }],
+    projPhotos: [{ ph: 0 }, { ph: 1 }, { ph: 4 }], projCover: 0, projAmenities: ['Clubhouse', 'Pool'], projBanks: ['SBI', 'HDFC'], projPincode: '',
+    projLoc: { State: 'Gujarat', District: 'Rajkot', Taluka: 'Rajkot', City: 'Rajkot', Area: '' },
+    brochure: 'none',
+    unitName: '', unitPrice: '', unitAvail: 10,
+    drafts: [{ title: '3 BHK Flat, Mavdi', progress: 'Details added · Photos pending', days: 5, ph: 0 }, { title: 'Untitled listing', progress: 'Just started', days: 82, ph: null }],
+    sheet: null, sheetStack: [], selectCtx: null, selectQuery: '', requestArea: false,
+    dialog: null, tip: false, tipText: '', toast: '', stillAvailable: true,
+    tileIdx: 0, draftIdx: 0
+  };
+
+  componentDidMount() {
+    const valid = ['preview', 'checkout', 'success', 'reqform', 'projform', 'drafts', 'edit', 'placeholder'];
+    const h = (location.hash || '').replace('#', '');
+    if (valid.includes(h) && h !== this.state.screen) this.setState({ screen: h });
+    history.replaceState({ screen: valid.includes(h) ? h : this.state.screen }, '');
+    this._pop = e => { const s = (e.state && e.state.screen) || 'preview'; this.setState({ screen: s, sheet: null, dialog: null, requestArea: false }); };
+    window.addEventListener('popstate', this._pop);
+  }
+  componentWillUnmount() { window.removeEventListener('popstate', this._pop); if (this._t) clearTimeout(this._t); if (this._p) clearTimeout(this._p); }
+
+  nav(s) { history.pushState({ screen: s }, '', '#' + s); this.setState({ screen: s, sheet: null, dialog: null, requestArea: false, paying: false }); }
+  goBack() { history.back(); }
+  toast(m) { this.setState({ toast: m }); clearTimeout(this._t); this._t = setTimeout(() => this.setState({ toast: '' }), 3000); }
+  close() { this.setState({ sheet: null, dialog: null, requestArea: false, tip: false }); }
+  fmtComma(v) { const n = String(v).replace(/\D/g, ''); if (!n) return ''; const l3 = n.slice(-3); const rest = n.slice(0, -3); return (rest ? rest.replace(/\B(?=(\d{2})+(?!\d))/g, ',') + ',' : '') + l3; }
+  words(v) { const n = parseInt(String(v).replace(/\D/g, ''), 10); if (!n) return ''; if (n >= 10000000) return '₹' + (n / 10000000).toFixed(2).replace(/\.?0+$/, '') + ' Cr'; if (n >= 100000) return '₹' + (n / 100000).toFixed(2).replace(/\.?0+$/, '') + ' Lakh'; return '₹' + n.toLocaleString('en-IN'); }
+  chip(label, on, fn) { return { label, style: `flex:0 0 auto;height:36px;padding:0 16px;border-radius:999px;font:600 13px/1 -apple-system;cursor:pointer;white-space:nowrap;${on ? 'background:var(--accentSoft);border:1px solid var(--accent);color:var(--accent)' : 'background:var(--surface2);border:1px solid var(--border);color:var(--ink1)'}`, pick: fn }; }
+  toggleUI(on, P) { return { track: `position:relative;width:46px;height:28px;border-radius:999px;border:none;cursor:pointer;transition:background .15s;background:${on ? P.accent : P.surface3}`, knob: `position:absolute;top:3px;left:${on ? '21px' : '3px'};width:22px;height:22px;border-radius:999px;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.3);transition:left .15s` }; }
+  openSelect(ctx) { this.setState({ sheet: 'select', selectCtx: ctx, selectQuery: '' }); }
+
+  renderVals() {
+    const st = this.state, D = st.theme === 'dark';
+    const P = D ? { page: '#000', surface1: '#121212', surface2: '#1E1E1E', surface3: '#262626', border: '#363636', divider: '#262626', ink1: '#F5F5F5', ink2: '#B0B0B0', ink3: '#8E8E8E', accent: '#1DB868', accentSoft: '#0E2B1C', accentDis: '#1E4032', error: '#FF5C6A', errorSoft: '#2A1416', warning: '#FFB74D', warningSoft: '#2A2113', info: '#3BA7F8', infoSoft: '#10263A', l1: 'none', l2: 'none', l3: 'none' }
+      : { page: '#FFF', surface1: '#FFF', surface2: '#F5F5F5', surface3: '#EFEFEF', border: '#DBDBDB', divider: '#EFEFEF', ink1: '#111', ink2: '#555', ink3: '#8E8E8E', accent: '#0F9D58', accentSoft: '#E6F4EC', accentDis: '#A8D5BD', error: '#ED4956', errorSoft: '#FDECEE', warning: '#F5A623', warningSoft: '#FEF5E7', info: '#0095F6', infoSoft: '#E7F3FD', l1: '0 1px 2px rgba(0,0,0,.06)', l2: '0 4px 12px rgba(0,0,0,.10)', l3: '0 8px 24px rgba(0,0,0,.16)' };
+    const vars = Object.entries(P).map(([k, v]) => `--${k}:${v}`).join(';');
+    const frameW = st.device === 'desktop' ? 1024 : st.device === 'tablet' ? 834 : 390;
+    const rootStyle = `min-height:100vh;width:100%;background:${D ? '#000' : '#FAFAFA'};display:flex;justify-content:center;align-items:flex-start;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;${vars}`;
+    const colStyle = `position:relative;display:flex;flex-direction:column;width:${frameW}px;max-width:100%;height:100vh;background:${P.page};overflow:hidden;box-shadow:0 0 0 1px ${P.border},0 8px 40px rgba(0,0,0,.12);${vars}`;
+
+    const dbtn = a => `flex:0 0 auto;height:26px;padding:0 9px;border-radius:6px;border:1px solid ${a ? '#1db868' : '#444'};background:${a ? '#153a26' : '#2e2e2e'};color:${a ? '#5fe0a0' : '#bbb'};font:600 11px/1 -apple-system;cursor:pointer`;
+    const grp = (title, defs, cur, set) => ({ title, items: defs.map(([v, l]) => ({ label: l, style: dbtn(cur === v), go: () => set(v) })) });
+    const devGroups = [
+      grp('Screen', [['preview', 'Preview'], ['checkout', 'Checkout'], ['success', 'Success'], ['reqform', 'Requirement'], ['projform', 'Project'], ['drafts', 'Drafts'], ['edit', 'Edit']], st.screen, v => this.nav(v)),
+      grp('Theme', [['light', 'Light'], ['dark', 'Dark']], st.theme, v => this.setState({ theme: v })),
+      grp('Device', [['mobile', 'Mobile'], ['tablet', 'Tablet'], ['desktop', 'Desktop']], st.device, v => this.setState({ device: v })),
+      grp('Payment', [['success', 'Success'], ['pending', 'Pending-UPI'], ['failed', 'Failed'], ['double', 'Double-pay']], st.pay, v => this.setState({ pay: v, paying: false })),
+      grp('Listing', [['live', 'Live'], ['pending', 'Pending'], ['changes', 'Changes req'], ['rejected', 'Rejected'], ['sold', 'Sold'], ['rented', 'Rented'], ['archived', 'Archived']], st.listingStatus, v => this.setState({ listingStatus: v })),
+      grp('Success as', [['listing', 'Listing'], ['requirement', 'Requirement'], ['project', 'Project']], st.successKind, v => this.setState({ successKind: v })),
+      grp('Role', [['owner', 'Owner'], ['broker', 'Broker'], ['builder', 'Builder']], st.role, v => this.setState({ role: v }))
+    ];
+
+    const topbar = `flex:0 0 auto;display:flex;align-items:center;height:52px;padding:0 6px;background:${P.surface1};border-bottom:1px solid ${P.divider}`;
+    const iconBtn = 'width:44px;height:44px;display:grid;place-items:center;border:none;background:none;cursor:pointer';
+    const topTitle = `flex:1;text-align:center;font:600 17px/1.2 -apple-system;color:${P.ink1}`;
+    const stickyBar = `flex:0 0 auto;padding:12px 16px;background:${P.surface1};border-top:1px solid ${P.border};box-shadow:${P.l2}`;
+    const secHdr = `font:600 13px/1 -apple-system;letter-spacing:.3px;color:${P.ink3};text-transform:uppercase;margin-bottom:12px`;
+    const fLabel = `font:600 13px/1 -apple-system;color:${P.ink2}`;
+    const helper = `font:400 11px/1.3 -apple-system;color:${P.ink3};margin-top:6px`;
+    const errLine = `display:flex;align-items:center;gap:5px;font:400 11px/1 -apple-system;color:${P.error};margin-top:6px`;
+    const selectRow = `display:flex;align-items:center;height:44px;margin-top:8px;padding:0 12px;background:${P.surface2};border:1px solid ${P.border};border-radius:8px;cursor:pointer`;
+    const inputStyle = `width:100%;height:44px;margin-top:8px;padding:0 12px;background:${P.surface2};border:1px solid ${P.border};border-radius:8px;font:400 15px/1 -apple-system;color:${P.ink1}`;
+    const budgetWrap = `display:flex;align-items:center;margin-top:8px;background:${P.surface2};border:1px solid ${P.border};border-radius:8px`;
+    const dot = a => `width:${a ? 6 : 4}px;height:${a ? 6 : 4}px;border-radius:999px;background:${a ? P.accent : 'rgba(255,255,255,.55)'}`;
+
+    // ---- PREVIEW ----
+    const previewTabs = [['feed', 'Feed card'], ['full', 'Full listing']].map(([k, l]) => ({ label: l, go: () => this.setState({ previewTab: k }), style: `position:relative;flex:0 0 auto;height:44px;padding:0 16px;background:none;border:none;cursor:pointer;font:600 15px/1 -apple-system;color:${st.previewTab === k ? P.ink1 : P.ink3}`, underline: st.previewTab === k ? `position:absolute;left:16px;right:16px;bottom:0;height:2px;background:${P.accent};border-radius:2px` : 'display:none' }));
+    const specStrip = [{ v: '3 BHK', k: 'Bedrooms' }, { v: '3 Bath', k: 'Bathrooms' }, { v: '1,450', k: 'Sqft' }, { v: '4/7', k: 'Floor' }];
+    const detailPairs = [{ k: 'Type', v: 'Flat' }, { k: 'Carpet area', v: '1,180 sqft' }, { k: 'Furnishing', v: 'Semi-furnished' }, { k: 'Facing', v: 'East' }, { k: 'Age', v: '3 years' }, { k: 'Ownership', v: 'Freehold' }];
+    const amenityList = ['Lift', 'Covered parking', 'Security', 'Garden', '24hr water'];
+
+    // ---- CHECKOUT ----
+    const isBuilder = st.role === 'builder';
+    const planName = isBuilder ? '₹9,999 Project Plan' : '₹999 Listing Plan';
+    const planSub = isBuilder ? '6 months · 1 project' : 'one-time · lifetime';
+    const orderFeats = isBuilder ? ['1 project listing (6 months)', 'Unlimited units', 'Priority match alerts'] : ['1 property listing (lifetime)', '1 requirement post (30 days)', '10 proposals'];
+    const base = isBuilder ? 9999 : 999;
+    const disc = st.coupon === 'applied' ? 200 : 0;
+    const gst = Math.round((base - disc) * 0.18);
+    const total = base - disc + gst;
+    const orderRows = [{ k: 'Subtotal', v: '₹' + base.toLocaleString('en-IN'), kFont: '400 13px/1 -apple-system', kColor: P.ink2, vFont: '600 13px/1 -apple-system', vColor: P.ink1 }];
+    if (disc) orderRows.push({ k: 'Coupon (SAVE20)', v: '− ₹200', kFont: '400 13px/1 -apple-system', kColor: P.accent, vFont: '600 13px/1 -apple-system', vColor: P.accent });
+    orderRows.push({ k: 'GST (18%)', v: '₹' + gst.toLocaleString('en-IN'), kFont: '400 13px/1 -apple-system', kColor: P.ink2, vFont: '600 13px/1 -apple-system', vColor: P.ink1 });
+    orderRows.push({ k: 'Total payable', v: '₹' + total.toLocaleString('en-IN'), kFont: '600 17px/1 -apple-system', kColor: P.ink1, vFont: '700 20px/1 -apple-system', vColor: P.accent });
+    const payMethodsDef = [['upi', 'UPI · GPay, PhonePe, Paytm', 'Instant'], ['card', 'Credit / Debit Card', 'Visa, Mastercard, RuPay'], ['net', 'Net Banking', 'All major banks']];
+    const payMethods = payMethodsDef.map(([k, title, sub]) => ({ title, sub, on: st.payMethod === k, borderColor: st.payMethod === k ? P.accent : P.border, radio: `flex:0 0 auto;width:22px;height:22px;border-radius:999px;display:grid;place-items:center;border:1.5px solid ${st.payMethod === k ? P.accent : P.border}`, pick: () => this.setState({ payMethod: k }) }));
+    const payButtonInner = st.paying ? React.createElement('svg', { className: 'hz-spin', width: 20, height: 20, viewBox: '0 0 24 24', fill: 'none', stroke: '#fff', strokeWidth: 2.4 }, React.createElement('path', { d: 'M12 3a9 9 0 1 0 9 9', strokeLinecap: 'round' })) : 'Pay ₹' + total.toLocaleString('en-IN');
+
+    // ---- SUCCESS ----
+    const successMap = { listing: { t: 'Listing submitted', s: 'Your listing is under review. We usually approve within 24 hours.', live: 'Live on HomzList' }, requirement: { t: 'Requirement submitted', s: 'Requirements are reviewed within 24 hours.', live: 'Live for matches' }, project: { t: 'Project submitted', s: '6-month project listing activated after approval.', live: 'Live on HomzList' } };
+    const sk = successMap[st.successKind];
+    const timeline = [
+      { label: 'Submitted', sub: 'Just now', done: true, current: false },
+      { label: 'Under review', sub: 'Usually within 24 hours', done: false, current: true },
+      { label: sk.live, sub: "You'll be notified", done: false, current: false, last: true }
+    ].map((n, i, arr) => ({ label: n.label, sub: n.sub, done: n.done, line: i < arr.length - 1, lineColor: n.done ? P.accent : P.surface3, node: n.done ? `flex:0 0 auto;width:24px;height:24px;border-radius:999px;background:${P.accent};display:grid;place-items:center` : n.current ? `flex:0 0 auto;width:24px;height:24px;border-radius:999px;background:${P.page};border:2px solid ${P.accent};animation:hzPulse 1.6s infinite` : `flex:0 0 auto;width:24px;height:24px;border-radius:999px;background:${P.surface3}` }));
+
+    // ---- REQUIREMENT FORM ----
+    const reqBuyRent = [this.chip('Buy', st.reqBuyRent === 'buy', () => this.setState({ reqBuyRent: 'buy' })), this.chip('Rent', st.reqBuyRent === 'rent', () => this.setState({ reqBuyRent: 'rent' }))];
+    const reqShowBHK = ['Flat', 'Bungalow', 'Tenement'].includes(st.reqType);
+    const reqBHK = ['1', '2', '3', '4', '5+'].map(b => this.chip(b, st.reqBHK === b, () => this.setState({ reqBHK: b })));
+    const minN = parseInt(st.minBudget, 10) || 0, maxN = parseInt(st.maxBudget, 10) || 0;
+    const budgetWord = (minN || maxN) ? `${this.words(st.minBudget) || '₹0'} – ${this.words(st.maxBudget) || '₹0'}` : '';
+    const budgetError = minN && maxN && maxN < minN;
+    const areaSel = st.reqAreas;
+    const selectedAreas = areaSel.map(a => ({ label: a, remove: () => this.setState(s => ({ reqAreas: s.reqAreas.filter(x => x !== a) })) }));
+    const urgencyChips = [['imm', 'Immediate (within 1 month)'], ['1-3', '1–3 months'], ['expl', 'Just exploring']].map(([k, l]) => this.chip(l, st.urgency === k, () => this.setState({ urgency: k })));
+    const reqPhoneWarn = /\d{10}/.test(st.reqNotes.replace(/\s/g, ''));
+
+    // ---- PROJECT FORM ----
+    const projStep = st.projStep;
+    const projBarStyle = `height:100%;width:${projStep / 5 * 100}%;background:${P.accent};border-radius:999px;transition:width .3s`;
+    const projStatusChips = [['bo', 'Booking open'], ['uc', 'Under construction'], ['rtm', 'Ready to move']].map(([k, l]) => this.chip(l, st.projStatus === k, () => this.setState({ projStatus: k })));
+    const reraUI = this.toggleUI(st.reraExempt, P);
+    const unitCards = st.units.map((u, i) => ({ title: u.title, sub: u.sub, edit: () => this.openAddUnitFn(i), del: () => { this.setState(s => ({ units: s.units.filter((_, k) => k !== i) })); this.toast('Unit removed'); } }));
+    const projPhotos = st.projPhotos.map((p, i) => ({ bg: url(PHOTO[p.ph % PHOTO.length]), cover: i === st.projCover, menu: () => this.setState({ sheet: 'tile', tileIdx: i }) }));
+    const projAmList = ['Clubhouse', 'Pool', 'Gym', 'Kids play area', 'Garden', 'Security', 'CCTV', 'Power backup', 'Parking', 'Jogging track', 'Community hall', 'Rain water harvesting'];
+    const projAmenities = projAmList.map(a => this.chip(a, st.projAmenities.includes(a), () => this.setState(s => ({ projAmenities: s.projAmenities.includes(a) ? s.projAmenities.filter(x => x !== a) : [...s.projAmenities, a] }))));
+    const projBankList = ['SBI', 'HDFC', 'ICICI', 'Axis', 'Kotak', 'LIC HFL', 'Bajaj'];
+    const projBanks = projBankList.map(b => this.chip(b, st.projBanks.includes(b), () => this.setState(s => ({ projBanks: s.projBanks.includes(b) ? s.projBanks.filter(x => x !== b) : [...s.projBanks, b] }))));
+    const projLocSeq = ['State', 'District', 'Taluka', 'City', 'Area'];
+    const projLocOpts = { State: ['Gujarat', 'Maharashtra'], District: ['Rajkot', 'Ahmedabad'], Taluka: ['Rajkot', 'Gondal'], City: ['Rajkot', 'Gondal'], Area: ['Mavdi', 'University Road', 'Kalawad Road', '150 Feet Ring Road', 'Kuvadva Road'] };
+    const projLocRows = projLocSeq.map((k, i) => { const prev = i === 0 || st.projLoc[projLocSeq[i - 1]]; const v = st.projLoc[k]; return { label: { State: 'State', District: 'District', Taluka: 'Taluka', City: 'City / Village', Area: 'Area / Landmark' }[k], value: v || 'Select', valColor: v ? P.ink1 : P.ink3, style: `display:flex;align-items:center;height:44px;margin-top:8px;padding:0 12px;background:${P.surface2};border:1px solid ${P.border};border-radius:8px;cursor:${prev ? 'pointer' : 'not-allowed'};opacity:${prev ? 1 : .5}`, open: () => { if (prev) this.openSelect({ projLocKey: k, title: k, options: projLocOpts[k], search: k === 'Area', single: true, requestArea: k === 'Area' }); } }; });
+    const reviewRows = [{ k: 'Project name', v: 'Green Valley Heights', step: 1 }, { k: 'Status', v: 'Under construction', step: 1 }, { k: 'Unit types', v: st.units.length + ' types', step: 2 }, { k: 'Photos', v: st.projPhotos.length + ' photos', step: 3 }].map(r => ({ k: r.k, v: r.v, jump: () => this.setState({ projStep: r.step }) }));
+    const projStepNames = { 1: 'Basics', 2: 'Unit types', 3: 'Media', 4: 'Amenities & Banks', 5: 'Location & Review' };
+    const unitPriceWord = this.words(st.unitPrice);
+
+    // ---- DRAFTS ----
+    const drafts = st.drafts.map((d, i) => ({ title: d.title, titleColor: d.ph === null ? P.ink3 : P.ink1, progress: d.progress, noPhoto: d.ph === null, thumb: d.ph !== null ? `width:64px;height:64px;border-radius:8px;flex:0 0 auto;background-image:${url(PHOTO[d.ph])};background-size:cover;background-position:center` : `width:64px;height:64px;border-radius:8px;flex:0 0 auto;border:1.5px dashed ${P.border};display:grid;place-items:center`, expiry: 'Expires in ' + d.days + ' days', expiryStyle: `display:inline-block;margin-top:6px;height:22px;padding:0 8px;border-radius:999px;font:600 11px/22px -apple-system;${d.days < 7 ? 'background:var(--warningSoft);color:var(--warning)' : 'background:var(--surface2);color:var(--ink2)'}`, open: () => this.nav('placeholder'), menu: () => this.setState({ sheet: 'draft', draftIdx: i }) }));
+
+    // ---- EDIT / STATUS ----
+    const ls = st.listingStatus;
+    const bannerChanges = ls === 'changes', bannerRejected = ls === 'rejected', bannerRented = ls === 'rented';
+    const bannerReReview = ls === 'live' || ls === 'pending';
+    const noteChanges = ls === 'changes';
+    const stillAvailable = ls === 'live' && st.stillAvailable;
+    const actionResubmit = ls === 'changes' || ls === 'rejected';
+    const actionRented = ls === 'rented';
+    const actionArchived = ls === 'archived';
+    const actionLive = ls === 'live' || ls === 'pending';
+
+    // ---- SELECT SHEET ----
+    const ctx = st.selectCtx;
+    let selectOptions = [], selectTitle = '', selectSearch = false, selectRequestArea = false, selectApply = false;
+    if (st.sheet === 'select' && ctx) {
+      selectTitle = ctx.title; selectSearch = !!ctx.search; selectRequestArea = !!ctx.requestArea; selectApply = !!ctx.multi;
+      let opts = ctx.options || [];
+      if (selectSearch && st.selectQuery) opts = opts.filter(o => o.toLowerCase().includes(st.selectQuery.toLowerCase()));
+      const cur = ctx.get ? ctx.get() : null;
+      selectOptions = opts.map(o => {
+        const on = ctx.multi ? st.reqAreas.includes(o) : cur === o;
+        return { label: o, on, checkbox: !!ctx.multi, radioCheck: !ctx.multi, box: `flex:0 0 auto;width:22px;height:22px;border-radius:6px;display:grid;place-items:center;margin-right:10px;${on ? 'background:var(--accent);border:1px solid var(--accent)' : 'background:transparent;border:1.5px solid var(--border)'}`, row: `display:flex;align-items:center;height:52px;cursor:pointer;border-bottom:1px solid ${P.divider}`, pick: () => ctx.pick(o) };
+      });
+    }
+
+    const sheetShell = `position:fixed;left:50%;transform:translateX(-50%);bottom:0;z-index:160;width:${frameW}px;max-width:100%;height:74vh;background:${P.surface1};border-top-left-radius:12px;border-top-right-radius:12px;display:flex;flex-direction:column;overflow:hidden;box-shadow:${P.l3};animation:hzSheet .3s cubic-bezier(0.2,0,0,1)`;
+    const sheetTall = `position:fixed;left:50%;transform:translateX(-50%);bottom:0;z-index:160;width:${frameW}px;max-width:100%;height:88vh;background:${P.surface1};border-top-left-radius:12px;border-top-right-radius:12px;display:flex;flex-direction:column;overflow:hidden;box-shadow:${P.l3};animation:hzSheet .3s cubic-bezier(0.2,0,0,1)`;
+    const sheetAuto = `position:fixed;left:50%;transform:translateX(-50%);bottom:0;z-index:160;width:${frameW}px;max-width:100%;max-height:80vh;background:${P.surface1};border-top-left-radius:12px;border-top-right-radius:12px;display:flex;flex-direction:column;overflow-y:auto;box-shadow:${P.l3};animation:hzSheet .3s cubic-bezier(0.2,0,0,1)`;
+    const sheetAuto2 = `position:fixed;left:50%;transform:translateX(-50%);bottom:0;z-index:190;width:${frameW}px;max-width:100%;max-height:80vh;background:${P.surface1};border-top-left-radius:12px;border-top-right-radius:12px;display:flex;flex-direction:column;overflow-y:auto;box-shadow:${P.l3};animation:hzSheet .3s cubic-bezier(0.2,0,0,1)`;
+    const toastStyle = `position:fixed;left:50%;bottom:90px;z-index:300;transform:translateX(-50%);background:${D ? '#2a2a2a' : '#1a1a1a'};color:#fff;font:400 13px/1.3 -apple-system;padding:11px 16px;border-radius:999px;box-shadow:0 6px 20px rgba(0,0,0,.35);max-width:320px;text-align:center;animation:hzToast .2s ease-out`;
+
+    // ---- DIALOGS ----
+    const dc = st.dialog;
+    const dmap = {
+      submit: { title: 'Submit this listing for review?', body: "Our team reviews listings within 24 hours. You'll be notified once it's live.", cancel: 'Cancel', confirm: 'Submit', fn: () => { this.close(); if (st.pay !== 'success') this.nav('checkout'); else { this.setState({ successKind: 'listing' }); this.nav('success'); } } },
+      submitReq: { title: 'Submit this requirement?', body: 'Requirements are reviewed within 24 hours before going live for matches.', cancel: 'Cancel', confirm: 'Submit', fn: () => { this.close(); this.setState({ successKind: 'requirement' }); this.nav('success'); } },
+      submitProj: { title: 'Submit this project?', body: 'Continue to payment to activate your 6-month project listing.', cancel: 'Cancel', confirm: 'Continue', fn: () => { this.close(); this.setState({ role: 'builder' }); this.nav('checkout'); } },
+      unsaved: { title: 'Save this as a draft?', body: 'You can finish it later from Drafts.', cancel: 'Cancel', confirm: 'Save Draft', third: 'Discard', thirdFn: () => { this.close(); this.nav('drafts'); }, fn: () => { this.close(); this.toast('Draft saved'); this.nav('drafts'); } },
+      deldraft: { title: 'Delete this draft?', body: 'This cannot be undone.', cancel: 'Cancel', confirm: 'Delete', danger: true, fn: () => { this.setState(s => ({ drafts: s.drafts.filter((_, k) => k !== s.draftIdx), dialog: null, sheet: null })); this.toast('Draft deleted'); } },
+      sold: { title: 'Mark this property as sold?', body: 'It will be archived and removed from search and feed. You can restore it later.', cancel: 'Cancel', confirm: 'Mark as Sold', fn: () => { this.close(); this.setState({ listingStatus: 'sold' }); this.toast('Listing marked as sold'); } },
+      rented: { title: 'Mark this property as rented?', body: "You can re-activate this listing for free when it's vacant again.", cancel: 'Cancel', confirm: 'Mark as Rented', fn: () => { this.close(); this.setState({ listingStatus: 'rented' }); this.toast('Listing marked as rented'); } },
+      reactivate: { title: 'Re-activate this listing?', body: 'It will go for a quick re-review and use the same listing slot — no extra payment.', cancel: 'Cancel', confirm: 'Re-activate', fn: () => { this.close(); this.setState({ listingStatus: 'live' }); this.toast('Listing re-activated'); } },
+      restore: { title: 'Restore this listing?', body: 'It will be re-reviewed before going live.', cancel: 'Cancel', confirm: 'Restore', fn: () => { this.close(); this.setState({ listingStatus: 'live' }); this.toast('Listing restored'); } }
+    };
+    const dcfg = dc ? dmap[dc] : null;
+
+    return {
+      rootStyle, colStyle,
+      devWrapStyle: 'position:fixed;top:10px;right:10px;z-index:500;display:flex;flex-direction:column;align-items:flex-end', devOpen: st.devOpen, toggleDev: () => this.setState(s => ({ devOpen: !s.devOpen })), devGroups,
+      topbar, iconBtn, topTitle, stickyBar, secHdr, fLabel, helper, errLine, selectRow, inputStyle, budgetWrap,
+      isOffline: false, goBack: () => this.goBack(),
+      isPreview: st.screen === 'preview', isCheckout: st.screen === 'checkout', isSuccess: st.screen === 'success', isReqForm: st.screen === 'reqform', isProjForm: st.screen === 'projform', isDrafts: st.screen === 'drafts', isEdit: st.screen === 'edit', isPlaceholder: st.screen === 'placeholder',
+      placeholderText: 'Coming in a later batch',
+
+      previewTabs, tabFeed: st.previewTab === 'feed', tabFull: st.previewTab === 'full', previewBg: st.previewTab === 'feed' ? P.surface2 : P.page,
+      heroPhoto: url(PHOTO[0]), posterAv: url(AV), feedDots: [dot(true), dot(false), dot(false), dot(false), dot(false), dot(false)],
+      specStrip, detailPairs, amenityList, contactPreview: st.contact === 'public' ? 'Number public — Call & WhatsApp shown' : 'Number hidden — buyers can request it',
+      editForm: () => this.nav('placeholder'), openSubmit: () => this.setState({ dialog: 'submit' }),
+
+      payForm: st.pay === 'success' || st.pay === 'double', payPending: st.pay === 'pending', payFailed: st.pay === 'failed', doublePay: st.pay === 'double',
+      planName, planSub, orderFeats, orderRows,
+      couponApplied: st.coupon === 'applied', couponClosed: st.coupon === 'closed', couponInput: st.couponInput, onCoupon: e => this.setState({ couponInput: e.target.value }), applyCoupon: () => this.setState({ coupon: 'applied' }), removeCoupon: () => this.setState({ coupon: 'closed' }),
+      gstinClosed: st.gstin === 'closed', gstinOpen: st.gstin === 'open', openGstin: () => this.setState({ gstin: 'open' }),
+      payMethods, payButtonInner,
+      pay: () => { this.setState({ paying: true }); clearTimeout(this._p); this._p = setTimeout(() => { this.setState({ paying: false }); if (st.pay === 'pending' || st.pay === 'failed') { this.forceUpdate(); } else { this.setState({ successKind: isBuilder ? 'project' : 'listing' }); this.nav('success'); } }, 1100); },
+      checkStatus: () => this.toast('Still processing'), goMyListings: () => this.nav('placeholder'), retryPay: () => this.setState({ pay: 'success', paying: false }), contactSupport: () => this.toast('Contact support'),
+
+      successTitle: sk.t, successSub: sk.s, timeline, toPreview: () => this.nav('preview'),
+
+      reqBuyRent, reqType: st.reqType, openReqType: () => this.openSelect({ title: 'Property type', options: ['Flat', 'Bungalow', 'Tenement', 'Plot', 'Office', 'Shop', 'PG / Hostel'], single: true, get: () => st.reqType, pick: o => { this.setState({ reqType: o, sheet: null }); } }),
+      reqShowBHK, reqBHK,
+      minBudget: this.fmtComma(st.minBudget), maxBudget: this.fmtComma(st.maxBudget), onMinBudget: e => this.setState({ minBudget: e.target.value.replace(/\D/g, '') }), onMaxBudget: e => this.setState({ maxBudget: e.target.value.replace(/\D/g, '') }), budgetWord, budgetError,
+      openAreas: () => this.openSelect({ title: 'Preferred areas', options: ['Mavdi', 'University Road', 'Raiya Road', 'Kalawad Road', '150 Feet Ring Road'], multi: true, search: true, pick: o => { this.setState(s => { const has = s.reqAreas.includes(o); if (!has && s.reqAreas.length >= 5) return {}; return { reqAreas: has ? s.reqAreas.filter(x => x !== o) : [...s.reqAreas, o] }; }); } }),
+      areasLabel: areaSel.length ? areaSel.length + ' area' + (areaSel.length > 1 ? 's' : '') + ' selected' : 'Select up to 5 areas', areasColor: areaSel.length ? P.ink1 : P.ink3, hasAreas: areaSel.length > 0, selectedAreas,
+      urgencyChips, reqNotes: st.reqNotes, onReqNotes: e => this.setState({ reqNotes: e.target.value.slice(0, 500) }), reqNotesCount: st.reqNotes.length, reqPhoneWarn,
+      reqHasQuota: st.reqQuota, reqNoQuota: !st.reqQuota, goPlans: () => this.nav('placeholder'),
+      submitReq: () => this.setState({ dialog: 'submitReq' }),
+
+      projStep1: projStep === 1, projStep2: projStep === 2, projStep3: projStep === 3, projStep4: projStep === 4, projStep5: projStep === 5,
+      projStepLabel: 'Step ' + projStep + ' of 5', projStepName: projStepNames[projStep], projBarStyle,
+      projType: st.projType, pOpen1: () => this.openSelect({ title: 'Project type', options: ['Residential', 'Commercial', 'Plot scheme'], single: true, get: () => st.projType, pick: o => this.setState({ projType: o, sheet: null }) }),
+      projStatusChips, projPoss: st.projPoss, pOpenPoss: () => this.openSelect({ title: 'Possession', options: ['Dec 2025', 'Jun 2026', 'Dec 2026', 'Jun 2027', 'Dec 2027'], single: true, get: () => st.projPoss, pick: o => this.setState({ projPoss: o, sheet: null }) }),
+      toggleRera: () => this.setState(s => ({ reraExempt: !s.reraExempt })), reraTrack: reraUI.track, reraKnob: reraUI.knob, reraExempt: st.reraExempt, exemptReason: st.exemptReason || 'Select', exemptColor: st.exemptReason ? P.ink1 : P.ink3, pOpenExempt: () => this.openSelect({ title: 'Exemption reason', options: ['Plot scheme below threshold', 'Completed before RERA', 'Other'], single: true, get: () => st.exemptReason, pick: o => this.setState({ exemptReason: o, sheet: null }) }),
+      unitCards, openAddUnit: () => this.openAddUnitFn(-1),
+      projPhotos, addProjPhoto: () => { this.setState(s => ({ projPhotos: [...s.projPhotos, { ph: s.projPhotos.length }] })); this.toast('Photo added'); }, deleteProjPhoto: () => { this.setState(s => ({ projPhotos: s.projPhotos.filter((_, k) => k !== s.tileIdx), sheet: null })); this.toast('Photo deleted'); }, setCover: () => { this.setState(s => ({ projCover: s.tileIdx, sheet: null })); this.toast('Cover updated'); },
+      brochureNone: st.brochure === 'none', brochureReady: st.brochure !== 'none', brochureScanning: st.brochure === 'scanning', brochureMeta: st.brochure === 'scanning' ? 'Scanning file…' : '2.4 MB · Ready ✓', brochureMetaColor: st.brochure === 'done' ? P.accent : P.ink3, uploadBrochure: () => { this.setState({ brochure: 'scanning' }); this.toast('Uploading…'); setTimeout(() => this.setState({ brochure: 'done' }), 1400); },
+      projAmenities, projBanks, projLocRows, projPincode: st.projPincode, onProjPincode: e => this.setState({ projPincode: e.target.value.replace(/\D/g, '').slice(0, 6) }), reviewRows,
+      projCanBack: projStep > 1, projBack: () => this.setState(s => ({ projStep: Math.max(1, s.projStep - 1) })), projNext: () => { if (projStep < 5) this.setState(s => ({ projStep: s.projStep + 1 })); else this.setState({ dialog: 'submitProj' }); }, projNextLabel: projStep < 5 ? 'Next' : 'Continue to Payment',
+      unitName: st.unitName || 'Select', unitNameColor: st.unitName ? P.ink1 : P.ink3, openUnitName: () => this.openSelect({ title: 'Unit name', options: ['1 BHK', '2 BHK', '3 BHK', '3 BHK Premium', '4 BHK', 'Shop', 'Office'], single: true, get: () => st.unitName, pick: o => this.setState({ unitName: o, sheet: 'addunit' }) }),
+      unitPrice: this.fmtComma(st.unitPrice), onUnitPrice: e => this.setState({ unitPrice: e.target.value.replace(/\D/g, '') }), unitPriceWord, unitAvail: st.unitAvail, unitDec: () => this.setState(s => ({ unitAvail: Math.max(0, s.unitAvail - 1) })), unitInc: () => this.setState(s => ({ unitAvail: s.unitAvail + 1 })), uploadPlan: () => this.toast('Floor plan picker'),
+      addUnitSheet: st.sheet === 'addunit', addUnit: () => { const nm = st.unitName || 'New unit'; this.setState(s => ({ units: [...s.units, { name: nm, title: nm + ' · ' + (this.words(s.unitPrice) || '₹—') + ' onwards', sub: s.unitAvail + ' available' }], sheet: null, unitName: '', unitPrice: '', unitAvail: 10 })); this.toast('Unit added'); },
+
+      draftCounter: st.drafts.length + ' / 3', draftsEmpty: st.drafts.length === 0, draftsList: st.drafts.length > 0, drafts, createListing: () => this.nav('placeholder'),
+      draftSheet: st.sheet === 'draft', resumeDraft: () => { this.close(); this.nav('placeholder'); }, openDeleteDraft: () => this.setState({ dialog: 'deldraft' }),
+
+      bannerChanges, bannerRejected, bannerRented, bannerReReview, noteChanges, stillAvailable,
+      actionResubmit, actionRented, actionArchived, actionLive, resubmitLabel: bannerRejected ? 'Edit & Resubmit' : 'Resubmit for Review',
+      saveEdit: () => this.toast('Saved'), goPhotos: () => this.nav('placeholder'), resubmit: () => { this.setState({ listingStatus: 'pending' }); this.toast('Resubmitted for review'); }, boost: () => this.nav('placeholder'),
+      openSold: () => this.setState({ dialog: 'sold' }), openRented: () => this.setState({ dialog: 'rented' }), openReactivate: () => this.setState({ dialog: 'reactivate' }), openRestore: () => this.setState({ dialog: 'restore' }),
+      markSoldFromPrompt: () => this.setState({ dialog: 'sold' }), stillAvailYes: () => { this.setState({ stillAvailable: false }); this.toast('Thanks — your listing stays live'); },
+
+      scrimOpen: !!st.sheet, closeSheet: () => this.close(), stop: e => e.stopPropagation(),
+      selectSheet: st.sheet === 'select', selectTitle, selectSearch, selectOptions, selectRequestArea, selectApply, selectQuery: st.selectQuery, onSelectQuery: e => this.setState({ selectQuery: e.target.value }),
+      openRequestArea: () => this.setState({ requestArea: true }), requestAreaSheet: st.requestArea, closeRequestArea: () => this.setState({ requestArea: false }), sendAreaRequest: () => { this.setState({ requestArea: false, sheet: null }); this.toast("Request sent — we'll add it soon"); },
+      tileSheet: st.sheet === 'tile',
+      openUnsaved: () => this.setState({ dialog: 'unsaved' }), saveDraft: () => this.toast('Draft saved'),
+      tipOpen: st.tip, tipText: st.tipText, showTip: () => this.setState({ tip: true, tipText: 'Your ₹999 plan includes 1 requirement post for 30 days.' }), closeTip: () => this.setState({ tip: false }),
+
+      dialog: dc, dialogTitle: dcfg && dcfg.title, dialogBody: dcfg && dcfg.body, dialogCancel: dcfg && dcfg.cancel, dialogConfirmLabel: dcfg && dcfg.confirm, dialogThird: dcfg && dcfg.third, dialogThirdFn: () => dcfg && dcfg.thirdFn && dcfg.thirdFn(), dialogConfirm: () => dcfg && dcfg.fn(), dialogConfirmStyle: `height:40px;padding:0 16px;border:none;border-radius:8px;font:600 15px/1 -apple-system;color:#fff;cursor:pointer;background:${dcfg && dcfg.danger ? P.error : P.accent}`,
+      sheetShell, sheetTall, sheetAuto, sheetAuto2, toast: st.toast, toastStyle
+    };
+  }
+
+  openAddUnitFn(i) { this.setState({ sheet: 'addunit', unitName: '', unitPrice: '', unitAvail: 10 }); }
+}
+</script>
+
+
+</body></html>

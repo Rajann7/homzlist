@@ -1,0 +1,171 @@
+/* ==========================================================================
+   ADMIN (P13-14-15) — the design's own token names, aliased onto Doc1 tokens.
+
+   `designs/_unpacked/P13.template.html:16-17` declares the admin prototype's
+   palette as --s1/--ink1/--accentSoft/… . Those values are Doc1's values under
+   shorter names, so this file ALIASES rather than redefines: one palette, one
+   source of truth, and the admin code can be copied from the design verbatim
+   (`background:var(--s2)`) without any name translation in every component.
+
+   Only the tokens Doc1 does not carry (--L1..--L3 elevation, --promoted,
+   --sold, --page) are given real values here, taken from the design's own two
+   theme blocks. Loaded by app/(admin)/account/layout.tsx, so nothing here
+   reaches the user-side bundle.
+   ========================================================================== */
+
+:root {
+  --s1: var(--surface-1);
+  --s2: var(--surface-2);
+  --s3: var(--surface-3);
+  --ink1: var(--ink-primary);
+  --ink2: var(--ink-secondary);
+  --ink3: var(--ink-tertiary);
+  --inkDis: var(--ink-disabled);
+  --accentPressed: var(--accent-pressed);
+  --accentSoft: var(--accent-soft);
+  --accentDis: var(--accent-disabled);
+  --errorSoft: var(--error-soft);
+  --warningSoft: var(--warning-soft);
+  --infoSoft: var(--info-soft);
+  --page: var(--bg-page);
+
+  /* template line 16 — light */
+  --promoted: rgba(0, 0, 0, 0.62);
+  --promotedInk: #fff;
+  --sold: #111111;
+  --soldInk: #fff;
+  --L1: 0 1px 2px rgba(0, 0, 0, 0.06);
+  --L2: 0 4px 12px rgba(0, 0, 0, 0.1);
+  --L3: 0 8px 24px rgba(0, 0, 0, 0.16);
+
+  /* template 440 — the presence dot on the "3 online" cluster. The design keeps
+     this literal green in BOTH themes (it does not follow --accent into dark),
+     so it is a token of its own rather than a theme-swapping one. */
+  --online: #0f9d58;
+}
+
+/* template line 17 — dark drops the shadows for border outlines.
+   `--accentDis` is the one place the admin design and Doc1 disagree: the design
+   darkens it to #2A5A40 in dark mode, Doc1 keeps the light #a8d5bd. Rajan chose
+   the design's value; the override is scoped to admin, so the user side keeps
+   Doc1's. */
+.dark {
+  --accentDis: #2a5a40;
+  --sold: #f5f5f5;
+  --soldInk: #111;
+  --L1: 0 0 0 1px var(--border);
+  --L2: 0 0 0 1px var(--border);
+  --L3: 0 0 0 1px var(--border);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --accentDis: #2a5a40;
+    --sold: #f5f5f5;
+    --soldInk: #111;
+    --L1: 0 0 0 1px var(--border);
+    --L2: 0 0 0 1px var(--border);
+    --L3: 0 0 0 1px var(--border);
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Animations — template lines 21-27, copied exactly (names included, so a
+   design string like `animation:'slideRight .25s cubic-bezier(0.2,0,0,1)'`
+   can be pasted as-is).
+   -------------------------------------------------------------------------- */
+
+@keyframes admin-shimmer {
+  0% {
+    background-position: -400px 0;
+  }
+  100% {
+    background-position: 400px 0;
+  }
+}
+@keyframes slideRight {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+@keyframes slideUp {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+@keyframes scaleIn {
+  from {
+    transform: scale(0.96);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes toastIn {
+  from {
+    transform: translateY(16px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+@keyframes adminSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-root *,
+  .admin-portal * {
+    animation-duration: 0.01ms !important;
+  }
+}
+
+/* template lines 18-20 — the panel's own scrollbar treatment */
+.admin-root ::-webkit-scrollbar,
+.admin-portal ::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+.admin-root ::-webkit-scrollbar-thumb,
+.admin-portal ::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+.admin-root ::-webkit-scrollbar-track,
+.admin-portal ::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* UI chrome is not selectable (CLAUDE.md rule 8); readable content opts back in. */
+.admin-root {
+  -webkit-user-select: none;
+  user-select: none;
+}
+.admin-selectable,
+.admin-root input,
+.admin-root textarea {
+  -webkit-user-select: text;
+  user-select: text;
+}

@@ -25,6 +25,19 @@ const APP_SELLER = `http://seller.localhost:${PORT}`;
 const DESIGN = `http://localhost:${PORT}/_dx`;
 const OUT = "_shots";
 const VW = 390, VH = 760;
+/**
+ * The admin design (P13-14-15) writes its own three device states rather than
+ * using CSS breakpoints: it renders inside a frame whose WIDTH is the state
+ * (template `renderVals`, line 398 — mobile 390 · tablet 768 · desktop 1440).
+ * A spec carries a `band`, and both sides of the diff are driven to it: the
+ * browser viewport is resized, and the prototype's own `viewport` state is set
+ * to match. A screen shot at only one width proves only one of three layouts.
+ */
+const BANDS = {
+  mobile: { w: 390, h: 760 },
+  tablet: { w: 768, h: 900 },
+  desktop: { w: 1440, h: 900 },
+};
 const only = process.argv.slice(2);
 
 // Only a FULL run clears the output; a filtered run refreshes just its own
@@ -91,10 +104,14 @@ const FREEZE = `
 })()`;
 
 async function captureDesign(sess, spec) {
+  const band = BANDS[spec.band ?? "mobile"];
+  await sess.setViewport(band.w, band.h);
   await sess.goto(`${DESIGN}/${spec.page}.html#${spec.screen}`, { waitMs: 700 });
   const gotInstance = await sess.eval(DESIGN_DRIVER);
   if (!gotInstance) throw new Error(`could not reach the ${spec.page} prototype state`);
-  const state = { screen: spec.screen, ...(spec.designState ?? {}) };
+  // `viewport` is the prototype's own device state, not the browser's — set it
+  // alongside the screen so the design side renders the band we are diffing.
+  const state = { screen: spec.screen, viewport: spec.band ?? "mobile", ...(spec.designState ?? {}) };
   await sess.eval(`window.__dc.setState(${JSON.stringify(state)}); true`);
   await sleep(500);
   if (spec.designAfter) { await sess.eval(spec.designAfter); await sleep(400); }
@@ -383,7 +400,8 @@ for (const spec of screenMap(fx)) {
   catch (e) { err = `design: ${e.message}`; }
 
   const appSess = await Session.connect(chrome.wsUrl);
-  await appSess.setViewport(VW, VH);
+  const band = BANDS[spec.band ?? "mobile"];
+  await appSess.setViewport(band.w, band.h);
   try {
     const s = sessions[spec.as];
     const r = await captureApp(appSess, spec.url, {
@@ -411,8 +429,8 @@ for (const spec of screenMap(fx)) {
   await contactSheet(designPng, appPng, d.diffPng, path.join(OUT, `${spec.id}.sheet.png`));
 
   const pct = (d.ratio * 100).toFixed(2);
-  report.push({ id: spec.id, url: spec.url, diffPct: +pct, settled, redirected, landed, consoleErrors });
-  console.log(`- ${spec.id}: ${pct}% differing${settled ? "" : "  [STILL LOADING]"}${redirected ? `  [REDIRECTED → ${landed}]` : ""}${consoleErrors.length ? `  [console: ${consoleErrors.length}]` : ""}`);
+  report.push({ id: spec.id, band: spec.band ?? "mobile", url: spec.url, diffPct: +pct, settled, redirected, landed, consoleErrors });
+  console.log(`- ${spec.id} [${spec.band ?? "mobile"}]: ${pct}% differing${settled ? "" : "  [STILL LOADING]"}${redirected ? `  [REDIRECTED → ${landed}]` : ""}${consoleErrors.length ? `  [console: ${consoleErrors.length}]` : ""}`);
 }
 
 // Merge into any existing report so a filtered run updates rows instead of

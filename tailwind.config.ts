@@ -49,6 +49,11 @@ const config: Config = {
       full: "9999px", // chips, pills, avatars, rings, FAB
     },
     extend: {
+      // The admin design (P13-14-15) has three device states written into its own
+      // code — mobile 390 / tablet 768 / desktop 1440 — and no CSS breakpoints of
+      // its own. `md:` (768) already is the tablet band; `desktop:` adds the third.
+      // A 1280px laptop therefore gets the design's TABLET layout, as intended.
+      screens: { desktop: "1440px" },
       // Default Tailwind spacing (1=4px…8=32px = Doc1's 4/8/12/16/24/32) is kept,
       // so component dimensions (h-11=44px touch target, h-9, h-12, w-5…) work.
       // Only these fixed layout constants are added (Doc1 §3). Usage discipline:

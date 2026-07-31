@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="e918ac7c-532e-4dd6-a92f-08d39f34e0c6"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+
+<style>
+  body{margin:0;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+  *{box-sizing:border-box}
+  input,button,textarea,select{font-family:inherit}
+  .hz-scroll{overflow-y:auto;-webkit-overflow-scrolling:touch}
+  .hz-scroll::-webkit-scrollbar{width:0;height:0}
+  .hz-x{overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+  .hz-x::-webkit-scrollbar{display:none}
+  .hz-press:active{transform:scale(.98)}
+  input:focus,textarea:focus{outline:none;border-color:var(--accent) !important;box-shadow:0 0 0 1px var(--accent)}
+  @keyframes hzSheet{from{transform:translateY(100%)}to{transform:translateY(0)}}
+  @keyframes hzScrim{from{opacity:0}to{opacity:1}}
+  @keyframes hzToast{from{transform:translate(-50%,140%);opacity:0}to{transform:translate(-50%,0);opacity:1}}
+  @keyframes hzPop{from{opacity:0;transform:scale(.92)}to{opacity:1;transform:scale(1)}}
+  @keyframes hzFade{from{opacity:0}to{opacity:1}}
+  @keyframes hzReveal{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
+  @keyframes hzSpin{to{transform:rotate(360deg)}}
+  .hz-spin{animation:hzSpin .8s linear infinite}
+  @media (prefers-reduced-motion:reduce){*{animation-duration:.001ms !important;transition-duration:.001ms !important}}
+</style>
+</helmet>
+
+<div style="{{ rootStyle }}">
+  <!-- DEV TOOLBAR -->
+  <div style="{{ devWrapStyle }}">
+    <button sc-camel-on-click="{{ toggleDev }}" style="display:flex;align-items:center;gap:6px;height:30px;padding:0 10px;background:#2a2a2a;color:#e5e5e5;border:none;border-radius:7px;font:600 12px/1 -apple-system;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.3)"><svg width="14" height="14" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="3"></circle><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"></path></svg>DEV</button>
+    <sc-if value="{{ devOpen }}" hint-placeholder-val="{{ false }}">
+      <div class="hz-scroll" style="margin-top:6px;width:232px;max-height:82vh;background:#232323;border:1px solid #3a3a3a;border-radius:9px;padding:10px;box-shadow:0 8px 28px rgba(0,0,0,.45)">
+        <sc-for list="{{ devGroups }}" as="g" hint-placeholder-count="6"><div style="font:600 10px/1 -apple-system;letter-spacing:.4px;color:#8a8a8a;text-transform:uppercase;margin:2px 0 6px">{{ g.title }}</div><div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px"><sc-for list="{{ g.items }}" as="d" hint-placeholder-count="3"><button sc-camel-on-click="{{ d.go }}" style="{{ d.style }}">{{ d.label }}</button></sc-for></div></sc-for>
+      </div>
+    </sc-if>
+  </div>
+
+  <div style="{{ colStyle }}">
+    <!-- OFFLINE -->
+    <sc-if value="{{ isOffline }}" hint-placeholder-val="{{ false }}"><div style="flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:8px 16px;background:var(--warningSoft);border-bottom:1px solid var(--border)"><svg width="16" height="16" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--warning)" stroke-width="1.8" stroke-linecap="round"><path d="M12 3C7 3 3 6 1 9M9 17a4 4 0 0 1 6 0M2 2l20 20"></path><circle cx="12" cy="21" r="1" fill="var(--warning)"></circle></svg><span style="flex:1;font:400 13px/1.3 -apple-system;color:var(--ink1)">No internet — your draft is saved locally.</span><button sc-camel-on-click="{{ retry }}" style="border:none;background:none;color:var(--accent);font:600 13px/1 -apple-system;cursor:pointer">Retry</button></div></sc-if>
+
+    <!-- ===== S1 PLAN WALL ===== -->
+    <sc-if value="{{ isPlan }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;flex-direction:column;height:100%;background:var(--page)">
+        <div style="{{ topbar }}"><button sc-camel-on-click="{{ goBack }}" class="hz-press" style="{{ iconBtn }}"><svg width="20" height="20" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink1)" stroke-width="1.9" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"></path></svg></button><span style="{{ topTitle }}">Choose a plan</span><span style="width:44px"></span></div>
+        <div class="hz-scroll" style="flex:1;min-height:0;padding:16px 16px 32px">
+          <div style="text-align:center;margin-bottom:20px"><div style="font:400 15px/1.4 -apple-system;color:var(--ink2)">Buy a plan to post your listing</div><div style="font:400 13px/1.3 -apple-system;color:var(--ink3);margin-top:3px">One-time payment · Lifetime listing</div></div>
+          <sc-for list="{{ planCards }}" as="p" hint-placeholder-count="2">
+            <div style="{{ p.wrap }}">
+              <sc-if value="{{ p.recommended }}" hint-placeholder-val="{{ false }}"><span style="position:absolute;top:12px;right:12px;background:var(--accentSoft);color:var(--accent);font:600 11px/1 -apple-system;letter-spacing:.3px;text-transform:uppercase;padding:4px 8px;border-radius:4px">Recommended</span></sc-if>
+              <div style="display:flex;align-items:baseline;gap:6px"><span style="font:700 24px/1 -apple-system;color:var(--ink1)">{{ p.price }}</span><span style="font:400 13px/1 -apple-system;color:var(--ink3)">{{ p.per }}</span></div>
+              <div style="display:flex;flex-direction:column;gap:10px;margin:16px 0"><sc-for list="{{ p.feats }}" as="f" hint-placeholder-count="3"><div style="display:flex;align-items:flex-start;gap:8px"><svg width="17" height="17" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:0 0 auto;margin-top:1px"><path d="M20 6 9 17l-5-5"></path></svg><span style="font:400 15px/1.35 -apple-system;color:var(--ink1)">{{ f }}</span></div></sc-for></div>
+              <button sc-camel-on-click="{{ p.go }}" class="hz-press" style="{{ p.btn }}">Continue</button>
+            </div>
+          </sc-for>
+          <!-- coupon -->
+          <sc-if value="{{ couponApplied }}" hint-placeholder-val="{{ false }}"><div style="display:flex;align-items:center;gap:8px;height:48px;padding:0 14px;background:var(--accentSoft);border-radius:8px;margin-top:4px"><svg width="18" height="18" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.7"><path d="M20 12a2 2 0 0 1 0-4V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v2a2 2 0 0 1 0 4v2a2 2 0 0 1 0 4v2a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-2a2 2 0 0 1 0-4z"></path></svg><span style="flex:1;font:600 13px/1 -apple-system;color:var(--accent)">SAVE20 applied — ₹200 off</span><button sc-camel-on-click="{{ removeCoupon }}" style="width:24px;height:24px;display:grid;place-items:center;border:none;background:none;cursor:pointer"><svg width="14" height="14" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2.2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div></sc-if>
+          <sc-if value="{{ couponClosed }}" hint-placeholder-val="{{ true }}"><div sc-camel-on-click="{{ expandCoupon }}" style="display:flex;align-items:center;gap:8px;height:48px;padding:0 14px;background:var(--surface2);border-radius:8px;margin-top:4px;cursor:pointer"><svg width="18" height="18" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink2)" stroke-width="1.7"><path d="M20 12a2 2 0 0 1 0-4V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v2a2 2 0 0 1 0 4v2a2 2 0 0 1 0 4v2a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-2a2 2 0 0 1 0-4z"></path></svg><span style="flex:1;font:400 15px/1 -apple-system;color:var(--ink2)">Have a coupon code?</span><svg width="18" height="18" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink3)" stroke-width="1.8" stroke-linecap="round"><path d="m9 6 6 6-6 6"></path></svg></div></sc-if>
+          <sc-if value="{{ couponOpen }}" hint-placeholder-val="{{ false }}"><div style="display:flex;gap:8px;margin-top:4px;animation:hzReveal .2s ease-out"><input value="{{ couponInput }}" sc-camel-on-input="{{ onCoupon }}" placeholder="Enter code" style="flex:1;height:48px;padding:0 14px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;font:400 15px/1 -apple-system;color:var(--ink1)"><button sc-camel-on-click="{{ applyCoupon }}" class="hz-press" style="height:48px;padding:0 18px;background:var(--surface2);border:1px solid var(--accent);border-radius:8px;font:600 15px/1 -apple-system;color:var(--accent);cursor:pointer">Apply</button></div></sc-if>
+          <button sc-camel-on-click="{{ openCompare }}" style="display:block;margin:20px auto 0;border:none;background:none;color:var(--accent);font:600 15px/1 -apple-system;cursor:pointer">Compare plans</button>
+          <div style="text-align:center;font:400 11px/1.4 -apple-system;color:var(--ink3);margin-top:16px">No refunds after purchase. See <a href="#" style="color:var(--accent)">Refund Policy</a>.</div>
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- ===== S2 POST TYPE ===== -->
+    <sc-if value="{{ isPostType }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;flex-direction:column;height:100%;background:var(--page)">
+        <div style="{{ topbar }}"><button sc-camel-on-click="{{ goBack }}" class="hz-press" style="{{ iconBtn }}"><svg width="20" height="20" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink1)" stroke-width="1.9" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"></path></svg></button><span style="{{ topTitle }}">Create</span><span style="width:44px"></span></div>
+        <div class="hz-scroll" style="flex:1;min-height:0;padding:16px">
+          <div style="font:400 15px/1.4 -apple-system;color:var(--ink2);margin-bottom:14px">What would you like to post?</div>
+          <div style="display:flex;flex-direction:column;gap:12px"><sc-for list="{{ postOptions }}" as="o" hint-placeholder-count="3"><div sc-camel-on-click="{{ o.go }}" class="hz-press" style="display:flex;align-items:center;gap:14px;padding:14px;background:var(--surface1);border:1px solid var(--border);border-radius:8px;cursor:pointer"><span style="width:48px;height:48px;border-radius:12px;background:var(--accentSoft);display:grid;place-items:center;color:var(--accent);flex:0 0 auto">{{ o.icon }}</span><div style="flex:1"><div style="font:600 17px/1.2 -apple-system;color:var(--ink1)">{{ o.title }}</div><div style="font:400 13px/1.3 -apple-system;color:var(--ink2);margin-top:3px">{{ o.sub }}</div></div><svg width="18" height="18" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink3)" stroke-width="1.8" stroke-linecap="round"><path d="m9 6 6 6-6 6"></path></svg></div></sc-for></div>
+          <sc-if value="{{ hasSlot }}" hint-placeholder-val="{{ true }}"><div style="display:flex;align-items:center;gap:8px;margin-top:16px;padding:12px 14px;background:var(--surface2);border-radius:8px"><span style="flex:1;font:600 13px/1.3 -apple-system;color:var(--accent)">1 listing slot available</span><button sc-camel-on-click="{{ showTip }}" style="width:24px;height:24px;display:grid;place-items:center;border:none;background:none;cursor:pointer"><svg width="18" height="18" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink3)" stroke-width="1.8"><circle cx="12" cy="12" r="9"></circle><path d="M12 11v5M12 8h.01" stroke-linecap="round"></path></svg></button></div></sc-if>
+          <sc-if value="{{ noSlot }}" hint-placeholder-val="{{ false }}"><div style="display:flex;align-items:center;gap:8px;margin-top:16px;padding:12px 14px;background:var(--warningSoft);border-radius:8px"><span style="flex:1;font:400 13px/1.3 -apple-system;color:var(--ink1)">No listing slots left — buy a plan to continue</span><button sc-camel-on-click="{{ goPlan }}" style="border:none;background:none;color:var(--accent);font:600 13px/1 -apple-system;cursor:pointer">View Plans</button></div></sc-if>
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- ===== S3 PROPERTY TYPE ===== -->
+    <sc-if value="{{ isPropType }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;flex-direction:column;height:100%;background:var(--page)">
+        <div style="{{ topbar }}"><button sc-camel-on-click="{{ goBack }}" class="hz-press" style="{{ iconBtn }}"><svg width="22" height="22" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink1)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"></path></svg></button><span style="{{ topTitle }}">Property type</span><div style="width:44px;display:flex;justify-content:center;gap:4px"><sc-for list="{{ dots1 }}" as="d" hint-placeholder-count="4"><span style="{{ d }}"></span></sc-for></div></div>
+        <div class="hz-scroll" style="flex:1;min-height:0;padding:16px 16px 96px">
+          <sc-for list="{{ typeCategories }}" as="c" hint-placeholder-count="4">
+            <div style="font:600 13px/1 -apple-system;letter-spacing:.3px;color:var(--ink3);text-transform:uppercase;margin-bottom:12px">{{ c.title }}</div>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:22px"><sc-for list="{{ c.tiles }}" as="t" hint-placeholder-count="4"><div sc-camel-on-click="{{ t.pick }}" class="hz-press" style="{{ t.style }}"><span style="color:{{ t.iconColor }}">{{ t.icon }}</span><span style="font:600 11px/1.2 -apple-system;color:var(--ink1);text-align:center">{{ t.label }}</span></div></sc-for></div>
+          </sc-for>
+        </div>
+        <div style="{{ stickyBar }}"><button sc-camel-on-click="{{ typeContinue }}" class="hz-press" style="{{ typeContinueBtn }}">Continue</button></div>
+      </div>
+    </sc-if>
+
+    <!-- ===== S4 LISTING FORM ===== -->
+    <sc-if value="{{ isForm }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;flex-direction:column;height:100%;background:var(--page)">
+        <div style="{{ topbar }}"><button sc-camel-on-click="{{ formClose }}" class="hz-press" style="{{ iconBtn }}"><svg width="20" height="20" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink1)" stroke-width="1.9" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"></path></svg></button><span style="{{ topTitle }}">Add details</span><button sc-camel-on-click="{{ saveDraft }}" style="width:auto;padding:0 8px;border:none;background:none;color:var(--accent);font:600 13px/1 -apple-system;cursor:pointer">Save draft</button></div>
+        <sc-if value="{{ draftRestored }}" hint-placeholder-val="{{ false }}"><div style="flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:10px 16px;background:var(--accentSoft)"><svg width="15" height="15" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.8"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2" stroke-linecap="round"></path></svg><span style="flex:1;font:400 13px/1.3 -apple-system;color:var(--ink1)">Draft restored from 2 hours ago</span><button sc-camel-on-click="{{ startFresh }}" style="border:none;background:none;color:var(--accent);font:600 13px/1 -apple-system;cursor:pointer">Start fresh</button></div></sc-if>
+        <div class="hz-scroll" style="flex:1;min-height:0;padding:16px 16px 96px">
+          <!-- A BASICS -->
+          <div style="{{ secHdr }}">Basics</div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px"><span style="{{ fLabel }}">Title</span><button sc-camel-on-click="{{ autoTitle }}" style="border:none;background:none;color:var(--accent);font:600 13px/1 -apple-system;cursor:pointer">Auto-generate</button></div>
+          <input value="{{ titleVal }}" sc-camel-on-input="{{ onTitle }}" style="{{ titleFieldStyle }}">
+          <sc-if value="{{ titleError }}" hint-placeholder-val="{{ false }}"><div style="{{ errLine }}"><svg width="14" height="14" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--error)" stroke-width="1.9"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v4M12 16h.01" stroke-linecap="round"></path></svg>Title is required</div></sc-if>
+          <div style="{{ helper }}">{{ titleHint }}</div>
+
+          <div style="{{ fLabel }};margin-top:16px">Looking to</div>
+          <div style="display:flex;gap:8px;margin-top:8px"><sc-for list="{{ lookChips }}" as="c" hint-placeholder-count="2"><button sc-camel-on-click="{{ c.pick }}" style="{{ c.style }}">{{ c.label }}</button></sc-for></div>
+
+          <!-- B PROPERTY DETAILS -->
+          <div style="{{ secHdr }};margin-top:24px">Property details</div>
+          <sc-for list="{{ detailFields }}" as="f" hint-placeholder-count="6">
+            <div style="margin-bottom:16px">
+              <div style="{{ fLabel }}">{{ f.label }}</div>
+              <!-- chips -->
+              <sc-if value="{{ f.isChips }}" hint-placeholder-val="{{ false }}"><div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px"><sc-for list="{{ f.chips }}" as="c" hint-placeholder-count="4"><button sc-camel-on-click="{{ c.pick }}" style="{{ c.style }}">{{ c.label }}</button></sc-for></div></sc-if>
+              <!-- select row -->
+              <sc-if value="{{ f.isSelect }}" hint-placeholder-val="{{ false }}"><div sc-camel-on-click="{{ f.open }}" style="{{ selectRow }}"><span style="flex:1;font:400 15px/1 -apple-system;color:{{ f.valColor }}">{{ f.value }}</span><svg width="18" height="18" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink3)" stroke-width="1.8" stroke-linecap="round"><path d="m6 9 6 6 6-6"></path></svg></div></sc-if>
+              <!-- number + unit -->
+              <sc-if value="{{ f.isAreaUnit }}" hint-placeholder-val="{{ false }}"><div style="display:flex;gap:8px;margin-top:8px"><input value="{{ f.num }}" sc-camel-on-input="{{ f.onNum }}" inputmode="numeric" placeholder="0" style="flex:1;height:44px;padding:0 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;font:400 15px/1 -apple-system;color:var(--ink1)"><div sc-camel-on-click="{{ f.openUnit }}" style="flex:0 0 auto;display:flex;align-items:center;gap:6px;height:44px;padding:0 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;cursor:pointer"><span style="font:600 15px/1 -apple-system;color:var(--ink1)">{{ f.unit }}</span><svg width="16" height="16" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink3)" stroke-width="1.8" stroke-linecap="round"><path d="m6 9 6 6 6-6"></path></svg></div></div><sc-if value="{{ f.conv }}" hint-placeholder-val="{{ false }}"><div style="{{ helper }}">{{ f.conv }}</div></sc-if></sc-if>
+              <!-- number input -->
+              <sc-if value="{{ f.isNum }}" hint-placeholder-val="{{ false }}"><input value="{{ f.num }}" sc-camel-on-input="{{ f.onNum }}" inputmode="numeric" placeholder="0" style="width:100%;height:44px;margin-top:8px;padding:0 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;font:400 15px/1 -apple-system;color:var(--ink1)"></sc-if>
+              <!-- text input -->
+              <sc-if value="{{ f.isText }}" hint-placeholder-val="{{ false }}"><input value="{{ f.text }}" sc-camel-on-input="{{ f.onText }}" style="width:100%;height:44px;margin-top:8px;padding:0 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;font:400 15px/1 -apple-system;color:var(--ink1)"></sc-if>
+              <!-- stepper -->
+              <sc-if value="{{ f.isStepper }}" hint-placeholder-val="{{ false }}"><div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px"><span style="font:400 15px/1 -apple-system;color:var(--ink1)">{{ f.stepLabel }}</span><div style="display:flex;align-items:center;gap:14px"><button sc-camel-on-click="{{ f.dec }}" style="width:36px;height:36px;border-radius:999px;border:1px solid var(--border);background:var(--surface2);color:var(--ink1);font:600 18px/1 -apple-system;cursor:pointer">−</button><span style="min-width:20px;text-align:center;font:600 15px/1 -apple-system;color:var(--ink1)">{{ f.count }}</span><button sc-camel-on-click="{{ f.inc }}" style="width:36px;height:36px;border-radius:999px;border:1px solid var(--border);background:var(--surface2);color:var(--ink1);font:600 18px/1 -apple-system;cursor:pointer">+</button></div></div></sc-if>
+              <!-- toggle -->
+              <sc-if value="{{ f.isToggle }}" hint-placeholder-val="{{ false }}"><div style="display:flex;align-items:center;justify-content:space-between;margin-top:4px"><span style="font:400 15px/1 -apple-system;color:var(--ink1)">{{ f.toggleLabel }}</span><button sc-camel-on-click="{{ f.tog }}" style="{{ f.track }}"><span style="{{ f.knob }}"></span></button></div></sc-if>
+              <!-- checkchips -->
+              <sc-if value="{{ f.isCheck }}" hint-placeholder-val="{{ false }}"><div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px"><sc-for list="{{ f.chips }}" as="c" hint-placeholder-count="4"><button sc-camel-on-click="{{ c.pick }}" style="{{ c.style }}">{{ c.label }}</button></sc-for></div></sc-if>
+              <sc-if value="{{ f.help }}" hint-placeholder-val="{{ false }}"><div style="{{ helper }}">{{ f.help }}</div></sc-if>
+            </div>
+          </sc-for>
+
+          <!-- C PRICE -->
+          <div style="{{ secHdr }};margin-top:8px">Price</div>
+          <div style="{{ fLabel }}">Price</div>
+          <div style="{{ priceWrap }}"><span style="font:600 15px/1 -apple-system;color:var(--ink2);padding-left:12px">₹</span><input value="{{ priceVal }}" sc-camel-on-input="{{ onPrice }}" inputmode="numeric" placeholder="0" style="flex:1;height:44px;padding:0 12px;background:transparent;border:none;font:400 15px/1 -apple-system;color:var(--ink1)" {{="" pricedisabled="" }}=""></div>
+          <sc-if value="{{ priceError }}" hint-placeholder-val="{{ false }}"><div style="{{ errLine }}"><svg width="14" height="14" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--error)" stroke-width="1.9"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v4M12 16h.01" stroke-linecap="round"></path></svg>Price is required</div></sc-if>
+          <sc-if value="{{ priceWord }}" hint-placeholder-val="{{ false }}"><div style="font:400 13px/1 -apple-system;color:var(--accent);margin-top:8px">{{ priceWord }}</div></sc-if>
+          <sc-if value="{{ priceSanity }}" hint-placeholder-val="{{ false }}"><div style="display:flex;align-items:center;gap:6px;margin-top:8px;padding:8px 12px;background:var(--warningSoft);border-radius:8px"><svg width="14" height="14" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--warning)" stroke-width="1.9"><path d="M12 3l9 16H3z"></path><path d="M12 10v4M12 17h.01" stroke-linecap="round"></path></svg><span style="font:400 11px/1.3 -apple-system;color:var(--ink1)">Please check the price — this looks unusual</span></div></sc-if>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px"><button sc-camel-on-click="{{ toggleNego }}" style="{{ negoChip }}">Price negotiable</button><button sc-camel-on-click="{{ togglePoR }}" style="{{ porChip }}">Price on request</button></div>
+          <sc-if value="{{ priceOnReq }}" hint-placeholder-val="{{ false }}"><div style="{{ helper }}">Price will be hidden — buyers must inquire</div></sc-if>
+
+          <sc-for list="{{ priceExtraFields }}" as="f" hint-placeholder-count="2"><div style="margin-top:16px"><div style="{{ fLabel }}">{{ f.label }}</div><sc-if value="{{ f.isText }}" hint-placeholder-val="{{ true }}"><input value="{{ f.text }}" sc-camel-on-input="{{ f.onText }}" inputmode="numeric" style="width:100%;height:44px;margin-top:8px;padding:0 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;font:400 15px/1 -apple-system;color:var(--ink1)"></sc-if><sc-if value="{{ f.word }}" hint-placeholder-val="{{ false }}"><div style="font:400 13px/1 -apple-system;color:var(--accent);margin-top:6px">{{ f.word }}</div></sc-if><sc-if value="{{ f.isSelect }}" hint-placeholder-val="{{ false }}"><div sc-camel-on-click="{{ f.open }}" style="{{ selectRow }}"><span style="flex:1;font:400 15px/1 -apple-system;color:{{ f.valColor }}">{{ f.value }}</span><svg width="18" height="18" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink3)" stroke-width="1.8" stroke-linecap="round"><path d="m6 9 6 6 6-6"></path></svg></div></sc-if><sc-if value="{{ f.isChips }}" hint-placeholder-val="{{ false }}"><div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px"><sc-for list="{{ f.chips }}" as="c" hint-placeholder-count="3"><button sc-camel-on-click="{{ c.pick }}" style="{{ c.style }}">{{ c.label }}</button></sc-for></div></sc-if><sc-if value="{{ f.isToggle }}" hint-placeholder-val="{{ false }}"><div style="display:flex;align-items:center;justify-content:space-between;margin-top:4px"><span style="font:400 15px/1 -apple-system;color:var(--ink1)">{{ f.toggleLabel }}</span><button sc-camel-on-click="{{ f.tog }}" style="{{ f.track }}"><span style="{{ f.knob }}"></span></button></div></sc-if></div></sc-for>
+
+          <!-- D LOCATION -->
+          <div style="{{ secHdr }};margin-top:24px">Location</div>
+          <sc-for list="{{ locationRows }}" as="r" hint-placeholder-count="6"><div style="margin-bottom:12px"><div style="{{ fLabel }}">{{ r.label }}</div><div sc-camel-on-click="{{ r.open }}" style="{{ r.style }}"><span style="flex:1;font:400 15px/1 -apple-system;color:{{ r.valColor }}">{{ r.value }}</span><svg width="18" height="18" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink3)" stroke-width="1.8" stroke-linecap="round"><path d="m6 9 6 6 6-6"></path></svg></div><sc-if value="{{ r.help }}" hint-placeholder-val="{{ false }}"><div style="{{ helper }}">{{ r.help }}</div></sc-if></div></sc-for>
+          <div style="{{ fLabel }};margin-top:4px">Pincode</div>
+          <input value="{{ pincode }}" sc-camel-on-input="{{ onPincode }}" inputmode="numeric" maxlength="6" style="width:100%;height:44px;margin-top:8px;padding:0 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;font:400 15px/1 -apple-system;color:var(--ink1)">
+          <sc-if value="{{ locationError }}" hint-placeholder-val="{{ false }}"><div style="{{ errLine }}"><svg width="14" height="14" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--error)" stroke-width="1.9"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v4M12 16h.01" stroke-linecap="round"></path></svg>Select at least the area</div></sc-if>
+          <sc-if value="{{ breadcrumb }}" hint-placeholder-val="{{ false }}"><div style="display:flex;align-items:center;gap:8px;margin-top:12px;padding:10px 12px;background:var(--surface2);border-radius:8px"><span style="flex:1;font:400 11px/1.3 -apple-system;color:var(--ink3)">{{ breadcrumb }}</span><button sc-camel-on-click="{{ editLocation }}" style="border:none;background:none;color:var(--accent);font:600 11px/1 -apple-system;cursor:pointer">Edit</button></div></sc-if>
+
+          <!-- E AMENITIES -->
+          <div style="{{ secHdr }};margin-top:24px">Amenities</div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px"><sc-for list="{{ amenityChips }}" as="c" hint-placeholder-count="8"><button sc-camel-on-click="{{ c.pick }}" style="{{ c.style }}">{{ c.label }}</button></sc-for></div>
+
+          <!-- F DESCRIPTION -->
+          <div style="{{ secHdr }};margin-top:24px">Description</div>
+          <textarea value="{{ descVal }}" sc-camel-on-input="{{ onDesc }}" placeholder="{{ descPlaceholder }}" style="width:100%;height:120px;padding:12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;font:400 15px/1.45 -apple-system;color:var(--ink1);resize:none"></textarea>
+          <div style="display:flex;justify-content:flex-end;font:400 11px/1 -apple-system;color:var(--ink3);margin-top:6px">{{ descCount }} / 2000</div>
+          <sc-if value="{{ descPhoneWarn }}" hint-placeholder-val="{{ false }}"><div style="display:flex;align-items:flex-start;gap:6px;margin-top:8px;padding:8px 12px;background:var(--warningSoft);border-radius:8px"><svg width="14" height="14" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--warning)" stroke-width="1.9" style="flex:0 0 auto;margin-top:1px"><path d="M12 3l9 16H3z"></path><path d="M12 10v4M12 17h.01" stroke-linecap="round"></path></svg><span style="font:400 11px/1.4 -apple-system;color:var(--ink1)">Phone numbers aren't allowed in descriptions. Use the contact toggle below — buyers can request your number.</span></div></sc-if>
+
+          <!-- G CONTACT -->
+          <div style="{{ secHdr }};margin-top:24px">Contact</div>
+          <div style="display:flex;align-items:center;justify-content:space-between"><span style="font:600 15px/1 -apple-system;color:var(--ink1)">Show my number publicly</span><button sc-camel-on-click="{{ togglePublic }}" style="{{ pubTrack }}"><span style="{{ pubKnob }}"></span></button></div>
+          <div style="{{ helper }}">{{ publicHelp }}</div>
+          <div style="{{ fLabel }};margin-top:16px">Display number</div>
+          <input value="{{ displayNum }}" sc-camel-on-input="{{ onDisplayNum }}" style="width:100%;height:44px;margin-top:8px;padding:0 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;font:400 15px/1 -apple-system;color:var(--ink1)">
+          <div style="{{ helper }}">This number will be shown publicly on your listing.</div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-top:16px"><span style="font:400 15px/1 -apple-system;color:var(--ink1)">WhatsApp is on this number</span><button sc-camel-on-click="{{ toggleWa }}" style="{{ waTrack }}"><span style="{{ waKnob }}"></span></button></div>
+          <sc-if value="{{ waOff }}" hint-placeholder-val="{{ false }}"><div style="margin-top:12px;animation:hzReveal .2s ease-out"><div style="{{ fLabel }}">WhatsApp number</div><input value="{{ waNum }}" sc-camel-on-input="{{ onWaNum }}" style="width:100%;height:44px;margin-top:8px;padding:0 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;font:400 15px/1 -apple-system;color:var(--ink1)"></div></sc-if>
+          <div style="{{ fLabel }};margin-top:16px">Alternate contact number</div>
+          <input value="{{ altNum }}" sc-camel-on-input="{{ onAltNum }}" style="width:100%;height:44px;margin-top:8px;padding:0 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;font:400 15px/1 -apple-system;color:var(--ink1)">
+          <div style="{{ helper }}">Optional — for a family member or assistant.</div>
+
+          <!-- H OWNERSHIP PROOF -->
+          <div style="margin-top:24px;border:1px solid var(--border);border-radius:8px;overflow:hidden">
+            <div sc-camel-on-click="{{ toggleProof }}" style="display:flex;align-items:center;gap:12px;padding:14px;cursor:pointer;background:var(--surface2)"><svg width="20" height="20" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink2)" stroke-width="1.6" style="flex:0 0 auto"><path d="M12 3l7 3v6c0 4-3 7-7 9-4-2-7-5-7-9V6z"></path></svg><div style="flex:1"><div style="font:600 15px/1.2 -apple-system;color:var(--ink1)">Add ownership proof (optional)</div><div style="font:400 11px/1.3 -apple-system;color:var(--ink3);margin-top:2px">Verified listings get more genuine inquiries</div></div><svg style="{{ proofChev }}" width="18" height="18" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink3)" stroke-width="1.8" stroke-linecap="round"><path d="m6 9 6 6 6-6"></path></svg></div>
+            <sc-if value="{{ proofOpen }}" hint-placeholder-val="{{ false }}"><div style="padding:14px;animation:hzReveal .2s ease-out"><div style="{{ fLabel }}">Document type</div><div sc-camel-on-click="{{ openProofType }}" style="{{ selectRow }}"><span style="flex:1;font:400 15px/1 -apple-system;color:{{ proofValColor }}">{{ proofType }}</span><svg width="18" height="18" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink3)" stroke-width="1.8" stroke-linecap="round"><path d="m6 9 6 6 6-6"></path></svg></div><div style="display:flex;flex-direction:column;align-items:center;gap:6px;margin-top:12px;padding:20px;border:1.5px dashed var(--border);border-radius:8px;cursor:pointer" sc-camel-on-click="{{ uploadDoc }}"><svg width="24" height="24" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink3)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5M5 20h14"></path></svg><span style="font:400 13px/1 -apple-system;color:var(--ink3)">Upload document (PDF/JPG)</span></div><div style="{{ helper }}">Only visible to HomzList admins — never shown publicly.</div></div></sc-if>
+          </div>
+        </div>
+        <div style="{{ stickyBar }}"><button sc-camel-on-click="{{ formContinue }}" class="hz-press" style="width:100%;height:44px;background:var(--accent);border:none;border-radius:8px;font:600 15px/1 -apple-system;color:#fff;cursor:pointer">Continue to Photos</button></div>
+      </div>
+    </sc-if>
+
+    <!-- ===== S5 PHOTO UPLOAD ===== -->
+    <sc-if value="{{ isPhotos }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;flex-direction:column;height:100%;position:relative;background:var(--page)">
+        <div style="{{ topbar }}"><button sc-camel-on-click="{{ goBack }}" class="hz-press" style="{{ iconBtn }}"><svg width="22" height="22" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink1)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"></path></svg></button><span style="{{ topTitle }}">Add photos</span><span style="width:auto;padding:0 8px;font:400 13px/1 -apple-system;color:var(--ink3)">{{ photoCounter }}</span></div>
+        <div style="flex:0 0 auto;display:flex;justify-content:center;gap:4px;padding:8px 0"><sc-for list="{{ dots3 }}" as="d" hint-placeholder-count="4"><span style="{{ d }}"></span></sc-for></div>
+        <div class="hz-scroll" style="flex:1;min-height:0;padding:8px 16px 96px">
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+            <sc-for list="{{ photoTiles }}" as="t" hint-placeholder-count="6">
+              <div style="position:relative;aspect-ratio:1;border-radius:8px;overflow:hidden;background:var(--surface2);{{ t.border }}">
+                <div style="position:absolute;inset:0;background-image:{{ t.bg }};background-size:cover;background-position:center;{{ t.dim }}"></div>
+                <sc-if value="{{ t.cover }}" hint-placeholder-val="{{ false }}"><span style="position:absolute;top:6px;left:6px;background:var(--accentSoft);color:var(--accent);font:600 11px/1 -apple-system;letter-spacing:.3px;text-transform:uppercase;padding:3px 6px;border-radius:4px;z-index:3">Cover</span></sc-if>
+                <sc-if value="{{ t.uploading }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;inset:0;display:grid;place-items:center;z-index:3"><svg width="34" height="34" sc-camel-view-box="0 0 36 36"><circle cx="18" cy="18" r="15" fill="none" stroke="rgba(255,255,255,.4)" stroke-width="3"></circle><circle cx="18" cy="18" r="15" fill="none" stroke="var(--accent)" stroke-width="3" stroke-linecap="round" stroke-dasharray="{{ t.dash }}" transform="rotate(-90 18 18)"></circle></svg><span style="position:absolute;font:600 11px/1 -apple-system;color:#fff">{{ t.pct }}</span></div></sc-if>
+                <sc-if value="{{ t.failed }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;inset:0;background:var(--errorSoft);display:grid;place-items:center;z-index:3"><button sc-camel-on-click="{{ t.retry }}" style="height:26px;padding:0 10px;background:var(--accent);border:none;border-radius:999px;font:600 11px/1 -apple-system;color:#fff;cursor:pointer">Retry</button></div></sc-if>
+                <sc-if value="{{ t.label }}" hint-placeholder-val="{{ false }}"><span style="position:absolute;bottom:6px;left:6px;right:6px;background:rgba(0,0,0,.6);color:#fff;font:400 11px/1.2 -apple-system;padding:3px 6px;border-radius:4px;z-index:3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ t.label }}</span></sc-if>
+                <button sc-camel-on-click="{{ t.menu }}" style="position:absolute;top:6px;right:6px;width:30px;height:30px;display:grid;place-items:center;background:rgba(0,0,0,.6);border:none;border-radius:999px;cursor:pointer;z-index:4"><svg width="16" height="16" sc-camel-view-box="0 0 24 24" fill="#fff"><circle cx="5" cy="12" r="2"></circle><circle cx="12" cy="12" r="2"></circle><circle cx="19" cy="12" r="2"></circle></svg></button>
+              </div>
+            </sc-for>
+            <div sc-camel-on-click="{{ addPhoto }}" class="hz-press" style="aspect-ratio:1;border:1.5px dashed var(--border);border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;cursor:pointer"><svg width="24" height="24" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink3)" stroke-width="1.7" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg><span style="font:400 11px/1 -apple-system;color:var(--ink3)">Add photos</span></div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;margin-top:16px;padding:10px 12px;background:var(--surface2);border-radius:8px"><svg width="16" height="16" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink3)" stroke-width="1.6" style="flex:0 0 auto"><rect x="3" y="3" width="18" height="18" rx="2"></rect><circle cx="9" cy="9" r="2"></circle><path d="m21 15-5-5L5 21"></path></svg><span style="font:400 11px/1.4 -apple-system;color:var(--ink3)">Recommended 1200×1500 px or larger · JPG, PNG, HEIC · we compress automatically</span></div>
+          <sc-if value="{{ isBuilder }}" hint-placeholder-val="{{ false }}">
+            <div style="{{ secHdr }};margin-top:24px">Project brochure</div>
+            <sc-if value="{{ brochureNone }}" hint-placeholder-val="{{ true }}"><div sc-camel-on-click="{{ uploadBrochure }}" class="hz-press" style="display:flex;align-items:center;gap:10px;padding:14px;border:1.5px dashed var(--border);border-radius:8px;cursor:pointer"><svg width="22" height="22" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--error)" stroke-width="1.6"><path d="M6 2h9l5 5v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Z"></path><path d="M14 2v6h6"></path></svg><span style="font:400 13px/1 -apple-system;color:var(--ink3)">Upload brochure (PDF, max 10 MB)</span></div></sc-if>
+            <sc-if value="{{ brochureReady }}" hint-placeholder-val="{{ false }}"><div style="display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--surface2);border-radius:8px"><svg width="22" height="22" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--error)" stroke-width="1.6"><path d="M6 2h9l5 5v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Z"></path><path d="M14 2v6h6"></path></svg><div style="flex:1"><div style="font:600 15px/1.2 -apple-system;color:var(--ink1)">GreenValley-Brochure.pdf</div><div style="font:400 11px/1 -apple-system;color:{{ brochureMetaColor }};margin-top:2px">{{ brochureMeta }}</div></div><sc-if value="{{ brochureScanning }}" hint-placeholder-val="{{ false }}"><svg class="hz-spin" width="18" height="18" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink3)" stroke-width="2"><path d="M12 3a9 9 0 1 0 9 9" stroke-linecap="round"></path></svg></sc-if><sc-if value="{{ brochureDone }}" hint-placeholder-val="{{ false }}"><button sc-camel-on-click="{{ removeBrochure }}" style="width:28px;height:28px;display:grid;place-items:center;border:none;background:none;cursor:pointer"><svg width="16" height="16" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink3)" stroke-width="1.9" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></sc-if></div></sc-if>
+          </sc-if>
+        </div>
+        <div style="{{ stickyBar }}"><button sc-camel-on-click="{{ photoContinue }}" class="hz-press" style="{{ photoContinueBtn }}">Continue to Preview</button></div>
+
+        <sc-if value="{{ guideOpen }}" hint-placeholder-val="{{ false }}">
+          <div style="position:absolute;inset:0;z-index:120;background:rgba(0,0,0,.5);display:grid;place-items:center;padding:24px;animation:hzScrim .2s ease-out"><div style="width:100%;background:var(--surface1);border-radius:12px;padding:16px;animation:hzPop .2s ease-out"><div style="font:600 17px/1.3 -apple-system;color:var(--ink1)">Photos that get more inquiries</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:14px 0"><sc-for list="{{ guideThumbs }}" as="g" hint-placeholder-count="4"><div><div style="aspect-ratio:4/3;border-radius:8px;background-image:{{ g.bg }};background-size:cover;background-position:center"></div><div style="font:400 11px/1 -apple-system;color:var(--ink3);margin-top:4px">{{ g.label }}</div></div></sc-for></div><div style="display:flex;flex-direction:column;gap:6px;margin-bottom:14px"><sc-for list="{{ guideTips }}" as="t" hint-placeholder-count="3"><div style="display:flex;align-items:center;gap:8px"><svg width="15" height="15" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round"><path d="M20 6 9 17l-5-5"></path></svg><span style="font:400 13px/1.3 -apple-system;color:var(--ink2)">{{ t }}</span></div></sc-for></div><button sc-camel-on-click="{{ dismissGuide }}" class="hz-press" style="width:100%;height:44px;background:var(--accent);border:none;border-radius:8px;font:600 15px/1 -apple-system;color:#fff;cursor:pointer">Got it</button></div></div>
+        </sc-if>
+      </div>
+    </sc-if>
+
+    <!-- ===== PLACEHOLDER ===== -->
+    <sc-if value="{{ isPlaceholder }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;flex-direction:column;height:100%;background:var(--page)"><div style="{{ topbar }}"><button sc-camel-on-click="{{ goBack }}" class="hz-press" style="{{ iconBtn }}"><svg width="22" height="22" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink1)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"></path></svg></button><span style="{{ topTitle }}"></span><span style="width:44px"></span></div><div style="flex:1;display:grid;place-items:center;padding:24px;text-align:center"><div style="font:400 15px/1.5 -apple-system;color:var(--ink3)">{{ placeholderText }}</div></div></div>
+    </sc-if>
+  </div>
+
+  <!-- SCRIM -->
+  <sc-if value="{{ scrimOpen }}" hint-placeholder-val="{{ false }}"><div sc-camel-on-click="{{ closeSheet }}" style="position:fixed;inset:0;z-index:150;background:rgba(0,0,0,.4);animation:hzScrim .25s ease-out"></div></sc-if>
+
+  <!-- GENERIC SELECT / SEARCH SHEET -->
+  <sc-if value="{{ selectSheet }}" hint-placeholder-val="{{ false }}">
+    <div style="{{ sheetShell }}">
+      <div style="flex:0 0 auto"><div style="width:36px;height:4px;border-radius:999px;background:var(--border);margin:8px auto 8px"></div><div style="display:flex;align-items:center;padding:4px 16px 12px"><span style="flex:1;font:600 17px/1.2 -apple-system;color:var(--ink1)">{{ selectTitle }}</span><button sc-camel-on-click="{{ closeSheet }}" style="width:44px;height:44px;display:grid;place-items:center;border:none;background:none;cursor:pointer;margin-right:-12px"><svg width="20" height="20" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink1)" stroke-width="1.9" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+        <sc-if value="{{ selectSearch }}" hint-placeholder-val="{{ false }}"><div style="padding:0 16px 8px"><div style="display:flex;align-items:center;gap:8px;height:40px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:0 12px"><svg width="16" height="16" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink3)" stroke-width="1.8"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.2-3.2" stroke-linecap="round"></path></svg><input value="{{ selectQuery }}" sc-camel-on-input="{{ onSelectQuery }}" placeholder="Search…" style="flex:1;border:none;background:transparent;font:400 15px/1 -apple-system;color:var(--ink1)"></div></div></sc-if>
+      </div>
+      <div class="hz-scroll" style="flex:1;min-height:0;padding:0 16px 8px"><sc-for list="{{ selectOptions }}" as="o" hint-placeholder-count="5"><div sc-camel-on-click="{{ o.pick }}" style="{{ o.row }}"><span style="flex:1;font:400 15px/1 -apple-system;color:var(--ink1)">{{ o.label }}</span><sc-if value="{{ o.on }}" hint-placeholder-val="{{ false }}"><svg width="18" height="18" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2.2" stroke-linecap="round"><path d="M20 6 9 17l-5-5"></path></svg></sc-if></div></sc-for>
+        <sc-if value="{{ selectRequestArea }}" hint-placeholder-val="{{ false }}"><div sc-camel-on-click="{{ openRequestArea }}" style="display:flex;align-items:center;gap:8px;height:52px;cursor:pointer"><svg width="18" height="18" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg><span style="font:600 15px/1 -apple-system;color:var(--accent)">Can't find your area? Request it</span></div></sc-if>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- REQUEST AREA SHEET (stacks over select) -->
+  <sc-if value="{{ requestAreaSheet }}" hint-placeholder-val="{{ false }}">
+    <div sc-camel-on-click="{{ closeRequestArea }}" style="position:fixed;inset:0;z-index:170;background:rgba(0,0,0,.4);animation:hzScrim .25s ease-out"></div>
+    <div style="{{ sheetAuto2 }}"><div style="width:36px;height:4px;border-radius:999px;background:var(--border);margin:8px auto 8px"></div><div style="display:flex;align-items:center;padding:4px 16px 12px"><span style="flex:1;font:600 17px/1.2 -apple-system;color:var(--ink1)">Request an area</span><button sc-camel-on-click="{{ closeRequestArea }}" style="width:44px;height:44px;display:grid;place-items:center;border:none;background:none;cursor:pointer;margin-right:-12px"><svg width="20" height="20" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink1)" stroke-width="1.9" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+      <div style="padding:0 16px 16px"><div style="{{ fLabel }}">Area name</div><input placeholder="e.g. Nana Mava" style="width:100%;height:44px;margin:8px 0 12px;padding:0 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;font:400 15px/1 -apple-system;color:var(--ink1)"><div style="{{ fLabel }}">City</div><input value="Rajkot" style="width:100%;height:44px;margin:8px 0 16px;padding:0 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;font:400 15px/1 -apple-system;color:var(--ink1)"><button sc-camel-on-click="{{ sendAreaRequest }}" class="hz-press" style="width:100%;height:44px;background:var(--accent);border:none;border-radius:8px;font:600 15px/1 -apple-system;color:#fff;cursor:pointer">Send Request</button></div>
+    </div>
+  </sc-if>
+
+  <!-- COMPARE SHEET -->
+  <sc-if value="{{ compareSheet }}" hint-placeholder-val="{{ false }}">
+    <div style="{{ sheetTall }}">
+      <div style="flex:0 0 auto"><div style="width:36px;height:4px;border-radius:999px;background:var(--border);margin:8px auto 8px"></div><div style="display:flex;align-items:center;padding:4px 16px 12px;border-bottom:1px solid var(--divider)"><span style="flex:1;font:600 17px/1.2 -apple-system;color:var(--ink1)">Compare plans</span><button sc-camel-on-click="{{ closeSheet }}" style="width:44px;height:44px;display:grid;place-items:center;border:none;background:none;cursor:pointer;margin-right:-12px"><svg width="20" height="20" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink1)" stroke-width="1.9" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div></div>
+      <div class="hz-scroll" style="flex:1;min-height:0;padding:0 0 12px">
+        <sc-for list="{{ compareRows }}" as="r" hint-placeholder-count="8"><div style="{{ r.rowStyle }}"><span style="flex:1.4;padding-left:16px;font:{{ r.kFont }};color:var(--ink2)">{{ r.k }}</span><span style="flex:1;text-align:center;font:{{ r.vFont }};color:var(--ink1)">{{ r.a }}</span><span style="flex:1;text-align:center;font:{{ r.vFont }};color:var(--ink1)">{{ r.b }}</span><span style="flex:1;text-align:center;font:{{ r.vFont }};color:var(--ink1);padding-right:16px">{{ r.c }}</span></div></sc-for>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- TILE SHEET -->
+  <sc-if value="{{ tileSheet }}" hint-placeholder-val="{{ false }}">
+    <div style="{{ sheetAuto }}"><div style="width:36px;height:4px;border-radius:999px;background:var(--border);margin:8px auto 8px"></div>
+      <div sc-camel-on-click="{{ setCover }}" style="display:flex;align-items:center;gap:14px;height:52px;padding:0 18px;cursor:pointer"><svg width="20" height="20" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink1)" stroke-width="1.7"><rect x="3" y="3" width="18" height="18" rx="2"></rect><path d="M3 15l5-5 4 4 3-3 6 6" stroke-linecap="round" stroke-linejoin="round"></path></svg><span style="font:400 15px/1 -apple-system;color:var(--ink1)">Set as cover</span></div>
+      <div sc-camel-on-click="{{ editPhoto }}" style="display:flex;align-items:center;gap:14px;height:52px;padding:0 18px;cursor:pointer"><svg width="20" height="20" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink1)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"></path></svg><span style="font:400 15px/1 -apple-system;color:var(--ink1)">Edit photo</span></div>
+      <div sc-camel-on-click="{{ addLabel }}" style="display:flex;align-items:center;gap:14px;height:52px;padding:0 18px;cursor:pointer"><svg width="20" height="20" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink1)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5H4v5l11 11 5-5zM7.5 7.5h.01"></path></svg><span style="font:400 15px/1 -apple-system;color:var(--ink1)">Add label</span></div>
+      <div sc-camel-on-click="{{ deleteTile }}" style="display:flex;align-items:center;gap:14px;height:52px;padding:0 18px;cursor:pointer"><svg width="20" height="20" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--error)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13h10l1-13"></path></svg><span style="font:400 15px/1 -apple-system;color:var(--error)">Delete</span></div>
+      <div style="height:12px"></div>
+    </div>
+  </sc-if>
+
+  <!-- EDITOR SHEET -->
+  <sc-if value="{{ editorSheet }}" hint-placeholder-val="{{ false }}">
+    <div style="{{ sheetTall }}">
+      <div style="flex:0 0 auto"><div style="width:36px;height:4px;border-radius:999px;background:var(--border);margin:8px auto 8px"></div><div style="display:flex;align-items:center;padding:4px 16px 12px"><span style="flex:1;font:600 17px/1.2 -apple-system;color:var(--ink1)">Edit photo</span><button sc-camel-on-click="{{ closeSheet }}" style="width:44px;height:44px;display:grid;place-items:center;border:none;background:none;cursor:pointer;margin-right:-12px"><svg width="20" height="20" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink1)" stroke-width="1.9" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div></div>
+      <div class="hz-scroll" style="flex:1;min-height:0;padding:0 16px">
+        <div style="aspect-ratio:4/5;border-radius:8px;background-image:{{ editorPhoto }};background-size:cover;background-position:center;filter:brightness({{ editorBright }})"></div>
+        <div style="display:flex;gap:0;margin-top:16px;background:var(--surface2);border-radius:8px;padding:3px"><sc-for list="{{ editorTabs }}" as="t" hint-placeholder-count="3"><button sc-camel-on-click="{{ t.pick }}" style="{{ t.style }}">{{ t.label }}</button></sc-for></div>
+        <sc-if value="{{ editorCrop }}" hint-placeholder-val="{{ true }}"><div style="display:flex;gap:8px;margin-top:14px"><sc-for list="{{ cropChips }}" as="c" hint-placeholder-count="3"><button sc-camel-on-click="{{ c.pick }}" style="{{ c.style }}">{{ c.label }}</button></sc-for></div></sc-if>
+        <sc-if value="{{ editorRotate }}" hint-placeholder-val="{{ false }}"><div style="display:flex;gap:12px;margin-top:14px"><button sc-camel-on-click="{{ rotL }}" style="width:52px;height:44px;display:grid;place-items:center;background:var(--surface2);border:1px solid var(--border);border-radius:8px;cursor:pointer"><svg width="20" height="20" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink1)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8m0-5v5h5"></path></svg></button><button sc-camel-on-click="{{ rotR }}" style="width:52px;height:44px;display:grid;place-items:center;background:var(--surface2);border:1px solid var(--border);border-radius:8px;cursor:pointer"><svg width="20" height="20" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink1)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8m0-5v5h-5"></path></svg></button></div></sc-if>
+        <sc-if value="{{ editorBrightTab }}" hint-placeholder-val="{{ false }}"><input type="range" min="50" max="150" value="{{ editorBrightVal }}" sc-camel-on-input="{{ onBright }}" style="width:100%;margin-top:16px;accent-color:var(--accent)"></sc-if>
+      </div>
+      <div style="flex:0 0 auto;display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--surface1);border-top:1px solid var(--border)"><button sc-camel-on-click="{{ resetEditor }}" style="border:none;background:none;color:var(--accent);font:600 15px/1 -apple-system;cursor:pointer">Reset</button><button sc-camel-on-click="{{ saveEditor }}" class="hz-press" style="flex:1;height:44px;background:var(--accent);border:none;border-radius:8px;font:600 15px/1 -apple-system;color:#fff;cursor:pointer">Save</button></div>
+    </div>
+  </sc-if>
+
+  <!-- LABEL SHEET -->
+  <sc-if value="{{ labelSheet }}" hint-placeholder-val="{{ false }}">
+    <div style="{{ sheetAuto2 }}"><div style="width:36px;height:4px;border-radius:999px;background:var(--border);margin:8px auto 8px"></div><div style="padding:0 16px 16px"><div style="{{ fLabel }}">Photo label</div><input value="{{ labelInput }}" sc-camel-on-input="{{ onLabel }}" placeholder="e.g. Master bedroom" style="width:100%;height:44px;margin:8px 0 12px;padding:0 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;font:400 15px/1 -apple-system;color:var(--ink1)"><button sc-camel-on-click="{{ saveLabel }}" class="hz-press" style="width:100%;height:44px;background:var(--accent);border:none;border-radius:8px;font:600 15px/1 -apple-system;color:#fff;cursor:pointer">Save label</button></div></div>
+  </sc-if>
+
+  <!-- TOOLTIP -->
+  <sc-if value="{{ tipOpen }}" hint-placeholder-val="{{ false }}">
+    <div sc-camel-on-click="{{ closeTip }}" style="position:fixed;inset:0;z-index:210;animation:hzScrim .15s ease-out"><div style="position:absolute;left:50%;top:40%;transform:translateX(-50%);width:240px;background:var(--ink1);color:var(--page);border-radius:8px;padding:12px 14px;font:400 13px/1.4 -apple-system;box-shadow:var(--l3)">Your ₹999 plan includes 1 lifetime listing.</div></div>
+  </sc-if>
+
+  <!-- UNSAVED DIALOG -->
+  <sc-if value="{{ unsavedDialog }}" hint-placeholder-val="{{ false }}">
+    <div sc-camel-on-click="{{ closeSheet }}" style="position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.4);display:grid;place-items:center;padding:32px;animation:hzScrim .2s ease-out"><div sc-camel-on-click="{{ stop }}" style="width:320px;max-width:100%;background:var(--surface1);border-radius:16px;padding:20px;box-shadow:var(--l3);animation:hzPop .2s ease-out"><div style="font:600 17px/1.3 -apple-system;color:var(--ink1)">Save this as a draft?</div><div style="font:400 13px/1.45 -apple-system;color:var(--ink2);margin-top:8px">You can finish it later from Drafts.</div><div style="display:flex;align-items:center;gap:8px;margin-top:20px"><button sc-camel-on-click="{{ discardDraft }}" style="border:none;background:none;color:var(--error);font:600 15px/1 -apple-system;cursor:pointer;padding:10px 8px">Discard</button><span style="flex:1"></span><button sc-camel-on-click="{{ closeSheet }}" style="height:40px;padding:0 14px;background:var(--surface2);border:none;border-radius:8px;font:600 15px/1 -apple-system;color:var(--ink1);cursor:pointer">Cancel</button><button sc-camel-on-click="{{ confirmDraft }}" class="hz-press" style="height:40px;padding:0 16px;background:var(--accent);border:none;border-radius:8px;font:600 15px/1 -apple-system;color:#fff;cursor:pointer">Save Draft</button></div></div></div>
+  </sc-if>
+
+  <!-- TOAST -->
+  <sc-if value="{{ toast }}" hint-placeholder-val="{{ false }}"><div style="{{ toastStyle }}">{{ toast }}</div></sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script="" data-props="{&quot;$preview&quot;:{&quot;width&quot;:390,&quot;height&quot;:760}}">
+const PHOTO = [
+  'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=600&q=80&auto=format&fit=crop',
+  'https://images.unsplash.com/photo-1512918728675-ed5a9ecdebfd?w=600&q=80&auto=format&fit=crop',
+  'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=600&q=80&auto=format&fit=crop',
+  'https://images.unsplash.com/photo-1484154218962-a197022b5858?w=600&q=80&auto=format&fit=crop',
+  'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=600&q=80&auto=format&fit=crop',
+  'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?w=600&q=80&auto=format&fit=crop'
+];
+const url = u => `url('${u}')`;
+const ic = p => `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
+const icn = (p, s) => `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${s || 1.4}" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
+const spanIco = svg => React.createElement('span', { style: { display: 'inline-flex' }, dangerouslySetInnerHTML: { __html: svg } });
+
+class Component extends DCLogic {
+  state = {
+    screen: 'posttype', theme: 'light', device: 'mobile', devOpen: false,
+    role: 'owner', slot: true, forced: null,
+    ptype: 'Flat', lookingTo: 'sell',
+    title: '', price: '', deposit: '', desc: '', pincode: '',
+    nego: false, priceOnReq: false,
+    fields: {}, chips: {}, checks: {}, steppers: { car: 1, bike: 2 }, toggles: { lift: true },
+    loc: { State: 'Gujarat', District: 'Rajkot', Taluka: 'Rajkot', City: 'Rajkot', Area: 'Mavdi' },
+    showPublic: false, wa: true, displayNum: '+91 98250 12345', waNum: '', altNum: '',
+    proofOpen: false, proofType: '',
+    amenities: [],
+    sheet: null, sheetStack: [], selectCtx: null, selectQuery: '',
+    dialog: null, tip: false, requestArea: false, toast: '',
+    couponMode: 'closed', couponInput: '',
+    guideSeen: false, tileIdx: 0, cover: 0, labelInput: '',
+    editorTab: 'crop', editorBright: 100,
+    photos: [{ ph: 0, st: 'done', label: '' }, { ph: 1, st: 'done', label: '' }, { ph: 2, st: 'done', label: '' }, { ph: 3, st: 'done', label: '' }, { ph: 4, st: 'done', label: '' }, { ph: 5, st: 'done', label: '' }],
+    brochure: 'none'
+  };
+
+  componentDidMount() {
+    const valid = ['plan', 'posttype', 'proptype', 'form', 'photos', 'placeholder'];
+    const h = (location.hash || '').replace('#', '');
+    if (valid.includes(h) && h !== this.state.screen) this.setState({ screen: h });
+    history.replaceState({ screen: valid.includes(h) ? h : this.state.screen }, '');
+    this._pop = e => { const s = (e.state && e.state.screen) || 'posttype'; this.setState({ screen: s, sheet: null, dialog: null, requestArea: false }); };
+    window.addEventListener('popstate', this._pop);
+    if (this.state.screen === 'photos' && !this.state.guideSeen) this.setState({ guideSeen: false });
+  }
+  componentWillUnmount() { window.removeEventListener('popstate', this._pop); if (this._t) clearTimeout(this._t); }
+
+  nav(s) { history.pushState({ screen: s }, '', '#' + s); this.setState({ screen: s, sheet: null, dialog: null, requestArea: false }); }
+  goBack() { history.back(); }
+  toast(m) { this.setState({ toast: m }); clearTimeout(this._t); this._t = setTimeout(() => this.setState({ toast: '' }), 3000); }
+  open(k) { this.setState({ sheet: k }); }
+  close() { this.setState({ sheet: null, dialog: null, requestArea: false, tip: false }); }
+
+  fmtComma(v) { const n = String(v).replace(/\D/g, ''); if (!n) return ''; const last3 = n.slice(-3); const rest = n.slice(0, -3); return (rest ? rest.replace(/\B(?=(\d{2})+(?!\d))/g, ',') + ',' : '') + last3; }
+  words(v) { const n = parseInt(String(v).replace(/\D/g, ''), 10); if (!n) return ''; if (n >= 10000000) return '₹' + (n / 10000000).toFixed(2).replace(/\.?0+$/, '') + ' Crore'; if (n >= 100000) return '₹' + (n / 100000).toFixed(2).replace(/\.?0+$/, '') + ' Lakh'; return '₹' + n.toLocaleString('en-IN'); }
+
+  chip(label, on, onClick) { return { label, style: `flex:0 0 auto;height:36px;padding:0 16px;border-radius:999px;font:600 13px/1 -apple-system;cursor:pointer;white-space:nowrap;${on ? 'background:var(--accentSoft);border:1px solid var(--accent);color:var(--accent)' : 'background:var(--surface2);border:1px solid var(--border);color:var(--ink1)'}`, pick: onClick }; }
+  toggleUI(on, P) { return { track: `position:relative;width:46px;height:28px;border-radius:999px;border:none;cursor:pointer;transition:background .15s;background:${on ? P.accent : P.surface3}`, knob: `position:absolute;top:3px;left:${on ? '21px' : '3px'};width:22px;height:22px;border-radius:999px;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.3);transition:left .15s` }; }
+  cField(key, def) { return this.state.fields[key] !== undefined ? this.state.fields[key] : def; }
+  setField(key, v) { this.setState(s => ({ fields: { ...s.fields, [key]: v } })); }
+  toggleChipArr(key, val, single) { this.setState(s => { const cur = s.fields[key]; if (single) return { fields: { ...s.fields, [key]: val } }; const a = Array.isArray(cur) ? cur : []; return { fields: { ...s.fields, [key]: a.includes(val) ? a.filter(x => x !== val) : [...a, val] } }; }); }
+
+  openSelect(ctx) { this.setState({ sheet: 'select', selectCtx: ctx, selectQuery: '' }); }
+
+  renderVals() {
+    const st = this.state, D = st.theme === 'dark';
+    const P = D ? { page: '#000', surface1: '#121212', surface2: '#1E1E1E', surface3: '#262626', border: '#363636', divider: '#262626', ink1: '#F5F5F5', ink2: '#B0B0B0', ink3: '#8E8E8E', inkDis: '#4D4D4D', accent: '#1DB868', accentPressed: '#17A05A', accentSoft: '#0E2B1C', accentDis: '#1E4032', error: '#FF5C6A', errorSoft: '#2A1416', warning: '#FFB74D', warningSoft: '#2A2113', info: '#3BA7F8', infoSoft: '#10263A', l1: 'none', l2: 'none', l3: 'none' }
+      : { page: '#FFF', surface1: '#FFF', surface2: '#F5F5F5', surface3: '#EFEFEF', border: '#DBDBDB', divider: '#EFEFEF', ink1: '#111', ink2: '#555', ink3: '#8E8E8E', inkDis: '#C7C7C7', accent: '#0F9D58', accentPressed: '#0C7C46', accentSoft: '#E6F4EC', accentDis: '#A8D5BD', error: '#ED4956', errorSoft: '#FDECEE', warning: '#F5A623', warningSoft: '#FEF5E7', info: '#0095F6', infoSoft: '#E7F3FD', l1: '0 1px 2px rgba(0,0,0,.06)', l2: '0 4px 12px rgba(0,0,0,.10)', l3: '0 8px 24px rgba(0,0,0,.16)' };
+    const vars = Object.entries(P).map(([k, v]) => `--${k}:${v}`).join(';');
+    const frameW = st.device === 'desktop' ? 1024 : st.device === 'tablet' ? 834 : 390;
+    const rootStyle = `min-height:100vh;width:100%;background:${D ? '#000' : '#FAFAFA'};display:flex;justify-content:center;align-items:flex-start;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;${vars}`;
+    const colStyle = `position:relative;display:flex;flex-direction:column;width:${frameW}px;max-width:100%;height:100vh;background:${P.page};overflow:hidden;box-shadow:0 0 0 1px ${P.border},0 8px 40px rgba(0,0,0,.12);${vars}`;
+
+    const dbtn = a => `flex:0 0 auto;height:26px;padding:0 9px;border-radius:6px;border:1px solid ${a ? '#1db868' : '#444'};background:${a ? '#153a26' : '#2e2e2e'};color:${a ? '#5fe0a0' : '#bbb'};font:600 11px/1 -apple-system;cursor:pointer`;
+    const grp = (title, defs, cur, set) => ({ title, items: defs.map(([v, l]) => ({ label: l, style: dbtn(cur === v), go: () => set(v) })) });
+    const devGroups = [
+      grp('Screen', [['plan', 'Plan'], ['posttype', 'Post'], ['proptype', 'Type'], ['form', 'Form'], ['photos', 'Photos']], st.screen, v => this.nav(v)),
+      grp('Theme', [['light', 'Light'], ['dark', 'Dark']], st.theme, v => this.setState({ theme: v })),
+      grp('Device', [['mobile', 'Mobile'], ['tablet', 'Tablet'], ['desktop', 'Desktop']], st.device, v => this.setState({ device: v })),
+      grp('Role', [['owner', 'Owner'], ['broker', 'Broker'], ['builder', 'Builder']], st.role, v => this.setState({ role: v })),
+      grp('Slot', [[true, 'Has plan'], [false, 'No plan']], st.slot, v => this.setState({ slot: v })),
+      grp('Prop type', [['Flat', 'Flat'], ['Farmhouse', 'Farmhouse'], ['Shop', 'Shop'], ['Residential Plot', 'Plot'], ['Agriculture Land', 'Agri'], ['PG / Hostel', 'PG']], st.ptype, v => this.setState({ ptype: v })),
+      grp('State', [[null, 'Normal'], ['draft', 'Draft'], ['errors', 'Errors'], ['upfail', 'Upload fail'], ['offline', 'Offline']], st.forced, v => this.setState({ forced: v, photos: v === 'upfail' ? st.photos.map((p, i) => i < 2 ? { ...p, st: 'failed' } : p) : st.photos }) )
+    ].filter(Boolean);
+    const isBuilder = st.role === 'builder';
+
+    // shared styles
+    const topbar = `flex:0 0 auto;display:flex;align-items:center;height:52px;padding:0 6px;background:${P.surface1};border-bottom:1px solid ${P.divider}`;
+    const iconBtn = 'width:44px;height:44px;display:grid;place-items:center;border:none;background:none;cursor:pointer';
+    const topTitle = `flex:1;text-align:center;font:600 17px/1.2 -apple-system;color:${P.ink1}`;
+    const stickyBar = `flex:0 0 auto;padding:12px 16px;background:${P.surface1};border-top:1px solid ${P.border};box-shadow:${P.l2}`;
+    const secHdr = `font:600 13px/1 -apple-system;letter-spacing:.3px;color:${P.ink3};text-transform:uppercase;margin-bottom:12px`;
+    const fLabel = `font:600 13px/1 -apple-system;color:${P.ink2}`;
+    const helper = `font:400 11px/1.3 -apple-system;color:${P.ink3};margin-top:6px`;
+    const errLine = `display:flex;align-items:center;gap:5px;font:400 11px/1 -apple-system;color:${P.error};margin-top:6px`;
+    const selectRow = `display:flex;align-items:center;height:44px;margin-top:8px;padding:0 12px;background:${P.surface2};border:1px solid ${P.border};border-radius:8px;cursor:pointer`;
+    const dot = active => `width:6px;height:6px;border-radius:999px;background:${active ? P.accent : P.border}`;
+
+    // ---------- S1 PLAN ----------
+    const planDefs = [
+      { price: '₹999', per: 'one-time · lifetime', recommended: true, feats: ['1 property listing — stays live forever', '1 requirement post (30 days)', "10 proposals on others' requirements"], primary: true },
+      { price: '₹2,999', per: '/month', feats: ['Unlock all requirements', '30 proposals included', 'Instant match alerts'], primary: false },
+      { price: '₹9,999', per: 'per project · 6 months', builderOnly: true, feats: ['1 project listing with unlimited units', 'Unlimited matching requirements', 'Priority match notifications'], primary: false }
+    ];
+    const planCards = planDefs.filter(p => !p.builderOnly || isBuilder).map(p => ({
+      price: p.price, per: p.per, recommended: !!p.recommended, feats: p.feats,
+      wrap: `position:relative;padding:16px;border-radius:12px;margin-bottom:12px;background:${P.surface1};border:${p.recommended ? '1.5px solid ' + P.accent : '1px solid ' + P.border}`,
+      btn: p.primary ? `width:100%;height:44px;background:${P.accent};border:none;border-radius:8px;font:600 15px/1 -apple-system;color:#fff;cursor:pointer` : `width:100%;height:44px;background:transparent;border:1px solid ${P.border};border-radius:8px;font:600 15px/1 -apple-system;color:${P.ink1};cursor:pointer`,
+      go: () => this.nav('placeholder')
+    }));
+
+    // ---------- S2 POST TYPE ----------
+    const postDefs = [];
+    if (isBuilder) postDefs.push({ title: 'Post a New Project', sub: 'Multi-unit project with RERA details', icon: spanIco(ic('<path d="M3 21V7l6-4 6 4v14M9 21V11h6"/><path d="M15 21V9l4 3v9M2 21h20"/>')), go: () => this.nav('placeholder') });
+    postDefs.push(
+      { title: 'Sell a Property', sub: 'List a property for sale', icon: spanIco(ic('<path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/><path d="M14 21v-6h-4v6"/>')), go: () => { this.setState({ lookingTo: 'sell' }); this.nav('proptype'); } },
+      { title: 'Rent a Property', sub: 'List a property for rent', icon: spanIco(ic('<circle cx="8" cy="15" r="4"/><path d="m11 12 8-8 3 3M16 7l2 2"/>')), go: () => { this.setState({ lookingTo: 'rent' }); this.nav('proptype'); } },
+      { title: 'Post a Requirement', sub: "Tell us what you're looking for", icon: spanIco(ic('<circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2M8 11h6M8 8h6M8 14h3"/>')), go: () => this.nav('placeholder') }
+    );
+    const postOptions = postDefs;
+
+    // ---------- S3 PROPERTY TYPE ----------
+    const typeIco = {
+      Flat: '<rect x="4" y="3" width="16" height="18" rx="1"/><path d="M8 7h2M14 7h2M8 11h2M14 11h2M8 15h2M14 15h2"/>',
+      Bungalow: '<path d="M3 11 12 4l9 7v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/><path d="M9 21v-6h6v6"/>',
+      Tenement: '<path d="M4 21V8l5-4 5 4v13M14 21V11l6 4v6M4 21h16"/>',
+      Farmhouse: '<path d="M3 21V10l7-5 7 5v11M8 21v-6h4v6"/><path d="M17 21v-7l4 3v4"/>',
+      Office: '<rect x="4" y="3" width="16" height="18" rx="1"/><path d="M8 7h3M8 11h3M8 15h3M14 7h2M14 11h2"/>',
+      Shop: '<path d="M4 9h16l-1-4H5zM5 9v11h14V9M9 20v-5h6v5"/>',
+      Showroom: '<path d="M3 9l2-5h14l2 5M3 9v11h18V9M3 9h18M8 13h8"/>',
+      Godown: '<path d="M3 21V8l9-4 9 4v13M3 21h18M7 21v-8h10v8"/>',
+      'Residential Plot': '<path d="M3 3h18v18H3z" stroke-dasharray="3 3"/><path d="M9 15l3-4 3 4"/>',
+      'Commercial Plot': '<path d="M3 3h18v18H3z" stroke-dasharray="3 3"/><path d="M8 16V9h3a2 2 0 0 1 0 4H8"/>',
+      'Agriculture Land': '<path d="M2 20h20M4 20c0-4 2-6 4-6M12 20c0-6 2-10 2-10M20 20c0-4-2-6-4-6"/>',
+      Farm: '<path d="M2 20h20M5 20v-6l3-2 3 2v6M14 20v-8l3-2 3 2v8"/>',
+      'PG / Hostel': '<path d="M3 20V6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v14M3 20h18M7 9h2M7 13h2M15 9h2M15 13h2"/>'
+    };
+    let categoriesDef = [
+      { title: 'Residential', tiles: ['Flat', 'Bungalow', 'Tenement', 'Farmhouse'] },
+      { title: 'Commercial', tiles: ['Office', 'Shop', 'Showroom', 'Godown'] },
+      { title: 'Plot / Land', tiles: ['Residential Plot', 'Commercial Plot', 'Agriculture Land', 'Farm'] },
+      { title: 'Other', tiles: ['PG / Hostel'] }
+    ];
+    if (isBuilder) categoriesDef = categoriesDef.filter(c => c.title !== 'Other');
+    const typeCategories = categoriesDef.map(c => ({ title: c.title, tiles: c.tiles.map(t => { const on = st.ptype === t; return { label: t, icon: spanIco(icn(typeIco[t], 1.4)), iconColor: on ? P.accent : P.ink2, style: `display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;height:76px;border-radius:8px;cursor:pointer;padding:4px;${on ? 'background:var(--accentSoft);border:1.5px solid var(--accent)' : 'background:var(--surface2);border:1px solid var(--border)'}`, pick: () => this.setState({ ptype: t }) }; }) }));
+    const dots1 = [dot(true), dot(false), dot(false), dot(false)];
+
+    // ---------- S4 FORM ----------
+    const t = st.ptype, isRent = st.lookingTo === 'rent';
+    const isFlatLike = ['Flat', 'Bungalow', 'Tenement'].includes(t);
+    const isFarmhouse = t === 'Farmhouse';
+    const isCommercial = ['Office', 'Shop', 'Showroom', 'Godown'].includes(t);
+    const isPlot = ['Residential Plot', 'Commercial Plot', 'Agriculture Land', 'Farm'].includes(t);
+    const isPG = t === 'PG / Hostel';
+
+    const titleHints = { Flat: 'e.g. 3 BHK Flat for sale in Mavdi, Rajkot', Bungalow: 'e.g. 4 BHK Bungalow for sale in Kalawad Road', Tenement: 'e.g. 2 BHK Tenement for sale in Raiya Road', Shop: 'e.g. Commercial shop for rent on Kalawad Road', Office: 'e.g. Office space for rent on University Road', 'Residential Plot': 'e.g. Residential plot for sale in Kuvadva Road', 'Agriculture Land': 'e.g. Agricultural land for sale near Rajkot', Farmhouse: 'e.g. Farmhouse for sale on 150 Feet Ring Road', 'PG / Hostel': 'e.g. PG for bachelors near University Road' };
+    const titleHint = titleHints[t] || 'e.g. Property for sale in Rajkot';
+
+    const selectVal = (key, def) => this.cField(key, def);
+    const mkSelect = (key, label, options, def, help) => { const v = selectVal(key, def); return { label, isSelect: true, value: v || 'Select', valColor: v ? P.ink1 : P.ink3, open: () => this.openSelect({ key, title: label, options, search: false, single: true }), help }; };
+    const mkChips = (key, label, opts, def, single, help) => { const cur = this.cField(key, def); return { label, isChips: true, help, chips: opts.map(o => this.chip(o, single ? cur === o : (Array.isArray(cur) && cur.includes(o)), () => single ? this.setField(key, o) : this.toggleChipArr(key, o))) }; };
+    const mkArea = (key, label, units, help) => { const num = this.cField(key + '_n', ''); const unit = this.cField(key + '_u', units[0]); let conv = ''; const n = parseFloat(num); if (n && !isNaN(n)) { if (unit === 'Vigha') conv = `${num} Vigha ≈ ${Math.round(n * 12100).toLocaleString('en-IN')} sq ft`; else if (unit === 'Guntha') conv = `${num} Guntha ≈ ${Math.round(n * 1089).toLocaleString('en-IN')} sq ft`; } return { label, isAreaUnit: true, num, unit, help, conv, onNum: e => this.setField(key + '_n', e.target.value.replace(/[^\d.]/g, '')), openUnit: () => this.openSelect({ key: key + '_u', title: 'Unit', options: units, single: true }) }; };
+    const mkNum = (key, label, help) => ({ label, isNum: true, help, num: this.cField(key, ''), onNum: e => this.setField(key, e.target.value.replace(/\D/g, '')) });
+    const mkText = (key, label, help) => ({ label, isText: true, help, text: this.cField(key, ''), onText: e => this.setField(key, e.target.value) });
+    const mkStepper = (key, label) => ({ label: ' ', isStepper: true, stepLabel: label, count: st.steppers[key], dec: () => this.setState(s => ({ steppers: { ...s.steppers, [key]: Math.max(0, s.steppers[key] - 1) } })), inc: () => this.setState(s => ({ steppers: { ...s.steppers, [key]: s.steppers[key] + 1 } })) });
+    const mkToggle = (key, label) => { const on = !!st.toggles[key]; const u = this.toggleUI(on, P); return { label: ' ', isToggle: true, toggleLabel: label, track: u.track, knob: u.knob, tog: () => this.setState(s => ({ toggles: { ...s.toggles, [key]: !s.toggles[key] } })) }; };
+    const mkCheck = (key, label, opts, def) => { const cur = this.cField(key, def || []); return { label, isCheck: true, chips: opts.map(o => this.chip(o, cur.includes(o), () => this.toggleChipArr(key, o))) }; };
+
+    let detailFields = [];
+    if (isFlatLike) {
+      detailFields = [
+        mkChips('bhk', 'BHK', ['1', '2', '3', '4', '5+'], '3', true),
+        mkChips('bath', 'Bathrooms', ['1', '2', '3+'], null, true),
+        mkChips('balc', 'Balconies', ['0', '1', '2', '3+'], null, true),
+        mkArea('builtup', 'Built-up area', ['sq ft', 'sq yard', 'sq m']),
+        mkArea('carpet', 'Carpet area (optional)', ['sq ft', 'sq yard', 'sq m'], 'Carpet area is recommended for accuracy'),
+        { label: 'Floor / Total floors', isText: false, isNum: false, twoCol: true, ...mkNum('floor', 'Floor') },
+        mkNum('totalFloors', 'Total floors'),
+        mkSelect('furnish', 'Furnishing', ['Unfurnished', 'Semi-furnished', 'Fully furnished'], 'Semi-furnished')
+      ];
+      const furn = this.cField('furnish', 'Semi-furnished');
+      if (furn === 'Semi-furnished' || furn === 'Fully furnished') detailFields.push(mkCheck('furnItems', 'Furnishing included', ['AC', 'Wardrobes', 'Fridge', 'Geyser', 'Modular kitchen', 'Beds', 'Sofa', 'Curtains']));
+      detailFields.push(mkSelect('facing', 'Facing', ['East', 'West', 'North', 'South', 'NE', 'NW', 'SE', 'SW']));
+      detailFields.push(mkSelect('age', 'Age', ['Under construction', 'New construction', '0–1 year', '1–5 years', '5–10 years', '10+ years'], '1–5 years'));
+      const age = this.cField('age', '1–5 years');
+      if (age === 'New construction') detailFields.push(mkSelect('possession', 'Possession date', ['Dec 2025', 'Jun 2026', 'Dec 2026', 'Jun 2027']));
+      detailFields.push(mkStepper('car', 'Car parking'), mkStepper('bike', 'Two-wheeler parking'), mkChips('parkType', 'Parking type', ['Covered', 'Open'], 'Covered', true), mkChips('water', 'Water supply', ['Municipal', 'Bore', 'Both'], 'Municipal', true), mkToggle('lift', 'Lift'), mkText('society', 'Society / Project name', 'Helps buyers find your listing'), mkSelect('ownership', 'Ownership', ['Freehold', 'Leasehold', 'Power of Attorney'], 'Freehold'));
+    } else if (isFarmhouse) {
+      detailFields = [mkArea('landarea', 'Land area', ['sq ft', 'sq yard', 'Vigha', 'Guntha']), mkArea('constarea', 'Construction area', ['sq ft', 'sq yard']), mkToggle('borewell', 'Bore / Well'), mkToggle('garden', 'Garden'), mkToggle('boundary', 'Boundary wall'), mkSelect('facing', 'Facing', ['East', 'West', 'North', 'South']), mkSelect('ownership', 'Ownership', ['Freehold', 'Leasehold', 'Power of Attorney'], 'Freehold')];
+    } else if (isCommercial) {
+      detailFields = [mkArea('carpet', 'Carpet area', ['sq ft', 'sq yard', 'sq m']), mkChips('wash', 'Washrooms', ['0', '1', '2+'], null, true), mkNum('floor', 'Floor'), mkNum('totalFloors', 'Total floors'), mkChips('shell', 'Shell state', ['Bare shell', 'Warm shell', 'Furnished'], null, true), mkNum('frontage', 'Frontage (ft)'), mkToggle('corner', 'Corner unit')];
+    } else if (isPlot) {
+      const units = t === 'Agriculture Land' || t === 'Farm' ? ['Vigha', 'Guntha', 'sq yard', 'sq ft', 'sq m'] : ['sq yard', 'sq ft', 'sq m', 'Vigha', 'Guntha'];
+      detailFields = [mkArea('plotarea', 'Area', units), mkChips('landuse', 'Land use', ['NA (non-agricultural)', 'Agricultural'], null, true), mkNum('roadwidth', 'Road width (ft)'), mkToggle('roadtouch', 'Road touch'), mkToggle('cornerplot', 'Corner plot'), mkToggle('fencing', 'Fencing')];
+    } else if (isPG) {
+      detailFields = [mkChips('sharing', 'Sharing', ['Single', 'Double', 'Triple'], null, true), mkChips('tenant', 'Tenant type', ['Family', 'Bachelors', 'Company lease'], 'Bachelors', true), mkToggle('vegonly', 'Veg only'), mkToggle('meals', 'Meals included'), mkStepper('beds', 'Beds available')];
+    }
+
+    // price
+    const priceStr = this.fmtComma(st.price);
+    const priceWord = st.priceOnReq ? '' : this.words(st.price);
+    const priceNum = parseInt(String(st.price).replace(/\D/g, ''), 10) || 0;
+    const priceSanity = !st.priceOnReq && priceNum > 0 && (priceNum < 10000 || priceNum > 5000000000);
+    const negoChip = `flex:0 0 auto;height:36px;padding:0 16px;border-radius:999px;font:600 13px/1 -apple-system;cursor:pointer;${st.nego ? 'background:var(--accentSoft);border:1px solid var(--accent);color:var(--accent)' : 'background:var(--surface2);border:1px solid var(--border);color:var(--ink1)'}`;
+    const porChip = `flex:0 0 auto;height:36px;padding:0 16px;border-radius:999px;font:600 13px/1 -apple-system;cursor:pointer;${st.priceOnReq ? 'background:var(--accentSoft);border:1px solid var(--accent);color:var(--accent)' : 'background:var(--surface2);border:1px solid var(--border);color:var(--ink1)'}`;
+    const priceWrap = `display:flex;align-items:center;margin-top:8px;background:${st.priceOnReq ? P.surface3 : P.surface2};border:1px solid ${P.border};border-radius:8px;opacity:${st.priceOnReq ? .5 : 1}`;
+
+    const priceExtraFields = [];
+    if (isRent) {
+      const depWord = this.words(st.deposit);
+      priceExtraFields.push({ label: 'Deposit', isText: true, text: this.fmtComma(st.deposit), word: depWord, onText: e => this.setState({ deposit: e.target.value.replace(/\D/g, '') }) });
+      priceExtraFields.push(mkToggle('maintIncl', 'Maintenance included in rent'));
+      if (!st.toggles.maintIncl) priceExtraFields.push({ label: 'Maintenance ₹/month', isText: true, text: this.cField('maint', ''), onText: e => this.setField('maint', e.target.value.replace(/\D/g, '')) });
+      priceExtraFields.push(mkSelect('availFrom', 'Available from', ['Immediately', 'Next month', 'Jan 2026', 'Feb 2026']));
+      priceExtraFields.push(mkChips('tenantPref', 'Tenant preference', ['Family', 'Bachelors', 'Company'], 'Family', true));
+      priceExtraFields.push(mkToggle('vegRent', 'Veg only'));
+    } else {
+      priceExtraFields.push({ label: 'Maintenance ₹/month', isText: true, text: this.cField('maint', ''), onText: e => this.setField('maint', e.target.value.replace(/\D/g, '')) });
+    }
+
+    // location cascade
+    const locOpts = { State: ['Gujarat', 'Maharashtra', 'Rajasthan'], District: ['Rajkot', 'Ahmedabad', 'Surat'], Taluka: ['Rajkot', 'Gondal', 'Jetpur'], City: ['Rajkot', 'Gondal', 'Jetpur'], Area: ['Mavdi', 'University Road', 'Kalawad Road', 'Raiya Road', '150 Feet Ring Road', 'Kuvadva Road'] };
+    const locSeq = ['State', 'District', 'Taluka', 'City', 'Area'];
+    const locHelp = { City: 'Choose Village for agricultural or farm properties' };
+    const locationRows = locSeq.map((k, i) => {
+      const prevDone = i === 0 || st.loc[locSeq[i - 1]];
+      const v = st.loc[k];
+      const labelMap = { State: 'State', District: 'District', Taluka: 'Taluka', City: 'City / Village', Area: 'Area / Landmark' };
+      return { label: labelMap[k], value: v || 'Select', valColor: v ? P.ink1 : P.ink3, help: locHelp[k], style: `display:flex;align-items:center;height:44px;margin-top:8px;padding:0 12px;background:${P.surface2};border:1px solid ${P.border};border-radius:8px;cursor:${prevDone ? 'pointer' : 'not-allowed'};opacity:${prevDone ? 1 : .5}`, open: () => { if (!prevDone) return; this.openSelect({ locKey: k, title: labelMap[k], options: locOpts[k], search: k === 'Area', single: true, requestArea: k === 'Area' }); } };
+    });
+    const breadcrumb = st.loc.Area ? `${st.loc.State} › ${st.loc.District} › ${st.loc.City} › ${st.loc.Area}${st.pincode ? ' · ' + st.pincode : ''}` : '';
+
+    const amenityList = ['Lift', 'Covered parking', 'Security', 'CCTV', 'Garden', 'Gym', 'Clubhouse', 'Swimming pool', 'Kids play area', '24hr water', 'Power backup', 'Gas line', 'Intercom', 'Fire safety', 'Visitor parking', 'Rain water harvesting'];
+    const amenityChips = amenityList.map(a => this.chip(a, st.amenities.includes(a), () => this.setState(s => ({ amenities: s.amenities.includes(a) ? s.amenities.filter(x => x !== a) : [...s.amenities, a] }))));
+
+    const descPh = isPlot ? 'Describe road access, land use, nearby developments, boundary status…' : isCommercial ? 'Describe frontage, footfall, floor, parking availability…' : 'Describe floor, furnishing, society amenities, nearby schools and markets…';
+    const descPhoneWarn = /\d{10}/.test(st.desc.replace(/\D/g, m => m).replace(/[^\d]/g, ''));
+
+    const pubUI = this.toggleUI(st.showPublic, P);
+    const waUI = this.toggleUI(st.wa, P);
+
+    // errors
+    const showErr = st.forced === 'errors';
+    const titleError = showErr && !st.title.trim();
+    const priceError = showErr && !st.priceOnReq && !st.price;
+    const locationError = showErr && !st.loc.Area;
+    const titleFieldStyle = `width:100%;height:44px;margin-top:8px;padding:0 12px;background:${P.surface2};border:1px solid ${titleError ? P.error : P.border};border-radius:8px;font:400 15px/1 -apple-system;color:${P.ink1}`;
+
+    // ---------- S5 PHOTOS ----------
+    const photoCounter = isBuilder ? st.photos.length + ' / ∞' : st.photos.length + ' / 10';
+    const photoTiles = st.photos.map((p, i) => {
+      const pct = p.pct || 0;
+      const circ = 2 * Math.PI * 15;
+      return {
+        bg: url(PHOTO[p.ph % PHOTO.length]), cover: i === st.cover, label: p.label,
+        border: p.st === 'failed' ? `box-shadow:0 0 0 1.5px ${P.error}` : '',
+        dim: (p.st === 'uploading' || p.st === 'failed') ? 'opacity:.5' : '',
+        uploading: p.st === 'uploading', failed: p.st === 'failed', pct: pct + '%', dash: `${circ * pct / 100} ${circ}`,
+        menu: () => this.setState({ sheet: 'tile', tileIdx: i }), retry: () => { this.setState(s => ({ photos: s.photos.map((x, k) => k === i ? { ...x, st: 'done' } : x) })); this.toast('Photo uploaded'); }
+      };
+    });
+    const dots3 = [dot(false), dot(false), dot(true), dot(false)];
+    const guideThumbs = [{ label: 'Exterior / building', ph: 5 }, { label: 'Living room', ph: 0 }, { label: 'Kitchen', ph: 2 }, { label: 'Bedroom', ph: 1 }].map(g => ({ label: g.label, bg: url(PHOTO[g.ph]) }));
+
+    // editor
+    const editorTabs = [['crop', 'Crop'], ['rotate', 'Rotate'], ['bright', 'Brightness']].map(([k, l]) => ({ label: l, pick: () => this.setState({ editorTab: k }), style: `flex:1;height:32px;border:none;border-radius:6px;font:600 13px/1 -apple-system;cursor:pointer;${st.editorTab === k ? 'background:var(--surface1);color:var(--ink1);box-shadow:' + P.l1 : 'background:transparent;color:var(--ink3)'}` }));
+    const cropChips = ['4:5 recommended', '1:1', 'Original'].map((l, i) => this.chip(l, this.cField('crop', 0) === i, () => this.setField('crop', i)));
+
+    // compare
+    const compareData = [
+      ['Property listing', '✓', '—', '✓'], ['Listing validity', 'Lifetime', '—', '6 mo'], ['Requirement post', '1', '—', '✓'], ['Requirement viewing', '—', 'All', 'All'], ['Proposals included', '10', '30', '∞'], ['Project posting', '—', '—', '✓'], ['Match alerts', '—', '✓', '✓'], ['Boost eligible', '✓', '✓', '✓'], ['Price', '₹999', '₹2,999', '₹9,999']
+    ];
+    const compareRows = compareData.map((r, i) => { const last = i === compareData.length - 1; return { k: r[0], a: r[1], b: r[2], c: r[3], kFont: '400 13px/1.3 -apple-system', vFont: (last ? '700' : '600') + ' 13px/1.3 -apple-system', rowStyle: `display:flex;align-items:center;min-height:44px;padding:8px 0;border-bottom:1px solid ${P.divider};${i === 0 ? 'border-top:1px solid ' + P.divider : ''}` }; });
+
+    // select sheet options
+    const ctx = st.selectCtx;
+    let selectOptions = [], selectTitle = '', selectSearch = false, selectRequestArea = false;
+    if (st.sheet === 'select' && ctx) {
+      selectTitle = ctx.title; selectSearch = !!ctx.search; selectRequestArea = !!ctx.requestArea;
+      const cur = ctx.locKey ? st.loc[ctx.locKey] : (ctx.key ? this.cField(ctx.key, '') : '');
+      let opts = ctx.options || [];
+      if (selectSearch && st.selectQuery) opts = opts.filter(o => o.toLowerCase().includes(st.selectQuery.toLowerCase()));
+      selectOptions = opts.map(o => ({ label: o, on: cur === o, row: `display:flex;align-items:center;height:48px;padding:0 4px;cursor:pointer;border-bottom:1px solid ${P.divider}`, pick: () => { if (ctx.locKey) { this.setState(s => { const loc = { ...s.loc, [ctx.locKey]: o }; const idx = locSeq.indexOf(ctx.locKey); for (let j = idx + 1; j < locSeq.length; j++) loc[locSeq[j]] = ''; return { loc, sheet: null }; }); } else { this.setField(ctx.key, o); this.setState({ sheet: null }); } } }));
+    }
+
+    const sheetShell = `position:fixed;left:50%;transform:translateX(-50%);bottom:0;z-index:160;width:${frameW}px;max-width:100%;height:70vh;background:${P.surface1};border-top-left-radius:12px;border-top-right-radius:12px;display:flex;flex-direction:column;overflow:hidden;box-shadow:${P.l3};animation:hzSheet .3s cubic-bezier(0.2,0,0,1)`;
+    const sheetTall = `position:fixed;left:50%;transform:translateX(-50%);bottom:0;z-index:160;width:${frameW}px;max-width:100%;height:90vh;background:${P.surface1};border-top-left-radius:12px;border-top-right-radius:12px;display:flex;flex-direction:column;overflow:hidden;box-shadow:${P.l3};animation:hzSheet .3s cubic-bezier(0.2,0,0,1)`;
+    const sheetAuto = `position:fixed;left:50%;transform:translateX(-50%);bottom:0;z-index:160;width:${frameW}px;max-width:100%;max-height:80vh;background:${P.surface1};border-top-left-radius:12px;border-top-right-radius:12px;display:flex;flex-direction:column;overflow-y:auto;box-shadow:${P.l3};animation:hzSheet .3s cubic-bezier(0.2,0,0,1)`;
+    const sheetAuto2 = `position:fixed;left:50%;transform:translateX(-50%);bottom:0;z-index:180;width:${frameW}px;max-width:100%;max-height:80vh;background:${P.surface1};border-top-left-radius:12px;border-top-right-radius:12px;display:flex;flex-direction:column;overflow-y:auto;box-shadow:${P.l3};animation:hzSheet .3s cubic-bezier(0.2,0,0,1)`;
+    const toastStyle = `position:fixed;left:50%;bottom:90px;z-index:300;transform:translateX(-50%);background:${D ? '#2a2a2a' : '#1a1a1a'};color:#fff;font:400 13px/1.3 -apple-system;padding:11px 16px;border-radius:999px;box-shadow:0 6px 20px rgba(0,0,0,.35);max-width:320px;text-align:center;animation:hzToast .2s ease-out`;
+
+    const brochure = st.brochure;
+
+    return {
+      rootStyle, colStyle,
+      devWrapStyle: 'position:fixed;top:10px;right:10px;z-index:500;display:flex;flex-direction:column;align-items:flex-end', devOpen: st.devOpen, toggleDev: () => this.setState(s => ({ devOpen: !s.devOpen })), devGroups,
+      topbar, iconBtn, topTitle, stickyBar, secHdr, fLabel, helper, errLine, selectRow,
+      isOffline: st.forced === 'offline', retry: () => { this.setState({ forced: null }); this.toast('Back online'); },
+      goBack: () => this.goBack(),
+
+      isPlan: st.screen === 'plan', isPostType: st.screen === 'posttype', isPropType: st.screen === 'proptype', isForm: st.screen === 'form', isPhotos: st.screen === 'photos', isPlaceholder: st.screen === 'placeholder',
+      placeholderText: 'Coming in Batch P6',
+
+      planCards, couponClosed: st.couponMode === 'closed', couponOpen: st.couponMode === 'open', couponApplied: st.couponMode === 'applied',
+      couponInput: st.couponInput, onCoupon: e => this.setState({ couponInput: e.target.value }), expandCoupon: () => this.setState({ couponMode: 'open' }), applyCoupon: () => this.setState({ couponMode: 'applied' }), removeCoupon: () => this.setState({ couponMode: 'closed', couponInput: '' }),
+      openCompare: () => this.open('compare'),
+
+      postOptions, hasSlot: st.slot, noSlot: !st.slot, showTip: () => this.setState({ tip: true }), goPlan: () => this.nav('plan'),
+
+      typeCategories, dots1, typeContinue: () => this.nav('form'), typeContinueBtn: `width:100%;height:44px;border:none;border-radius:8px;font:600 15px/1 -apple-system;cursor:pointer;${st.ptype ? 'background:var(--accent);color:#fff' : 'background:var(--accentDis);color:#fff'}`,
+
+      // form
+      draftRestored: st.forced === 'draft', startFresh: () => { this.setState({ forced: null, title: '', price: '', fields: {} }); this.toast('Started fresh'); },
+      titleVal: st.title, onTitle: e => this.setState({ title: e.target.value }), titleFieldStyle, titleError, titleHint,
+      autoTitle: () => { const bhk = this.cField('bhk', '3'); this.setState({ title: `${bhk} BHK ${t} for ${isRent ? 'rent' : 'sale'} in ${st.loc.Area || 'Rajkot'}` }); this.toast('Title generated'); },
+      lookChips: [this.chip('Sell', st.lookingTo === 'sell', () => this.setState({ lookingTo: 'sell' })), this.chip('Rent', st.lookingTo === 'rent', () => this.setState({ lookingTo: 'rent' }))],
+      detailFields,
+      priceVal: priceStr, onPrice: e => this.setState({ price: e.target.value.replace(/\D/g, '') }), priceWord, priceSanity, priceError, priceWrap, priceDisabled: st.priceOnReq ? 'disabled' : '',
+      toggleNego: () => this.setState(s => ({ nego: !s.nego })), negoChip, togglePoR: () => this.setState(s => ({ priceOnReq: !s.priceOnReq })), porChip, priceOnReq: st.priceOnReq,
+      priceExtraFields,
+      locationRows, pincode: st.pincode, onPincode: e => this.setState({ pincode: e.target.value.replace(/\D/g, '').slice(0, 6) }), locationError, breadcrumb, editLocation: () => this.openSelect({ locKey: 'Area', title: 'Area / Landmark', options: locOpts.Area, search: true, single: true, requestArea: true }),
+      amenityChips,
+      descVal: st.desc, onDesc: e => this.setState({ desc: e.target.value.slice(0, 2000) }), descPlaceholder: descPh, descCount: st.desc.length, descPhoneWarn,
+      togglePublic: () => this.setState(s => ({ showPublic: !s.showPublic })), pubTrack: pubUI.track, pubKnob: pubUI.knob, publicHelp: st.showPublic ? 'Your number will be visible on the listing with Call and WhatsApp buttons.' : 'When off, buyers must request your number and you decide.',
+      displayNum: st.displayNum, onDisplayNum: e => this.setState({ displayNum: e.target.value }),
+      toggleWa: () => this.setState(s => ({ wa: !s.wa })), waTrack: waUI.track, waKnob: waUI.knob, waOff: !st.wa, waNum: st.waNum, onWaNum: e => this.setState({ waNum: e.target.value }),
+      altNum: st.altNum, onAltNum: e => this.setState({ altNum: e.target.value }),
+      proofOpen: st.proofOpen, toggleProof: () => this.setState(s => ({ proofOpen: !s.proofOpen })), proofChev: `transition:transform .2s;transform:rotate(${st.proofOpen ? 180 : 0}deg)`, proofType: st.proofType || 'Select', proofValColor: st.proofType ? P.ink1 : P.ink3, openProofType: () => this.openSelect({ key: 'proofTypeField', title: 'Document type', options: ['Property tax receipt', 'Index copy', 'Allotment letter', 'Power of Attorney', 'Electricity bill', 'Other'], single: true }), uploadDoc: () => this.toast('Document picker'),
+      formClose: () => this.setState({ dialog: 'unsaved' }), saveDraft: () => this.toast('Draft saved'), formContinue: () => { if (!st.title.trim() || (!st.price && !st.priceOnReq) || !st.loc.Area) { this.setState({ forced: 'errors' }); this.toast('Please fix the errors'); return; } this.nav('photos'); },
+
+      photoCounter, photoTiles, dots3, isBuilder, addPhoto: () => { this.setState(s => ({ photos: [...s.photos, { ph: s.photos.length % PHOTO.length, st: 'uploading', pct: 20, label: '' }] })); this.toast('Uploading…'); setTimeout(() => this.setState(s => ({ photos: s.photos.map((x, k) => k === s.photos.length - 1 ? { ...x, st: 'done', pct: 100 } : x) })), 900); },
+      guideOpen: st.screen === 'photos' && !st.guideSeen, dismissGuide: () => this.setState({ guideSeen: true }), guideThumbs, guideTips: ['Shoot in daylight', 'Keep the room tidy', 'Add at least 5 photos'],
+      photoContinue: () => { if (st.photos.length) this.nav('placeholder'); }, photoContinueBtn: `width:100%;height:44px;border:none;border-radius:8px;font:600 15px/1 -apple-system;cursor:pointer;${st.photos.length ? 'background:var(--accent);color:#fff' : 'background:var(--accentDis);color:#fff'}`,
+      brochureNone: brochure === 'none', brochureReady: brochure !== 'none', brochureScanning: brochure === 'scanning', brochureDone: brochure === 'done', brochureMeta: brochure === 'scanning' ? 'Scanning file…' : '2.4 MB · Ready ✓', brochureMetaColor: brochure === 'done' ? P.accent : P.ink3,
+      uploadBrochure: () => { this.setState({ brochure: 'scanning' }); this.toast('Uploading brochure…'); setTimeout(() => this.setState({ brochure: 'done' }), 1400); }, removeBrochure: () => this.setState({ brochure: 'none' }),
+
+      // sheets
+      scrimOpen: !!st.sheet, closeSheet: () => this.close(), stop: e => e.stopPropagation(),
+      selectSheet: st.sheet === 'select', selectTitle, selectSearch, selectOptions, selectRequestArea, selectQuery: st.selectQuery, onSelectQuery: e => this.setState({ selectQuery: e.target.value }),
+      openRequestArea: () => this.setState({ requestArea: true }), requestAreaSheet: st.requestArea, closeRequestArea: () => this.setState({ requestArea: false }), sendAreaRequest: () => { this.setState({ requestArea: false, sheet: null }); this.toast("Request sent — we'll add it soon"); },
+      compareSheet: st.sheet === 'compare', compareRows,
+      tileSheet: st.sheet === 'tile', setCover: () => { this.setState(s => ({ cover: s.tileIdx, sheet: null })); this.toast('Cover updated'); }, editPhoto: () => this.setState({ sheet: 'editor' }), addLabel: () => this.setState({ sheet: 'label', labelInput: st.photos[st.tileIdx].label || '' }), deleteTile: () => { this.setState(s => ({ photos: s.photos.filter((_, k) => k !== s.tileIdx), sheet: null, cover: s.cover >= s.photos.length - 1 ? 0 : s.cover })); this.toast('Photo deleted'); },
+      editorSheet: st.sheet === 'editor', editorPhoto: url(PHOTO[st.photos[st.tileIdx] ? st.photos[st.tileIdx].ph % PHOTO.length : 0]), editorTabs, editorCrop: st.editorTab === 'crop', editorRotate: st.editorTab === 'rotate', editorBrightTab: st.editorTab === 'bright', cropChips, editorBright: st.editorBright / 100, editorBrightVal: st.editorBright, onBright: e => this.setState({ editorBright: +e.target.value }), rotL: () => this.toast('Rotated left'), rotR: () => this.toast('Rotated right'), resetEditor: () => this.setState({ editorBright: 100 }), saveEditor: () => { this.close(); this.toast('Photo saved'); },
+      labelSheet: st.sheet === 'label', labelInput: st.labelInput, onLabel: e => this.setState({ labelInput: e.target.value }), saveLabel: () => { this.setState(s => ({ photos: s.photos.map((x, k) => k === s.tileIdx ? { ...x, label: s.labelInput } : x), sheet: null })); this.toast('Label added'); },
+      tipOpen: st.tip, closeTip: () => this.setState({ tip: false }),
+      unsavedDialog: st.dialog === 'unsaved', discardDraft: () => { this.close(); this.nav('posttype'); }, confirmDraft: () => { this.close(); this.toast('Draft saved'); this.nav('posttype'); },
+      sheetShell, sheetTall, sheetAuto, sheetAuto2, toast: st.toast, toastStyle
+    };
+  }
+}
+</script>
+
+
+</body></html>

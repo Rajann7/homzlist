@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="e521b772-db3a-4633-a8eb-615e33da1ff3"></script>
+</head>
+<body>
+<x-dc>
+
+<helmet>
+<style>
+  body{margin:0;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+  *{box-sizing:border-box}
+  input,button,textarea{font-family:inherit}
+  .hz-scroll{overflow-y:auto;-webkit-overflow-scrolling:touch}
+  .hz-scroll::-webkit-scrollbar{width:0;height:0}
+  .hz-x{overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+  .hz-x::-webkit-scrollbar{display:none}
+  .hz-press:active{transform:scale(.98)}
+  @keyframes hzSheet{from{transform:translateY(100%)}to{transform:translateY(0)}}
+  @keyframes hzScrim{from{opacity:0}to{opacity:1}}
+  @keyframes hzToast{from{transform:translate(-50%,140%);opacity:0}to{transform:translate(-50%,0);opacity:1}}
+  @keyframes hzPop{from{opacity:0;transform:scale(.92)}to{opacity:1;transform:scale(1)}}
+  @keyframes hzFade{from{opacity:0}to{opacity:1}}
+  @keyframes hzShimmer{0%{background-position:-360px 0}100%{background-position:360px 0}}
+  @keyframes hzExpand{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
+  .hz-shim{background:linear-gradient(90deg,var(--surface2) 0px,var(--surface3) 60px,var(--surface2) 120px);background-size:360px 100%;animation:hzShimmer 1.2s infinite linear}
+  @media (prefers-reduced-motion:reduce){*{animation-duration:.001ms !important;transition-duration:.001ms !important}}
+</style>
+</helmet>
+
+<div style="{{ rootStyle }}">
+
+  <!-- ===== DEV TOOLBAR ===== -->
+  <div style="{{ devWrapStyle }}">
+    <button sc-camel-on-click="{{ toggleDev }}" style="display:flex;align-items:center;gap:6px;height:30px;padding:0 10px;background:#2a2a2a;color:#e5e5e5;border:none;border-radius:7px;font:600 12px/1 -apple-system;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.3)">
+      <svg width="14" height="14" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="3"></circle><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"></path></svg>DEV
+    </button>
+    <sc-if value="{{ devOpen }}" hint-placeholder-val="{{ false }}">
+      <div class="hz-scroll" style="margin-top:6px;width:230px;max-height:80vh;background:#232323;border:1px solid #3a3a3a;border-radius:9px;padding:10px;box-shadow:0 8px 28px rgba(0,0,0,.45);color:#ddd;font:400 12px/1.3 -apple-system">
+        <sc-for list="{{ devGroups }}" as="g" hint-placeholder-count="6">
+          <div style="font:600 10px/1 -apple-system;letter-spacing:.4px;color:#8a8a8a;text-transform:uppercase;margin:2px 0 6px">{{ g.title }}</div>
+          <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px"><sc-for list="{{ g.items }}" as="d" hint-placeholder-count="3"><button sc-camel-on-click="{{ d.go }}" style="{{ d.style }}">{{ d.label }}</button></sc-for></div>
+        </sc-for>
+      </div>
+    </sc-if>
+  </div>
+
+  <div style="{{ colStyle }}">
+
+    <!-- ============ S1 PROPERTY DETAIL ============ -->
+    <sc-if value="{{ isProperty }}" hint-placeholder-val="{{ true }}">
+      <div style="display:flex;flex-direction:column;height:100%;position:relative;background:var(--page)">
+
+        <!-- morphing header -->
+        <div style="{{ hdrStyle }}">
+          <button sc-camel-on-click="{{ goBack }}" class="hz-press" style="{{ hdrBtn }}"><svg width="22" height="22" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"></path></svg></button>
+          <span style="{{ hdrTitle }}">3 BHK Flat, Mavdi</span>
+          <button sc-camel-on-click="{{ toggleSave }}" class="hz-press" style="{{ hdrBtn }}"><svg width="21" height="21" sc-camel-view-box="0 0 24 24" fill="{{ saveFill }}" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M6 3h12a1 1 0 0 1 1 1v17l-7-4-7 4V4a1 1 0 0 1 1-1Z"></path></svg></button>
+          <button sc-camel-on-click="{{ openShare }}" class="hz-press" style="{{ hdrBtn }}"><svg width="21" height="21" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><path d="m8.6 10.6 6.8-4M8.6 13.4l6.8 4"></path></svg></button>
+          <button sc-camel-on-click="{{ openMore }}" class="hz-press" style="{{ hdrBtn }}"><svg width="21" height="21" sc-camel-view-box="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"></circle><circle cx="12" cy="12" r="2"></circle><circle cx="12" cy="19" r="2"></circle></svg></button>
+        </div>
+
+        <div class="hz-scroll" sc-camel-on-scroll="{{ onScroll }}" style="flex:1;min-height:0">
+          <sc-if value="{{ isSkeleton }}" hint-placeholder-val="{{ false }}">
+            <div><div class="hz-shim" style="aspect-ratio:4/3"></div><div style="padding:16px"><div class="hz-shim" style="height:26px;width:150px;border-radius:6px;margin-bottom:14px"></div><div class="hz-shim" style="height:16px;width:80%;border-radius:4px;margin-bottom:10px"></div><div class="hz-shim" style="height:72px;border-radius:12px;margin:14px 0"></div><sc-for list="{{ six }}" as="n" hint-placeholder-count="6"><div class="hz-shim" style="height:14px;border-radius:4px;margin-bottom:10px"></div></sc-for></div></div>
+          </sc-if>
+
+          <sc-if value="{{ propNormal }}" hint-placeholder-val="{{ true }}">
+            <!-- carousel -->
+            <div style="position:relative;width:100%;aspect-ratio:4/3;background:#000;overflow:hidden">
+              <div style="{{ galleryDim }}"></div>
+              <div sc-camel-on-click="{{ openViewer }}" style="position:absolute;inset:0;background-image:{{ heroPhoto }};background-size:cover;background-position:center;cursor:pointer;{{ soldGray }}"></div>
+              <sc-if value="{{ statusReview }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;inset:0;display:grid;place-items:center;pointer-events:none"><span style="font:700 44px/1 -apple-system;color:rgba(255,255,255,.28);transform:rotate(-24deg);letter-spacing:2px;text-transform:uppercase">Under Review</span></div></sc-if>
+              <sc-if value="{{ promoted }}" hint-placeholder-val="{{ true }}"><span style="position:absolute;top:calc(env(safe-area-inset-top) + 56px);left:12px;background:rgba(0,0,0,.6);color:#fff;font:600 11px/1 -apple-system;letter-spacing:.3px;text-transform:uppercase;padding:5px 9px;border-radius:4px">Promoted</span></sc-if>
+              <span style="position:absolute;top:calc(env(safe-area-inset-top) + 56px);right:12px;background:rgba(0,0,0,.6);color:#fff;font:600 11px/1 -apple-system;padding:5px 9px;border-radius:999px">{{ carouselCounter }}</span>
+              <div style="position:absolute;bottom:12px;left:0;right:0;display:flex;justify-content:center;gap:5px"><sc-for list="{{ carouselDots }}" as="d" hint-placeholder-count="6"><span style="{{ d.style }}"></span></sc-for></div>
+            </div>
+
+            <sc-if value="{{ statusReview }}" hint-placeholder-val="{{ false }}"><div style="display:flex;align-items:center;gap:8px;padding:10px 16px;background:var(--infoSoft)"><svg width="16" height="16" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--info)" stroke-width="1.8"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2" stroke-linecap="round"></path></svg><span style="font:400 13px/1.4 -apple-system;color:var(--ink1)">This listing is under review. It will go live once approved.</span></div></sc-if>
+            <sc-if value="{{ statusSold }}" hint-placeholder-val="{{ false }}"><div style="display:flex;align-items:center;gap:8px;padding:10px 16px;background:var(--errorSoft)"><svg width="16" height="16" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--error)" stroke-width="1.8" stroke-linecap="round"><path d="M20 6 9 17l-5-5"></path></svg><span style="font:400 13px/1.4 -apple-system;color:var(--ink1)">This property has been sold.</span></div></sc-if>
+
+            <div style="padding:16px 16px 120px">
+              <!-- price block -->
+              <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">
+                <div>
+                  <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span style="{{ priceStyle }}">{{ priceLabel }}</span><sc-if value="{{ showNego }}" hint-placeholder-val="{{ true }}"><span style="background:var(--surface2);color:var(--ink2);font:600 11px/1 -apple-system;padding:5px 8px;border-radius:4px">Negotiable</span></sc-if></div>
+                  <sc-if value="{{ showPsf }}" hint-placeholder-val="{{ true }}"><div style="font:400 13px/1 -apple-system;color:var(--ink3);margin-top:5px">₹5,862 / sqft</div></sc-if>
+                </div>
+                <span style="flex:0 0 auto;background:var(--accentSoft);color:var(--accent);font:600 11px/1 -apple-system;letter-spacing:.3px;text-transform:uppercase;padding:6px 9px;border-radius:4px;margin-top:4px">For Sale</span>
+              </div>
+              <!-- title/location -->
+              <div style="font:600 17px/1.35 -apple-system;color:var(--ink1);margin-top:14px;text-wrap:pretty">3 BHK Flat in Shree Residency</div>
+              <div style="display:flex;align-items:center;gap:5px;margin-top:5px"><svg width="15" height="15" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink3)" stroke-width="1.6"><path d="M12 21s7-6.2 7-11a7 7 0 1 0-14 0c0 4.8 7 11 7 11Z"></path><circle cx="12" cy="10" r="2.2"></circle></svg><span style="font:400 13px/1.3 -apple-system;color:var(--ink2)">Mavdi, Rajkot – 360004</span></div>
+
+              <!-- key specs -->
+              <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:2px;background:var(--surface2);border-radius:12px;padding:14px 8px;margin-top:16px">
+                <sc-for list="{{ keySpecs }}" as="s" hint-placeholder-count="4"><div style="display:flex;flex-direction:column;align-items:center;gap:5px;text-align:center"><span style="color:var(--ink2)">{{ s.icon }}</span><span style="font:600 13px/1 -apple-system;color:var(--ink1)">{{ s.v }}</span><span style="font:400 11px/1 -apple-system;color:var(--ink3)">{{ s.k }}</span></div></sc-for>
+              </div>
+
+              <!-- highlights -->
+              <div class="hz-x" style="display:flex;gap:8px;margin-top:16px"><sc-for list="{{ highlightChips }}" as="c" hint-placeholder-count="5"><button class="hz-press" sc-camel-on-click="{{ c.go }}" style="flex:0 0 auto;height:34px;padding:0 14px;background:var(--surface2);border:1px solid var(--border);border-radius:999px;font:600 13px/1 -apple-system;color:var(--ink1);cursor:pointer;white-space:nowrap">{{ c.label }}</button></sc-for></div>
+
+              <!-- details -->
+              <div style="font:600 13px/1 -apple-system;color:var(--ink2);margin:24px 0 12px">Property Details</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px 16px">
+                <sc-for list="{{ detailRows }}" as="d" hint-placeholder-count="8"><div><div style="font:400 11px/1 -apple-system;color:var(--ink3)">{{ d.k }}</div><div style="font:400 15px/1.3 -apple-system;color:var(--ink1);margin-top:3px">{{ d.v }}</div></div></sc-for>
+              </div>
+
+              <!-- amenities -->
+              <div style="font:600 13px/1 -apple-system;color:var(--ink2);margin:24px 0 12px">Amenities</div>
+              <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px"><sc-for list="{{ amenities }}" as="a" hint-placeholder-count="8"><div style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px 4px;background:var(--surface2);border-radius:12px"><span style="color:var(--ink2)">{{ a.icon }}</span><span style="font:400 11px/1.2 -apple-system;color:var(--ink2);text-align:center">{{ a.label }}</span></div></sc-for></div>
+
+              <!-- furnishing -->
+              <div style="font:600 13px/1 -apple-system;color:var(--ink2);margin:24px 0 12px">Furnishing included</div>
+              <div style="display:flex;flex-wrap:wrap;gap:8px"><sc-for list="{{ furnishing }}" as="c" hint-placeholder-count="4"><span style="height:34px;padding:0 14px;display:inline-flex;align-items:center;background:var(--surface2);border:1px solid var(--border);border-radius:999px;font:600 13px/1 -apple-system;color:var(--ink1)">{{ c }}</span></sc-for></div>
+
+              <!-- description -->
+              <div style="font:600 13px/1 -apple-system;color:var(--ink2);margin:24px 0 10px">Description</div>
+              <div style="{{ descStyle }}">Spacious 3 BHK in a well-maintained society close to 150 Feet Ring Road. Corner flat with cross ventilation, morning sunlight and a large balcony overlooking the garden. Schools and market within walking distance. Ideal for families.</div>
+              <button sc-camel-on-click="{{ toggleDesc }}" style="border:none;background:none;color:var(--accent);font:600 13px/1 -apple-system;cursor:pointer;margin-top:8px;padding:0">{{ descToggleLabel }}</button>
+
+              <!-- price history -->
+              <div style="display:flex;align-items:center;gap:8px;margin-top:20px;padding:12px 14px;background:var(--accentSoft);border-radius:8px"><svg width="16" height="16" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12l7 7 7-7"></path></svg><span style="font:600 13px/1.3 -apple-system;color:var(--accent)">Price dropped ₹5 Lakh on 12 Jan</span></div>
+
+              <!-- about area -->
+              <div style="margin-top:20px;padding:16px;background:var(--surface2);border-radius:12px"><div style="font:600 15px/1.2 -apple-system;color:var(--ink1)">About Mavdi</div><div style="font:400 13px/1.5 -apple-system;color:var(--ink2);margin-top:6px;text-wrap:pretty">Mavdi is one of Rajkot's fastest-growing residential areas, well connected to 150 Feet Ring Road, with schools, markets and hospitals within 2 km.</div><button sc-camel-on-click="{{ exploreArea }}" style="border:none;background:none;color:var(--accent);font:600 13px/1 -apple-system;cursor:pointer;margin-top:10px;padding:0">Explore Mavdi</button></div>
+
+              <!-- poster -->
+              <div sc-camel-on-click="{{ openPoster }}" style="display:flex;align-items:center;gap:12px;margin-top:16px;padding:12px;background:var(--surface1);border:1px solid var(--border);border-radius:12px;cursor:pointer;box-shadow:var(--l1)">
+                <div style="width:48px;height:48px;border-radius:999px;background-image:{{ posterAv }};background-size:cover;background-position:center;flex:0 0 auto"></div>
+                <div style="flex:1;min-width:0"><div style="display:flex;align-items:center;gap:5px"><span style="font:600 15px/1.2 -apple-system;color:var(--ink1)">RK Properties</span><svg width="14" height="14" sc-camel-view-box="0 0 24 24" fill="var(--accent)"><path d="M12 2l2.4 1.8 3 .2.9 2.8 2.2 2-1 2.9 1 2.9-2.2 2-.9 2.8-3 .2L12 22l-2.4-1.8-3-.2-.9-2.8-2.2-2 1-2.9-1-2.9 2.2-2 .9-2.8 3-.2z"></path><path d="m8.5 12 2.4 2.4 4.6-4.8" stroke="#fff" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"></path></svg><span style="font:400 11px/1 -apple-system;color:var(--ink3);background:var(--surface2);padding:3px 6px;border-radius:4px">Broker</span></div><div style="font:400 11px/1.3 -apple-system;color:var(--ink3);margin-top:3px">Member since Jan 2025 · Usually responds in 2 hours</div></div>
+                <svg width="18" height="18" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink3)" stroke-width="1.8" stroke-linecap="round"><path d="m9 6 6 6-6 6"></path></svg>
+              </div>
+
+              <!-- safety -->
+              <div style="display:flex;gap:8px;margin-top:16px;padding:12px 14px;background:var(--warningSoft);border-radius:8px"><svg width="16" height="16" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--warning)" stroke-width="1.7" style="flex:0 0 auto;margin-top:1px"><path d="M12 3l7 3v6c0 4-3 7-7 9-4-2-7-5-7-9V6l7-3Z"></path></svg><span style="font:400 11px/1.5 -apple-system;color:var(--ink2)">Never pay token or advance before a site visit. HomzList is not responsible for off-platform payments.</span></div>
+
+              <!-- similar -->
+              <div style="font:600 11px/1 -apple-system;letter-spacing:.3px;color:var(--ink3);text-transform:uppercase;margin:24px 0 12px">Similar properties</div>
+              <div class="hz-x" style="display:flex;gap:12px"><sc-for list="{{ similar }}" as="c" hint-placeholder-count="3"><div sc-camel-on-click="{{ c.go }}" style="flex:0 0 auto;width:140px;cursor:pointer"><div style="aspect-ratio:1;border-radius:12px;background-image:{{ c.bg }};background-size:cover;background-position:center"></div><div style="font:600 13px/1.2 -apple-system;color:var(--ink1);margin-top:8px">{{ c.price }}</div><div style="font:400 11px/1.2 -apple-system;color:var(--ink3);margin-top:2px">{{ c.meta }}</div></div></sc-for></div>
+
+              <!-- breadcrumbs -->
+              <div style="font:400 11px/1.4 -apple-system;color:var(--ink3);margin-top:24px">Home › Rajkot › Mavdi › 3 BHK Flat</div>
+            </div>
+          </sc-if>
+        </div>
+
+        <!-- sticky bottom bar -->
+        <sc-if value="{{ showBar }}" hint-placeholder-val="{{ true }}">
+          <div style="flex:0 0 auto;background:var(--surface1);border-top:1px solid var(--border);box-shadow:var(--l2)">
+            <sc-if value="{{ ownerStats }}" hint-placeholder-val="{{ false }}">
+              <div style="display:grid;grid-template-columns:repeat(3,1fr);border-bottom:1px solid var(--divider)"><sc-for list="{{ statList }}" as="s" hint-placeholder-count="3"><div sc-camel-on-click="{{ s.tap }}" style="text-align:center;padding:8px 4px;cursor:{{ s.cursor }}"><div style="font:600 13px/1 -apple-system;color:var(--ink1)">{{ s.v }}</div><div style="font:400 11px/1 -apple-system;color:var(--ink3);margin-top:3px">{{ s.k }}</div></div></sc-for></div>
+            </sc-if>
+            <div style="display:flex;align-items:center;gap:8px;padding:10px 16px">
+              <sc-if value="{{ barSold }}" hint-placeholder-val="{{ false }}"><button class="hz-press" sc-camel-on-click="{{ browseSimilar }}" style="flex:1;height:44px;background:var(--surface1);border:1px solid var(--border);border-radius:8px;font:600 15px/1 -apple-system;color:var(--ink1);cursor:pointer">Browse similar properties</button></sc-if>
+              <sc-if value="{{ barPrivate }}" hint-placeholder-val="{{ true }}"><button class="hz-press" sc-camel-on-click="{{ requestNumber }}" style="flex:1;height:44px;display:flex;align-items:center;justify-content:center;gap:7px;background:var(--surface1);border:1px solid var(--border);border-radius:8px;font:600 15px/1 -apple-system;color:var(--ink1);cursor:pointer"><svg width="17" height="17" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 3h3l2 5-2.5 1.5a11 11 0 0 0 5 5L21 15v3a2 2 0 0 1-2 2A16 16 0 0 1 4 5a2 2 0 0 1 2-2Z"></path></svg>Request Number</button><button class="hz-press" sc-camel-on-click="{{ openInquiry }}" style="{{ inquiryBtn }}">{{ inquiryLabel }}</button></sc-if>
+              <sc-if value="{{ barPublic }}" hint-placeholder-val="{{ false }}"><button class="hz-press" sc-camel-on-click="{{ callNow }}" style="width:52px;height:44px;display:grid;place-items:center;background:var(--surface1);border:1px solid var(--border);border-radius:8px;cursor:pointer"><svg width="20" height="20" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink1)" stroke-width="1.8"><path d="M6 3h3l2 5-2.5 1.5a11 11 0 0 0 5 5L21 15v3a2 2 0 0 1-2 2A16 16 0 0 1 4 5a2 2 0 0 1 2-2Z"></path></svg></button><button class="hz-press" sc-camel-on-click="{{ whatsapp }}" style="width:52px;height:44px;display:grid;place-items:center;background:var(--accentSoft);border:1px solid var(--accent);border-radius:8px;cursor:pointer"><svg width="20" height="20" sc-camel-view-box="0 0 24 24" fill="var(--accent)"><path d="M12 2a10 10 0 0 0-8.5 15.2L2 22l4.9-1.3A10 10 0 1 0 12 2Zm5.3 14.1c-.2.6-1.3 1.2-1.8 1.2-.5.1-1 .2-3.3-.7-2.8-1.1-4.5-4-4.7-4.2-.1-.2-1-1.4-1-2.6s.6-1.8.9-2.1c.2-.2.4-.3.6-.3h.5c.2 0 .4 0 .6.5l.8 2c.1.2.1.3 0 .5l-.4.6-.3.3c-.2.2-.3.4-.1.6.2.4.9 1.4 1.9 2.3 1.2 1.1 2.2 1.4 2.5 1.5.2.1.4.1.6-.1l.9-1.1c.2-.2.4-.2.6-.1l2 .9c.3.2.5.3.5.4.1.2.1.7-.1 1.2Z"></path></svg></button><button class="hz-press" sc-camel-on-click="{{ openInquiry }}" style="{{ inquiryBtn }}">{{ inquiryLabel }}</button></sc-if>
+              <sc-if value="{{ barOwner }}" hint-placeholder-val="{{ false }}"><button class="hz-press" sc-camel-on-click="{{ ownerEdit }}" style="flex:1;height:44px;background:var(--surface1);border:1px solid var(--border);border-radius:8px;font:600 15px/1 -apple-system;color:var(--ink1);cursor:pointer">Edit</button><button class="hz-press" sc-camel-on-click="{{ ownerBoost }}" style="flex:1;height:44px;background:var(--surface1);border:1px solid var(--border);border-radius:8px;font:600 15px/1 -apple-system;color:var(--ink1);cursor:pointer">Boost</button><button class="hz-press" sc-camel-on-click="{{ openMarkSold }}" style="flex:1.4;height:44px;background:var(--accent);border:none;border-radius:8px;font:600 15px/1 -apple-system;color:#fff;cursor:pointer">Mark as Sold</button></sc-if>
+            </div>
+          </div>
+        </sc-if>
+      </div>
+    </sc-if>
+
+    <!-- ============ S2 PHOTO VIEWER ============ -->
+    <sc-if value="{{ isViewer }}" hint-placeholder-val="{{ false }}">
+      <div style="position:relative;height:100%;background:#000;display:flex;flex-direction:column;animation:hzFade .2s ease-out">
+        <div style="flex:0 0 auto;display:flex;align-items:center;padding:6px 8px;z-index:5"><button sc-camel-on-click="{{ closeViewer }}" style="width:44px;height:44px;display:grid;place-items:center;border:none;background:none;cursor:pointer"><svg width="24" height="24" sc-camel-view-box="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"></path></svg></button><span style="flex:1;text-align:center;font:400 13px/1 -apple-system;color:#fff">{{ viewerCounter }}</span><button sc-camel-on-click="{{ openShare }}" style="width:44px;height:44px;display:grid;place-items:center;border:none;background:none;cursor:pointer"><svg width="21" height="21" sc-camel-view-box="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><path d="m8.6 10.6 6.8-4M8.6 13.4l6.8 4"></path></svg></button></div>
+        <div sc-camel-on-click="{{ viewerTap }}" sc-camel-on-double-click="{{ viewerDoubleTap }}" style="flex:1;min-height:0;position:relative;overflow:hidden;display:grid;place-items:center;cursor:zoom-in">
+          <button sc-camel-on-click="{{ viewerPrev }}" style="position:absolute;left:6px;top:50%;transform:translateY(-50%);width:40px;height:40px;border-radius:999px;background:rgba(255,255,255,.12);border:none;display:grid;place-items:center;cursor:pointer;z-index:4"><svg width="22" height="22" sc-camel-view-box="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"></path></svg></button>
+          <div oncontextmenu="return false" style="{{ viewerImgStyle }}"></div>
+          <button sc-camel-on-click="{{ viewerNext }}" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);width:40px;height:40px;border-radius:999px;background:rgba(255,255,255,.12);border:none;display:grid;place-items:center;cursor:pointer;z-index:4"><svg width="22" height="22" sc-camel-view-box="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 5 7 7-7 7"></path></svg></button>
+        </div>
+        <div style="flex:0 0 auto;padding:8px 0 4px;text-align:center;font:400 11px/1 -apple-system;color:rgba(255,255,255,.7)">{{ viewerCaption }}</div>
+        <div class="hz-x" style="flex:0 0 auto;display:flex;gap:6px;padding:8px 12px 14px;justify-content:center"><sc-for list="{{ viewerThumbs }}" as="t" hint-placeholder-count="6"><div sc-camel-on-click="{{ t.pick }}" style="{{ t.style }}"></div></sc-for></div>
+      </div>
+    </sc-if>
+
+    <!-- ============ S3 PROJECT DETAIL ============ -->
+    <sc-if value="{{ isProject }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;flex-direction:column;height:100%;position:relative;background:var(--page)">
+        <div style="{{ hdrStyle }}">
+          <button sc-camel-on-click="{{ goBack }}" class="hz-press" style="{{ hdrBtn }}"><svg width="22" height="22" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"></path></svg></button>
+          <span style="{{ hdrTitle }}">Green Valley Heights</span>
+          <button sc-camel-on-click="{{ toggleSave }}" class="hz-press" style="{{ hdrBtn }}"><svg width="21" height="21" sc-camel-view-box="0 0 24 24" fill="{{ saveFill }}" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M6 3h12a1 1 0 0 1 1 1v17l-7-4-7 4V4a1 1 0 0 1 1-1Z"></path></svg></button>
+          <button sc-camel-on-click="{{ openShare }}" class="hz-press" style="{{ hdrBtn }}"><svg width="21" height="21" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><path d="m8.6 10.6 6.8-4M8.6 13.4l6.8 4"></path></svg></button>
+        </div>
+        <div class="hz-scroll" sc-camel-on-scroll="{{ onScroll }}" style="flex:1;min-height:0">
+          <div style="position:relative;width:100%;aspect-ratio:4/3;background:#000"><div style="{{ galleryDim }}"></div><div sc-camel-on-click="{{ openViewer }}" style="position:absolute;inset:0;background-image:{{ projPhoto }};background-size:cover;background-position:center;cursor:pointer"></div><span style="position:absolute;top:calc(env(safe-area-inset-top) + 56px);right:12px;background:rgba(0,0,0,.6);color:#fff;font:600 11px/1 -apple-system;padding:5px 9px;border-radius:999px">1/5</span></div>
+          <div style="padding:16px 16px 120px">
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span style="font:700 24px/1.15 -apple-system;color:var(--ink1)">Green Valley Heights</span><span style="background:var(--infoSoft);color:var(--info);font:600 11px/1 -apple-system;letter-spacing:.3px;text-transform:uppercase;padding:5px 8px;border-radius:4px">{{ projBadge }}</span></div>
+            <div style="font:400 13px/1.3 -apple-system;color:var(--ink2);margin-top:5px">by Shreeji Builders</div>
+            <div style="font:600 17px/1.2 -apple-system;color:var(--ink1);margin-top:10px">₹45 Lakh – ₹78 Lakh</div>
+            <div class="hz-x" style="display:flex;gap:8px;margin-top:14px"><sc-for list="{{ projStatusChips }}" as="c" hint-placeholder-count="3"><span style="{{ c.style }}">{{ c.label }}</span></sc-for></div>
+            <div style="display:flex;align-items:center;gap:8px;margin-top:14px;padding:10px 12px;background:var(--surface2);border-radius:8px"><svg width="15" height="15" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink3)" stroke-width="1.6" style="flex:0 0 auto"><path d="M12 3l7 3v6c0 4-3 7-7 9-4-2-7-5-7-9V6l7-3Z"></path></svg><span style="font:400 11px/1.4 -apple-system;color:var(--ink3);user-select:text">RERA No: PR/GJ/RAJKOT/RAJKOT/Others/MAA12345/240424</span></div>
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:2px;background:var(--surface2);border-radius:12px;padding:14px 8px;margin-top:16px"><sc-for list="{{ projFacts }}" as="f" hint-placeholder-count="4"><div style="text-align:center"><div style="font:600 15px/1.1 -apple-system;color:var(--ink1)">{{ f.v }}</div><div style="font:400 11px/1.2 -apple-system;color:var(--ink3);margin-top:3px">{{ f.k }}</div></div></sc-for></div>
+
+            <div style="font:600 13px/1 -apple-system;color:var(--ink2);margin:24px 0 12px">Available Units</div>
+            <sc-for list="{{ unitRows }}" as="u" hint-placeholder-count="3">
+              <div style="border:1px solid var(--border);border-radius:8px;margin-bottom:10px;overflow:hidden">
+                <button sc-camel-on-click="{{ u.toggle }}" style="width:100%;display:flex;align-items:center;gap:10px;padding:12px;background:none;border:none;cursor:pointer;text-align:left"><span style="flex:1;font:600 15px/1.3 -apple-system;color:var(--ink1)">{{ u.title }}</span><svg style="{{ u.chev }}" width="18" height="18" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink2)" stroke-width="2" stroke-linecap="round"><path d="m6 9 6 6 6-6"></path></svg></button>
+                <sc-if value="{{ u.open }}" hint-placeholder-val="{{ false }}"><div style="padding:0 12px 12px;animation:hzExpand .2s ease-out"><div style="display:flex;gap:12px"><div sc-camel-on-click="{{ openViewer }}" style="width:88px;height:88px;border-radius:8px;background-image:{{ u.plan }};background-size:cover;background-position:center;flex:0 0 auto;cursor:pointer"></div><div style="flex:1"><div style="font:400 13px/1.5 -apple-system;color:var(--ink2)">Carpet area: {{ u.carpet }}</div><div style="font:400 13px/1.5 -apple-system;color:var(--ink2)">{{ u.avail }} units available</div><button sc-camel-on-click="{{ openInquiry }}" style="border:none;background:none;color:var(--accent);font:600 13px/1 -apple-system;cursor:pointer;margin-top:8px;padding:0">Enquire about this unit</button></div></div></div></sc-if>
+              </div>
+            </sc-for>
+
+            <div style="font:600 13px/1 -apple-system;color:var(--ink2);margin:20px 0 10px">Bank approvals</div>
+            <div style="display:flex;flex-wrap:wrap;gap:8px"><sc-for list="{{ banks }}" as="b" hint-placeholder-count="4"><span style="height:32px;padding:0 14px;display:inline-flex;align-items:center;background:var(--accentSoft);color:var(--accent);border-radius:999px;font:600 13px/1 -apple-system">{{ b }}</span></sc-for></div>
+
+            <div style="font:600 13px/1 -apple-system;color:var(--ink2);margin:24px 0 12px">Amenities</div>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px"><sc-for list="{{ projAmenities }}" as="a" hint-placeholder-count="8"><div style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px 4px;background:var(--surface2);border-radius:12px"><span style="color:var(--ink2)">{{ a.icon }}</span><span style="font:400 11px/1.2 -apple-system;color:var(--ink2);text-align:center">{{ a.label }}</span></div></sc-for></div>
+
+            <div sc-camel-on-click="{{ downloadBrochure }}" style="display:flex;align-items:center;gap:12px;margin-top:20px;padding:12px 14px;background:var(--surface2);border-radius:8px;cursor:pointer"><svg width="22" height="22" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--error)" stroke-width="1.6"><path d="M6 2h9l5 5v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Z"></path><path d="M14 2v6h6"></path></svg><div style="flex:1"><div style="font:600 15px/1.2 -apple-system;color:var(--ink1)">Project Brochure</div><div style="font:400 11px/1 -apple-system;color:var(--ink3);margin-top:2px">2.4 MB</div></div><svg width="20" height="20" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink2)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"></path></svg></div>
+
+            <div style="display:flex;align-items:center;gap:5px;margin-top:20px"><svg width="15" height="15" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink3)" stroke-width="1.6"><path d="M12 21s7-6.2 7-11a7 7 0 1 0-14 0c0 4.8 7 11 7 11Z"></path><circle cx="12" cy="10" r="2.2"></circle></svg><span style="font:400 13px/1.3 -apple-system;color:var(--ink2)">150 Feet Ring Road, Rajkot – 360005</span></div>
+
+            <div sc-camel-on-click="{{ openPoster }}" style="display:flex;align-items:center;gap:12px;margin-top:16px;padding:12px;background:var(--surface1);border:1px solid var(--border);border-radius:12px;cursor:pointer;box-shadow:var(--l1)"><div style="width:48px;height:48px;border-radius:999px;background-image:{{ builderAv }};background-size:cover;background-position:center;flex:0 0 auto"></div><div style="flex:1;min-width:0"><div style="display:flex;align-items:center;gap:5px"><span style="font:600 15px/1.2 -apple-system;color:var(--ink1)">Shreeji Builders</span><svg width="14" height="14" sc-camel-view-box="0 0 24 24" fill="var(--accent)"><path d="M12 2l2.4 1.8 3 .2.9 2.8 2.2 2-1 2.9 1 2.9-2.2 2-.9 2.8-3 .2L12 22l-2.4-1.8-3-.2-.9-2.8-2.2-2 1-2.9-1-2.9 2.2-2 .9-2.8 3-.2z"></path><path d="m8.5 12 2.4 2.4 4.6-4.8" stroke="#fff" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"></path></svg><span style="font:400 11px/1 -apple-system;color:var(--ink3);background:var(--surface2);padding:3px 6px;border-radius:4px">Builder</span></div><div style="font:400 11px/1.3 -apple-system;color:var(--ink3);margin-top:3px">12 projects · Member since 2019</div></div><svg width="18" height="18" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink3)" stroke-width="1.8" stroke-linecap="round"><path d="m9 6 6 6-6 6"></path></svg></div>
+
+            <div style="font:600 11px/1 -apple-system;letter-spacing:.3px;color:var(--ink3);text-transform:uppercase;margin:24px 0 12px">Similar projects</div>
+            <div class="hz-x" style="display:flex;gap:12px"><sc-for list="{{ similarProjects }}" as="c" hint-placeholder-count="3"><div sc-camel-on-click="{{ c.go }}" style="flex:0 0 auto;width:150px;cursor:pointer"><div style="aspect-ratio:4/3;border-radius:12px;background-image:{{ c.bg }};background-size:cover;background-position:center"></div><div style="font:600 13px/1.2 -apple-system;color:var(--ink1);margin-top:8px">{{ c.name }}</div><div style="font:400 11px/1.2 -apple-system;color:var(--ink3);margin-top:2px">{{ c.price }}</div></div></sc-for></div>
+          </div>
+        </div>
+        <div style="flex:0 0 auto;background:var(--surface1);border-top:1px solid var(--border);box-shadow:var(--l2)">
+          <sc-if value="{{ projOwner }}" hint-placeholder-val="{{ false }}"><div style="display:grid;grid-template-columns:repeat(3,1fr);border-bottom:1px solid var(--divider)"><sc-for list="{{ projStatList }}" as="s" hint-placeholder-count="3"><div style="text-align:center;padding:8px 4px"><div style="font:600 13px/1 -apple-system;color:var(--ink1)">{{ s.v }}</div><div style="font:400 11px/1 -apple-system;color:var(--ink3);margin-top:3px">{{ s.k }}</div></div></sc-for></div></sc-if>
+          <div style="display:flex;align-items:center;gap:8px;padding:10px 16px">
+            <sc-if value="{{ projOwner }}" hint-placeholder-val="{{ false }}"><button class="hz-press" sc-camel-on-click="{{ ownerEdit }}" style="flex:1;height:44px;background:var(--surface1);border:1px solid var(--border);border-radius:8px;font:600 15px/1 -apple-system;color:var(--ink1);cursor:pointer">Edit</button><button class="hz-press" sc-camel-on-click="{{ updateUnits }}" style="flex:1;height:44px;background:var(--surface1);border:1px solid var(--border);border-radius:8px;font:600 15px/1 -apple-system;color:var(--ink1);cursor:pointer">Update Units</button><button class="hz-press" sc-camel-on-click="{{ ownerBoost }}" style="flex:1;height:44px;background:var(--surface1);border:1px solid var(--border);border-radius:8px;font:600 15px/1 -apple-system;color:var(--ink1);cursor:pointer">Boost</button></sc-if>
+            <sc-if value="{{ projPublic }}" hint-placeholder-val="{{ true }}"><button class="hz-press" sc-camel-on-click="{{ callNow }}" style="width:52px;height:44px;display:grid;place-items:center;background:var(--surface1);border:1px solid var(--border);border-radius:8px;cursor:pointer"><svg width="20" height="20" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink1)" stroke-width="1.8"><path d="M6 3h3l2 5-2.5 1.5a11 11 0 0 0 5 5L21 15v3a2 2 0 0 1-2 2A16 16 0 0 1 4 5a2 2 0 0 1 2-2Z"></path></svg></button><button class="hz-press" sc-camel-on-click="{{ whatsapp }}" style="width:52px;height:44px;display:grid;place-items:center;background:var(--accentSoft);border:1px solid var(--accent);border-radius:8px;cursor:pointer"><svg width="20" height="20" sc-camel-view-box="0 0 24 24" fill="var(--accent)"><path d="M12 2a10 10 0 0 0-8.5 15.2L2 22l4.9-1.3A10 10 0 1 0 12 2Z"></path></svg></button><button class="hz-press" sc-camel-on-click="{{ openInquiry }}" style="flex:1;height:44px;background:var(--accent);border:none;border-radius:8px;font:600 15px/1 -apple-system;color:#fff;cursor:pointer">Send Inquiry</button></sc-if>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- ============ S4 REQUIREMENT DETAIL ============ -->
+    <sc-if value="{{ isRequirement }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;flex-direction:column;height:100%;position:relative;background:var(--page)">
+        <div style="flex:0 0 auto;display:flex;align-items:center;gap:4px;padding:6px 8px;background:var(--surface1);border-bottom:1px solid var(--divider)">
+          <button sc-camel-on-click="{{ goBack }}" class="hz-press" style="width:44px;height:44px;display:grid;place-items:center;border:none;background:none;cursor:pointer"><svg width="22" height="22" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink1)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"></path></svg></button>
+          <span style="flex:1;text-align:center;font:600 15px/1.2 -apple-system;color:var(--ink1)">Requirement</span>
+          <button sc-camel-on-click="{{ openMore }}" class="hz-press" style="width:44px;height:44px;display:grid;place-items:center;border:none;background:none;cursor:pointer"><svg width="21" height="21" sc-camel-view-box="0 0 24 24" fill="var(--ink1)"><circle cx="12" cy="5" r="2"></circle><circle cx="12" cy="12" r="2"></circle><circle cx="12" cy="19" r="2"></circle></svg></button>
+        </div>
+        <div class="hz-scroll" style="flex:1;min-height:0">
+          <div style="padding:16px 16px 120px">
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+              <span style="background:var(--accentSoft);color:var(--accent);font:600 11px/1 -apple-system;letter-spacing:.3px;text-transform:uppercase;padding:5px 8px;border-radius:4px">Looking to Buy</span>
+              <sc-if value="{{ reqUrgent }}" hint-placeholder-val="{{ true }}"><span style="display:inline-flex;align-items:center;gap:4px;background:var(--warningSoft);color:var(--warning);font:600 11px/1 -apple-system;letter-spacing:.3px;text-transform:uppercase;padding:5px 8px;border-radius:4px"><svg width="12" height="12" sc-camel-view-box="0 0 24 24" fill="currentColor"><path d="M12 2s5 5 5 10a5 5 0 0 1-10 0c0-2 1-3 1-3s0 2 2 2 1-4 2-6c1 1 3 3 3 5"></path></svg>Urgent</span></sc-if>
+              <sc-if value="{{ reqStatusChip }}" hint-placeholder-val="{{ false }}"><span style="{{ reqStatusStyle }}">{{ reqStatusChip }}</span></sc-if>
+            </div>
+
+            <!-- budget -->
+            <div style="margin-top:16px;position:relative">
+              <div style="{{ budgetStyle }}">{{ budgetLabel }}</div>
+              <sc-if value="{{ reqLocked }}" hint-placeholder-val="{{ false }}"><span style="position:absolute;left:70px;top:2px"><svg width="22" height="22" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink2)" stroke-width="1.8"><rect x="5" y="11" width="14" height="10" rx="2"></rect><path d="M8 11V7a4 4 0 0 1 8 0v4"></path></svg></span></sc-if>
+            </div>
+
+            <!-- expired/fulfilled banners -->
+            <sc-if value="{{ reqExpired }}" hint-placeholder-val="{{ false }}"><div style="display:flex;align-items:center;gap:8px;margin-top:14px;padding:10px 14px;background:var(--surface3);border-radius:8px"><svg width="16" height="16" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink2)" stroke-width="1.8"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2" stroke-linecap="round"></path></svg><span style="font:400 13px/1.4 -apple-system;color:var(--ink2)">This requirement expired on 12 Jan.</span></div></sc-if>
+            <sc-if value="{{ reqFulfilled }}" hint-placeholder-val="{{ false }}"><div style="display:flex;align-items:center;gap:8px;margin-top:14px;padding:10px 14px;background:var(--accentSoft);border-radius:8px"><svg width="16" height="16" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round"><path d="M20 6 9 17l-5-5"></path></svg><span style="font:400 13px/1.4 -apple-system;color:var(--ink1)">Fulfilled — proposals are closed.</span></div></sc-if>
+
+            <!-- LOCKED -->
+            <sc-if value="{{ reqLocked }}" hint-placeholder-val="{{ false }}">
+              <div style="font:400 15px/1.4 -apple-system;color:var(--ink1);margin-top:14px">2 BHK · Rent · University Road area</div>
+              <div style="display:flex;align-items:center;gap:12px;margin-top:14px;padding:12px;background:var(--surface2);border-radius:12px;position:relative"><div style="width:44px;height:44px;border-radius:999px;background:var(--surface3);filter:blur(6px)"></div><div style="flex:1"><div style="height:14px;width:120px;background:var(--surface3);border-radius:4px;filter:blur(6px)"></div><div style="height:11px;width:80px;background:var(--surface3);border-radius:4px;filter:blur(6px);margin-top:8px"></div></div><span style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%)"><svg width="18" height="18" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink2)" stroke-width="1.8"><rect x="5" y="11" width="14" height="10" rx="2"></rect><path d="M8 11V7a4 4 0 0 1 8 0v4"></path></svg></span></div>
+              <div style="font:400 11px/1 -apple-system;color:var(--ink3);margin-top:12px">Posted 2h ago</div>
+              <div style="margin-top:16px;padding:20px 16px;background:var(--accentSoft);border-radius:12px;text-align:center">
+                <svg width="32" height="32" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.7"><rect x="4" y="10" width="16" height="11" rx="2"></rect><path d="M8 10V7a4 4 0 0 1 8 0v3"></path></svg>
+                <div style="font:600 17px/1.3 -apple-system;color:var(--ink1);margin-top:10px">Unlock all requirements</div>
+                <div style="font:400 13px/1.4 -apple-system;color:var(--ink2);margin-top:4px">See full details, budgets and contact posters directly.</div>
+                <div style="margin-top:12px"><span style="font:700 24px/1 -apple-system;color:var(--ink1)">₹2,999</span><span style="font:400 13px/1 -apple-system;color:var(--ink3)"> /month</span></div>
+                <div style="display:flex;flex-direction:column;gap:8px;margin:14px 0;text-align:left"><sc-for list="{{ paywallList }}" as="p" hint-placeholder-count="3"><div style="display:flex;align-items:center;gap:8px"><svg width="16" height="16" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round"><path d="M20 6 9 17l-5-5"></path></svg><span style="font:400 13px/1.3 -apple-system;color:var(--ink1)">{{ p }}</span></div></sc-for></div>
+                <button class="hz-press" sc-camel-on-click="{{ checkout }}" style="width:100%;height:44px;background:var(--accent);border:none;border-radius:8px;font:600 15px/1 -apple-system;color:#fff;cursor:pointer">Continue to Payment</button>
+                <button sc-camel-on-click="{{ comparePlans }}" style="border:none;background:none;color:var(--accent);font:600 13px/1 -apple-system;cursor:pointer;margin-top:12px;padding:0">Compare plans</button>
+              </div>
+            </sc-if>
+
+            <!-- UNLOCKED / OWN detail body -->
+            <sc-if value="{{ reqShowFull }}" hint-placeholder-val="{{ false }}">
+              <sc-if value="{{ reqOwn }}" hint-placeholder-val="{{ false }}">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-top:16px;padding:12px 14px;background:var(--surface2);border-radius:8px"><span style="font:600 15px/1 -apple-system;color:var(--ink1)">Requirement active</span><button sc-camel-on-click="{{ toggleReqActive }}" style="{{ reqActiveTrack }}"><span style="{{ reqActiveKnob }}"></span></button></div>
+                <div sc-camel-on-click="{{ openProposalsList }}" style="display:flex;align-items:center;gap:10px;margin-top:12px;padding:14px;background:var(--surface1);border:1px solid var(--border);border-radius:12px;cursor:pointer;box-shadow:var(--l1)"><span style="flex:1;font:600 15px/1 -apple-system;color:var(--ink1)">12 proposals received</span><span style="min-width:22px;height:22px;padding:0 7px;background:var(--accent);color:#fff;border-radius:999px;font:600 12px/22px -apple-system;text-align:center">12</span><svg width="18" height="18" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink3)" stroke-width="1.8" stroke-linecap="round"><path d="m9 6 6 6-6 6"></path></svg></div>
+              </sc-if>
+              <div style="font:600 13px/1 -apple-system;color:var(--ink2);margin:24px 0 12px">Requirement Details</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px 16px"><sc-for list="{{ reqDetailRows }}" as="d" hint-placeholder-count="6"><div><div style="font:400 11px/1 -apple-system;color:var(--ink3)">{{ d.k }}</div><div style="font:400 15px/1.3 -apple-system;color:var(--ink1);margin-top:3px">{{ d.v }}</div></div></sc-for></div>
+              <div style="font:400 11px/1 -apple-system;color:var(--ink3);margin-top:16px">Preferred areas</div>
+              <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px"><sc-for list="{{ reqAreas }}" as="a" hint-placeholder-count="3"><span style="height:32px;padding:0 14px;display:inline-flex;align-items:center;background:var(--surface2);border:1px solid var(--border);border-radius:999px;font:600 13px/1 -apple-system;color:var(--ink1)">{{ a }}</span></sc-for></div>
+              <div style="font:400 11px/1 -apple-system;color:var(--ink3);margin-top:16px">Notes</div>
+              <div style="font:400 15px/1.5 -apple-system;color:var(--ink1);margin-top:6px;text-wrap:pretty">Looking for a ready-to-move 3 BHK, preferably east facing, near a good school. Budget slightly flexible for the right property.</div>
+
+              <div sc-camel-on-click="{{ openPoster }}" style="display:flex;align-items:center;gap:12px;margin-top:20px;padding:12px;background:var(--surface1);border:1px solid var(--border);border-radius:12px;cursor:pointer;box-shadow:var(--l1)"><div style="width:48px;height:48px;border-radius:999px;background-image:{{ reqPosterAv }};background-size:cover;background-position:center;flex:0 0 auto"></div><div style="flex:1;min-width:0"><div style="display:flex;align-items:center;gap:5px"><span style="font:600 15px/1.2 -apple-system;color:var(--ink1)">Meet Patel</span><svg width="14" height="14" sc-camel-view-box="0 0 24 24" fill="var(--accent)"><path d="M12 2l2.4 1.8 3 .2.9 2.8 2.2 2-1 2.9 1 2.9-2.2 2-.9 2.8-3 .2L12 22l-2.4-1.8-3-.2-.9-2.8-2.2-2 1-2.9-1-2.9 2.2-2 .9-2.8 3-.2z"></path><path d="m8.5 12 2.4 2.4 4.6-4.8" stroke="#fff" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"></path></svg><span style="font:400 11px/1 -apple-system;color:var(--ink3);background:var(--surface2);padding:3px 6px;border-radius:4px">Owner</span></div><div style="font:400 11px/1.3 -apple-system;color:var(--ink3);margin-top:3px">Rajkot · Member since Mar 2025</div></div></div>
+
+              <sc-if value="{{ reqOwn }}" hint-placeholder-val="{{ false }}">
+                <div style="font:600 11px/1 -apple-system;letter-spacing:.3px;color:var(--ink3);text-transform:uppercase;margin:24px 0 12px">Matching properties on HomzList</div>
+                <div class="hz-x" style="display:flex;gap:12px"><sc-for list="{{ matchingCards }}" as="c" hint-placeholder-count="3"><div sc-camel-on-click="{{ c.go }}" style="flex:0 0 auto;width:140px;cursor:pointer"><div style="aspect-ratio:1;border-radius:12px;background-image:{{ c.bg }};background-size:cover;background-position:center"></div><div style="font:600 13px/1.2 -apple-system;color:var(--ink1);margin-top:8px">{{ c.price }}</div><div style="font:400 11px/1.2 -apple-system;color:var(--ink3);margin-top:2px">{{ c.meta }}</div></div></sc-for></div>
+                <div style="display:flex;align-items:center;gap:6px;margin-top:12px"><svg width="14" height="14" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink3)" stroke-width="1.7"><path d="M12 21s7-6.2 7-11a7 7 0 1 0-14 0c0 4.8 7 11 7 11Z"></path><circle cx="12" cy="10" r="2.2"></circle></svg><span style="font:600 11px/1 -apple-system;letter-spacing:.3px;color:var(--ink3);text-transform:uppercase">Nearby: Raiya Road</span></div>
+              </sc-if>
+            </sc-if>
+          </div>
+        </div>
+
+        <!-- req bottom bars -->
+        <sc-if value="{{ reqUnlocked }}" hint-placeholder-val="{{ false }}">
+          <div style="flex:0 0 auto;padding:8px 16px 12px;background:var(--surface1);border-top:1px solid var(--border);box-shadow:var(--l2)"><div style="text-align:center;font:400 11px/1 -apple-system;color:var(--ink3);margin-bottom:8px">6 proposals remaining</div><button class="hz-press" sc-camel-on-click="{{ openProposal }}" style="{{ proposalBtn }}">{{ proposalLabel }}</button></div>
+        </sc-if>
+        <sc-if value="{{ reqOwn }}" hint-placeholder-val="{{ false }}">
+          <div style="flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:10px 16px;background:var(--surface1);border-top:1px solid var(--border);box-shadow:var(--l2)"><button class="hz-press" sc-camel-on-click="{{ ownerEdit }}" style="flex:1;height:44px;background:var(--surface1);border:1px solid var(--border);border-radius:8px;font:600 15px/1 -apple-system;color:var(--ink1);cursor:pointer">Edit</button><button class="hz-press" sc-camel-on-click="{{ markFulfilled }}" style="flex:1;height:44px;background:var(--surface1);border:1px solid var(--border);border-radius:8px;font:600 15px/1 -apple-system;color:var(--ink1);cursor:pointer">Mark Fulfilled</button><button class="hz-press" sc-camel-on-click="{{ openDelete }}" style="flex:0 0 auto;height:44px;padding:0 16px;background:none;border:none;font:600 15px/1 -apple-system;color:var(--error);cursor:pointer">Delete</button></div>
+        </sc-if>
+      </div>
+    </sc-if>
+
+    <!-- ============ S5 SOLD ============ -->
+    <sc-if value="{{ isSold }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;flex-direction:column;height:100%;background:var(--page)">
+        <div style="flex:0 0 auto;display:flex;align-items:center;padding:6px 8px;background:var(--surface1);border-bottom:1px solid var(--divider)"><button sc-camel-on-click="{{ goBack }}" class="hz-press" style="width:44px;height:44px;display:grid;place-items:center;border:none;background:none;cursor:pointer"><svg width="22" height="22" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink1)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"></path></svg></button></div>
+        <div class="hz-scroll" style="flex:1;min-height:0"><div style="padding:40px 24px 24px;text-align:center;display:flex;flex-direction:column;align-items:center">
+          <svg width="96" height="96" sc-camel-view-box="0 0 96 96" fill="none" stroke="var(--ink3)" stroke-width="2"><path d="M20 44 48 22l28 22v30a2 2 0 0 1-2 2H22a2 2 0 0 1-2-2z"></path><path d="M40 78V56h16v22" stroke-linejoin="round"></path><circle cx="64" cy="34" r="12" fill="var(--errorSoft)" stroke="var(--error)"></circle><path d="M59 34h10" stroke="var(--error)" stroke-linecap="round"></path></svg>
+          <div style="font:700 20px/1.3 -apple-system;color:var(--ink1);margin-top:20px">This property is no longer available</div>
+          <div style="font:400 15px/1.45 -apple-system;color:var(--ink2);margin-top:8px;max-width:280px">It may have been sold, rented or removed by the owner.</div>
+          <button class="hz-press" sc-camel-on-click="{{ browseSimilar }}" style="margin-top:20px;height:44px;padding:0 24px;background:var(--accent);border:none;border-radius:8px;font:600 15px/1 -apple-system;color:#fff;cursor:pointer">Browse similar properties</button>
+          <button sc-camel-on-click="{{ goHome }}" style="margin-top:14px;border:none;background:none;color:var(--accent);font:600 15px/1 -apple-system;cursor:pointer">Go to Home</button>
+        </div>
+        <div style="padding:0 16px 24px"><div style="font:600 11px/1 -apple-system;letter-spacing:.3px;color:var(--ink3);text-transform:uppercase;margin-bottom:12px">Similar properties</div><sc-for list="{{ soldSimilar }}" as="c" hint-placeholder-count="3"><div sc-camel-on-click="{{ c.go }}" style="display:flex;gap:12px;margin-bottom:12px;padding:10px;background:var(--surface1);border:1px solid var(--border);border-radius:12px;cursor:pointer"><div style="width:88px;height:88px;border-radius:8px;background-image:{{ c.bg }};background-size:cover;background-position:center;flex:0 0 auto"></div><div><div style="font:700 15px/1.2 -apple-system;color:var(--ink1)">{{ c.price }}</div><div style="font:400 13px/1.3 -apple-system;color:var(--ink2);margin-top:4px">{{ c.meta }}</div><div style="font:400 11px/1.3 -apple-system;color:var(--ink3);margin-top:4px">{{ c.area }}</div></div></div></sc-for></div>
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- ============ S6 404 / CRASH ============ -->
+    <sc-if value="{{ isError }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;flex-direction:column;height:100%;background:var(--page)">
+        <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center">
+          <sc-if value="{{ is404 }}" hint-placeholder-val="{{ true }}">
+            <svg width="96" height="96" sc-camel-view-box="0 0 96 96" fill="none" stroke="var(--ink3)" stroke-width="2"><circle cx="48" cy="48" r="34"></circle><path d="M60 36 42 42l-6 18 18-6z" stroke-linejoin="round"></path><circle cx="48" cy="48" r="3" fill="var(--ink3)"></circle></svg>
+            <div style="font:700 20px/1.3 -apple-system;color:var(--ink1);margin-top:20px">Page not found</div>
+            <div style="font:400 15px/1.45 -apple-system;color:var(--ink2);margin-top:8px;max-width:280px">The link may be broken or the page may have been removed.</div>
+            <button class="hz-press" sc-camel-on-click="{{ goHome }}" style="margin-top:20px;height:44px;padding:0 28px;background:var(--accent);border:none;border-radius:8px;font:600 15px/1 -apple-system;color:#fff;cursor:pointer">Go to Home</button>
+            <button class="hz-press" sc-camel-on-click="{{ goSearch }}" style="margin-top:12px;height:44px;padding:0 28px;background:var(--surface1);border:1px solid var(--border);border-radius:8px;font:600 15px/1 -apple-system;color:var(--ink1);cursor:pointer">Search properties</button>
+          </sc-if>
+          <sc-if value="{{ isCrash }}" hint-placeholder-val="{{ false }}">
+            <svg width="96" height="96" sc-camel-view-box="0 0 96 96" fill="none" stroke="var(--ink3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M40 30V16M56 30V16"></path><rect x="34" y="30" width="28" height="18" rx="3"></rect><path d="M48 48v10a10 10 0 0 1-10 10H30"></path><path d="M20 62l6 6-6 6"></path></svg>
+            <div style="font:700 20px/1.3 -apple-system;color:var(--ink1);margin-top:20px">Something went wrong</div>
+            <div style="font:400 15px/1.45 -apple-system;color:var(--ink2);margin-top:8px;max-width:280px">Please try again. If it keeps happening, contact support.</div>
+            <button class="hz-press" sc-camel-on-click="{{ reload }}" style="margin-top:20px;height:44px;padding:0 28px;background:var(--accent);border:none;border-radius:8px;font:600 15px/1 -apple-system;color:#fff;cursor:pointer">Reload</button>
+            <button sc-camel-on-click="{{ contactSupport }}" style="margin-top:14px;border:none;background:none;color:var(--accent);font:600 15px/1 -apple-system;cursor:pointer">Contact Support</button>
+          </sc-if>
+          <sc-if value="{{ isInlineErr }}" hint-placeholder-val="{{ false }}">
+            <div style="width:100%;display:flex;align-items:center;gap:10px;padding:14px 16px;background:var(--errorSoft);border-radius:8px"><svg width="18" height="18" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--error)" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v4M12 16h.01"></path></svg><span style="flex:1;text-align:left;font:400 13px/1.3 -apple-system;color:var(--ink1)">Couldn't load this listing</span><button sc-camel-on-click="{{ reload }}" style="border:none;background:none;color:var(--accent);font:600 13px/1 -apple-system;cursor:pointer">Retry</button></div>
+          </sc-if>
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- OFFLINE -->
+    <sc-if value="{{ isOffline }}" hint-placeholder-val="{{ false }}">
+      <div style="position:absolute;left:0;right:0;top:0;z-index:80;display:flex;align-items:center;gap:8px;padding:8px 16px;background:var(--warningSoft);border-bottom:1px solid var(--border)"><svg width="16" height="16" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--warning)" stroke-width="1.8" stroke-linecap="round"><path d="M12 3C7 3 3 6 1 9M9 17a4 4 0 0 1 6 0M2 2l20 20"></path><circle cx="12" cy="21" r="1" fill="var(--warning)"></circle></svg><span style="flex:1;font:400 13px/1.3 -apple-system;color:var(--ink1)">You're offline. Showing saved data.</span></div>
+    </sc-if>
+  </div>
+
+  <!-- ===== SCRIM ===== -->
+  <sc-if value="{{ scrimOpen }}" hint-placeholder-val="{{ false }}"><div sc-camel-on-click="{{ closeSheet }}" style="position:fixed;inset:0;z-index:150;background:rgba(0,0,0,.4);animation:hzScrim .25s ease-out"></div></sc-if>
+
+  <!-- LOGIN sheet (guest) -->
+  <sc-if value="{{ loginSheet }}" hint-placeholder-val="{{ false }}">
+    <div style="{{ sheetAuto }}"><div style="width:36px;height:4px;border-radius:999px;background:var(--border);margin:8px auto 12px"></div><div style="padding:0 20px 20px;text-align:center"><div style="font:700 22px/1 -apple-system"><span style="color:var(--ink1)">Homz</span><span style="color:var(--accent)">List</span></div><div style="font:600 17px/1.3 -apple-system;color:var(--ink1);margin-top:16px">Sign in to continue</div><div style="font:400 13px/1.4 -apple-system;color:var(--ink2);margin-top:6px">Save properties, send inquiries and chat securely.</div><button class="hz-press" sc-camel-on-click="{{ loginPhone }}" style="width:100%;height:44px;margin-top:18px;background:var(--accent);border:none;border-radius:8px;font:600 15px/1 -apple-system;color:#fff;cursor:pointer">Continue with phone</button></div></div>
+  </sc-if>
+
+  <!-- INQUIRY sheet -->
+  <sc-if value="{{ inquirySheet }}" hint-placeholder-val="{{ false }}">
+    <div style="{{ sheetTall }}">
+      <div style="flex:0 0 auto"><div style="width:36px;height:4px;border-radius:999px;background:var(--border);margin:8px auto 8px"></div><div style="display:flex;align-items:center;padding:4px 16px 12px;border-bottom:1px solid var(--divider)"><span style="flex:1;font:600 17px/1.2 -apple-system;color:var(--ink1)">Send Inquiry</span><button sc-camel-on-click="{{ closeSheet }}" style="width:44px;height:44px;display:grid;place-items:center;border:none;background:none;cursor:pointer;margin-right:-12px"><svg width="20" height="20" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink1)" stroke-width="1.9" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div></div>
+      <div class="hz-scroll" style="flex:1;min-height:0;padding:16px"><textarea style="width:100%;height:88px;padding:12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;font:400 15px/1.4 -apple-system;color:var(--ink1);resize:none;outline:none">Hi, I'm interested in your 3 BHK Flat at Mavdi, Rajkot (₹85 Lakh). Is it still available?</textarea>
+        <div style="font:600 13px/1 -apple-system;color:var(--ink2);margin:16px 0 8px">Quick questions</div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px"><sc-for list="{{ quickChips }}" as="c" hint-placeholder-count="4"><button sc-camel-on-click="{{ c.toggle }}" style="{{ c.style }}">{{ c.label }}</button></sc-for></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;height:44px;margin-top:8px"><span style="font:400 15px/1 -apple-system;color:var(--ink1)">Share my number with owner</span><button sc-camel-on-click="{{ toggleShareNum }}" style="{{ shareNumTrack }}"><span style="{{ shareNumKnob }}"></span></button></div>
+      </div>
+      <div style="flex:0 0 auto;padding:12px 16px;background:var(--surface1);border-top:1px solid var(--border)"><button class="hz-press" sc-camel-on-click="{{ sendInquiry }}" style="width:100%;height:44px;background:var(--accent);border:none;border-radius:8px;font:600 15px/1 -apple-system;color:#fff;cursor:pointer">Send Inquiry</button></div>
+    </div>
+  </sc-if>
+
+  <!-- SHARE sheet -->
+  <sc-if value="{{ shareSheet }}" hint-placeholder-val="{{ false }}">
+    <div style="{{ sheetAuto }}"><div style="width:36px;height:4px;border-radius:999px;background:var(--border);margin:8px auto 8px"></div>
+      <div style="padding:0 16px 12px"><div style="display:flex;gap:12px;padding:12px;background:var(--surface2);border-radius:12px"><div style="width:56px;height:56px;border-radius:8px;background-image:{{ heroPhoto }};background-size:cover;background-position:center;flex:0 0 auto"></div><div style="min-width:0"><div style="font:600 15px/1.2 -apple-system;color:var(--ink1)">3 BHK Flat, Mavdi</div><div style="font:400 13px/1.3 -apple-system;color:var(--ink3);margin-top:3px">₹85 Lakh · HomzList</div></div></div></div>
+      <div style="padding:0 16px 8px"><div style="display:flex;align-items:center;gap:8px;height:44px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:0 12px"><span style="flex:1;font:400 13px/1 -apple-system;color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">homzlist.com/property/rajkot-mavdi-3bhk-flat-x7k2</span><button sc-camel-on-click="{{ copyLink }}" style="border:none;background:none;color:var(--accent);font:600 13px/1 -apple-system;cursor:pointer">Copy</button></div></div>
+      <div style="display:flex;gap:14px;padding:12px 16px 8px;overflow-x:auto"><sc-for list="{{ shareDests }}" as="d" hint-placeholder-count="3"><button sc-camel-on-click="{{ d.tap }}" style="flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:6px;border:none;background:none;cursor:pointer"><span style="width:52px;height:52px;border-radius:999px;background:{{ d.bg }};display:grid;place-items:center;color:#fff;font:600 13px/1 -apple-system">{{ d.icon }}</span><span style="font:400 11px/1 -apple-system;color:var(--ink2)">{{ d.label }}</span></button></sc-for></div>
+      <div style="height:12px"></div>
+    </div>
+  </sc-if>
+
+  <!-- MORE sheet -->
+  <sc-if value="{{ moreSheet }}" hint-placeholder-val="{{ false }}">
+    <div style="{{ sheetAuto }}"><div style="width:36px;height:4px;border-radius:999px;background:var(--border);margin:8px auto 8px"></div>
+      <div sc-camel-on-click="{{ shareFromMore }}" style="display:flex;align-items:center;gap:14px;height:52px;padding:0 18px;cursor:pointer"><svg width="21" height="21" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink1)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><path d="m8.6 10.6 6.8-4M8.6 13.4l6.8 4"></path></svg><span style="font:400 15px/1 -apple-system;color:var(--ink1)">Share</span></div>
+      <div sc-camel-on-click="{{ openReport }}" style="display:flex;align-items:center;gap:14px;height:52px;padding:0 18px;cursor:pointer"><svg width="21" height="21" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--error)" stroke-width="1.7" stroke-linecap="round"><path d="M4 21V4h13l-2 4 2 4H4"></path></svg><span style="font:400 15px/1 -apple-system;color:var(--error)">Report</span></div>
+      <div sc-camel-on-click="{{ notInterested }}" style="display:flex;align-items:center;gap:14px;height:52px;padding:0 18px;cursor:pointer"><svg width="21" height="21" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink1)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9.9 4.2A9.7 9.7 0 0 1 12 4c6 0 10 8 10 8a17 17 0 0 1-2.2 3.2M6.6 6.6A17 17 0 0 0 2 12s4 8 10 8a9.6 9.6 0 0 0 5.4-1.6M2 2l20 20"></path></svg><span style="font:400 15px/1 -apple-system;color:var(--ink1)">Not interested</span></div>
+      <div style="height:12px"></div>
+    </div>
+  </sc-if>
+
+  <!-- REPORT sheet -->
+  <sc-if value="{{ reportSheet }}" hint-placeholder-val="{{ false }}">
+    <div style="{{ sheetTall }}">
+      <div style="flex:0 0 auto"><div style="width:36px;height:4px;border-radius:999px;background:var(--border);margin:8px auto 8px"></div><div style="display:flex;align-items:center;padding:4px 16px 12px;border-bottom:1px solid var(--divider)"><span style="flex:1;font:600 17px/1.2 -apple-system;color:var(--ink1)">Report listing</span><button sc-camel-on-click="{{ closeSheet }}" style="width:44px;height:44px;display:grid;place-items:center;border:none;background:none;cursor:pointer;margin-right:-12px"><svg width="20" height="20" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink1)" stroke-width="1.9" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div></div>
+      <div class="hz-scroll" style="flex:1;min-height:0;padding:4px 16px"><sc-for list="{{ reportOptions }}" as="r" hint-placeholder-count="6"><div sc-camel-on-click="{{ r.pick }}" style="display:flex;align-items:center;gap:12px;height:52px;cursor:pointer;border-bottom:1px solid var(--divider)"><span style="flex:1;font:400 15px/1 -apple-system;color:var(--ink1)">{{ r.label }}</span><span style="{{ r.radio }}"><sc-if value="{{ r.on }}" hint-placeholder-val="{{ false }}"><span style="width:10px;height:10px;border-radius:999px;background:var(--accent)"></span></sc-if></span></div></sc-for>
+        <textarea placeholder="Add a note (optional)" style="width:100%;height:72px;margin-top:14px;padding:12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;font:400 15px/1.4 -apple-system;color:var(--ink1);resize:none;outline:none"></textarea>
+      </div>
+      <div style="flex:0 0 auto;padding:12px 16px;background:var(--surface1);border-top:1px solid var(--border)"><button sc-camel-on-click="{{ submitReport }}" style="{{ reportBtn }}">Submit Report</button></div>
+    </div>
+  </sc-if>
+
+  <!-- PROPOSAL sheet -->
+  <sc-if value="{{ proposalSheet }}" hint-placeholder-val="{{ false }}">
+    <div style="{{ sheetTall }}">
+      <div style="flex:0 0 auto"><div style="width:36px;height:4px;border-radius:999px;background:var(--border);margin:8px auto 8px"></div><div style="display:flex;align-items:center;padding:4px 16px 12px;border-bottom:1px solid var(--divider)"><span style="flex:1;font:600 17px/1.2 -apple-system;color:var(--ink1)">Send Proposal</span><button sc-camel-on-click="{{ closeSheet }}" style="width:44px;height:44px;display:grid;place-items:center;border:none;background:none;cursor:pointer;margin-right:-12px"><svg width="20" height="20" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink1)" stroke-width="1.9" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div></div>
+      <div class="hz-scroll" style="flex:1;min-height:0;padding:16px">
+        <div sc-camel-on-click="{{ pickHasProperty }}" style="{{ propOpt1 }}"><svg width="22" height="22" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink1)" stroke-width="1.7" style="flex:0 0 auto"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"></path></svg><span style="flex:1;font:600 15px/1.2 -apple-system;color:var(--ink1)">I have a property</span><span style="{{ propRadio1 }}"></span></div>
+        <sc-if value="{{ hasProperty }}" hint-placeholder-val="{{ false }}"><div style="margin:4px 0 12px;animation:hzExpand .2s ease-out"><div class="hz-x" style="display:flex;gap:10px"><sc-for list="{{ myListings }}" as="l" hint-placeholder-count="2"><div sc-camel-on-click="{{ l.pick }}" style="{{ l.style }}"><div style="aspect-ratio:4/3;border-radius:6px;background-image:{{ l.bg }};background-size:cover;background-position:center"></div><div style="font:600 12px/1.2 -apple-system;color:var(--ink1);margin-top:6px">{{ l.price }}</div><div style="font:400 11px/1.2 -apple-system;color:var(--ink3)">{{ l.meta }}</div></div></sc-for></div><button sc-camel-on-click="{{ suggestInstead }}" style="border:none;background:none;color:var(--accent);font:600 11px/1 -apple-system;cursor:pointer;margin-top:10px;padding:0">No listing? Send a suggestion instead</button></div></sc-if>
+        <div sc-camel-on-click="{{ pickChat }}" style="{{ propOpt2 }}"><svg width="22" height="22" sc-camel-view-box="0 0 24 24" fill="none" stroke="var(--ink1)" stroke-width="1.7" style="flex:0 0 auto"><path d="M21 12a8 8 0 0 1-11.5 7.2L4 21l1.8-5.5A8 8 0 1 1 21 12Z"></path></svg><span style="flex:1;font:600 15px/1.2 -apple-system;color:var(--ink1)">Can we chat</span><span style="{{ propRadio2 }}"></span></div>
+        <textarea style="width:100%;height:88px;margin-top:12px;padding:12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;font:400 15px/1.4 -apple-system;color:var(--ink1);resize:none;outline:none">Hi, I have a 3 BHK in Mavdi that matches your requirement. Let me know if you'd like details.</textarea>
+      </div>
+      <div style="flex:0 0 auto;padding:8px 16px 12px;background:var(--surface1);border-top:1px solid var(--border)"><div style="text-align:center;font:400 11px/1 -apple-system;color:var(--ink3);margin-bottom:8px">6 proposals remaining</div><button class="hz-press" sc-camel-on-click="{{ sendProposal }}" style="width:100%;height:44px;background:var(--accent);border:none;border-radius:8px;font:600 15px/1 -apple-system;color:#fff;cursor:pointer">Send Proposal</button></div>
+    </div>
+  </sc-if>
+
+  <!-- DIALOGS -->
+  <sc-if value="{{ dialog }}" hint-placeholder-val="{{ false }}">
+    <div sc-camel-on-click="{{ closeSheet }}" style="position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.4);display:grid;place-items:center;padding:32px;animation:hzScrim .2s ease-out">
+      <div sc-camel-on-click="{{ stop }}" style="width:320px;max-width:100%;background:var(--surface1);border-radius:16px;padding:20px;box-shadow:var(--l3);animation:hzPop .2s ease-out">
+        <div style="font:600 17px/1.3 -apple-system;color:var(--ink1)">{{ dialogTitle }}</div>
+        <div style="font:400 13px/1.45 -apple-system;color:var(--ink2);margin-top:8px;text-wrap:pretty">{{ dialogBody }}</div>
+        <div style="display:flex;align-items:center;gap:12px;margin-top:20px;justify-content:flex-end"><button sc-camel-on-click="{{ closeSheet }}" style="border:none;background:none;color:var(--accent);font:600 15px/1 -apple-system;cursor:pointer;padding:10px">{{ dialogCancel }}</button><button class="hz-press" sc-camel-on-click="{{ dialogConfirm }}" style="{{ dialogConfirmStyle }}">{{ dialogConfirmLabel }}</button></div>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- TOAST -->
+  <sc-if value="{{ toast }}" hint-placeholder-val="{{ false }}"><div style="{{ toastStyle }}">{{ toast }}</div></sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script="" data-props="{&quot;$preview&quot;:{&quot;width&quot;:390,&quot;height&quot;:760}}">
+const PHOTO = [
+  'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=1000&q=80&auto=format&fit=crop',
+  'https://images.unsplash.com/photo-1512918728675-ed5a9ecdebfd?w=1000&q=80&auto=format&fit=crop',
+  'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=1000&q=80&auto=format&fit=crop',
+  'https://images.unsplash.com/photo-1484154218962-a197022b5858?w=1000&q=80&auto=format&fit=crop',
+  'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=1000&q=80&auto=format&fit=crop',
+  'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?w=1000&q=80&auto=format&fit=crop',
+  'https://images.unsplash.com/photo-1600566753086-00f18fb6b3ea?w=1000&q=80&auto=format&fit=crop',
+  'https://images.unsplash.com/photo-1502005229762-cf1b2da7c5d6?w=1000&q=80&auto=format&fit=crop'
+];
+const AV = [
+  'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&q=80&auto=format&fit=crop',
+  'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=100&q=80&auto=format&fit=crop',
+  'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&q=80&auto=format&fit=crop'
+];
+const CAPTIONS = ['Living room', 'Master bedroom', 'Modular kitchen', 'Balcony view', 'Bathroom', 'Society exterior'];
+const url = u => `url('${u}')`;
+const ic = (p, sw) => `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${sw || 1.6}" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
+const svgSpan = (svg) => React.createElement('span', { style: { display: 'inline-flex' }, dangerouslySetInnerHTML: { __html: svg } });
+
+class Component extends DCLogic {
+  state = {
+    screen: 'property', theme: 'light', device: 'mobile', devOpen: false,
+    role: 'buyer', contact: 'private', status: 'live', reqState: 'unlocked', errKind: '404', forced: null,
+    scrolled: false, carousel: 0, viewer: 0, viewerZoom: false,
+    sheet: null, dialog: null, toast: '',
+    saved: false, descOpen: false, promoted: true,
+    inquirySent: false, proposalSent: false, shareNum: true, reqActive: true,
+    quick: { visit: true, nego: false, docs: false, loan: false },
+    openUnit: 1, report: null, propMode: 'property', pickedListing: 0
+  };
+
+  componentDidMount() {
+    const valid = ['property', 'viewer', 'project', 'requirement', 'sold', 'error'];
+    const h = (location.hash || '').replace('#', '');
+    const initial = valid.includes(h) ? h : 'property';
+    if (initial !== this.state.screen) this.setState({ screen: initial });
+    history.replaceState({ screen: initial }, '');
+    this._pop = e => { const s = (e.state && e.state.screen) || 'property'; this.setState({ screen: s, sheet: null, dialog: null }); };
+    window.addEventListener('popstate', this._pop);
+  }
+  componentWillUnmount() { window.removeEventListener('popstate', this._pop); if (this._t) clearTimeout(this._t); }
+
+  nav(s) { history.pushState({ screen: s }, '', '#' + s); this.setState({ screen: s, sheet: null, dialog: null, scrolled: false }); }
+  goBack() { history.back(); }
+  toast(m) { this.setState({ toast: m }); clearTimeout(this._t); this._t = setTimeout(() => this.setState({ toast: '' }), 3000); }
+  open(k) { this.setState({ sheet: k, dialog: null }); }
+  close() { this.setState({ sheet: null, dialog: null }); }
+  guard(fn) { if (this.state.role === 'guest') { this.open('login'); return; } fn(); }
+  gotoSearch(hash) { window.location.href = 'HomzList%20Search.dc.html' + (hash ? '#' + hash : ''); }
+
+  renderVals() {
+    const st = this.state, D = st.theme === 'dark';
+    const P = D ? { page: '#000', surface1: '#121212', surface2: '#1E1E1E', surface3: '#262626', border: '#363636', divider: '#262626', ink1: '#F5F5F5', ink2: '#B0B0B0', ink3: '#8E8E8E', accent: '#1DB868', accentSoft: '#0E2B1C', error: '#FF5C6A', errorSoft: '#2A1416', warning: '#FFB74D', warningSoft: '#2A2113', info: '#3BA7F8', infoSoft: '#10263A', l1: 'none', l2: 'none', l3: 'none', dim: '.06' }
+      : { page: '#FFF', surface1: '#FFF', surface2: '#F5F5F5', surface3: '#EFEFEF', border: '#DBDBDB', divider: '#EFEFEF', ink1: '#111', ink2: '#555', ink3: '#8E8E8E', accent: '#0F9D58', accentSoft: '#E6F4EC', error: '#ED4956', errorSoft: '#FDECEE', warning: '#F5A623', warningSoft: '#FEF5E7', info: '#0095F6', infoSoft: '#E7F3FD', l1: '0 1px 2px rgba(0,0,0,.06)', l2: '0 -2px 12px rgba(0,0,0,.08)', l3: '0 8px 24px rgba(0,0,0,.16)', dim: '0' };
+    const vars = Object.entries(P).map(([k, v]) => `--${k}:${v}`).join(';');
+    const frameW = st.device === 'desktop' ? 1024 : st.device === 'tablet' ? 834 : 390;
+    const rootStyle = `min-height:100vh;width:100%;background:${D ? '#000' : '#EFEFEF'};display:flex;justify-content:center;align-items:flex-start;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;${vars}`;
+    const colStyle = `position:relative;width:${frameW}px;max-width:100%;height:100vh;background:${P.page};overflow:hidden;box-shadow:0 0 0 1px ${P.border},0 8px 40px rgba(0,0,0,.12);${vars}`;
+
+    // dev toolbar
+    const dbtn = a => `flex:0 0 auto;height:26px;padding:0 9px;border-radius:6px;border:1px solid ${a ? '#1db868' : '#444'};background:${a ? '#153a26' : '#2e2e2e'};color:${a ? '#5fe0a0' : '#bbb'};font:600 11px/1 -apple-system;cursor:pointer`;
+    const grp = (title, defs, cur, set) => ({ title, items: defs.map(([v, l]) => ({ label: l, style: dbtn(cur === v), go: () => set(v) })) });
+    const devGroups = [
+      grp('Screen', [['property', 'Property'], ['viewer', 'Photos'], ['project', 'Project'], ['requirement', 'Requirement'], ['sold', 'Sold'], ['error', 'Error']], st.screen, v => this.nav(v)),
+      grp('Theme', [['light', 'Light'], ['dark', 'Dark']], st.theme, v => this.setState({ theme: v })),
+      grp('Device', [['mobile', 'Mobile'], ['tablet', 'Tablet'], ['desktop', 'Desktop']], st.device, v => this.setState({ device: v })),
+      grp('Viewer role', [['guest', 'Guest'], ['buyer', 'Buyer'], ['owner', 'Owner']], st.role, v => this.setState({ role: v })),
+      grp('Contact', [['private', 'Private'], ['public', 'Public']], st.contact, v => this.setState({ contact: v })),
+      grp('Listing status', [['live', 'Live'], ['review', 'Review'], ['sold', 'Sold']], st.status, v => this.setState({ status: v })),
+      grp('Requirement', [['locked', 'Locked'], ['unlocked', 'Unlocked'], ['own', 'Own'], ['expired', 'Expired'], ['fulfilled', 'Fulfilled']], st.reqState, v => this.setState({ reqState: v })),
+      grp('Error kind', [['404', '404'], ['crash', 'Crash'], ['inline', 'Inline']], st.errKind, v => { this.setState({ errKind: v }); }),
+      grp('State', [[null, 'Normal'], ['skeleton', 'Skeleton'], ['offline', 'Offline']], st.forced, v => this.setState({ forced: v }))
+    ];
+
+    // header morph
+    const solid = st.scrolled;
+    const hdrStyle = `position:absolute;top:0;left:0;right:0;z-index:40;display:flex;align-items:center;gap:2px;height:52px;padding:0 6px;padding-top:env(safe-area-inset-top);transition:background .2s,border-color .2s;${solid ? `background:${P.surface1};border-bottom:1px solid ${P.border}` : 'background:linear-gradient(rgba(0,0,0,.35),rgba(0,0,0,0));border-bottom:1px solid transparent'}`;
+    const hdrBtn = `width:44px;height:44px;display:grid;place-items:center;border:none;background:none;cursor:pointer;color:${solid ? P.ink1 : '#fff'};filter:${solid ? 'none' : 'drop-shadow(0 1px 2px rgba(0,0,0,.5))'}`;
+    const hdrTitle = `flex:1;text-align:center;font:600 15px/1.2 -apple-system;color:${P.ink1};opacity:${solid ? 1 : 0};transition:opacity .2s;white-space:nowrap;overflow:hidden;text-overflow:ellipsis`;
+    const onScroll = e => { const s = e.target.scrollTop > 160; if (s !== st.scrolled) this.setState({ scrolled: s }); };
+
+    // carousel
+    const N = 6;
+    const carouselDots = Array.from({ length: N }).map((_, k) => ({ style: `width:${k === st.carousel ? 6 : 4}px;height:${k === st.carousel ? 6 : 4}px;border-radius:999px;background:${k === st.carousel ? P.accent : 'rgba(255,255,255,.5)'};transition:all .2s` }));
+
+    // key specs
+    const keySpecs = [
+      { icon: svgSpan(ic('<path d="M2 10V7a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v3"/><path d="M2 10h20v7M4 17v2M20 17v2M6 10V8h5v2M13 10V8h5v2"/>')), v: '3 BHK', k: 'Bedrooms' },
+      { icon: svgSpan(ic('<path d="M5 12V6a2 2 0 0 1 2-2 2 2 0 0 1 2 2M4 12h16v3a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4zM6 19l-1 2M18 19l1 2"/>')), v: '3 Bath', k: 'Bathrooms' },
+      { icon: svgSpan(ic('<path d="M3 3h18v18H3zM3 9h18M9 3v18"/>')), v: '1,450', k: 'Sqft' },
+      { icon: svgSpan(ic('<path d="M4 21V5a2 2 0 0 1 2-2h9l5 5v13M8 8h4M8 12h4M8 16h4"/>')), v: '4 / 7', k: 'Floor' }
+    ];
+    const amIco = {
+      Lift: '<rect x="6" y="3" width="12" height="18" rx="1"/><path d="M12 6v12M9 9l3-3 3 3M9 15l3 3 3-3"/>',
+      Parking: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 17V7h4a3 3 0 0 1 0 6H9"/>',
+      Security: '<path d="M12 3l7 3v6c0 4-3 7-7 9-4-2-7-5-7-9V6l7-3Z"/><path d="m9 12 2 2 4-4"/>',
+      Garden: '<path d="M12 22V12M12 12C12 8 9 5 5 5c0 4 3 7 7 7ZM12 12c0-4 3-7 7-7 0 4-3 7-7 7Z"/>',
+      Gym: '<path d="M6 7v10M18 7v10M3 9v6M21 9v6M6 12h12"/>',
+      '24hr Water': '<path d="M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11Z"/>',
+      'Power backup': '<path d="M13 2 4 14h7l-1 8 9-12h-7z"/>',
+      'Gas line': '<path d="M12 3c3 3 5 6 5 9a5 5 0 0 1-10 0c0-1 .5-2 1-3 1 2 2 2 2 2s-1-4 2-8Z"/>'
+    };
+    const amenities = Object.keys(amIco).map(k => ({ label: k, icon: svgSpan(ic(amIco[k])) }));
+    const highlightChips = ['Semi-furnished', 'East facing', 'Ready to move', 'Lift', 'Covered parking'].map(l => ({ label: l, go: () => this.toast('Search: ' + l) }));
+    const detailRows = [
+      { k: 'Property type', v: 'Flat' }, { k: 'Built-up area', v: '1,450 sqft' }, { k: 'Carpet area', v: '1,180 sqft' }, { k: 'Furnishing', v: 'Semi-furnished' },
+      { k: 'Facing', v: 'East' }, { k: 'Floor', v: '4 of 7' }, { k: 'Age', v: '3 years' }, { k: 'Bathrooms', v: '3' },
+      { k: 'Balconies', v: '2' }, { k: 'Parking', v: '1 car + 2 two-wheeler' }, { k: 'Water', v: 'Municipal + Bore' }, { k: 'Maintenance', v: '₹2,200/month' },
+      { k: 'Ownership', v: 'Freehold' }, { k: 'Society', v: 'Shree Residency' }
+    ];
+    const furnishing = ['AC (2)', 'Wardrobes (3)', 'Geyser', 'Modular kitchen'];
+    const similar = [{ price: '₹78 Lakh', meta: '3 BHK · Mavdi', ph: 1 }, { price: '₹62 Lakh', meta: '2 BHK · Mavdi', ph: 2 }, { price: '₹95 Lakh', meta: '3 BHK · Mavdi', ph: 4 }].map(c => ({ ...c, bg: url(PHOTO[c.ph]), go: () => this.nav('property') }));
+
+    // status / role logic
+    const statusReview = st.status === 'review';
+    const statusSold = st.status === 'sold';
+    const ownerStats = st.role === 'owner' && !statusSold;
+    const barSold = statusSold;
+    const barOwner = st.role === 'owner' && !statusSold;
+    const barPublic = !barOwner && !barSold && st.contact === 'public';
+    const barPrivate = !barOwner && !barSold && st.contact === 'private';
+    const statList = [{ v: '1,240', k: 'Views', tap: () => {}, cursor: 'default' }, { v: '18', k: 'Saves', tap: () => {}, cursor: 'default' }, { v: '6', k: 'Leads', tap: () => this.toast('Leads — coming in Batch P8'), cursor: 'pointer' }];
+    const inquiryBtn = `flex:1;height:44px;border:none;border-radius:8px;font:600 15px/1 -apple-system;cursor:${st.inquirySent ? 'default' : 'pointer'};${st.inquirySent ? 'background:var(--surface3);color:var(--ink3)' : 'background:var(--accent);color:#fff'}`;
+
+    // viewer
+    const viewerThumbs = Array.from({ length: N }).map((_, k) => ({ style: `flex:0 0 auto;width:48px;height:48px;border-radius:6px;background-image:${url(PHOTO[k])};background-size:cover;background-position:center;cursor:pointer;border:2px solid ${k === st.viewer ? '#fff' : 'transparent'}`, pick: () => this.setState({ viewer: k, viewerZoom: false }) }));
+    const viewerImgStyle = `width:100%;height:100%;background-image:${url(PHOTO[st.viewer])};background-size:contain;background-repeat:no-repeat;background-position:center;transition:transform .2s;transform:scale(${st.viewerZoom ? 2 : 1});cursor:${st.viewerZoom ? 'zoom-out' : 'zoom-in'};user-select:none`;
+
+    // project
+    const projCompleted = st.status === 'sold';
+    const projOwner = st.role === 'owner';
+    const projPublic = !projOwner;
+    const projStatusChips = [
+      { label: projCompleted ? 'Completed' : 'Under Construction', style: `flex:0 0 auto;height:30px;padding:0 12px;display:inline-flex;align-items:center;border-radius:999px;font:600 11px/1 -apple-system;letter-spacing:.3px;text-transform:uppercase;${projCompleted ? 'background:var(--surface3);color:var(--ink2)' : 'background:var(--warningSoft);color:var(--warning)'}` },
+      { label: projCompleted ? 'Ready to move' : 'Possession: Dec 2026', style: 'flex:0 0 auto;height:30px;padding:0 12px;display:inline-flex;align-items:center;border-radius:999px;font:600 11px/1 -apple-system;background:var(--surface2);color:var(--ink1)' },
+      { label: 'RERA Approved', style: 'flex:0 0 auto;height:30px;padding:0 12px;display:inline-flex;align-items:center;border-radius:999px;font:600 11px/1 -apple-system;background:var(--accentSoft);color:var(--accent)' }
+    ];
+    const projFacts = [{ v: '3', k: 'Towers' }, { v: 'G+7', k: 'Floors' }, { v: '84', k: 'Units' }, { v: '26', k: 'Available' }];
+    const unitDefs = [
+      { title: '2 BHK — 1,100 sqft — ₹45 L onwards', carpet: '920 sqft', avail: 12, ph: 2 },
+      { title: '3 BHK — 1,450 sqft — ₹62 L onwards', carpet: '1,180 sqft', avail: 8, ph: 3 },
+      { title: '3 BHK Premium — 1,680 sqft — ₹78 L onwards', carpet: '1,380 sqft', avail: 6, ph: 4 }
+    ];
+    const unitRows = unitDefs.map((u, i) => ({ ...u, plan: url(PHOTO[u.ph]), open: st.openUnit === i, chev: `transition:transform .2s;transform:rotate(${st.openUnit === i ? 180 : 0}deg)`, toggle: () => this.setState(s => ({ openUnit: s.openUnit === i ? -1 : i })) }));
+    const banks = ['SBI', 'HDFC', 'ICICI', 'Axis'];
+    const projAmIco = { Clubhouse: '<path d="M3 21V9l9-6 9 6v12M9 21v-6h6v6"/>', 'Swimming pool': '<path d="M2 15c2 0 2 2 4 2s2-2 4-2 2 2 4 2 2-2 4-2 2 2 4 2M6 12V5a2 2 0 0 1 4 0M14 12V5a2 2 0 0 1 4 0"/>', Gym: '<path d="M6 7v10M18 7v10M3 9v6M21 9v6M6 12h12"/>', 'Kids play area': '<circle cx="12" cy="5" r="2"/><path d="M12 7v6M8 22l4-9 4 9M6 12h12"/>', Garden: '<path d="M12 22V12M12 12C12 8 9 5 5 5c0 4 3 7 7 7Z"/>', Security: '<path d="M12 3l7 3v6c0 4-3 7-7 9-4-2-7-5-7-9V6z"/>', 'Power backup': '<path d="M13 2 4 14h7l-1 8 9-12h-7z"/>', Parking: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 17V7h4a3 3 0 0 1 0 6H9"/>' };
+    const projAmenities = Object.keys(projAmIco).map(k => ({ label: k, icon: svgSpan(ic(projAmIco[k])) }));
+    const similarProjects = [{ name: 'Shree Residency', price: '₹68 L onwards', ph: 5 }, { name: 'Skyline Towers', price: '₹52 L onwards', ph: 6 }, { name: 'Palm Greens', price: '₹80 L onwards', ph: 7 }].map(c => ({ ...c, bg: url(PHOTO[c.ph]), go: () => this.nav('project') }));
+    const projStatList = [{ v: '1,240', k: 'Views' }, { v: '18', k: 'Leads' }, { v: '26/84', k: 'Units' }];
+
+    // requirement
+    const reqLocked = st.reqState === 'locked';
+    const reqUnlocked = st.reqState === 'unlocked';
+    const reqOwn = st.reqState === 'own';
+    const reqExpired = st.reqState === 'expired';
+    const reqFulfilled = st.reqState === 'fulfilled';
+    const reqShowFull = !reqLocked;
+    const budgetLabel = reqLocked ? '₹••L – ₹••L' : '₹40 Lakh – ₹60 Lakh';
+    const budgetStyle = `font:700 24px/1.15 -apple-system;color:var(--ink1);${reqLocked ? 'filter:blur(6px);width:180px' : ''}`;
+    const reqStatusChip = reqOwn ? 'Active · 22 days left' : reqExpired ? 'Expired' : reqFulfilled ? 'Fulfilled ✓' : '';
+    const reqStatusStyle = `height:24px;padding:0 8px;display:inline-flex;align-items:center;border-radius:4px;font:600 11px/1 -apple-system;letter-spacing:.3px;text-transform:uppercase;${reqExpired ? 'background:var(--surface3);color:var(--ink2)' : 'background:var(--accentSoft);color:var(--accent)'}`;
+    const paywallList = ['View all requirements', '30 proposals included', 'Instant match alerts'];
+    const reqDetailRows = [{ k: 'Property type', v: 'Flat' }, { k: 'Configuration', v: '3 BHK' }, { k: 'Urgency', v: 'Immediate (1 month)' }, { k: 'Posted', v: '2 hours ago' }, { k: 'Requirement ID', v: '#REQ-8842' }, { k: 'Budget flexibility', v: 'Slightly flexible' }];
+    const reqAreas = ['Mavdi', 'University Road', 'Raiya Road'];
+    const matchingCards = [{ price: '₹78 Lakh', meta: '3 BHK · Mavdi', ph: 1 }, { price: '₹62 Lakh', meta: '3 BHK · Mavdi', ph: 2 }, { price: '₹85 Lakh', meta: '3 BHK · Raiya Rd', ph: 4 }].map(c => ({ ...c, bg: url(PHOTO[c.ph]), go: () => this.nav('property') }));
+    const reqActiveUI = this._toggle(st.reqActive, P);
+    const proposalBtn = `width:100%;height:44px;border:none;border-radius:8px;font:600 15px/1 -apple-system;cursor:${st.proposalSent ? 'default' : 'pointer'};${st.proposalSent ? 'background:var(--surface3);color:var(--ink3)' : 'background:var(--accent);color:#fff'}`;
+
+    // sold / error
+    const soldSimilar = [{ price: '₹78 Lakh', meta: '3 BHK · 1,380 sqft', area: 'University Road, Rajkot', ph: 1 }, { price: '₹54 Lakh', meta: '2 BHK · 1,050 sqft', area: 'Mavdi, Rajkot', ph: 2 }, { price: '₹1.1 Cr', meta: '4 BHK · 2,050 sqft', area: 'Kalawad Road, Rajkot', ph: 4 }].map(c => ({ ...c, bg: url(PHOTO[c.ph]), go: () => this.nav('property') }));
+
+    // sheets
+    const q = st.quick;
+    const qChip = (key, label) => ({ label, toggle: () => this.setState(s => ({ quick: { ...s.quick, [key]: !s.quick[key] } })), style: `height:34px;padding:0 14px;border-radius:999px;font:600 13px/1 -apple-system;cursor:pointer;${q[key] ? 'background:var(--accentSoft);border:1px solid var(--accent);color:var(--accent)' : 'background:var(--surface2);border:1px solid var(--border);color:var(--ink1)'}` });
+    const quickChips = [qChip('visit', 'Site visit?'), qChip('nego', 'Negotiable?'), qChip('docs', 'Documents ready?'), qChip('loan', 'Loan available?')];
+    const shareNumUI = this._toggle(st.shareNum, P);
+    const reportDefs = ['Fake listing', 'Already sold', 'Wrong price', 'Wrong photos', 'Abusive content', 'Duplicate'];
+    const reportOptions = reportDefs.map((l, i) => ({ label: l, on: st.report === i, pick: () => this.setState({ report: i }), radio: `flex:0 0 auto;width:22px;height:22px;border-radius:999px;display:grid;place-items:center;border:1.5px solid ${st.report === i ? P.accent : P.border}` }));
+    const reportBtn = `width:100%;height:44px;border:none;border-radius:8px;font:600 15px/1 -apple-system;cursor:${st.report == null ? 'default' : 'pointer'};${st.report == null ? 'background:var(--errorSoft);color:var(--ink3)' : 'background:var(--error);color:#fff'}`;
+    const shareDests = [{ label: 'WhatsApp', icon: 'WA', bg: '#25D366', tap: () => { this.close(); this.toast('Shared to WhatsApp'); } }, { label: 'Copy Link', icon: '⧉', bg: P.ink2, tap: () => this.copyLink() }, { label: 'More', icon: '···', bg: P.ink3, tap: () => { this.close(); this.toast('Opening share…'); } }];
+
+    // proposal sheet
+    const hasProperty = st.propMode === 'property';
+    const optCard = on => `display:flex;align-items:center;gap:12px;padding:14px;border-radius:12px;cursor:pointer;margin-bottom:10px;border:1.5px solid ${on ? P.accent : P.border};background:${on ? P.accentSoft : P.surface1}`;
+    const radioDot = on => `flex:0 0 auto;width:22px;height:22px;border-radius:999px;border:1.5px solid ${on ? P.accent : P.border};background:${on ? 'radial-gradient(circle,' + P.accent + ' 0 5px,transparent 6px)' : 'transparent'}`;
+    const myListings = [{ price: '₹85 Lakh', meta: '3 BHK · Mavdi', ph: 0 }, { price: '₹62 Lakh', meta: '2 BHK · Mavdi', ph: 2 }].map((l, i) => ({ ...l, bg: url(PHOTO[l.ph]), style: `flex:0 0 auto;width:130px;padding:8px;border-radius:10px;cursor:pointer;border:1.5px solid ${st.pickedListing === i ? P.accent : P.border};background:${P.surface1}`, pick: () => this.setState({ pickedListing: i }) }));
+
+    // dialog config
+    const dc = st.dialog;
+    const dialogMap = {
+      numreq: { title: "Request owner's number?", body: "The owner will be asked to share their number with you. You'll be notified when they respond.", cancel: 'Cancel', confirm: 'Send Request', danger: false, fn: () => { this.close(); this.toast('Number request sent'); } },
+      marksold: { title: 'Mark this property as sold?', body: 'It will be archived and removed from search. You can restore it later.', cancel: 'Cancel', confirm: 'Mark as Sold', danger: false, fn: () => { this.close(); this.setState({ status: 'sold' }); this.toast('Marked as sold'); } },
+      reqoff: { title: 'Turn off this requirement?', body: 'It will stop receiving proposals. This requirement will still count against your plan quota.', cancel: 'Cancel', confirm: 'Turn Off', danger: false, fn: () => { this.close(); this.setState({ reqActive: false }); this.toast('Requirement turned off'); } },
+      delete: { title: 'Delete this requirement?', body: 'This cannot be undone. The requirement will still count against your plan quota.', cancel: 'Cancel', confirm: 'Delete', danger: true, fn: () => { this.close(); this.toast('Requirement deleted'); } }
+    };
+    const dcfg = dc ? dialogMap[dc] : null;
+
+    const sheetTall = `position:fixed;left:50%;transform:translateX(-50%);bottom:0;z-index:160;width:${frameW}px;max-width:100%;height:82vh;background:${P.surface1};border-top-left-radius:12px;border-top-right-radius:12px;display:flex;flex-direction:column;overflow:hidden;box-shadow:${P.l3};animation:hzSheet .3s cubic-bezier(0.2,0,0,1)`;
+    const sheetAuto = `position:fixed;left:50%;transform:translateX(-50%);bottom:0;z-index:160;width:${frameW}px;max-width:100%;max-height:80vh;background:${P.surface1};border-top-left-radius:12px;border-top-right-radius:12px;display:flex;flex-direction:column;overflow-y:auto;box-shadow:${P.l3};animation:hzSheet .3s cubic-bezier(0.2,0,0,1)`;
+    const toastStyle = `position:fixed;left:50%;bottom:90px;z-index:300;transform:translateX(-50%);background:${D ? '#2a2a2a' : '#1a1a1a'};color:#fff;font:400 13px/1.3 -apple-system;padding:11px 16px;border-radius:999px;box-shadow:0 6px 20px rgba(0,0,0,.35);max-width:320px;text-align:center;animation:hzToast .2s ease-out`;
+
+    return {
+      rootStyle, colStyle, vars,
+      devWrapStyle: 'position:fixed;top:10px;right:10px;z-index:500;display:flex;flex-direction:column;align-items:flex-end',
+      devOpen: st.devOpen, toggleDev: () => this.setState(s => ({ devOpen: !s.devOpen })), devGroups,
+
+      isProperty: st.screen === 'property', isViewer: st.screen === 'viewer', isProject: st.screen === 'project',
+      isRequirement: st.screen === 'requirement', isSold: st.screen === 'sold', isError: st.screen === 'error',
+      isSkeleton: st.forced === 'skeleton', propNormal: st.forced !== 'skeleton', isOffline: st.forced === 'offline',
+      six: [0, 0, 0, 0, 0, 0],
+
+      hdrStyle, hdrBtn, hdrTitle, onScroll, goBack: () => this.goBack(), goHome: () => this.gotoSearch('home'), goSearch: () => this.gotoSearch('home'),
+      saveFill: st.saved ? (D ? '#F5F5F5' : '#111') : 'none', toggleSave: () => this.guard(() => { this.setState(s => ({ saved: !s.saved })); this.toast(st.saved ? 'Removed from saved' : 'Saved to your list'); }),
+
+      heroPhoto: url(PHOTO[st.carousel]), galleryDim: `position:absolute;inset:0;background:rgba(0,0,0,${P.dim});z-index:2;pointer-events:none`,
+      soldGray: statusSold ? 'filter:grayscale(1)' : '', statusReview, statusSold,
+      promoted: st.promoted, carouselCounter: (st.carousel + 1) + '/' + N, carouselDots,
+      openViewer: () => this.setState({ screen: 'viewer', viewer: st.carousel, viewerZoom: false }),
+
+      priceLabel: st.status === 'review' && false ? '' : (this.state.priceOnReq ? 'Price on Request' : '₹85 Lakh'),
+      priceStyle: 'font:700 24px/1 -apple-system;color:var(--ink1)', showNego: !this.state.priceOnReq, showPsf: !this.state.priceOnReq,
+      keySpecs, highlightChips, detailRows, amenities, furnishing, similar,
+      descStyle: `font:400 15px/1.55 -apple-system;color:var(--ink2);${st.descOpen ? '' : 'display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden'}`,
+      descToggleLabel: st.descOpen ? 'Read less' : 'Read more', toggleDesc: () => this.setState(s => ({ descOpen: !s.descOpen })),
+      posterAv: url(AV[0]), openPoster: () => this.toast('Profile — coming in Batch P9'), exploreArea: () => this.gotoSearch('area'),
+
+      showBar: !st.forced || st.forced === 'offline',
+      ownerStats, statList, barSold, barPublic, barPrivate, barOwner,
+      inquiryBtn, inquiryLabel: st.inquirySent ? 'Inquiry sent ✓' : 'Send Inquiry',
+      requestNumber: () => this.guard(() => this.setState({ dialog: 'numreq' })),
+      openInquiry: () => this.guard(() => { if (!st.inquirySent) this.open('inquiry'); }),
+      callNow: () => this.toast('Calling +91 98765 43210…'), whatsapp: () => this.toast('Opening WhatsApp…'),
+      ownerEdit: () => this.toast('Edit listing — Batch P7'), ownerBoost: () => this.toast('Boost — Batch P7'), updateUnits: () => this.toast('Update units — Batch P7'),
+      openMarkSold: () => this.setState({ dialog: 'marksold' }), browseSimilar: () => this.gotoSearch('results'),
+
+      viewerCounter: (st.viewer + 1) + ' / ' + N, viewerPhoto: PHOTO[st.viewer], viewerImgStyle, viewerCaption: CAPTIONS[st.viewer], viewerThumbs,
+      closeViewer: () => this.setState({ screen: st.screen === 'viewer' ? 'property' : st.screen, viewerZoom: false }),
+      viewerTap: () => {}, viewerDoubleTap: () => this.setState(s => ({ viewerZoom: !s.viewerZoom })),
+      viewerPrev: () => this.setState(s => ({ viewer: (s.viewer - 1 + N) % N, viewerZoom: false })),
+      viewerNext: () => this.setState(s => ({ viewer: (s.viewer + 1) % N, viewerZoom: false })),
+
+      projPhoto: url(PHOTO[1]), projBadge: projCompleted ? 'Completed' : 'New Project', projStatusChips, projFacts, unitRows, banks, projAmenities, similarProjects,
+      projOwner, projPublic, projStatList, builderAv: url(AV[1]), downloadBrochure: () => this.toast('Downloading brochure…'),
+
+      reqUrgent: !reqExpired && !reqFulfilled, reqLocked, reqUnlocked, reqOwn, reqExpired, reqFulfilled, reqShowFull,
+      budgetLabel, budgetStyle, reqStatusChip, reqStatusStyle, paywallList, reqDetailRows, reqAreas, matchingCards, reqPosterAv: url(AV[2]),
+      checkout: () => this.toast('Checkout — coming in Batch P6'), comparePlans: () => this.toast('Compare plans'),
+      reqActiveTrack: reqActiveUI.track, reqActiveKnob: reqActiveUI.knob, toggleReqActive: () => { if (st.reqActive) this.setState({ dialog: 'reqoff' }); else { this.setState({ reqActive: true }); this.toast('Requirement active'); } },
+      openProposalsList: () => this.toast('Proposals — coming in Batch P8'),
+      proposalBtn, proposalLabel: st.proposalSent ? 'Proposal sent ✓' : 'Send Proposal', openProposal: () => { if (!st.proposalSent) this.open('proposal'); },
+      markFulfilled: () => { this.setState({ reqState: 'fulfilled' }); this.toast('Marked as fulfilled'); }, openDelete: () => this.setState({ dialog: 'delete' }),
+
+      soldSimilar,
+      is404: st.errKind === '404', isCrash: st.errKind === 'crash', isInlineErr: st.errKind === 'inline',
+      reload: () => this.toast('Reloading…'), contactSupport: () => this.toast('Contact support'),
+
+      scrimOpen: (st.sheet && st.sheet !== 'login') || false, closeSheet: () => this.close(), stop: e => e.stopPropagation(),
+      loginSheet: st.sheet === 'login', loginPhone: () => { this.close(); this.toast('Phone sign-in — Auth module'); },
+      inquirySheet: st.sheet === 'inquiry', shareSheet: st.sheet === 'share', moreSheet: st.sheet === 'more', reportSheet: st.sheet === 'report', proposalSheet: st.sheet === 'proposal',
+      openShare: () => this.open('share'), openMore: () => this.open('more'), shareFromMore: () => this.open('share'), openReport: () => this.open('report'),
+      notInterested: () => { this.close(); this.toast("We'll show fewer like this"); }, copyLink: () => { this.close(); this.toast('Link copied'); }, shareDests,
+      quickChips, shareNumTrack: shareNumUI.track, shareNumKnob: shareNumUI.knob, toggleShareNum: () => this.setState(s => ({ shareNum: !s.shareNum })),
+      sendInquiry: () => { this.close(); this.setState({ inquirySent: true }); this.toast('Inquiry sent — waiting for owner to accept'); },
+      reportOptions, reportBtn, submitReport: () => { if (st.report == null) return; this.close(); this.toast('Report submitted'); },
+      hasProperty, propOpt1: optCard(hasProperty), propOpt2: optCard(!hasProperty), propRadio1: radioDot(hasProperty), propRadio2: radioDot(!hasProperty),
+      pickHasProperty: () => this.setState({ propMode: 'property' }), pickChat: () => this.setState({ propMode: 'chat' }),
+      myListings, suggestInstead: () => this.toast('Send a suggestion'),
+      sendProposal: () => { this.close(); this.setState({ proposalSent: true }); this.toast('Proposal sent — 5 remaining'); },
+
+      dialog: dc, dialogTitle: dcfg && dcfg.title, dialogBody: dcfg && dcfg.body, dialogCancel: dcfg && dcfg.cancel, dialogConfirmLabel: dcfg && dcfg.confirm,
+      dialogConfirm: () => dcfg && dcfg.fn(), dialogConfirmStyle: `height:40px;padding:0 18px;border:none;border-radius:8px;font:600 15px/1 -apple-system;color:#fff;cursor:pointer;background:${dcfg && dcfg.danger ? P.error : P.accent}`,
+
+      sheetTall, sheetAuto, toast: st.toast, toastStyle
+    };
+  }
+
+  _toggle(on, P) {
+    return { track: `position:relative;width:46px;height:28px;border-radius:999px;border:none;cursor:pointer;transition:background .15s;background:${on ? P.accent : P.surface3}`, knob: `position:absolute;top:3px;left:${on ? '21px' : '3px'};width:22px;height:22px;border-radius:999px;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.3);transition:left .15s` };
+  }
+}
+</script>
+
+
+</body></html>
