@@ -1,8 +1,9 @@
 import "server-only";
 import { randomUUID, createHash } from "node:crypto";
 import { kv } from "@/lib/kv";
-import { rateLimit } from "./rate-limit";
+import { rateLimit, rateLimitDisabled } from "./rate-limit";
 import { getOtpProvider, generateOtpCode } from "./otp-provider";
+import { isBanned } from "./device-ban";
 
 /**
  * OTP lifecycle (Doc2 §3.1 / Doc9 §13). All state server-side.
@@ -49,10 +50,19 @@ export interface RequestOtpOutcome {
 }
 
 export async function isNumberLocked(phone: string): Promise<boolean> {
+  // Same temporary dev kill switch as the counters (docs/RATE-LIMIT-OFF.md): a
+  // 24h lock earned by a test run would otherwise outlive the test run itself.
+  if (rateLimitDisabled) return false;
   return (await kv.exists(lockKey(phone))) === 1;
 }
 
 export async function requestOtp(phone: string, ipHash: string): Promise<RequestOtpOutcome> {
+  // An admin ban (A9's "Ban device/IP") is checked HERE because this is the one
+  // door every account comes through. Reported as a number lock: the design has
+  // no "you are banned" screen, and telling a banned actor exactly which signal
+  // caught them is how they learn what to change.
+  if (await isBanned(ipHash)) return { ok: false, reason: "NUMBER_LOCKED" };
+
   if (await isNumberLocked(phone)) return { ok: false, reason: "NUMBER_LOCKED" };
 
   const perNumber = await rateLimit(`otp:num:${phone}`, OTP.SMS_PER_HOUR_NUMBER, 3600);

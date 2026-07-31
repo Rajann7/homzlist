@@ -29,7 +29,13 @@ export type NotificationType =
   | "saved_search_match" | "requirement_match" | "requirement_expiring"
   // plans, payments, security
   | "plan_expiring" | "plan_expired" | "trial_ending"
-  | "payment_success" | "payment_failed" | "refund_processed" | "new_device_login";
+  | "payment_success" | "payment_failed" | "refund_processed" | "new_device_login"
+  // admin decisions (A7/A9). These have existed in the `notification_type` enum
+  // and in `notification_types` since 0088; the union simply had not caught up,
+  // so the only way to send one was a cast — which compiles, runs, and hides
+  // the next genuinely-missing type behind the same cast.
+  | "verification_approved" | "verification_rejected" | "verification_revoked"
+  | "account_suspended" | "admin_message" | "role_changed";
 
 export type NotificationCategory = "inquiry" | "listing" | "requirement" | "payment";
 

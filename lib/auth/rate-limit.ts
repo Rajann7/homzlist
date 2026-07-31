@@ -8,7 +8,22 @@ export interface RateResult {
   retryAfterSec: number;
 }
 
+/**
+ * TEMPORARY dev kill switch — see docs/RATE-LIMIT-OFF.md for how to turn it back on.
+ *
+ * Browser-driven testing hammers the same IP and the same login over and over,
+ * so the per-IP / per-number counters trip long before a test run finishes. With
+ * `DISABLE_RATE_LIMIT=1` in .env.local every limiter reports "allowed" and the
+ * OTP number-lock is ignored. It refuses to engage when NODE_ENV is production,
+ * so this can never disarm the limits on a deployed server even if the env var
+ * leaks into that environment.
+ */
+export const rateLimitDisabled =
+  process.env.NODE_ENV !== "production" &&
+  (process.env.DISABLE_RATE_LIMIT === "1" || process.env.DISABLE_RATE_LIMIT === "true");
+
 export async function rateLimit(key: string, limit: number, windowSec: number): Promise<RateResult> {
+  if (rateLimitDisabled) return { allowed: true, remaining: limit, retryAfterSec: 0 };
   const redisKey = `rl:${key}`;
   const count = await kv.incr(redisKey);
   if (count === 1) await kv.expire(redisKey, windowSec);
