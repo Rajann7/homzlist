@@ -1,7 +1,11 @@
 import { notFound } from "next/navigation";
 import { Placeholder } from "@/components/admin/panel/Placeholder";
-import { SCREEN_ROUTES } from "@/components/admin/ds/screens";
-import { SCREEN_TITLES, SCREEN_MIN_ROLE, ROLE_RANK } from "@/components/admin/ds/admin-context";
+import {
+  SCREEN_ROUTES,
+  SCREEN_TITLES,
+  SCREEN_MIN_ROLE,
+  ROLE_RANK,
+} from "@/components/admin/ds/screens";
 import { requireAdmin } from "@/lib/admin/guard";
 
 /**
@@ -23,7 +27,10 @@ export const dynamic = "force-dynamic";
 export default async function PanelPlaceholder({ params }: { params: { screen: string[] } }) {
   const me = await requireAdmin("staff");
 
-  const path = `/account/${params.screen.join("/")}`;
+  // The segments below /account are the BROWSER's path, which is what
+  // SCREEN_ROUTES holds — `/account` itself is the rewrite target and never
+  // part of a route key.
+  const path = `/${params.screen.join("/")}`;
   const entry = Object.entries(SCREEN_ROUTES).find(([, route]) => route === path);
   // A4 Review is a full screen addressed by listing id (`reviewRoute`), so it
   // has no entry of its own — the dashboard's overdue list and every queue row

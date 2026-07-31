@@ -49,9 +49,19 @@ export type AdminListApi<R> = {
 
 const RESERVED = new Set(["q", "tab", "sort", "dir", "page", "pageSize"]);
 
+/**
+ * `defaultTab` is the tab the screen opens on when the URL names none. Every
+ * queue in P3 has one (the design opens A3 on "Pending", A7 on "Pending", A9 on
+ * "All"), and without it the first paint shows the UNFILTERED list under a
+ * highlighted tab — a table quietly disagreeing with the chip above it.
+ *
+ * It is not written to the URL: a default that rewrites the address on mount
+ * puts an entry in history that Back cannot escape.
+ */
 export function useAdminList<R = Record<string, unknown>>(
   resource: string,
   filterKeys: readonly string[],
+  defaultTab?: string,
 ): AdminListApi<R> {
   const router = useRouter();
   const pathname = usePathname();
@@ -70,9 +80,10 @@ export function useAdminList<R = Record<string, unknown>>(
     for (const key of RESERVED) {
       const v = params.get(key);
       if (v) out.set(key, v);
+      else if (key === "tab" && defaultTab) out.set("tab", defaultTab);
     }
     return out.toString();
-  }, [params, filterKeys]);
+  }, [params, filterKeys, defaultTab]);
 
   useEffect(() => {
     let cancelled = false;
@@ -136,7 +147,7 @@ export function useAdminList<R = Record<string, unknown>>(
     error,
     filters,
     search: params.get("q") ?? "",
-    tab: params.get("tab"),
+    tab: params.get("tab") ?? defaultTab ?? null,
     activeFilterCount: Object.values(filters).reduce((n, v) => n + v.length, 0),
     query,
     setSearch: (term) =>

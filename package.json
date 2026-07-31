@@ -45,7 +45,9 @@
     "check:story": "node scripts/check-story-live.mjs",
     "check:builder-req": "node scripts/check-builder-requirements-live.mjs",
     "seed:admin": "node scripts/seed-admin.mjs",
-    "check:admin-p2": "node scripts/check-admin-p2-live.mjs"
+    "check:admin-p2": "node scripts/check-admin-p2-live.mjs",
+    "check:admin-p3": "node scripts/check-admin-p3-decisions.mjs",
+    "check:admin-links": "node scripts/check-admin-links.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1091.0",

@@ -23,81 +23,20 @@ import {
   type ReactNode,
 } from "react";
 
-export type AdminRole = "staff" | "admin" | "super";
-
-/** template line 249 */
-export const ROLE_RANK: Record<AdminRole, number> = { staff: 1, admin: 2, super: 3 };
-
-/** template line 248 — which screens each role may open at all. */
-export const SCREEN_MIN_ROLE: Record<string, AdminRole> = {
-  staff: "super",
-  audit: "super",
-  settings: "super",
-  users: "admin",
-  listingsMaster: "admin",
-  payments: "admin",
-  finance: "admin",
-  plans: "admin",
-  coupons: "admin",
-  grants: "admin",
-  masterData: "admin",
-  cms: "admin",
-  templates: "admin",
-  disputes: "admin",
-  cron: "admin",
-  trash: "admin",
-  exports: "admin",
-  analytics: "admin",
-};
-
-/** template line 1994 */
-export function canSee(role: AdminRole, screen: string): boolean {
-  const need = SCREEN_MIN_ROLE[screen];
-  if (!need) return true;
-  return ROLE_RANK[role] >= ROLE_RANK[need];
-}
-
-/** template line 244 */
-export const SCREEN_TITLES: Record<string, string> = {
-  dashboard: "Dashboard",
-  listings: "Listings",
-  review: "Review",
-  requirements: "Requirements",
-  boosts: "Boosts",
-  verifications: "Verifications",
-  appeals: "Appeals",
-  reports: "Reports",
-  users: "Users",
-  listingsMaster: "Listings",
-  payments: "Payments",
-  finance: "Finance",
-  plans: "Plans",
-  coupons: "Coupons",
-  grants: "Grants & trials",
-  masterData: "Master data",
-  cms: "Content",
-  templates: "Templates",
-  settings: "Settings",
-  tickets: "Tickets",
-  disputes: "Disputes",
-  staff: "Staff",
-  audit: "Audit log",
-  cron: "System status",
-  analytics: "Analytics",
-  trash: "Trash",
-  exports: "Exports",
-};
-
-/** template line 245 */
-export const QUEUE_SCREENS = [
-  "listings",
-  "review",
-  "requirements",
-  "boosts",
-  "verifications",
-  "appeals",
-  "reports",
-];
+/**
+ * The screen tables moved to ./screens (no "use client"), because the route
+ * guards are Server Components and cannot read a constant out of a client
+ * module. Re-exported here so every existing client call site is unchanged.
+ */
+export {
+  ROLE_RANK,
+  SCREEN_MIN_ROLE,
+  SCREEN_TITLES,
+  QUEUE_SCREENS,
+  canSee,
+  type AdminRole,
+} from "./screens";
+import { ROLE_RANK, type AdminRole } from "./screens";
 
 export type AdminIdentity = {
   id: string;
