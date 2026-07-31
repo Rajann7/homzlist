@@ -3559,3 +3559,21 @@ screens read them.
 exist as DATA (so audit, ticket assignee, exports "by" and the Staff screen are
 populated) but nobody can log in with them. Real admin accounts get created with
 the admin build, when Rajan gives the emails.
+
+## Module 11 · P1 — admin sign-in provider
+
+**Google OAuth credentials are not configured.** `GOOGLE_OAUTH_CLIENT_ID` and
+`GOOGLE_OAUTH_CLIENT_SECRET` are empty in `.env.local`, so the real Google
+round-trip cannot be completed or proven. The panel therefore signs in through
+`lib/admin/auth-provider.ts`, which mirrors the OTP layer's dev/real split.
+
+What is NOT deferred: the whitelist check against `staff`, the active/revoked
+branch, the role, the `staff_sessions` row, the rotating refresh token, the
+`admin_login_attempts` log and the per-request re-verification are all real and
+identical in both providers. Only "which Google account is this?" is stubbed,
+and only outside production — `adminAuthProviderKind()`, `devIdentity()` and the
+`/api/v1/admin/auth/dev` route each refuse to run with `NODE_ENV=production`.
+
+**To finish:** put the two credentials in the environment. The provider flips to
+Google automatically; `googleAuthorizeUrl()` / `googleIdentityFromCode()` are
+already written and no other code changes.

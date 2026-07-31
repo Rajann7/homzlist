@@ -30,7 +30,14 @@ import { createServiceClient } from "@/lib/supabase/server";
 export type StorageDriver = "r2" | "supabase" | "local";
 
 /** Public bucket for listing imagery; private bucket for proofs/brochures. */
-export const BUCKET = { public: "listing-photos", private: "private-docs" } as const;
+export const BUCKET = {
+  public: "listing-photos",
+  private: "private-docs",
+  /** Admin exports (0092). Private, and kept separate from `private-docs` so
+   *  accepting spreadsheets here never loosens the mime guard on the bucket
+   *  holding user-uploaded ownership proofs and ID scans. */
+  adminExports: "admin-exports",
+} as const;
 
 export function storageDriver(): StorageDriver {
   const { r2 } = serverEnv();

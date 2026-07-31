@@ -53,6 +53,7 @@
     "@supabase/supabase-js": "^2.45.4",
     "bullmq": "^5.28.1",
     "clsx": "^2.1.1",
+    "exceljs": "^4.4.0",
     "firebase": "^11.10.0",
     "firebase-admin": "^14.2.0",
     "ioredis": "^5.4.1",
