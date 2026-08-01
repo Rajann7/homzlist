@@ -1,8 +1,7 @@
 import "server-only";
 import { registerBulkActions } from "./bulk";
 import { grantTrial, sendAdminMessage, suspendUser } from "./users";
-import { deleteListing, hideListing } from "./listings-master";
-import { moderate } from "@/lib/listings/moderation";
+import { deleteListing, hideListing, moderateFromMaster } from "./listings-master";
 import { createServiceClient } from "@/lib/supabase/server";
 
 /**
@@ -117,17 +116,12 @@ registerBulkActions("listings-master", {
     auditAction: "approve",
     entityType: "listing",
     apply: async (me, id) => {
-      const kind = await kindOf(id);
-      if (kind === "project") {
-        // `moderate()` covers listings and requirements only — a project has no
-        // approval path anywhere in the app yet (recorded in
-        // docs/PENDING-INTEGRATIONS.md). Saying so per subject is better than
-        // a bulk action that silently skips every builder row.
-        throw new Error("Projects have no approval path yet");
-      }
-      const res = await moderate("listing", id, me.id, { action: "approve", notes: null, reason: null });
-      if (!res.ok) throw new Error(res.reason);
-      return { label: "Listing", summary: "Approved from the bulk bar" };
+      // Both kinds. A project used to throw here because nothing in the panel
+      // could approve one; `moderateFromMaster` is that path now, so a builder's
+      // row is no longer the one the bulk bar quietly skips.
+      const res = await moderateFromMaster(await kindOf(id), id, me, "approve", null, null);
+      if (!res.ok) throw new Error(res.message ?? res.reason);
+      return { label: res.label, summary: res.summary, diff: res.diff };
     },
   },
   delete: {

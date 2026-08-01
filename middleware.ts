@@ -47,7 +47,11 @@ export async function middleware(request: NextRequest) {
    * every endpoint anyone adds later. Reads pass; nothing else does.
    */
   if (pathname.startsWith("/api")) {
-    if (user?.imp && !["GET", "HEAD", "OPTIONS"].includes(request.method)) {
+    // The one exception, and it is the opposite of a hole: ending the session
+    // is how an admin gets OUT of read-only mode. Refusing it would leave the
+    // tab live until the 30-minute expiry with no way to close it.
+    const isExit = pathname === "/api/v1/impersonate/exit";
+    if (user?.imp && !isExit && !["GET", "HEAD", "OPTIONS"].includes(request.method)) {
       return NextResponse.json(
         { ok: false, error: { code: "IMPERSONATION_READ_ONLY", message: "This is a read-only admin view — sends, payments and messages are disabled." } },
         { status: 403 },

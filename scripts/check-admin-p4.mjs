@@ -909,6 +909,159 @@ console.log("\nMerge and delete — proved on accounts this script creates");
   gte("audit row (sensitive)", await audited("delete", primary), 1);
 }
 
+/* ═══════════════════ 7c · the four dead ends P4 opened, proved closed ══════ */
+console.log("\nThe four gaps P4 closed");
+{
+  /* 1 — a PROJECT can now be decided. It could be submitted and never
+     reviewed: moderate() always supported it, but no admin screen called it
+     with that subject. */
+  let proj = await one(
+    `select id, profile_id, name from projects
+      where status = 'pending_review' and deleted_at is null limit 1`,
+  );
+  if (!proj) {
+    const owner = await one(`select id from profiles where role='builder' limit 1`);
+    proj = await one(
+      `insert into projects (profile_id, name, status, area_label, submitted_at,
+                             rera_exempt, rera_exempt_reason)
+       values ($1,'P4 project approval check','pending_review','Mavdi, Rajkot', now(),
+               true, 'Automated check fixture')
+       returning id, profile_id, name`,
+      owner.id,
+    );
+  }
+  const before = (await one(`select status from projects where id=$1`, proj.id)).status;
+  check("a project is waiting for review", before, "pending_review");
+
+  const noReason = await api(`/listings-master/${proj.id}/actions`, {
+    method: "POST",
+    body: JSON.stringify({ action: "reject", kind: "project", reason: "" }),
+  });
+  check("rejecting a project without a reason is refused", noReason.status, 422);
+
+  const changes = await api(`/listings-master/${proj.id}/actions`, {
+    method: "POST",
+    body: JSON.stringify({ action: "request_changes", kind: "project", reason: "P4 check — add the RERA number" }),
+  });
+  check("request changes on a project → 200", changes.status, 200);
+  check(
+    "projects.status",
+    (await one(`select status from projects where id=$1`, proj.id)).status,
+    "changes_requested",
+  );
+  gte("the builder was notified", await notified(proj.profile_id, "listing_changes_requested"), 1);
+
+  const approved = await api(`/listings-master/${proj.id}/actions`, {
+    method: "POST",
+    body: JSON.stringify({ action: "approve", kind: "project" }),
+  });
+  check("approve a project → 200", approved.status, 200);
+  const live = await one(`select status, approved_at, live_at from projects where id=$1`, proj.id);
+  check("projects.status is live", live.status, "live");
+  check("approved_at set", live.approved_at !== null, true);
+  gte("audit row", await audited("approve", proj.id), 1);
+
+  // and the bulk bar no longer skips builder rows
+  const proj2 = await one(
+    `insert into projects (profile_id, name, status, area_label, submitted_at,
+                           rera_exempt, rera_exempt_reason)
+     values ($1,'P4 bulk project check','pending_review','Mavdi, Rajkot', now(),
+             true, 'Automated check fixture')
+     returning id`,
+    proj.profile_id,
+  );
+  const bulk = await api("/bulk/listings-master/approve", {
+    method: "POST",
+    body: JSON.stringify({ ids: [proj2.id] }),
+  });
+  check("bulk approve accepts a PROJECT", bulk.json?.data?.done?.length, 1);
+  check(
+    "…and it went live",
+    (await one(`select status from projects where id=$1`, proj2.id)).status,
+    "live",
+  );
+
+  /* 2 — a send records what each channel actually did. */
+  const target = await one(
+    `select id, email from profiles where state='active' and is_registered and email is not null limit 1`,
+  );
+  const sent = await api(`/users/${target.id}/actions`, {
+    method: "POST",
+    body: JSON.stringify({
+      action: "send_message",
+      channels: ["in_app", "email", "whatsapp"],
+      subject: "P4 delivery check",
+      body: "Automated.",
+    }),
+  });
+  check("three-channel send → 200", sent.status, 200);
+  const row = await one(
+    `select delivery, delivered_at from admin_messages where profile_id=$1 order by created_at desc limit 1`,
+    target.id,
+  );
+  check("in-app records sent", row.delivery.in_app.sent, true);
+  check("email records its real outcome", typeof row.delivery.email.sent, "boolean");
+  check("whatsapp records its real outcome", typeof row.delivery.whatsapp.sent, "boolean");
+  // On an environment with no provider keys the reason is recorded, not hidden.
+  const emailOk = row.delivery.email.sent;
+  check(
+    emailOk ? "email sent" : "email failure carries a reason",
+    emailOk ? true : Boolean(row.delivery.email.reason),
+    true,
+  );
+  check("delivered_at set because in-app really went", row.delivered_at !== null, true);
+  check(
+    "the summary names the channel that failed",
+    /✓|✗/.test(sent.json.data.summary),
+    true,
+  );
+
+  /* 3 — the impersonated TAB carries the banner, and can end its own session. */
+  const subject3 = await one(
+    `select id, name from profiles where state='active' and is_registered limit 1`,
+  );
+  const start = await api("/impersonate", {
+    method: "POST",
+    body: JSON.stringify({ profileId: subject3.id }),
+  });
+  const jar3 = jar();
+  const enter = await fetch(start.json.data.userViewUrl, { redirect: "manual" });
+  jar3.absorb(enter);
+  const page = await fetch(`http://seller.localhost:${PORT}/`, { headers: { cookie: jar3.header() } });
+  const html = await page.text();
+  check("the seller tab renders the A31 banner", html.includes("(read-only)"), true);
+  check("…naming the admin", html.includes("Viewing as"), true);
+
+  const exit = await fetch(`http://seller.localhost:${PORT}/api/v1/impersonate/exit`, {
+    method: "POST",
+    headers: { cookie: jar3.header() },
+  });
+  check("Exit session is the one write the read-only wall allows", exit.status, 200);
+  check(
+    "…and it really ended the session",
+    (await one(
+      `select ended_at from impersonation_sessions where id=$1`,
+      start.json.data.session.id,
+    )).ended_at !== null,
+    true,
+  );
+  // every OTHER write is still refused with that same cookie jar
+  const stillBlocked = await fetch(`http://seller.localhost:${PORT}/api/v1/listings`, {
+    method: "POST",
+    headers: { cookie: jar3.header(), "content-type": "application/json" },
+    body: "{}",
+  });
+  check("a write is still refused", stillBlocked.status === 403 || stillBlocked.status === 401, true);
+
+  /* 4 — the users view is no longer O(everything). */
+  const plan = await all(
+    `explain (analyze, format json) select * from admin_user_list order by joined_at desc limit 50`,
+  );
+  const ms = plan[0]["QUERY PLAN"][0]["Execution Time"];
+  console.log(`  --   admin_user_list page of 50: ${ms.toFixed(1)} ms (was 132 ms as CTEs)`);
+  check("a page of A10 costs under 60 ms", ms < 60, true);
+}
+
 /* ═══════════════════════════════════════════════════════ 8 · security ══════ */
 console.log("\nSecurity — the two walls");
 {

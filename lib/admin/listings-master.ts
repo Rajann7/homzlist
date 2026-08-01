@@ -694,3 +694,74 @@ export async function photoAction(
 }
 
 export { subject as masterSubject };
+
+/* ═════════════════════════════════════════ the project moderation dead end ═ */
+
+/**
+ * Approve / request changes / reject, FROM THE MASTER.
+ *
+ * A builder posts projects, not listings. `moderate()` has always supported
+ * `project`, but nothing in the panel called it with that subject: A3's queue
+ * view is listings-only, so a submitted project sat in `pending_review` with no
+ * screen able to decide it — a builder could pay, post, and never be reviewed.
+ * That is exactly the state trap CLAUDE.md's hidden-issue hunt asks about.
+ *
+ * The design has no project-approval surface because it predates the
+ * builder-projects-only change, so this adds the three decisions to the ONE
+ * place a project already appears (A12's panel, template 1712's row menu), and
+ * nowhere else. A3 keeps the five sub-tabs the design draws.
+ *
+ * It calls the same state machine the seller app and A4 obey — there is still
+ * exactly one, so the panel and the queue cannot drift.
+ */
+export async function moderateFromMaster(
+  kind: MasterKind,
+  id: string,
+  me: AdminIdentity,
+  action: "approve" | "request_changes" | "reject",
+  reason: string | null,
+  notes: Record<string, string> | null,
+): Promise<MasterResult> {
+  if (action === "reject" && !reason?.trim()) {
+    return { ok: false, reason: "validation", message: "A reason is required to reject" };
+  }
+  if (action === "request_changes" && !reason?.trim() && !notes) {
+    return { ok: false, reason: "validation", message: "Say what needs changing" };
+  }
+
+  const { moderate } = await import("@/lib/listings/moderation");
+  // `moderate()` refuses "request changes" with nothing to change — correctly,
+  // because a seller told to fix something unnamed is a dead end. A4 has a
+  // per-field note composer; A12's panel does not, so the reason the admin
+  // typed IS the note, attached to the posting as a whole.
+  const withNotes =
+    action === "request_changes" && !notes && reason?.trim()
+      ? { general: reason.trim().slice(0, 300) }
+      : notes;
+
+  const res = await moderate(kind, id, me.id, {
+    action,
+    notes: withNotes,
+    reason: reason?.trim()?.slice(0, 300) ?? null,
+  });
+
+  if (!res.ok) {
+    if (res.reason === "not_found") return { ok: false, reason: "not_found" };
+    if (res.reason === "locked")
+      return { ok: false, reason: "bad_state", message: "Locked after three rejections — needs an appeal" };
+    return { ok: false, reason: "bad_state", message: "Already decided" };
+  }
+
+  const row = await subject(kind, id);
+  return {
+    ok: true,
+    label: (row?.[TITLE[kind]] as string) ?? (kind === "project" ? "Project" : "Listing"),
+    summary:
+      action === "approve"
+        ? "Approved from the listings master"
+        : action === "reject"
+          ? `Rejected — ${reason?.trim()}`
+          : "Changes requested",
+    diff: { action, reason: reason?.trim() ?? null, notes },
+  };
+}

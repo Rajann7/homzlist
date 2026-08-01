@@ -437,7 +437,7 @@ in the panel resolves it and behaves correctly for both.
 ### P4 gates
 
 ```
-npm run check:admin-p4        168 checks, all green
+npm run check:admin-p4        192 checks, all green
 npm run check:admin-p4-bands  30 checks — the device branches, machine-asserted
 npm run check:admin-links     28 destinations, all resolve
 tsc --noEmit                  clean
@@ -521,3 +521,22 @@ Two more the pixel diff caught, both design branches that had been missed:
 A12's mobile view has **no filter bar at all** (template 1079 is `head,
 chipRow, bulk, cards`), and the filter bar's **"Clear all" is unconditional**
 (template 1005) rather than appearing once a filter is set.
+
+### P4 closes with nothing open
+
+The four gaps the first pass wrote into `docs/PENDING-INTEGRATIONS.md` were
+closed in the same part rather than handed to a later one:
+
+- **project moderation** — Approve / Request changes / Reject in A12's panel and
+  bulk bar, on the same state machine A4 uses. A builder's project could be
+  submitted and never reviewed; it cannot now.
+- **message delivery** — `admin_messages.delivery` records a per-channel result
+  (0101); WhatsApp got the provider module email already had. A channel with no
+  keys on this environment records `no_credentials` and the toast says so.
+- **the A31 banner inside the user app** — rendered from the SESSION, so it can
+  never appear for a real user, and its Exit ends the row server-side.
+- **A10's view** — rebuilt with LATERAL (0100). 132 ms → **8.6 ms** per page,
+  and the check now fails if it goes back over 60.
+
+`npm run check:admin-p3` still passes unchanged (53 checks), so none of it
+regressed the queues.

@@ -3,6 +3,8 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { notify } from "@/lib/notifications/service";
 import { listSessions, revokeAllSessions, revokeSession } from "@/lib/auth/session";
 import { describeUserAgent } from "@/lib/notifications/user-agent";
+import { renderEmail, sendEmail } from "@/lib/notifications/email";
+import { sendWhatsApp } from "@/lib/notifications/whatsapp";
 import type { AdminIdentity } from "./guard";
 
 /**
@@ -983,39 +985,95 @@ export async function sendAdminMessage(
   if (!allowed.length)
     return { ok: false, reason: "validation", message: "Pick at least one channel" };
 
-  const rows = ids.map((profile_id) => ({
-    profile_id,
-    channel: allowed.join(","),
-    subject: subject.trim().slice(0, 140) || null,
-    body: body.trim().slice(0, 2000),
-    sent_by: me.id,
-    sent_by_name: me.name,
-    // Only in-app is delivered by this platform today; email and WhatsApp are
-    // provider-gated (docs/PENDING-INTEGRATIONS.md). Claiming delivery for a
-    // channel that has no provider is exactly the lie the hunt looks for, so
-    // delivered_at is set only for what really went out.
-    delivered_at: allowed.includes("in_app") ? new Date().toISOString() : null,
-  }));
-  const { error } = await db().from("admin_messages").insert(rows);
-  if (error) return { ok: false, reason: "validation", message: error.message };
+  const title = subject.trim().slice(0, 140) || "A message from the HomzList team";
+  const text = body.trim().slice(0, 2000);
 
-  if (allowed.includes("in_app")) {
-    for (const profileId of ids) {
-      await notify({
+  const { data: people } = await db()
+    .from("profiles")
+    .select("id, email, phone")
+    .in("id", ids);
+  const contact = new Map(
+    ((people ?? []) as { id: string; email: string | null; phone: string | null }[]).map((p) => [
+      p.id,
+      p,
+    ]),
+  );
+
+  const totals: Record<string, { sent: number; failed: number; reason?: string }> = {};
+  const bump = (ch: string, sent: boolean, reason?: string) => {
+    const t = (totals[ch] ??= { sent: 0, failed: 0 });
+    if (sent) t.sent++;
+    else {
+      t.failed++;
+      t.reason ??= reason;
+    }
+  };
+
+  for (const profileId of ids) {
+    const who = contact.get(profileId);
+    const delivery: Record<string, { sent: boolean; reason?: string }> = {};
+
+    // IN-APP goes through the notification pipeline, which owns preferences,
+    // quiet hours and the delivery ledger. Writing our own would be a second
+    // sender that disagrees with the first.
+    if (allowed.includes("in_app")) {
+      const res = await notify({
         profileId,
         type: "admin_message",
-        title: subject.trim() || "A message from the HomzList team",
-        body: body.trim().slice(0, 500),
+        title,
+        body: text.slice(0, 500),
         actorId: me.id,
       });
+      delivery.in_app = { sent: Boolean(res.id) };
+      bump("in_app", Boolean(res.id));
     }
+
+    // EMAIL and WHATSAPP are real calls to the real providers. Where a
+    // provider has no credentials on this environment they answer
+    // "no_credentials" — which is RECORDED, not hidden behind a success toast.
+    if (allowed.includes("email")) {
+      const res = await sendEmail({
+        to: who?.email ?? "",
+        subject: title,
+        html: renderEmail({ title, body: text }),
+      });
+      delivery.email = { sent: res.sent, reason: res.reason };
+      bump("email", res.sent, res.reason);
+    }
+    if (allowed.includes("whatsapp")) {
+      const res = await sendWhatsApp({ to: who?.phone ?? "", body: `${title}
+
+${text}` });
+      delivery.whatsapp = { sent: res.sent, reason: res.reason };
+      bump("whatsapp", res.sent, res.reason);
+    }
+
+    const anySent = Object.values(delivery).some((d) => d.sent);
+    const { error } = await db().from("admin_messages").insert({
+      profile_id: profileId,
+      channel: allowed.join(","),
+      subject: subject.trim().slice(0, 140) || null,
+      body: text,
+      sent_by: me.id,
+      sent_by_name: me.name,
+      // Only set when something genuinely went out on at least one channel.
+      delivered_at: anySent ? new Date().toISOString() : null,
+      delivery,
+    });
+    if (error) return { ok: false, reason: "validation", message: error.message };
   }
+
+  // The summary names what failed, so the toast cannot claim three channels
+  // when one of them has no provider on this environment.
+  const parts = Object.entries(totals).map(([ch, t]) =>
+    t.failed === 0 ? `${ch} ✓` : `${ch} ✗ (${t.reason ?? "failed"})`,
+  );
 
   return {
     ok: true,
     label: ids.length === 1 ? "User" : `${ids.length} users`,
-    summary: `Message sent via ${allowed.join(", ")}`,
-    diff: { channels: allowed, subject: subject.trim() || null, recipients: ids.length },
+    summary: `Message sent — ${parts.join(" · ")}`,
+    diff: { channels: allowed, subject: subject.trim() || null, recipients: ids.length, totals },
   };
 }
 

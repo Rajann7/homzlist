@@ -65,6 +65,7 @@ export function ListingPanelBody({ panel }: { panel: PanelEntry }) {
   const [menu, setMenu] = useState<"more" | "photo" | null>(null);
   const [photoId, setPhotoId] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<"hide" | "expire" | "pause" | "delete" | null>(null);
+  const [decide, setDecide] = useState<"request_changes" | "reject" | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -112,6 +113,14 @@ export function ListingPanelBody({ panel }: { panel: PanelEntry }) {
   );
 
   const title = String(header?.title ?? "Listing");
+
+  /**
+   * A submitted PROJECT has no other screen that can decide it: A3's queue is
+   * listings-only, exactly as the design draws it. So the three decisions
+   * appear here, and only while the row is actually awaiting one — a live
+   * listing must not offer "Approve".
+   */
+  const awaitingReview = header?.status_key === "pending" || header?.status_key === "changes";
 
   return (
     <>
@@ -299,6 +308,13 @@ export function ListingPanelBody({ panel }: { panel: PanelEntry }) {
               ["Mark sold", () => void act("mark_sold")],
               ["Restore", () => void act("restore")],
               ["Force expire", () => setConfirm("expire")],
+              ...(awaitingReview
+                ? ([
+                    ["Approve", () => void act("approve")],
+                    ["Request changes", () => setDecide("request_changes")],
+                    ["Reject", () => setDecide("reject"), true],
+                  ] as [string, () => void, boolean?][])
+                : []),
               ["Delete", () => setConfirm("delete"), true],
             ]}
             onPick={() => setMenu(null)}
@@ -317,6 +333,17 @@ export function ListingPanelBody({ panel }: { panel: PanelEntry }) {
             onPick={() => setMenu(null)}
           />
         </SheetMenu>
+      ) : null}
+
+      {decide ? (
+        <DecideDialog
+          which={decide}
+          onClose={() => setDecide(null)}
+          onGo={async (reason) => {
+            await act(decide, { reason });
+            setDecide(null);
+          }}
+        />
       ) : null}
 
       {confirm ? (
@@ -343,6 +370,68 @@ export function ListingPanelBody({ panel }: { panel: PanelEntry }) {
 function roleLabel(role: string | null | undefined): string {
   if (!role) return "Owner";
   return role.charAt(0).toUpperCase() + role.slice(1);
+}
+
+/**
+ * Request changes / Reject, with the same wording A4 uses for a listing — one
+ * vocabulary for one state machine, whichever screen the decision came from.
+ */
+function DecideDialog({
+  which,
+  onClose,
+  onGo,
+}: {
+  which: "request_changes" | "reject";
+  onClose: () => void;
+  onGo: (reason: string) => void;
+}) {
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+  const isReject = which === "reject";
+  return (
+    <Modal
+      title={isReject ? "Reject this posting?" : "Request changes?"}
+      onClose={onClose}
+      footer={
+        <>
+          <Btn label="Cancel" kind="outline" onClick={onClose} />
+          <Btn
+            label={busy ? "Sending…" : isReject ? "Reject" : "Request changes"}
+            kind={isReject ? "dangerFill" : "primary"}
+            onClick={() => {
+              if (!reason.trim()) return;
+              setBusy(true);
+              onGo(reason);
+            }}
+          />
+        </>
+      }
+    >
+      <div style={{ fontSize: 13, color: "var(--ink2)" }}>
+        {isReject
+          ? "The poster is notified and can edit and resubmit. Three rejections lock it until an appeal."
+          : "The poster is notified and can edit and resubmit right away."}
+      </div>
+      <textarea
+        value={reason}
+        onChange={(e) => setReason(e.target.value)}
+        placeholder="Reason (required)…"
+        style={{
+          width: "100%",
+          height: 60,
+          marginTop: 10,
+          padding: 10,
+          borderRadius: 8,
+          border: "1px solid var(--border)",
+          background: "var(--s2)",
+          color: "var(--ink1)",
+          fontSize: 13,
+          fontFamily: "inherit",
+          resize: "none",
+        }}
+      />
+    </Modal>
+  );
 }
 
 /* template 1780 / 1784 — the panel's four confirmations, with the design's copy. */

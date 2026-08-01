@@ -7,6 +7,7 @@ import type { AdminRole } from "@/lib/admin/session";
 import {
   deleteListing,
   editListing,
+  moderateFromMaster,
   forceExpireListing,
   hideListing,
   markSold,
@@ -44,6 +45,11 @@ const GATE: Record<string, { role: AdminRole; audit: string }> = {
   photo_cover: { role: "admin", audit: "photo_cover" },
   photo_remove: { role: "admin", audit: "photo_remove" },
   delete: { role: "super", audit: "delete" },
+  // The three moderation decisions, reachable from A12 because a PROJECT has no
+  // other screen that can make them (A3's queue is listings-only by design).
+  approve: { role: "admin", audit: "approve" },
+  request_changes: { role: "admin", audit: "request_changes" },
+  reject: { role: "admin", audit: "reject" },
 };
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
@@ -120,6 +126,20 @@ async function run(
     }
     case "delete":
       return deleteListing(kind, id, me, str(body, "reason") || null);
+    case "approve":
+    case "request_changes":
+    case "reject": {
+      const notes =
+        body.notes && typeof body.notes === "object"
+          ? Object.fromEntries(
+              Object.entries(body.notes as Record<string, unknown>)
+                .filter(([, v]) => typeof v === "string" && v.trim())
+                .slice(0, 30)
+                .map(([k, v]) => [k, String(v).slice(0, 300)]),
+            )
+          : null;
+      return moderateFromMaster(kind, id, me, action, str(body, "reason") || null, notes);
+    }
     default:
       return { ok: false, reason: "validation" };
   }

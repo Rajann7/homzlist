@@ -193,12 +193,13 @@ export async function impersonationContext(): Promise<{
   sessionId: string;
   profileId: string;
   staffName: string;
+  startedAt: string;
 } | null> {
   const value = cookies().get(IMP_COOKIE)?.value;
   if (!value) return null;
   const { data } = await db()
     .from("impersonation_sessions")
-    .select("id, profile_id, staff_name, ended_at, expires_at")
+    .select("id, profile_id, staff_name, started_at, ended_at, expires_at")
     .eq("id", value)
     .maybeSingle();
   const row = data as
@@ -206,13 +207,19 @@ export async function impersonationContext(): Promise<{
         id: string;
         profile_id: string;
         staff_name: string;
+        started_at: string;
         ended_at: string | null;
         expires_at: string | null;
       }
     | null;
   if (!row || row.ended_at) return null;
   if (row.expires_at && new Date(row.expires_at).getTime() < Date.now()) return null;
-  return { sessionId: row.id, profileId: row.profile_id, staffName: row.staff_name };
+  return {
+    sessionId: row.id,
+    profileId: row.profile_id,
+    staffName: row.staff_name,
+    startedAt: row.started_at,
+  };
 }
 
 export class ImpersonationReadOnlyError extends Error {

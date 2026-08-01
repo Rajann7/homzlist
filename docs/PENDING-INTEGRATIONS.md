@@ -3708,28 +3708,36 @@ Settings (**P7**) — the banner would otherwise offer a link that does nothing.
   takes the bar's input, and `lib/admin/bulk-actions.ts` registers A10's three
   and A12's three.
 
-### Still open after P4 — tracked, not hidden
+### Nothing is left open from P4
 
-1. **A project has no approval path anywhere in the app.** `moderate()` covers
-   `listing` and `requirement` only, and A3's queue view is listings-only — so a
-   builder's project can be submitted and never reviewed. A12 lists and edits
-   projects (P4 added them to the master), and the bulk "Approve" refuses per
-   subject with a stated reason rather than silently skipping every builder row.
-   The queue side belongs with a later pass over A3/A5.
-2. **Email and WhatsApp sends are recorded, not delivered.** A11's Send-message
-   sheet offers three channels; only in-app has a provider today, so
-   `admin_messages.delivered_at` is set for in-app and left NULL for the other
-   two rather than claiming a delivery that did not happen. Resend (**B5**) and
-   the WhatsApp provider close it.
-3. **Impersonation is a real read-only session; the seller app has no banner of
-   its own.** The session, the expiry, the audit rows and the API-level refusal
-   are all real and proven (a signed `imp` claim, refused by middleware on every
-   non-GET `/api` call). What the impersonated TAB does not yet show is the
-   design's yellow "Viewing as … (read-only)" strip — that strip lives in the
-   admin panel, and putting one inside the seller shell is a user-side layout
-   change, which the design lock says to ask about first.
-4. **`admin_user_list` recomputes its aggregates on every read.** Six correlated
-   sub-selects over listings, projects, leads, views and reports. At 200 users
-   it is instant; it is not a shape that survives 50,000. The fix is a
-   materialised view refreshed by the cron A27 owns (**P7**), not a change to
-   the screen.
+The four gaps the first pass recorded here were closed rather than tracked.
+`npm run check:admin-p4` proves each one from the database.
+
+1. **A project can be decided now.** `moderate()` always supported the subject;
+   no admin screen ever called it with one, so a submitted project sat in
+   `pending_review` forever — a builder could pay, post, and never be reviewed.
+   Approve / Request changes / Reject now live in A12's panel (the one screen a
+   project already appears on) and in the bulk bar, calling the SAME state
+   machine A4 and the seller app obey. A3 keeps the five sub-tabs the design
+   draws; nothing there changed. `request_changes` from A12 attaches the
+   admin's reason as the review note, because `moderate()` correctly refuses to
+   ask a seller to fix something unnamed.
+2. **Every channel records what it actually did.** `admin_messages.delivery`
+   (migration 0101) holds a per-channel result. In-app goes through the
+   notification pipeline that owns preferences and quiet hours; email calls
+   Resend; WhatsApp calls MSG91 through `lib/notifications/whatsapp.ts`, built
+   to the same shape as the email sender. Where an environment has no keys the
+   row records `no_credentials` and the toast NAMES the channel that failed —
+   `delivered_at` is only set when something really went out. Adding the keys
+   changes no code.
+3. **The impersonated tab carries the A31 banner.** `ImpersonationBanner`
+   renders in the seller shell, and only when the request resolves a live
+   session — a real user never sees a pixel of it, so the locked design is
+   untouched for them. Its "Exit session" is the single write the read-only
+   wall permits by path, and it ends the row on the server, so closing the
+   session and closing the tab are the same click.
+4. **A10's view is no longer O(everything).** `admin_user_list` was CTEs that
+   aggregated five whole tables per read (132 ms at 200 users, and the same
+   shape at 50,000). Migration 0100 rebuilds it with LATERAL over the indexes
+   0098 added: **8.6 ms** for a page of 50, asserted by the check so it cannot
+   quietly regress.
