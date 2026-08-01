@@ -53,7 +53,8 @@ absorb(
  * honest signal — and for a screen a later part builds, the marker is the
  * design's own placeholder, which is exactly what should be there today.
  */
-const BUILT = "a later delivery batch";
+/** The marker a screen a LATER part builds must still be showing. */
+const UNBUILT = "a later delivery batch";
 const SCREENS = [
   ["/", "Refresh dashboard"],
   ["/queues/listings", "Listings queue"],
@@ -62,25 +63,26 @@ const SCREENS = [
   ["/queues/verifications", "Verification queue"],
   ["/queues/appeals", "Appeals queue"],
   ["/queues/reports", "Reports queue"],
-  ["/users", BUILT],
-  ["/listings", BUILT],
-  ["/payments", BUILT],
-  ["/finance", BUILT],
-  ["/plans", BUILT],
-  ["/coupons", BUILT],
-  ["/grants", BUILT],
-  ["/master-data", BUILT],
-  ["/cms", BUILT],
-  ["/templates", BUILT],
-  ["/settings", BUILT],
-  ["/tickets", BUILT],
-  ["/disputes", BUILT],
-  ["/staff", BUILT],
-  ["/audit", BUILT],
-  ["/cron", BUILT],
-  ["/analytics", BUILT],
-  ["/trash", BUILT],
-  ["/exports", BUILT],
+  // P4 built these two, so the marker is their own copy, not the placeholder.
+  ["/users", "No users match|users"],
+  ["/listings", "No listings here|Listings"],
+  ["/payments", UNBUILT],
+  ["/finance", UNBUILT],
+  ["/plans", UNBUILT],
+  ["/coupons", UNBUILT],
+  ["/grants", UNBUILT],
+  ["/master-data", UNBUILT],
+  ["/cms", UNBUILT],
+  ["/templates", UNBUILT],
+  ["/settings", UNBUILT],
+  ["/tickets", UNBUILT],
+  ["/disputes", UNBUILT],
+  ["/staff", UNBUILT],
+  ["/audit", UNBUILT],
+  ["/cron", UNBUILT],
+  ["/analytics", UNBUILT],
+  ["/trash", UNBUILT],
+  ["/exports", UNBUILT],
 ];
 
 const listing = await one(
@@ -103,11 +105,13 @@ for (const [path, marker] of SCREENS) {
   });
   const body = res.status === 200 ? await res.text() : "";
   const redirected = res.status >= 300 && res.status < 400;
-  const ok = res.status === 200 && body.includes(marker);
+  // A marker may be an alternation ("A|B") — a built screen can legitimately be
+  // in its empty state or its populated one, and both are the screen.
+  const ok = res.status === 200 && marker.split("|").some((m) => body.includes(m));
   if (!ok) failures++;
 
   const verdict = ok
-    ? marker === BUILT
+    ? marker === UNBUILT
       ? "ok (placeholder, as designed)"
       : "ok"
     : redirected

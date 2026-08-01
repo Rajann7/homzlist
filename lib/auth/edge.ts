@@ -7,14 +7,20 @@ import { jwtVerify } from "jose";
  */
 export async function verifyAccessEdge(
   token: string | undefined,
-): Promise<{ sub: string; role: string | null; registered: boolean } | null> {
+): Promise<{ sub: string; role: string | null; registered: boolean; imp: string | null } | null> {
   if (!token) return null;
   const secret = process.env.JWT_ACCESS_SECRET;
   if (!secret) return null;
   try {
     const { payload } = await jwtVerify(token, new TextEncoder().encode(secret));
     if (payload.typ !== "access" || !payload.sub) return null;
-    return { sub: payload.sub as string, role: (payload.role as string) ?? null, registered: Boolean(payload.registered) };
+    return {
+      sub: payload.sub as string,
+      role: (payload.role as string) ?? null,
+      registered: Boolean(payload.registered),
+      // A31: an impersonation token. middleware.ts refuses every write with it.
+      imp: (payload.imp as string) ?? null,
+    };
   } catch {
     return null;
   }

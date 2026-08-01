@@ -263,8 +263,142 @@ export const reportQueueResource: ListResource = {
   ],
 };
 
+/* ══════════════════════════════════════ P4 — users and the listings master ══ */
+
+/**
+ * A10 — template 994-1046.
+ *
+ * The design's six filter pills are Role · Status · Plan · City · Verification
+ * · Joined, and every one of them is an `.in()` on a real column of
+ * `admin_user_list` (migration 0098) rather than a chip that narrows nothing.
+ *
+ * There are no sub-tabs on A10 — the design uses a saved-view button ("All
+ * users") where the queues use tabs — so this resource declares none, and the
+ * count next to the filter bar is the engine's filtered total.
+ */
+export const userResource: ListResource = {
+  name: "users",
+  table: "admin_user_list",
+  select:
+    "id, name, handle, phone, email, role, account_state, photo_url, joined_at, last_active_at, city_name, v_phone, v_id, v_rera, verification_key, plan_names, plan_key, trial_ends_at, listings_count, listings_live, listings_other, leads_count, views_count, reports_count, is_new, status_key",
+  // The design's search box says "Name or phone" (template 1004); email and
+  // handle are searched too because an admin arriving from a support ticket has
+  // one of those and not the other.
+  searchColumns: ["name", "phone", "email", "handle"],
+  sortColumns: ["joined_at", "name", "listings_count", "leads_count", "last_active_at"],
+  defaultSort: { column: "joined_at", ascending: false },
+  filters: [
+    { key: "role", column: "role", kind: "in", options: ["owner", "broker", "builder"] },
+    {
+      key: "status",
+      column: "status_key",
+      kind: "in",
+      options: ["active", "suspended", "trial", "deleted"],
+    },
+    { key: "plan", column: "plan_key", kind: "in", options: ["paid", "trial", "none"] },
+    { key: "city", column: "city_name", kind: "in" },
+    {
+      key: "verification",
+      column: "verification_key",
+      kind: "in",
+      options: ["rera", "id", "phone", "none"],
+    },
+    { key: "from", column: "joined_at", kind: "dateFrom" },
+    { key: "to", column: "joined_at", kind: "dateTo" },
+  ],
+  minRole: "admin",
+  // template 1032 — the design's twelve header cells, in its order.
+  columns: [
+    { key: "user", label: "User", field: "name" },
+    { key: "phone", label: "Phone", field: "phone" },
+    { key: "role", label: "Role", field: "role" },
+    { key: "verification", label: "Verification", field: "verification_key" },
+    { key: "city", label: "City", field: "city_name" },
+    { key: "plans", label: "Plans", field: "plan_names" },
+    { key: "listings", label: "Listings", field: "listings_count" },
+    { key: "leads", label: "Leads", field: "leads_count" },
+    { key: "joined", label: "Joined", field: "joined_at" },
+    { key: "status", label: "Status", field: "status_key" },
+  ],
+};
+
+/**
+ * A12 — template 1056-1105.
+ *
+ * The design's ten status chips are this resource's ten tabs, so each chip
+ * carries a real count over the whole table under the same filters. ("Trash"
+ * is the exception the design itself makes: its chip navigates to A29 rather
+ * than filtering, template 1068 — so the tab exists for the count and the
+ * screen routes away instead of selecting it.)
+ */
+export const listingMasterResource: ListResource = {
+  name: "listings-master",
+  table: "admin_listing_master",
+  select:
+    "id, kind, title, type_code, type_label, deal_kind, price_paise, price_on_request, area_label, city_name, poster_id, poster_name, poster_role, raw_status, availability, status_key, cover_url, created_at, live_at, views_count, leads_count, is_boosted, reports_count, expiry_prompted, has_story",
+  // "Title or ID" (template 1070). The id is a uuid, so it is matched as text.
+  searchColumns: ["title", "area_label", "poster_name"],
+  sortColumns: ["created_at", "price_paise", "views_count", "leads_count", "title"],
+  defaultSort: { column: "created_at", ascending: false },
+  filters: [
+    { key: "type", column: "type_code", kind: "in" },
+    { key: "city", column: "city_name", kind: "in" },
+    { key: "role", column: "poster_role", kind: "in", options: ["owner", "broker", "builder"] },
+    { key: "priceMin", column: "price_paise", kind: "numFrom" },
+    { key: "priceMax", column: "price_paise", kind: "numTo" },
+    { key: "boosted", column: "is_boosted", kind: "bool", options: ["true", "false"] },
+    { key: "reported", column: "reports_count", kind: "numFrom" },
+    { key: "from", column: "created_at", kind: "dateFrom" },
+    { key: "to", column: "created_at", kind: "dateTo" },
+  ],
+  tabs: [
+    { key: "all", label: "All", apply: (q) => q.in("status_key", ALL_STATUS_KEYS) },
+    { key: "live", label: "Live", apply: (q) => q.eq("status_key", "live") },
+    { key: "pending", label: "Pending", apply: (q) => q.eq("status_key", "pending") },
+    { key: "changes", label: "Changes requested", apply: (q) => q.eq("status_key", "changes") },
+    { key: "rejected", label: "Rejected", apply: (q) => q.eq("status_key", "rejected") },
+    { key: "hidden", label: "Hidden", apply: (q) => q.eq("status_key", "hidden") },
+    { key: "sold", label: "Sold", apply: (q) => q.eq("status_key", "sold") },
+    { key: "rented", label: "Rented", apply: (q) => q.eq("status_key", "rented") },
+    { key: "archived", label: "Archived", apply: (q) => q.eq("status_key", "archived") },
+    { key: "trash", label: "Trash", apply: (q) => q.eq("status_key", "trash") },
+  ],
+  minRole: "admin",
+  // template 1085 — Listing · Type · Price · Location · Poster · Status ·
+  // Stats · Posted · Flags
+  columns: [
+    { key: "listing", label: "Listing", field: "title" },
+    { key: "type", label: "Type", field: "type_label" },
+    { key: "price", label: "Price", field: "price_paise" },
+    { key: "location", label: "Location", field: "area_label" },
+    { key: "poster", label: "Poster", field: "poster_name" },
+    { key: "status", label: "Status", field: "status_key" },
+    { key: "stats", label: "Stats", field: "views_count" },
+    { key: "posted", label: "Posted", field: "created_at" },
+    { key: "flags", label: "Flags", field: "reports_count" },
+  ],
+};
+
+/**
+ * "All" on A12 means every LIVING status, not literally every row: the design
+ * gives Trash its own chip, so a deleted listing appearing under All would make
+ * the two chips' counts add up to more than the table has.
+ */
+const ALL_STATUS_KEYS = [
+  "live",
+  "pending",
+  "changes",
+  "rejected",
+  "hidden",
+  "sold",
+  "rented",
+  "archived",
+];
+
 export const ADMIN_RESOURCES: Record<string, ListResource> = {
   audit: auditResource,
+  users: userResource,
+  "listings-master": listingMasterResource,
   listings: listingQueueResource,
   requirements: requirementQueueResource,
   boosts: boostQueueResource,

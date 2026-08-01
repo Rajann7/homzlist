@@ -3671,3 +3671,65 @@ Settings (**P7**) — the banner would otherwise offer a link that does nothing.
   host — including the OAuth `redirect_uri`, which would have failed against
   Google in production. Both now use the request's own Host / a relative
   Location (`lib/admin/oauth.ts`).
+
+---
+
+## Module 11 · P4 — A10 Users, A11 User detail, A12 Listings master, A31 Impersonation
+
+### What P4 found and FIXED (none of it was in the prompt)
+
+- **Every queue's City filter had been silently empty since P3.**
+  `lib/admin/filter-options.ts` read `locations` with `.eq("kind","city")`, and
+  that table's column is `level`. PostgREST errored, `data` came back null, and
+  the pill opened onto no options at all. Now `level` + `is_launched` (the
+  master table holds 104,612 cities).
+- **"Grant trial" could never have worked.** `user_plans.catalog_code` is a
+  foreign key into `plan_catalog(code)` and the endpoint invented `admin_trial`,
+  so every grant 422'd behind a sheet the design draws a success toast for.
+  Migration 0099 gives the grant its own inactive catalog row. The seeded trials
+  had sidestepped this by reusing a SELLABLE code (`p2999`/`p9999`), which made
+  a granted trial claim to be that paid plan in every screen that groups by
+  catalog code.
+- **A compliance edit wrote a moderation_log row that Postgres rejected.**
+  That table's `action` is CHECK-constrained to approve/request_changes/reject,
+  so the insert failed and was swallowed: a success toast over a trail entry
+  that never existed. Removed — the edit does not belong there, and the audit
+  row carries the reason and the old value, which is what the panel's banner
+  actually promises.
+- **"Remove story" had nothing it could write.** Stories are DERIVED from
+  `live_at` inside 24h (`lib/feed/stories.ts`), so the button would have
+  "removed" a story that came back on the next feed read. Migration 0098 adds
+  `story_suppressed_at` to `listings` and `projects` and the story queries now
+  honour it — all six read paths.
+- **The bulk registry had never had a single entry.** `lib/admin/bulk.ts` and
+  `/api/v1/admin/bulk/:resource/:action` shipped in P1b and 404'd every action,
+  because `apply(me, id)` took no payload and every bulk action the design draws
+  needs one (a reason, a message body, a grant's contents). The handler now
+  takes the bar's input, and `lib/admin/bulk-actions.ts` registers A10's three
+  and A12's three.
+
+### Still open after P4 — tracked, not hidden
+
+1. **A project has no approval path anywhere in the app.** `moderate()` covers
+   `listing` and `requirement` only, and A3's queue view is listings-only — so a
+   builder's project can be submitted and never reviewed. A12 lists and edits
+   projects (P4 added them to the master), and the bulk "Approve" refuses per
+   subject with a stated reason rather than silently skipping every builder row.
+   The queue side belongs with a later pass over A3/A5.
+2. **Email and WhatsApp sends are recorded, not delivered.** A11's Send-message
+   sheet offers three channels; only in-app has a provider today, so
+   `admin_messages.delivered_at` is set for in-app and left NULL for the other
+   two rather than claiming a delivery that did not happen. Resend (**B5**) and
+   the WhatsApp provider close it.
+3. **Impersonation is a real read-only session; the seller app has no banner of
+   its own.** The session, the expiry, the audit rows and the API-level refusal
+   are all real and proven (a signed `imp` claim, refused by middleware on every
+   non-GET `/api` call). What the impersonated TAB does not yet show is the
+   design's yellow "Viewing as … (read-only)" strip — that strip lives in the
+   admin panel, and putting one inside the seller shell is a user-side layout
+   change, which the design lock says to ask about first.
+4. **`admin_user_list` recomputes its aggregates on every read.** Six correlated
+   sub-selects over listings, projects, leads, views and reports. At 200 users
+   it is instant; it is not a shape that survives 50,000. The fix is a
+   materialised view refreshed by the cron A27 owns (**P7**), not a change to
+   the screen.

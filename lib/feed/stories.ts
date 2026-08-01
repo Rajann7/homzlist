@@ -246,6 +246,10 @@ export async function getStories(viewerId: string | null, cityOverride?: string 
     .select("id,profile_id,cover_url,title,type_code,kind,is_negotiable,price_paise,price_on_request,area_label,area_id,attributes,area_sqft,live_at")
     .eq("status", "live").eq("availability", "available")
     .gte("live_at", since)
+    // A12's "Remove story" (template 1416) sets this. Stories are DERIVED from
+    // live_at, so without a suppression flag an admin-removed story came back
+    // on the very next feed read — the button wrote nothing.
+    .is("story_suppressed_at", null)
     .order("live_at", { ascending: false });
   if (cityId) lq = lq.eq("city_id", cityId);
   if (viewerId) lq = lq.neq("profile_id", viewerId); // never a "your story" circle (Doc2 §9.3)
@@ -255,6 +259,7 @@ export async function getStories(viewerId: string | null, cityOverride?: string 
     .select("id,profile_id,cover_url,name,project_type,attributes,towers,floors,total_units,available_units,area_label,area_id,live_at")
     .eq("status", "live")
     .gte("live_at", since)
+    .is("story_suppressed_at", null)
     .order("live_at", { ascending: false });
   if (cityId) pq = pq.eq("city_id", cityId);
   if (viewerId) pq = pq.neq("profile_id", viewerId);
@@ -283,13 +288,13 @@ export async function getStories(viewerId: string | null, cityOverride?: string 
       missingListing.length
         ? db().from("listings")
             .select("id,profile_id,cover_url,title,type_code,kind,is_negotiable,price_paise,price_on_request,area_label,area_id,attributes,area_sqft,live_at")
-            .in("id", missingListing).eq("status", "live").eq("availability", "available").gte("live_at", since)
+            .in("id", missingListing).eq("status", "live").eq("availability", "available").gte("live_at", since).is("story_suppressed_at", null)
             .neq("profile_id", viewerId ?? NIL)
         : Promise.resolve({ data: [] }),
       missingProject.length
         ? db().from("projects")
             .select("id,profile_id,cover_url,name,project_type,attributes,towers,floors,total_units,available_units,area_label,area_id,live_at")
-            .in("id", missingProject).eq("status", "live").gte("live_at", since)
+            .in("id", missingProject).eq("status", "live").gte("live_at", since).is("story_suppressed_at", null)
             .neq("profile_id", viewerId ?? NIL)
         : Promise.resolve({ data: [] }),
     ]);
@@ -371,7 +376,7 @@ export async function markSeen(viewerId: string, cityId: string, segmentId: stri
 export async function storySegment(segmentId: string, viewerId: string | null = null): Promise<StorySegment | null> {
   const { data: l } = await db()
     .from("listings")
-    .select("id,cover_url,title,type_code,kind,is_negotiable,price_paise,price_on_request,area_label,attributes,area_sqft,status,availability,live_at")
+    .select("id,cover_url,title,type_code,kind,is_negotiable,price_paise,price_on_request,area_label,attributes,area_sqft,status,availability,live_at,story_suppressed_at")
     .eq("id", segmentId).maybeSingle();
   if (l) {
     const row = l as any;
@@ -381,18 +386,18 @@ export async function storySegment(segmentId: string, viewerId: string | null = 
     // price/cover/area never leak. A listing that went sold/hidden mid-window
     // still has a fresh live_at → `available:false` drives "no longer available".
     const fresh = row.live_at && Date.now() - new Date(row.live_at).getTime() < DAY_MS;
-    if (!fresh) return null;
+    if (!fresh || row.story_suppressed_at) return null;
     const available = row.status === "live" && row.availability === "available";
     return propertySegment(row, await segCtx(viewerId, [row.id], []), available);
   }
   const { data: p } = await db()
     .from("projects")
-    .select("id,cover_url,name,project_type,attributes,towers,floors,total_units,available_units,area_label,status,live_at")
+    .select("id,cover_url,name,project_type,attributes,towers,floors,total_units,available_units,area_label,status,live_at,story_suppressed_at")
     .eq("id", segmentId).maybeSingle();
   if (p) {
     const row = p as any;
     const fresh = row.live_at && Date.now() - new Date(row.live_at).getTime() < DAY_MS;
-    if (!fresh) return null; // never a story → 404 (no leak)
+    if (!fresh || row.story_suppressed_at) return null; // never a story → 404 (no leak)
     return projectSegment(row, await segCtx(viewerId, [], [row.id]), row.status === "live");
   }
   return null;

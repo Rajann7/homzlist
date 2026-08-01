@@ -47,7 +47,9 @@
     "seed:admin": "node scripts/seed-admin.mjs",
     "check:admin-p2": "node scripts/check-admin-p2-live.mjs",
     "check:admin-p3": "node scripts/check-admin-p3-decisions.mjs",
-    "check:admin-links": "node scripts/check-admin-links.mjs"
+    "check:admin-links": "node scripts/check-admin-links.mjs",
+    "check:admin-p4": "node scripts/check-admin-p4.mjs",
+    "check:admin-p4-bands": "node scripts/check-admin-p4-bands.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1091.0",

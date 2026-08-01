@@ -24,8 +24,21 @@ export type BulkHandler = {
   minRole: AdminRole;
   /** the design's own per-screen limit on a single bulk action */
   cap: number;
-  /** applied to ONE subject; throwing marks just that subject failed */
-  apply: (me: AdminIdentity, id: string) => Promise<{ label: string; summary: string }>;
+  /**
+   * Applied to ONE subject; throwing marks just that subject failed.
+   *
+   * `input` is the bar's own payload — A10's bulk "Send message" and "Grant
+   * trial" open a sheet before they run, so a handler signature without it
+   * could only ever express the actions that need no arguments. That is why
+   * this registry sat empty through P3: every bulk action the panel had
+   * needed a reason or a body, so the bulk bars called the per-subject
+   * endpoint in a loop and this one answered 404 to everything.
+   */
+  apply: (
+    me: AdminIdentity,
+    id: string,
+    input: Record<string, unknown>,
+  ) => Promise<{ label: string; summary: string; diff?: Record<string, unknown> }>;
   auditAction: string;
   entityType: string;
 };
@@ -56,6 +69,7 @@ export async function runBulk(
   me: AdminIdentity,
   handler: BulkHandler,
   ids: string[],
+  input: Record<string, unknown> = {},
 ): Promise<BulkResult> {
   const unique = [...new Set(ids)];
   if (unique.length > handler.cap) {
@@ -65,7 +79,7 @@ export async function runBulk(
   const result: BulkResult = { done: [], failed: [] };
   for (const id of unique) {
     try {
-      const { label, summary } = await handler.apply(me, id);
+      const { label, summary, diff } = await handler.apply(me, id, input);
       // Audited immediately after the mutation, per subject. writeAudit throws
       // on failure, so an action can never land untraced.
       await writeAudit(me, {
@@ -74,7 +88,7 @@ export async function runBulk(
         entityId: id,
         entityLabel: label,
         summary,
-        diff: { bulk: true, batchSize: unique.length },
+        diff: { bulk: true, batchSize: unique.length, ...(diff ?? {}) },
       });
       result.done.push(id);
     } catch (e) {

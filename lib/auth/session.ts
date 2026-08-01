@@ -26,6 +26,17 @@ export interface AccessClaims {
   role: string | null;
   registered: boolean;
   typ: "access";
+  /**
+   * A31 — set when this token was minted for an ADMIN impersonation session
+   * (lib/admin/impersonation.ts). It carries the session id, and its presence
+   * is what the middleware refuses every non-GET /api call on.
+   *
+   * The flag lives in the SIGNED token rather than beside it in a cookie on
+   * purpose: a cookie the holder can delete is not a restriction, and deleting
+   * this one would have turned a read-only view into a full session as that
+   * user — exactly the Doc9 §28 shape of bypass.
+   */
+  imp?: string | null;
 }
 
 export async function signAccess(claims: Omit<AccessClaims, "typ">): Promise<string> {
@@ -41,7 +52,13 @@ export async function verifyAccess(token: string): Promise<AccessClaims | null> 
   try {
     const { payload } = await jwtVerify(token, accessSecret());
     if (payload.typ !== "access" || !payload.sub) return null;
-    return { sub: payload.sub as string, role: (payload.role as string) ?? null, registered: Boolean(payload.registered), typ: "access" };
+    return {
+      sub: payload.sub as string,
+      role: (payload.role as string) ?? null,
+      registered: Boolean(payload.registered),
+      typ: "access",
+      imp: (payload.imp as string) ?? null,
+    };
   } catch {
     return null;
   }

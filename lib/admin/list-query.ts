@@ -23,7 +23,19 @@ import type { AdminRole } from "./session";
  * cannot sort or filter by a column the resource never meant to expose.
  */
 
-export type FilterKind = "eq" | "in" | "bool" | "isNull" | "dateFrom" | "dateTo";
+export type FilterKind =
+  | "eq"
+  | "in"
+  | "bool"
+  | "isNull"
+  | "dateFrom"
+  | "dateTo"
+  /** numeric >= / <= — A12's price range (template 1069) is a filter pill like
+   *  any other, and a range that only narrowed the loaded page would be the
+   *  thing §3 forbids. Kept separate from dateFrom/dateTo so a resource says
+   *  what it means. */
+  | "numFrom"
+  | "numTo";
 
 export type FilterDef = {
   /** query-string key, e.g. "role" */
@@ -145,6 +157,13 @@ function applyFilters(q: PgQuery, resource: ListResource, params: ListParams): P
       case "dateTo":
         q = q.lte(def.column, allowed[0]);
         break;
+      case "numFrom":
+      case "numTo": {
+        const n = Number(allowed[0]);
+        if (!Number.isFinite(n)) break;
+        q = def.kind === "numFrom" ? q.gte(def.column, n) : q.lte(def.column, n);
+        break;
+      }
     }
   }
   return q;

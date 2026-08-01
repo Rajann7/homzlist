@@ -17,10 +17,27 @@ import { useState } from "react";
 import { RightSheet } from "@/components/admin/ds/overlays";
 import { Btn, Chip } from "@/components/admin/ds/primitives";
 
+export type FilterOption = {
+  value: string;
+  label: string;
+  /**
+   * Extra query keys this ONE chip also sets.
+   *
+   * A12's "Price range" and both screens' date pill are single facts in the
+   * design and TWO parameters on the wire (priceMin+priceMax, from+to). Without
+   * this, either the pill disappears — a design deviation — or it half-works,
+   * which §3 counts as a failure. The chip stays one chip; the engine still
+   * gets two real SQL bounds.
+   */
+  params?: Record<string, string>;
+};
+
 export type FilterGroup = {
   key: string;
   label: string;
-  options: { value: string; label: string }[];
+  options: FilterOption[];
+  /** a range is one choice, not a set — picking a second replaces the first */
+  single?: boolean;
 };
 
 export function FilterSheet({
@@ -36,13 +53,21 @@ export function FilterSheet({
 }) {
   const [staged, setStaged] = useState<Record<string, string[]>>(value);
 
-  const toggle = (key: string, option: string) =>
+  const toggle = (group: FilterGroup, option: FilterOption) =>
     setStaged((s) => {
-      const current = s[key] ?? [];
-      const next = current.includes(option)
-        ? current.filter((v) => v !== option)
-        : [...current, option];
-      return { ...s, [key]: next };
+      const current = s[group.key] ?? [];
+      const on = current.includes(option.value);
+      const next = { ...s };
+
+      if (group.single) next[group.key] = on ? [] : [option.value];
+      else next[group.key] = on ? current.filter((v) => v !== option.value) : [...current, option.value];
+
+      // A chip that carries extra params sets or clears all of them together —
+      // a priceMin left behind by a cleared priceMax is a filter nobody chose.
+      for (const o of group.options) for (const k of Object.keys(o.params ?? {})) next[k] = [];
+      if (!on) for (const [k, v] of Object.entries(option.params ?? {})) next[k] = [v];
+
+      return next;
     });
 
   return (
@@ -78,7 +103,7 @@ export function FilterSheet({
                   key={o.value}
                   label={o.label}
                   active={(staged[g.key] ?? []).includes(o.value)}
-                  onClick={() => toggle(g.key, o.value)}
+                  onClick={() => toggle(g, o)}
                 />
               ))}
             </div>

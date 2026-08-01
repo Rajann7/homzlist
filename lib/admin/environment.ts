@@ -18,6 +18,22 @@ export function isStagingEnv(): boolean {
   return process.env.NODE_ENV !== "production";
 }
 
+/**
+ * The SELLER host, derived from the host this admin request arrived on.
+ *
+ * A31's user view has to open on seller.<host>, because that is where the user
+ * session cookie is host-only to and where the user app actually renders. It is
+ * derived rather than configured so dev (seller.localhost:3000), staging and
+ * production all work without a fourth env var to forget.
+ */
+export function userViewUrl(req: { headers: Headers; url: string }): string {
+  const host = req.headers.get("host") ?? "";
+  const proto = req.headers.get("x-forwarded-proto") ?? new URL(req.url).protocol.replace(":", "");
+  // account.homzlist.com → seller.homzlist.com; account.localhost:3000 → seller.localhost:3000
+  const sellerHost = host.replace(/^[^.]+\./, "seller.");
+  return `${proto}://${sellerHost}`;
+}
+
 /** branding_settings.support_email — A20 owns the row; every screen reads it. */
 export async function supportEmail(): Promise<string> {
   const db = createServiceClient();

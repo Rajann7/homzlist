@@ -35,9 +35,26 @@ export async function middleware(request: NextRequest) {
   const host = request.headers.get("host") ?? "";
   const zone = getZone(host);
 
-  if (pathname.startsWith("/api")) return NextResponse.next();
-
   const user = await verifyAccessEdge(request.cookies.get(ACCESS_COOKIE)?.value);
+
+  /**
+   * A31 read-only, enforced at the API — Doc5 A31 and Doc9's "no send even in
+   * impersonation".
+   *
+   * 119 route files call getCurrentUser() directly; adding a check to each is
+   * 119 chances to forget one. The session itself carries the restriction (a
+   * signed `imp` claim), so ONE gate here covers every endpoint that exists and
+   * every endpoint anyone adds later. Reads pass; nothing else does.
+   */
+  if (pathname.startsWith("/api")) {
+    if (user?.imp && !["GET", "HEAD", "OPTIONS"].includes(request.method)) {
+      return NextResponse.json(
+        { ok: false, error: { code: "IMPERSONATION_READ_ONLY", message: "This is a read-only admin view — sends, payments and messages are disabled." } },
+        { status: 403 },
+      );
+    }
+    return NextResponse.next();
+  }
 
   const isLogin = pathname === "/login" || pathname.startsWith("/login/");
 

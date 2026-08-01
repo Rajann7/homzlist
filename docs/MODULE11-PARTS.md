@@ -12,7 +12,7 @@ type-check.
 | P1b | The list controls as UI | ✅ done |
 | P2 | A1 Login + A2 Dashboard | ✅ done |
 | P3 | A3–A9 queues + review detail | ✅ done |
-| P4 | A10, A11, A12, A31 | ⬜ |
+| P4 | A10, A11, A12, A31 (+ the payment panel A11 pushes) | ✅ done |
 | P5 | A13–A18 | ⬜ |
 | P6 | A19–A21 | ⬜ |
 | P7 | A22–A30 | ⬜ |
@@ -403,3 +403,121 @@ or `[aria-busy="true"]`; the admin `Shimmer` had neither, so every admin list
 was screenshotted mid-load — A3's first capture was an empty table reported as
 a 2.84% "pass". `Shimmer` now sets `aria-busy`, which is also what a screen
 reader needs.
+
+## P4 — users, the user panel, the listings master, and impersonation
+
+The first part that uses the PANEL STACK P0 built. The design calls `pushPanel`
+58 times and every one of them lands on one of four surfaces, so all four are
+registered once in `components/admin/panels/registry.tsx`: a user, a listing, a
+payment, a chat. A payment opened from A11 can push the user panel back on top
+of itself, which is Doc5 A11's "onward drill infinite".
+
+| Screen | File | Decisions behind it |
+|---|---|---|
+| A10 Users | `components/admin/users/UsersScreen.tsx` | 6 filter pills, 10 columns, card list on mobile, 4-column drop on tablet, bulk (cap 20), row menu |
+| A11 User detail | `components/admin/users/UserPanel.tsx` + `overlays.tsx` | 10 tabs, each fetched on open; 9 action buttons, 13 overlays |
+| A12 Listings master | `components/admin/listings/ListingsMaster.tsx` | 10 status chips with real counts, 7 filter pills, bulk, row menu |
+| listing panel | `components/admin/listings/ListingPanel.tsx` | 7 tabs, edit-with-diffs + reason + re-review |
+| chat panel | `components/admin/panels/ChatPanel.tsx` | READ-ONLY; there is no send path in the file or the API |
+| payment panel | `components/admin/panels/PaymentPanel.tsx` | pulled forward from P5 — A11's Payments tab pushes it, and a row that opened nothing would fail §5 |
+| A31 Impersonation | `overlays.tsx` + `lib/admin/impersonation.ts` | real session, 30-min expiry, read-only enforced at the API |
+
+### The two views (migration 0098)
+
+`admin_user_list` and `admin_listing_master`, for the same reason 0095 exists:
+the engine resolves every control to SQL on ONE relation, so a screen that draws
+a plan chip, a verification cluster and a city needs those as real columns.
+
+**A12 unions listings AND projects.** Builders post projects, not listings
+(CLAUDE.md's builder change), so a "Listings" master over `listings` alone would
+show every Owner and Broker post and none of a Builder's — the rows most likely
+to need a compliance edit. `kind` is the only thing that differs; every action
+in the panel resolves it and behaves correctly for both.
+
+### P4 gates
+
+```
+npm run check:admin-p4        168 checks, all green
+npm run check:admin-p4-bands  30 checks — the device branches, machine-asserted
+npm run check:admin-links     28 destinations, all resolve
+tsc --noEmit                  clean
+next lint components/admin    no warnings or errors
+
+pixel diff (390 / 768 / 1440)
+  users            14.42 / 5.99 / 6.58 %
+  listings master  14.78 / 4.89 / 4.78 %
+
+The mobile figure is the largest and is DATA, for a reason that is easy to
+check: at 390 the screen is six cards of text on a 390x760 canvas, so every
+differing string — the design's "4,281 users" against a real 200, its fixture
+names against real ones, its hatched thumbnail against a real photo — is a
+much larger share of the image than the same difference is at 1440. The
+structure matches row for row; `check:admin-p4-bands` is what asserts that
+mechanically, because a percentage cannot.
+
+controls (§3), each proved against the database
+  filters      role · status · plan · city · verification · joined     = SQL
+  filters      type · city · role · price range · boosted · reported · date = SQL
+  search       server-side across name/phone/email/handle; count matches
+  sort         in the database, across pages; an undeclared column falls back
+  tabs         all ten A12 chips equal a count(*) over the whole table
+  pagination   page 2 keeps the filter and returns different rows
+  saved views  persist per resource and reload
+  columns      persist per admin (admin_column_prefs) and survive reload
+  export       users role=broker → 58 rows · listings tab=live → 185 rows,
+               both downloaded back with every column populated
+  bulk         3 subjects → 3 separate audit rows; 21 ids → refused server-side
+
+click flow (§5), replayed live
+  users row → user PANEL (480px, URL unchanged, crumb "Users › name")
+  Listings tab → listing PANEL stacked, older panel offset 24px right
+  crumb click → pops to that level
+  Chats tab → chat PANEL, no composer, one button (Close)
+  Payments row → payment PANEL
+
+security
+  anon → 401 on every list, detail, action and impersonation endpoint
+  staff → 403 on A10, A11 and every action (SCREEN_MIN_ROLE = admin)
+  admin → 403 on delete user, merge and bulk delete (super only)
+  unknown uuid → 404 · non-uuid → 404
+  typed confirmations (DELETE / MERGE / REFUND) enforced server-side
+  no secret VALUE from .env.local appears in the client bundle (101 files, 8 secrets)
+  impersonation: reads pass, every write → 403 IMPERSONATION_READ_ONLY
+```
+
+### The impersonation decision, written down
+
+The design's overlay is a banner and an Exit button; Doc5 A31 asks for the full
+user app. Both are honoured without inventing a layout: the panel renders the
+design's overlay exactly, and "Start session" ALSO opens the real seller app in
+its own tab, first-party, via a one-shot hashed token.
+
+Read-only is a **signed claim on the session**, not a cookie and not a CSS
+state. 119 route files call `getCurrentUser()` directly, so a per-route check is
+119 chances to forget one; `middleware.ts` refuses every non-GET `/api` request
+whose token carries `imp`. Putting the flag in a cookie instead would have meant
+deleting that cookie turned a read-only view into a full session as that user.
+The tab also mints no refresh cookie, so it cannot renew itself.
+
+### Four things the gates caught that were not in the prompt
+
+1. **Every queue's City filter had been empty since P3.**
+   `filter-options.ts` read `locations` on a `kind` column that does not exist
+   (it is `level`), so PostgREST errored, `data` came back null and the pill
+   offered nothing. Fixed, and scoped to launched cities — the master table
+   holds 104,612 of them.
+2. **"Grant trial" could never have succeeded.** `user_plans.catalog_code` is a
+   foreign key and the endpoint invented a code, so every grant 422'd behind a
+   sheet the design draws a success toast for. Migration 0099.
+3. **A compliance edit wrote an audit row Postgres rejected.**
+   `moderation_log.action` is CHECK-constrained to the three moderation verbs;
+   the insert failed and was swallowed. Removed — it belongs in the audit log,
+   which is where the panel's banner actually promises it.
+4. **A user holding the same plan twice lost a chip.** The plan badges were
+   keyed by plan NAME, so React dropped the duplicate and the second ₹999 the
+   user bought simply did not render. Keyed by index now.
+
+Two more the pixel diff caught, both design branches that had been missed:
+A12's mobile view has **no filter bar at all** (template 1079 is `head,
+chipRow, bulk, cards`), and the filter bar's **"Clear all" is unconditional**
+(template 1005) rather than appearing once a filter is set.

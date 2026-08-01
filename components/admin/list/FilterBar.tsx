@@ -33,8 +33,14 @@ export function FilterBar({
   filters: Record<string, string[]>;
   onOpenFilters: () => void;
   onClear: () => void;
-  /** e.g. "128 users" — already pluralised by the screen that owns the noun */
-  countLabel: string;
+  /**
+   * e.g. "128 users" — already pluralised by the screen that owns the noun.
+   *
+   * OMITTED on A12, because the design's filter bar there (template 1070) is
+   * search + pills and nothing else: the count lives on its status chips
+   * instead, and printing a second one would be a number the design never draws.
+   */
+  countLabel?: string;
 }) {
   const [term, setTerm] = useState(search);
 
@@ -47,8 +53,6 @@ export function FilterBar({
     const t = setTimeout(() => onSearch(term), 300);
     return () => clearTimeout(t);
   }, [term, search, onSearch]);
-
-  const active = Object.values(filters).reduce((n, v) => n + v.length, 0);
 
   return (
     <div
@@ -119,7 +123,10 @@ export function FilterBar({
         );
       })}
 
-      {active || search ? (
+      {/* The design renders "Clear all" UNCONDITIONALLY (template 1005) — it is
+          part of the bar, not a state of it. Hiding it until a filter is set
+          made the bar shift sideways the moment you picked one. */}
+      {countLabel !== undefined ? (
         <span
           onClick={onClear}
           style={{ fontSize: 13, color: "var(--accent)", fontWeight: 600, cursor: "pointer" }}
@@ -127,8 +134,9 @@ export function FilterBar({
           Clear all
         </span>
       ) : null}
-
-      <span style={{ fontSize: 13, color: "var(--ink3)", marginLeft: "auto" }}>{countLabel}</span>
+      {countLabel !== undefined ? (
+        <span style={{ fontSize: 13, color: "var(--ink3)", marginLeft: "auto" }}>{countLabel}</span>
+      ) : null}
     </div>
   );
 }

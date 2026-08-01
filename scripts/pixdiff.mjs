@@ -371,6 +371,19 @@ function screenMap(fx) {
         designState: { appState: "normal", reviewTab: "card", reviewIdx: 0 },
         url: fx.adminReviewId && `${APP_ADMIN}/queues/listings/${fx.adminReviewId}?tab=pending` },
     ]),
+
+    // ---- P13 · P4 ---------------------------------------------------------
+    // A10 and A12, each at all three bands. Both screens have a real mobile
+    // CARD branch and a tablet column drop in the design, so all three shots
+    // are testing different markup rather than the same table three times.
+    ...["mobile", "tablet", "desktop"].flatMap((band) => [
+      { id: `32-admin-users-${band}`, page: "P13", screen: "users", band, as: "admin",
+        designState: { appState: "normal", selected: [] },
+        url: `${APP_ADMIN}/users` },
+      { id: `33-admin-listings-master-${band}`, page: "P13", screen: "listingsMaster", band, as: "admin",
+        designState: { appState: "normal", lmFilter: "all", selected: [] },
+        url: `${APP_ADMIN}/listings` },
+    ]),
   ];
 }
 
