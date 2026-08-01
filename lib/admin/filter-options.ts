@@ -123,3 +123,24 @@ export async function queueFilterOptions(): Promise<QueueFilterOptions> {
     })),
   };
 }
+
+/**
+ * The products a coupon can be scoped to, and the plans A13 draws.
+ *
+ * Boosts are priced on their own rate card (A19), so they are not "plans" — but
+ * a coupon CAN apply to one, which is why this returns the whole sellable
+ * catalog and the screen filters it rather than the query.
+ */
+export async function sellablePlans(): Promise<{ code: string; name: string }[]> {
+  const db = createServiceClient();
+  const { data } = await db
+    .from("plan_catalog")
+    .select("code, name, kind")
+    .neq("code", "admin_grant") // not a product — it exists so a grant has an identity
+    .order("kind")
+    .order("sort_order");
+  return ((data ?? []) as { code: string; name: string }[]).map((p) => ({
+    code: p.code,
+    name: p.name,
+  }));
+}

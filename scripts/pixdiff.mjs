@@ -384,6 +384,18 @@ function screenMap(fx) {
         designState: { appState: "normal", lmFilter: "all", selected: [] },
         url: `${APP_ADMIN}/listings` },
     ]),
+
+    // ---- P13 · P5a --------------------------------------------------------
+    ...["mobile", "tablet", "desktop"].flatMap((band) => [
+      { id: `34-admin-plans-${band}`, page: "P13", screen: "plans", band, as: "admin",
+        url: `${APP_ADMIN}/plans` },
+      { id: `35-admin-coupons-${band}`, page: "P13", screen: "coupons", band, as: "admin",
+        designState: { coupFilter: "active" },
+        url: `${APP_ADMIN}/coupons` },
+      { id: `36-admin-grants-${band}`, page: "P13", screen: "grants", band, as: "admin",
+        designState: { grantFilter: "active" },
+        url: `${APP_ADMIN}/grants` },
+    ]),
   ];
 }
 

@@ -68,9 +68,10 @@ const SCREENS = [
   ["/listings", "No listings here|Listings"],
   ["/payments", UNBUILT],
   ["/finance", UNBUILT],
-  ["/plans", UNBUILT],
-  ["/coupons", UNBUILT],
-  ["/grants", UNBUILT],
+  // P5a built these three.
+  ["/plans", "Plans|grandfathering"],
+  ["/coupons", "Coupons|No coupons here"],
+  ["/grants", "Grants|never shown to users"],
   ["/master-data", UNBUILT],
   ["/cms", UNBUILT],
   ["/templates", UNBUILT],

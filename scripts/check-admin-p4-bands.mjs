@@ -45,7 +45,7 @@ for (const [band, w, h] of BANDS) {
   console.log(`\n${band} · ${w}×${h}`);
   await s.setViewport(w, h, 1, band === "mobile");
 
-  for (const path of ["/users", "/listings"]) {
+  for (const path of ["/users", "/listings", "/coupons", "/grants", "/plans"]) {
     s.consoleErrors.length = 0;
     await s.goto(`${BASE}${path}`, { waitMs: 2000 });
     // A12 asks for ten tab counts over a union view; on a cold route that is
@@ -53,7 +53,7 @@ for (const [band, w, h] of BANDS) {
     // once reported an empty table as a pass.
     for (let i = 0; i < 40; i++) {
       const ready = await s.eval(
-        `document.querySelectorAll('main table tbody tr, main [class*="md:hidden"] > div').length > 0`,
+        `document.querySelectorAll('main table tbody tr, main [class*="md:hidden"] > div, main [class*="md:grid-cols-2"] > div').length > 0`,
       );
       if (ready) break;
       await sleep(500);
@@ -75,6 +75,11 @@ for (const [band, w, h] of BANDS) {
           (b) => visible(b) && /chevD|▾/.test(b.innerHTML) && b.offsetHeight === 32,
         ).length,
         searchBoxes: [...document.querySelectorAll('main input[placeholder]')].filter(visible).length,
+        planCards: document.querySelectorAll('main [class*="md:grid-cols-2"] > div').length,
+        planCols: (() => {
+          const g = document.querySelector('main [class*="md:grid-cols-2"]');
+          return g ? getComputedStyle(g).gridTemplateColumns.split(' ').length : 0;
+        })(),
         // text the browser is cutting off inside an overflow:hidden box
         clipped: [...document.querySelectorAll('main td, main th')].filter(
           (e) => visible(e) && e.scrollWidth > e.clientWidth + 2 &&
@@ -87,6 +92,32 @@ for (const [band, w, h] of BANDS) {
     check(`${path} ${band} · no clipped cell`, m.clipped, 0);
     check(`${path} ${band} · no console errors`, s.consoleErrors.length, 0);
     if (s.consoleErrors.length) console.log("       ", s.consoleErrors[0]?.slice(0, 160));
+
+    // A13 is a CARD GRID at every band (template 1216) — one column on mobile,
+    // two above it. There is no table and no column drop to assert, so it is
+    // checked for scroll, clipping and console errors only.
+    if (path === "/plans") {
+      check(`/plans ${band} · cards rendered`, m.planCards > 0, true);
+      check(
+        `/plans ${band} · ${band === "mobile" ? "one" : "two"} column(s)`,
+        m.planCols,
+        band === "mobile" ? 1 : 2,
+      );
+      continue;
+    }
+
+    if (path === "/coupons" || path === "/grants") {
+      if (band === "mobile") {
+        check(`${path} mobile · card list, no table`, m.tables, 0);
+        check(`${path} mobile · cards rendered`, m.cards > 0, true);
+      } else {
+        check(`${path} ${band} · table renders`, m.tables, 1);
+        // A14 drops 3 columns on tablet (9 → 6), A15 drops 3 (8 → 5)
+        const want = path === "/coupons" ? (band === "tablet" ? 6 : 9) : band === "tablet" ? 5 : 8;
+        check(`${path} ${band} · visible columns`, m.columns, want);
+      }
+      continue;
+    }
 
     if (band === "mobile") {
       // the design's `if(mobile)` branch — a card list, never a table

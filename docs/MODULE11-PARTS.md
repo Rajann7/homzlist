@@ -13,7 +13,8 @@ type-check.
 | P2 | A1 Login + A2 Dashboard | ✅ done |
 | P3 | A3–A9 queues + review detail | ✅ done |
 | P4 | A10, A11, A12, A31 (+ the payment panel A11 pushes) | ✅ done |
-| P5 | A13–A18 | ⬜ |
+| P5a | A13 Plans · A14 Coupons · A15 Grants | ✅ done |
+| P5b | A16 Finance · A17–A18 Payments | ⬜ |
 | P6 | A19–A21 | ⬜ |
 | P7 | A22–A30 | ⬜ |
 
@@ -540,3 +541,74 @@ closed in the same part rather than handed to a later one:
 
 `npm run check:admin-p3` still passes unchanged (53 checks), so none of it
 regressed the queues.
+
+## P5a — plans, coupons and grants
+
+P5 is five screens, two edit panels and Finance's four tabs. §1 allows a part to
+be split when it is too big for one pass, and this is that: **P5a** is the
+catalog trio (A13/A14/A15), **P5b** is Finance and the payments list.
+
+| Screen | File | Decisions behind it |
+|---|---|---|
+| A13 Plans | `components/admin/catalog/PlansScreen.tsx` | card grid (1 col mobile, 2 above), live toggle, row menu, edit panel |
+| A14 Coupons | `CouponsScreen.tsx` + `CouponEditPanel.tsx` | 4 derived chips, table/cards, full CRUD with the design's own rules |
+| A15 Grants | `GrantsScreen.tsx` | 3 chips, extend and revoke, "+ New grant" opens A11's OWN sheet |
+
+### The two rules that shaped the server (`lib/admin/catalog.ts`)
+
+**Grandfathering is enforced, not captioned.** A13's note says existing users
+keep the plan they bought. That is true because a purchase copies its terms into
+`user_plans` at checkout, so editing `plan_catalog` cannot reach it — the save
+path deliberately does not touch `user_plans`, and reports how many holders it
+left alone so the promise is visible at the moment of the decision. The check
+proves it by reading one holder's quotas before and after a price change.
+
+**A coupon's state is derived** (migration 0102): Active / Scheduled / Expired /
+Exhausted are facts about two dates and a cap. A stored status is one nobody
+remembers to flip at 500/500.
+
+### What P5a found
+
+- **`coupons` had no start date**, so the design's "Scheduled" chip could never
+  have had a row under it — a state that was unreachable, not merely empty. It
+  also had no unique index on `code`, so two coupons could share one and race at
+  checkout. Both fixed in 0102.
+- **"Most popular" was being won by a boost.** The badge is on A13, which is the
+  PLANS screen, but 0102 compared purchases across the whole catalog (boosts
+  outsell plans 132 to 122) so no plan card ever carried it. 0103 compares
+  inside the row's own kind.
+- **Two coupon states had zero rows** — nobody had ever looked at Scheduled or
+  Exhausted. `check:admin-p5a` seeds both and asserts they derive correctly.
+- **A14 and A15 have no filter bar at all** (templates 1241 and 1270 are
+  `head, chipRow, table`); the chips are the only narrowing those screens
+  offer. The pixel diff caught the bar I had added — the same class of miss as
+  A12's mobile in P4.
+
+### P5a gates
+
+```
+npm run check:admin-p5a       68 checks, all green
+npm run check:admin-p4-bands  now covers /plans /coupons /grants too — green
+npm run check:admin-links     31 destinations, all resolve
+tsc --noEmit · next lint      clean
+
+pixel diff (390 / 768 / 1440)
+  plans     3.45 / 6.30 / 3.42 %
+  coupons   3.99 / 2.26 / 2.59 %
+  grants    4.81 / 7.17 / 6.50 %
+
+security
+  anon → 401 on every list and every write
+  staff → 403 on all three screens
+  admin → may READ plans, 403 on saving one (pricing is Super only)
+  a plan with purchases cannot be deleted · a redeemed coupon cannot be deleted
+  a cap below its redemptions, a >100% discount and an end-before-start refused
+```
+
+### A decision worth recording
+
+The top-up (`topup10`, "Proposal Top-up") appears on A13 alongside the three
+plans. The design's fourth card is "Custom / Enterprise", which the product does
+not have. A top-up IS a sellable product with a price, and no other screen
+prices it — leaving it off A13 would make its price uneditable anywhere in the
+panel. Boosts are excluded because A19's rate card owns them.

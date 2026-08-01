@@ -18,6 +18,33 @@ import { UserPanelBody } from "../users/UserPanel";
 import { ListingPanelBody } from "../listings/ListingPanel";
 import { PaymentPanelBody } from "./PaymentPanel";
 import { ChatPanelBody } from "./ChatPanel";
+import { PlanEditPanelBody, PlanPurchasesPanelBody } from "../catalog/PlanEditPanel";
+import { CouponEditPanelBody } from "../catalog/CouponEditPanel";
+
+/**
+ * P5a's editors need the plan catalog to render their scope pickers, and a
+ * panel body has no props but its own entry — so the list is threaded in when
+ * the provider is mounted, from the server component that already has it.
+ */
+function buildRegistry(planOptions: { code: string; name: string }[]): PanelRegistry {
+  return { ...REGISTRY, ...catalogPanels(planOptions) };
+}
+
+const catalogPanels = (planOptions: { code: string; name: string }[]): PanelRegistry => ({
+  planEdit: {
+    // template 1273 — a new plan has no name yet
+    crumb: (p) => String(p.data.name ?? "New plan"),
+    body: (p) => <PlanEditPanelBody panel={p} />,
+  },
+  planPurchases: {
+    crumb: (p) => `${p.data.name ?? "Plan"} · purchases`,
+    body: (p) => <PlanPurchasesPanelBody panel={p} />,
+  },
+  couponEdit: {
+    crumb: (p) => String(p.data.code ?? "New coupon"),
+    body: (p) => <CouponEditPanelBody panel={p} planOptions={planOptions} />,
+  },
+});
 
 const REGISTRY: PanelRegistry = {
   user: {
@@ -38,9 +65,18 @@ const REGISTRY: PanelRegistry = {
   },
 };
 
-export function AdminPanels({ screen, children }: { screen: string; children: ReactNode }) {
+export function AdminPanels({
+  screen,
+  children,
+  planOptions = [],
+}: {
+  screen: string;
+  children: ReactNode;
+  /** only the catalog screens need it; every other screen passes nothing */
+  planOptions?: { code: string; name: string }[];
+}) {
   return (
-    <PanelStackProvider registry={REGISTRY} screen={screen}>
+    <PanelStackProvider registry={buildRegistry(planOptions)} screen={screen}>
       {children}
     </PanelStackProvider>
   );

@@ -1,0 +1,1899 @@
+== ENUMS ==
+account_state: active|suspended|deactivated|deleted|archived
+billing_kind: plan|topup|boost
+boost_status: pending_payment|pending_approval|active|expired|rejected|stopped|cancelled|paused
+consumption_kind: listing|requirement|proposal|project
+coupon_scope: plans|boosts|both
+inquiry_status: sent|accepted|declined
+lead_source: inquiry|proposal|visit|project
+lead_stage: new|contacted|visit|negotiation|closed_won|closed_lost
+listing_availability: available|sold|rented|completed
+listing_kind: sell|rent
+listing_state: draft|payment_pending|pending_review|changes_requested|rejected|live|hidden|archived|deleted
+message_kind: text|photo|system|number_request|number_card|visit_proposal|visit_confirmed|continuity|link
+notification_type: inquiry_received|proposal_received|chat_accepted|number_requested|number_shared|new_message|saved_search_match|boost_approved|boost_rejected|boost_expiring|boost_expired|boost_stopped|listing_approved|listing_rejected|listing_changes_requested|proposal_accepted|proposal_declined|proposal_expired|price_drop|saved_listing_status|requirement_match|still_available|requirement_expiring|plan_expiring|plan_expired|trial_ending|payment_success|payment_failed|refund_processed|suspension_lifted|report_outcome|performance_nudge|area_added|new_device_login|weekly_digest|city_launched|chat_declined|verification_approved|verification_rejected|verification_revoked|account_suspended|admin_message|role_changed
+number_req_status: requested|allowed|denied
+order_status: created|pending|paid|failed|expired|refunded
+payment_status: pending|success|failed|refunded|chargeback
+proposal_mode: listing|chat
+proposal_status: pending|accepted|declined|not_relevant|expired|fulfilled
+report_status: open|reviewing|actioned|dismissed
+report_subject: listing|project|requirement|message|user
+request_status: pending|approved|rejected
+requirement_state: draft|pending_review|changes_requested|rejected|live|paused|fulfilled|expired|deleted
+requirement_urgency: immediate|1_3_months|exploring
+slot_state: reserved|released|consumed
+thread_kind: inquiry|proposal
+thread_role: buyer|poster
+thread_status: pending|accepted|declined
+user_plan_status: active|expired|revoked
+user_role: owner|broker|builder
+verify_level: phone|id|rera
+verify_status: not_started|pending|approved|rejected|revoked
+visit_outcome: done|cancelled
+visit_status: proposed|confirmed|completed|cancelled
+
+== TABLES ==
+
+[_migrations]
+  name text NOT NULL
+  applied_at timestamptz NOT NULL default now()
+
+[account_merges]
+  id uuid NOT NULL default gen_random_uuid()
+  primary_id uuid NOT NULL
+  merged_id uuid NOT NULL
+  moved jsonb NOT NULL default '{}'::jsonb
+  reason text
+  actor_id uuid
+  actor_name text NOT NULL
+  created_at timestamptz NOT NULL default now()
+
+[account_suspensions]
+  id uuid NOT NULL default gen_random_uuid()
+  profile_id uuid NOT NULL
+  reason text NOT NULL
+  days int4
+  suspended_by uuid
+  lifted_at timestamptz
+  lifted_by uuid
+  created_at timestamptz NOT NULL default now()
+
+[admin_appeal_queue]
+  id uuid
+  status text
+  created_at timestamptz
+  resolved_at timestamptz
+  resolution text
+  appeal_text text
+  subject text
+  subject_id uuid
+  profile_id uuid
+  user_name text
+  user_role text
+  user_bio text
+  bio_flag_reason text
+  kind text
+  listing_title text
+  listing_reject_count int4
+  listing_locked bool
+  listing_cover_url text
+
+[admin_audit_log]
+  id uuid NOT NULL default gen_random_uuid()
+  actor_id uuid
+  actor_name text NOT NULL
+  actor_role text NOT NULL
+  action text NOT NULL
+  entity_type text NOT NULL
+  entity_id uuid
+  entity_label text NOT NULL
+  summary text NOT NULL
+  diff jsonb
+  ip text
+  device text
+  is_sensitive bool NOT NULL default false
+  case_ref text
+  preserved bool NOT NULL default false
+  created_at timestamptz NOT NULL default now()
+  reason text
+  session_jti text
+
+[admin_boost_queue]
+  id uuid
+  status text
+  created_at timestamptz
+  subject_kind text
+  subject_id uuid
+  targeting text
+  target_label text
+  duration_days int4
+  price_paise int8
+  poster_id uuid
+  poster_name text
+  subject_title text
+  subject_status text
+  subject_cover_url text
+  subject_price_paise int8
+  payment_ref text
+  payment_status text
+  payment_method text
+
+[admin_column_prefs]
+  staff_id uuid NOT NULL
+  resource text NOT NULL
+  columns jsonb NOT NULL default '[]'::jsonb
+  updated_at timestamptz NOT NULL default now()
+
+[admin_listing_master]
+  id uuid
+  kind text
+  title text
+  type_code text
+  type_label text
+  deal_kind text
+  price_paise int8
+  price_on_request bool
+  area_label text
+  city_name text
+  poster_id uuid
+  poster_name text
+  poster_role text
+  raw_status text
+  availability text
+  status_key text
+  cover_url text
+  created_at timestamptz
+  live_at timestamptz
+  deleted_at timestamptz
+  views_count int8
+  leads_count int8
+  is_boosted bool
+  reports_count int8
+  expiry_prompted bool
+  has_story bool
+
+[admin_listing_queue]
+  id uuid
+  title text
+  type_code text
+  status text
+  created_at timestamptz
+  submitted_at timestamptz
+  area_label text
+  reject_count int4
+  is_locked bool
+  edited_since_approval bool
+  flagged_reason text
+  cover_url text
+  poster_id uuid
+  poster_name text
+  poster_role text
+  poster_created_at timestamptz
+  poster_is_new bool
+  city_name text
+  risk_score int4
+  open_reports int8
+  locked_by uuid
+  locked_by_name text
+  lock_expires_at timestamptz
+
+[admin_login_attempts]
+  id uuid NOT NULL default gen_random_uuid()
+  email text NOT NULL
+  success bool NOT NULL default false
+  reason text
+  ip text
+  device text
+  created_at timestamptz NOT NULL default now()
+  outcome text default 'denied'::text
+
+[admin_messages]
+  id uuid NOT NULL default gen_random_uuid()
+  profile_id uuid NOT NULL
+  channel text NOT NULL default 'in_app'::text
+  subject text
+  body text NOT NULL
+  sent_by uuid
+  sent_by_name text NOT NULL
+  delivered_at timestamptz
+  created_at timestamptz NOT NULL default now()
+  delivery jsonb NOT NULL default '{}'::jsonb
+
+[admin_notes]
+  id uuid NOT NULL default gen_random_uuid()
+  subject_type text NOT NULL default 'user'::text
+  subject_id uuid NOT NULL
+  author_id uuid
+  author_name text NOT NULL
+  body text NOT NULL
+  created_at timestamptz NOT NULL default now()
+
+[admin_notifications]
+  id uuid NOT NULL default gen_random_uuid()
+  kind text NOT NULL
+  title text NOT NULL
+  body text
+  link_screen text
+  entity_id uuid
+  severity text NOT NULL default 'info'::text
+  read_at timestamptz
+  created_at timestamptz NOT NULL default now()
+  staff_id uuid
+
+[admin_report_queue]
+  id uuid
+  subject_type text
+  subject_id uuid
+  report_count int8
+  first_reported_at timestamptz
+  created_at timestamptz
+  reason text
+  note text
+  status text
+  high_priority bool
+  reporter_id uuid
+
+[admin_requirement_queue]
+  id uuid
+  status text
+  created_at timestamptz
+  submitted_at timestamptz
+  type_code text
+  kind text
+  bhk int4
+  budget_min_paise int8
+  budget_max_paise int8
+  area_label text
+  urgency requirement_urgency
+  notes text
+  reject_count int4
+  poster_id uuid
+  poster_name text
+  poster_role text
+  city_name text
+  risk_score int4
+  locked_by uuid
+  locked_by_name text
+
+[admin_saved_views]
+  id uuid NOT NULL default gen_random_uuid()
+  queue text NOT NULL
+  name text NOT NULL
+  filters jsonb NOT NULL default '{}'::jsonb
+  owner_id uuid
+  is_shared bool NOT NULL default false
+  created_at timestamptz NOT NULL default now()
+
+[admin_user_list]
+  id uuid
+  name text
+  handle text
+  phone text
+  email text
+  role text
+  account_state text
+  photo_url text
+  bio text
+  joined_at timestamptz
+  last_active_at timestamptz
+  is_registered bool
+  city_name text
+  v_phone bool
+  v_id bool
+  v_rera bool
+  verification_key text
+  plan_names _text
+  plan_key text
+  trial_ends_at timestamptz
+  listings_count int8
+  listings_live int8
+  listings_other int8
+  leads_count int8
+  views_count int8
+  reports_count int8
+  is_new bool
+  status_key text
+
+[admin_verification_queue]
+  id uuid
+  status text
+  level text
+  doc_type text
+  doc_key text
+  rera_number text
+  valid_till date
+  reason text
+  submitted_at timestamptz
+  reviewed_at timestamptz
+  created_at timestamptz
+  profile_id uuid
+  user_name text
+  user_role text
+  user_photo_url text
+
+[amenities]
+  code text NOT NULL
+  label text NOT NULL
+  category text NOT NULL default 'general'::text
+  categories _text NOT NULL default '{}'::text[]
+  sort_order int4 NOT NULL default 0
+  is_active bool NOT NULL default true
+  icon text
+
+[analytics_events]
+  id uuid NOT NULL default gen_random_uuid()
+  name text NOT NULL
+  profile_id uuid
+  entity_type text
+  entity_id uuid
+  city_id uuid
+  props jsonb NOT NULL default '{}'::jsonb
+  created_at timestamptz NOT NULL default now()
+
+[anomaly_events]
+  id uuid NOT NULL default gen_random_uuid()
+  kind text NOT NULL
+  severity text NOT NULL default 'warning'::text
+  message text NOT NULL
+  link_screen text
+  metric jsonb NOT NULL default '{}'::jsonb
+  detected_at timestamptz NOT NULL default now()
+  dismissed_at timestamptz
+  dismissed_by uuid
+  link_label text
+
+[area_requests]
+  id uuid NOT NULL default gen_random_uuid()
+  profile_id uuid NOT NULL
+  name text NOT NULL
+  city_id uuid
+  status text NOT NULL default 'pending'::text
+  created_at timestamptz NOT NULL default now()
+  note text
+  resolved_by uuid
+  resolved_at timestamptz
+  created_area_id uuid
+
+[area_units]
+  code text NOT NULL
+  label text NOT NULL
+  unit_set text NOT NULL
+  sqft_factor numeric NOT NULL
+  sort_order int4 NOT NULL default 0
+  is_active bool NOT NULL default true
+  created_at timestamptz NOT NULL default now()
+
+[auth_consents]
+  id uuid NOT NULL default gen_random_uuid()
+  profile_id uuid NOT NULL
+  kind text NOT NULL
+  version text NOT NULL
+  accepted bool NOT NULL default true
+  ip_hash text
+  accepted_at timestamptz NOT NULL default now()
+
+[backups]
+  id uuid NOT NULL default gen_random_uuid()
+  kind text NOT NULL default 'daily'::text
+  status text NOT NULL default 'success'::text
+  size_bytes int8
+  started_at timestamptz NOT NULL
+  finished_at timestamptz
+  restore_drill_at date
+  note text
+
+[billing_settings]
+  key text NOT NULL
+  value jsonb NOT NULL
+  updated_at timestamptz NOT NULL default now()
+
+[blocklist_words]
+  id uuid NOT NULL default gen_random_uuid()
+  word text NOT NULL
+  script text NOT NULL default 'latin'::text
+  severity text NOT NULL default 'block'::text
+  applies_to _text NOT NULL default '{listing,chat,bio,requirement}'::text[]
+  is_active bool NOT NULL default true
+  created_at timestamptz NOT NULL default now()
+
+[blog_posts]
+  id uuid NOT NULL default gen_random_uuid()
+  slug text NOT NULL
+  title text NOT NULL
+  excerpt text
+  body_md text NOT NULL
+  cover_url text
+  category text NOT NULL default 'guides'::text
+  tags _text NOT NULL default '{}'::text[]
+  status text NOT NULL default 'draft'::text
+  seo_title text
+  seo_description text
+  read_minutes int4 NOT NULL default 4
+  view_count int4 NOT NULL default 0
+  author_id uuid
+  author_name text NOT NULL default 'HomzList'::text
+  scheduled_at timestamptz
+  published_at timestamptz
+  created_at timestamptz NOT NULL default now()
+  updated_at timestamptz NOT NULL default now()
+  is_featured bool NOT NULL default false
+  badge text
+
+[boost_credits]
+  id uuid NOT NULL default gen_random_uuid()
+  profile_id uuid NOT NULL
+  source_boost_id uuid NOT NULL
+  days int4 NOT NULL
+  reason text
+  expires_at timestamptz NOT NULL default (now() + '90 days'::interval)
+  consumed_at timestamptz
+  consumed_boost_id uuid
+  created_at timestamptz NOT NULL default now()
+
+[boost_rates]
+  code text NOT NULL
+  label text NOT NULL
+  targeting text NOT NULL
+  days int4 NOT NULL
+  price_paise int8 NOT NULL
+  is_active bool NOT NULL default true
+  updated_at timestamptz NOT NULL default now()
+
+[boost_reminders]
+  id uuid NOT NULL default gen_random_uuid()
+  boost_id uuid NOT NULL
+  profile_id uuid NOT NULL
+  milestone int4 NOT NULL
+  ends_at timestamptz NOT NULL
+  sent_at timestamptz NOT NULL default now()
+
+[boost_reviews]
+  id uuid NOT NULL default gen_random_uuid()
+  boost_id uuid NOT NULL
+  actor_id uuid
+  action text NOT NULL
+  reason text
+  created_at timestamptz NOT NULL default now()
+
+[boosts]
+  id uuid NOT NULL default gen_random_uuid()
+  profile_id uuid NOT NULL
+  listing_id uuid NOT NULL
+  order_id uuid
+  catalog_code text NOT NULL
+  duration_days int4 NOT NULL
+  targeting text NOT NULL
+  target_label text NOT NULL
+  price_paise int8 NOT NULL
+  status boost_status NOT NULL default 'pending_payment'::boost_status
+  approved_at timestamptz
+  starts_at timestamptz
+  ends_at timestamptz
+  reject_reason text
+  stopped_reason text
+  refunded_at timestamptz
+  created_at timestamptz NOT NULL default now()
+  updated_at timestamptz NOT NULL default now()
+  refund_claimed_at timestamptz
+  subject_kind text NOT NULL default 'listing'::text
+  target_area_id uuid
+  target_city_id uuid
+  target_state_id uuid
+  approved_by uuid
+  paused_at timestamptz
+
+[branding_settings]
+  key text NOT NULL
+  value text NOT NULL
+  updated_at timestamptz NOT NULL default now()
+
+[broadcasts]
+  id uuid NOT NULL default gen_random_uuid()
+  title text NOT NULL
+  body text NOT NULL
+  channels _text NOT NULL default '{push}'::text[]
+  audience jsonb NOT NULL default '{}'::jsonb
+  recipient_count int4 NOT NULL default 0
+  cost_estimate_paise int8 NOT NULL default 0
+  status text NOT NULL default 'draft'::text
+  scheduled_at timestamptz
+  sent_at timestamptz
+  sent_by uuid
+  created_at timestamptz NOT NULL default now()
+
+[canned_responses]
+  id uuid NOT NULL default gen_random_uuid()
+  title text NOT NULL
+  category text NOT NULL default 'general'::text
+  body text NOT NULL
+  used_count int4 NOT NULL default 0
+  is_active bool NOT NULL default true
+  created_at timestamptz NOT NULL default now()
+
+[chargebacks]
+  id uuid NOT NULL default gen_random_uuid()
+  payment_id uuid NOT NULL
+  profile_id uuid NOT NULL
+  amount_paise int8 NOT NULL
+  reason text NOT NULL
+  status text NOT NULL default 'open'::text
+  plan_suspended bool NOT NULL default true
+  raised_at timestamptz NOT NULL default now()
+  resolved_at timestamptz
+
+[chat_blocks]
+  blocker_id uuid NOT NULL
+  blocked_id uuid NOT NULL
+  created_at timestamptz NOT NULL default now()
+
+[chat_messages]
+  id uuid NOT NULL default gen_random_uuid()
+  thread_id uuid NOT NULL
+  sender_id uuid
+  kind message_kind NOT NULL default 'text'::message_kind
+  body text
+  photo_url text
+  photo_w int4
+  photo_h int4
+  reply_to uuid
+  meta jsonb NOT NULL default '{}'::jsonb
+  reactions jsonb NOT NULL default '{}'::jsonb
+  deleted_all bool NOT NULL default false
+  deleted_for _uuid NOT NULL default '{}'::uuid[]
+  number_flag bool NOT NULL default false
+  profanity_flag bool NOT NULL default false
+  created_at timestamptz NOT NULL default now()
+
+[chat_templates]
+  id uuid NOT NULL default gen_random_uuid()
+  profile_id uuid
+  body text NOT NULL
+  sort int4 NOT NULL default 0
+  created_at timestamptz NOT NULL default now()
+  updated_at timestamptz NOT NULL default now()
+
+[chat_threads]
+  id uuid NOT NULL default gen_random_uuid()
+  kind thread_kind NOT NULL
+  buyer_id uuid NOT NULL
+  poster_id uuid NOT NULL
+  listing_id uuid
+  requirement_id uuid
+  attached_listing_id uuid
+  source_inquiry_id uuid
+  source_proposal_id uuid
+  status thread_status NOT NULL default 'pending'::thread_status
+  cooldown_until timestamptz
+  last_message_at timestamptz NOT NULL default now()
+  last_message_preview text
+  last_message_kind message_kind
+  last_message_sender uuid
+  created_at timestamptz NOT NULL default now()
+  updated_at timestamptz NOT NULL default now()
+  project_id uuid
+  unit_id uuid
+
+[cities]
+  id uuid NOT NULL default gen_random_uuid()
+  name text NOT NULL
+  state text NOT NULL
+  slug text NOT NULL
+  property_count int4 NOT NULL default 0
+  is_active bool NOT NULL default true
+  sort_order int4 NOT NULL default 100
+  created_at timestamptz NOT NULL default now()
+
+[city_caps]
+  city_id uuid NOT NULL
+  max_active_boosts int4 NOT NULL default 20
+  is_launched bool NOT NULL default true
+  updated_at timestamptz NOT NULL default now()
+
+[city_daily_stats]
+  day date NOT NULL
+  city_id uuid NOT NULL
+  signups int4 NOT NULL default 0
+  listings int4 NOT NULL default 0
+  inquiries int4 NOT NULL default 0
+  revenue_paise int8 NOT NULL default 0
+
+[city_interest_requests]
+  id uuid NOT NULL default gen_random_uuid()
+  city_id uuid
+  city_name text NOT NULL
+  profile_id uuid
+  anon_key text
+  notified_at timestamptz
+  created_at timestamptz NOT NULL default now()
+
+[cms_page_versions]
+  id uuid NOT NULL default gen_random_uuid()
+  page_id uuid NOT NULL
+  version text NOT NULL
+  title text NOT NULL
+  body_md text NOT NULL
+  note text
+  created_by uuid
+  created_at timestamptz NOT NULL default now()
+  effective_date date
+  is_material bool NOT NULL default false
+
+[cms_pages]
+  id uuid NOT NULL default gen_random_uuid()
+  slug text NOT NULL
+  title text NOT NULL
+  body_md text NOT NULL
+  version text NOT NULL default '1.0'::text
+  is_published bool NOT NULL default true
+  requires_reacceptance bool NOT NULL default false
+  seo_title text
+  seo_description text
+  updated_by uuid
+  published_at timestamptz
+  created_at timestamptz NOT NULL default now()
+  updated_at timestamptz NOT NULL default now()
+  kind text NOT NULL default 'legal'::text
+  icon text NOT NULL default 'file'::text
+  sort_order int4 NOT NULL default 0
+  effective_date date
+  reader text NOT NULL default 'longform'::text
+
+[coupon_claims]
+  id uuid NOT NULL default gen_random_uuid()
+  coupon_id uuid NOT NULL
+  profile_id uuid NOT NULL
+  order_id uuid NOT NULL
+  slot int4 NOT NULL
+  state text NOT NULL default 'held'::text
+  expires_at timestamptz NOT NULL
+  created_at timestamptz NOT NULL default now()
+
+[coupon_redemptions]
+  id uuid NOT NULL default gen_random_uuid()
+  coupon_id uuid NOT NULL
+  profile_id uuid NOT NULL
+  order_id uuid NOT NULL
+  created_at timestamptz NOT NULL default now()
+
+[coupons]
+  id uuid NOT NULL default gen_random_uuid()
+  code text NOT NULL
+  discount_type text NOT NULL default 'flat'::text
+  discount_value int8 NOT NULL
+  max_discount_paise int8
+  min_value_paise int8 NOT NULL default 0
+  applies_to coupon_scope NOT NULL default 'both'::coupon_scope
+  per_user_limit int4 NOT NULL default 1
+  usage_cap int4
+  used_count int4 NOT NULL default 0
+  expires_at timestamptz
+  is_active bool NOT NULL default true
+  created_at timestamptz NOT NULL default now()
+
+[cron_jobs]
+  code text NOT NULL
+  name text NOT NULL
+  schedule text NOT NULL
+  description text
+  enabled bool NOT NULL default true
+  last_run_at timestamptz
+  last_status text
+  last_duration_ms int4
+  next_run_at timestamptz
+  failure_count int4 NOT NULL default 0
+
+[cron_runs]
+  id uuid NOT NULL default gen_random_uuid()
+  job_code text NOT NULL
+  started_at timestamptz NOT NULL
+  finished_at timestamptz
+  status text NOT NULL default 'success'::text
+  duration_ms int4
+  processed int4 NOT NULL default 0
+  error text
+  triggered_by text NOT NULL default 'schedule'::text
+
+[device_bans]
+  id uuid NOT NULL default gen_random_uuid()
+  kind text NOT NULL default 'device'::text
+  value text NOT NULL
+  profile_id uuid
+  reason text NOT NULL
+  banned_by uuid
+  expires_at timestamptz
+  lifted_at timestamptz
+  created_at timestamptz NOT NULL default now()
+
+[disputes]
+  id uuid NOT NULL default gen_random_uuid()
+  number text NOT NULL
+  party_a uuid NOT NULL
+  party_b uuid NOT NULL
+  listing_id uuid
+  thread_id uuid
+  category text NOT NULL default 'transaction'::text
+  summary text NOT NULL
+  amount_claimed_paise int8
+  status text NOT NULL default 'open'::text
+  outcome text
+  resolution text
+  evidence_preserved bool NOT NULL default false
+  opened_by uuid
+  resolved_by uuid
+  resolved_at timestamptz
+  created_at timestamptz NOT NULL default now()
+
+[exports]
+  id uuid NOT NULL default gen_random_uuid()
+  name text NOT NULL
+  entity text NOT NULL
+  filters jsonb NOT NULL default '{}'::jsonb
+  format text NOT NULL default 'csv'::text
+  row_count int4 NOT NULL default 0
+  status text NOT NULL default 'processing'::text
+  reason text
+  contains_personal_data bool NOT NULL default false
+  file_key text
+  requested_by uuid
+  requested_by_name text NOT NULL
+  expires_at timestamptz
+  created_at timestamptz NOT NULL default now()
+
+[faqs]
+  id uuid NOT NULL default gen_random_uuid()
+  category text NOT NULL default 'general'::text
+  question text NOT NULL
+  answer text NOT NULL
+  sort_order int4 NOT NULL default 0
+  is_active bool NOT NULL default true
+  helpful_yes int4 NOT NULL default 0
+  helpful_no int4 NOT NULL default 0
+  created_at timestamptz NOT NULL default now()
+  category_id uuid
+  slug text
+  body_md text
+  read_minutes int4 NOT NULL default 2
+  is_popular bool NOT NULL default false
+  search_terms text NOT NULL default ''::text
+  updated_at timestamptz NOT NULL default now()
+  related_slugs _text NOT NULL default '{}'::text[]
+
+[feature_flags]
+  key text NOT NULL
+  label text NOT NULL
+  description text
+  enabled bool NOT NULL default true
+  scope text NOT NULL default 'all'::text
+  scope_value jsonb NOT NULL default '{}'::jsonb
+  updated_by uuid
+  updated_at timestamptz NOT NULL default now()
+
+[featured_collection_items]
+  collection_id uuid NOT NULL
+  listing_id uuid NOT NULL
+  position int4 NOT NULL default 0
+
+[featured_collections]
+  id uuid NOT NULL default gen_random_uuid()
+  profile_id uuid NOT NULL
+  name text NOT NULL
+  created_at timestamptz NOT NULL default now()
+
+[feed_banners]
+  id uuid NOT NULL default gen_random_uuid()
+  placement text NOT NULL default 'feed'::text
+  title text NOT NULL
+  subtitle text
+  image_url text
+  target_url text
+  is_active bool NOT NULL default true
+  starts_at timestamptz
+  ends_at timestamptz
+  sort_order int4 NOT NULL default 0
+  created_at timestamptz NOT NULL default now()
+  updated_at timestamptz NOT NULL default now()
+  target_cities _uuid NOT NULL default '{}'::uuid[]
+  target_roles _text NOT NULL default '{}'::text[]
+  target_plan_status text
+  frequency_cap int4 NOT NULL default 0
+  impressions int4 NOT NULL default 0
+  clicks int4 NOT NULL default 0
+
+[feed_not_interested]
+  id uuid NOT NULL default gen_random_uuid()
+  profile_id uuid NOT NULL
+  type_code text
+  area_id uuid
+  created_at timestamptz NOT NULL default now()
+
+[field_definitions]
+  key text NOT NULL
+  label text NOT NULL
+  control text NOT NULL
+  options jsonb NOT NULL default '[]'::jsonb
+  placeholder text
+  hint text
+  sort_order int4 NOT NULL default 0
+  is_active bool NOT NULL default true
+  created_at timestamptz NOT NULL default now()
+  updated_at timestamptz NOT NULL default now()
+  show_if jsonb
+  units text
+  group text
+
+[field_groups]
+  key text NOT NULL
+  label text NOT NULL
+  sort_order int4 NOT NULL default 0
+  is_active bool NOT NULL default true
+  icon text
+  tone text
+  scope_labels jsonb NOT NULL default '{}'::jsonb
+
+[funnel_daily]
+  day date NOT NULL
+  visitors int4 NOT NULL default 0
+  signups int4 NOT NULL default 0
+  plan_bought int4 NOT NULL default 0
+  listing_posted int4 NOT NULL default 0
+  lead_received int4 NOT NULL default 0
+
+[grants]
+  id uuid NOT NULL default gen_random_uuid()
+  profile_id uuid NOT NULL
+  kind text NOT NULL default 'trial'::text
+  catalog_code text
+  contents jsonb NOT NULL default '{}'::jsonb
+  duration_days int4
+  reason text NOT NULL
+  granted_by uuid
+  granted_by_name text NOT NULL
+  user_plan_id uuid
+  notified_at timestamptz
+  revoked_at timestamptz
+  created_at timestamptz NOT NULL default now()
+
+[health_checks]
+  id uuid NOT NULL default gen_random_uuid()
+  component text NOT NULL
+  status text NOT NULL default 'healthy'::text
+  detail text
+  latency_ms int4
+  checked_at timestamptz NOT NULL default now()
+
+[impersonation_sessions]
+  id uuid NOT NULL default gen_random_uuid()
+  staff_id uuid
+  staff_name text NOT NULL
+  profile_id uuid NOT NULL
+  reason text
+  ip text
+  started_at timestamptz NOT NULL default now()
+  ended_at timestamptz
+  expires_at timestamptz
+  ended_reason text
+
+[inquiries]
+  id uuid NOT NULL default gen_random_uuid()
+  profile_id uuid NOT NULL
+  listing_id uuid NOT NULL
+  poster_id uuid NOT NULL
+  message text NOT NULL
+  intents _text NOT NULL default '{}'::text[]
+  share_number bool NOT NULL default true
+  status inquiry_status NOT NULL default 'sent'::inquiry_status
+  thread_id uuid
+  created_at timestamptz NOT NULL default now()
+  updated_at timestamptz NOT NULL default now()
+
+[invoices]
+  id uuid NOT NULL default gen_random_uuid()
+  number text NOT NULL
+  order_id uuid NOT NULL
+  payment_id uuid
+  profile_id uuid NOT NULL
+  gstin text
+  billed_to jsonb NOT NULL
+  line_items jsonb NOT NULL
+  totals jsonb NOT NULL
+  issued_at timestamptz NOT NULL default now()
+  emailed_at timestamptz
+
+[leads]
+  id uuid NOT NULL default gen_random_uuid()
+  owner_id uuid NOT NULL
+  lead_profile_id uuid NOT NULL
+  listing_id uuid
+  requirement_id uuid
+  source lead_source NOT NULL default 'inquiry'::lead_source
+  stage lead_stage NOT NULL default 'new'::lead_stage
+  last_activity text
+  last_activity_at timestamptz NOT NULL default now()
+  notes jsonb NOT NULL default '[]'::jsonb
+  is_relevant bool NOT NULL default true
+  created_at timestamptz NOT NULL default now()
+  updated_at timestamptz NOT NULL default now()
+  project_id uuid
+
+[listing_drafts]
+  id uuid NOT NULL default gen_random_uuid()
+  profile_id uuid NOT NULL
+  kind text NOT NULL default 'listing'::text
+  payload jsonb NOT NULL default '{}'::jsonb
+  title text
+  expires_at timestamptz NOT NULL default (now() + '90 days'::interval)
+  created_at timestamptz NOT NULL default now()
+  updated_at timestamptz NOT NULL default now()
+
+[listing_photos]
+  id uuid NOT NULL default gen_random_uuid()
+  listing_id uuid NOT NULL
+  profile_id uuid NOT NULL
+  storage_key text NOT NULL
+  url text
+  alt_text text
+  position int4 NOT NULL default 0
+  width int4
+  height int4
+  status text NOT NULL default 'uploading'::text
+  error text
+  created_at timestamptz NOT NULL default now()
+  bucket text NOT NULL default 'listing-photos'::text
+  variants jsonb
+
+[listing_price_history]
+  id uuid NOT NULL default gen_random_uuid()
+  listing_id uuid NOT NULL
+  old_paise int8
+  new_paise int8
+  changed_at timestamptz NOT NULL default now()
+
+[listing_shares]
+  id uuid NOT NULL default gen_random_uuid()
+  listing_id uuid NOT NULL
+  sharer_key text NOT NULL
+  channel text NOT NULL
+  shared_on date NOT NULL default ((now() AT TIME ZONE 'Asia/Kolkata'::text))::date
+  created_at timestamptz NOT NULL default now()
+
+[listing_slots]
+  id uuid NOT NULL default gen_random_uuid()
+  profile_id uuid NOT NULL
+  user_plan_id uuid NOT NULL
+  order_id uuid
+  listing_id uuid
+  state slot_state NOT NULL default 'reserved'::slot_state
+  released_reason text
+  created_at timestamptz NOT NULL default now()
+  updated_at timestamptz NOT NULL default now()
+
+[listing_views]
+  id uuid NOT NULL default gen_random_uuid()
+  listing_id uuid NOT NULL
+  viewer_key text NOT NULL
+  viewed_on date NOT NULL default ((now() AT TIME ZONE 'Asia/Kolkata'::text))::date
+  created_at timestamptz NOT NULL default now()
+
+[listings]
+  id uuid NOT NULL default gen_random_uuid()
+  profile_id uuid NOT NULL
+  slot_id uuid
+  type_code text NOT NULL
+  kind listing_kind NOT NULL default 'sell'::listing_kind
+  status listing_state NOT NULL default 'draft'::listing_state
+  availability listing_availability NOT NULL default 'available'::listing_availability
+  title text
+  description text
+  price_paise int8
+  price_on_request bool NOT NULL default false
+  is_negotiable bool NOT NULL default false
+  deposit_paise int8
+  maintenance_paise int8
+  maintenance_included bool NOT NULL default false
+  available_from date
+  state_id uuid
+  district_id uuid
+  taluka_id uuid
+  city_id uuid
+  area_id uuid
+  pincode text
+  area_label text
+  attributes jsonb NOT NULL default '{}'::jsonb
+  amenities _text NOT NULL default '{}'::text[]
+  contact_public bool NOT NULL default false
+  contact_number text
+  alt_number text
+  whatsapp_number text
+  ownership_proof_type text
+  ownership_proof_key text
+  cover_url text
+  photo_count int4 NOT NULL default 0
+  reject_count int4 NOT NULL default 0
+  review_notes jsonb
+  reject_reason text
+  is_locked bool NOT NULL default false
+  flagged_reason text
+  submitted_at timestamptz
+  approved_at timestamptz
+  live_at timestamptz
+  still_available_asked_at timestamptz
+  hidden_at timestamptz
+  archived_at timestamptz
+  deleted_at timestamptz
+  sold_at timestamptz
+  created_at timestamptz NOT NULL default now()
+  updated_at timestamptz NOT NULL default now()
+  ownership_proof_bucket text NOT NULL default 'private-docs'::text
+  area_sqft int4
+  edited_since_approval bool NOT NULL default false
+  ownership_proof_name text
+  story_suppressed_at timestamptz
+
+[location_adjacency]
+  location_id uuid NOT NULL
+  adjacent_id uuid NOT NULL
+
+[location_pincodes]
+  location_id uuid NOT NULL
+  pincode text NOT NULL
+
+[locations]
+  id uuid NOT NULL default gen_random_uuid()
+  parent_id uuid
+  level text NOT NULL
+  name text NOT NULL
+  name_gu text
+  pincode text
+  is_active bool NOT NULL default true
+  created_at timestamptz NOT NULL default now()
+  slug text NOT NULL
+  is_launched bool NOT NULL default true
+  highlights text
+  rera_portal_url text
+
+[maintenance_settings]
+  id bool NOT NULL default true
+  enabled bool NOT NULL default false
+  message text NOT NULL default 'HomzList is under maintenance. We will be back shortly.'::text
+  eta timestamptz
+  bypass_roles _text NOT NULL default '{super,admin,staff}'::text[]
+  updated_by uuid
+  updated_at timestamptz NOT NULL default now()
+
+[message_templates]
+  id uuid NOT NULL default gen_random_uuid()
+  code text NOT NULL
+  channel text NOT NULL
+  name text NOT NULL
+  subject text
+  body text NOT NULL
+  variables _text NOT NULL default '{}'::text[]
+  provider_ref text
+  is_active bool NOT NULL default true
+  last_test_at timestamptz
+  updated_by uuid
+  updated_at timestamptz NOT NULL default now()
+  created_at timestamptz NOT NULL default now()
+
+[metric_definitions]
+  key text NOT NULL
+  label text NOT NULL
+  definition text NOT NULL
+
+[moderation_appeals]
+  id uuid NOT NULL default gen_random_uuid()
+  subject text NOT NULL
+  subject_id uuid NOT NULL
+  profile_id uuid NOT NULL
+  reason text
+  status text NOT NULL default 'open'::text
+  resolved_by uuid
+  resolved_at timestamptz
+  resolution text
+  created_at timestamptz NOT NULL default now()
+  unlocked_at timestamptz
+
+[moderation_events]
+  id uuid NOT NULL default gen_random_uuid()
+  profile_id uuid NOT NULL
+  kind text NOT NULL
+  severity text NOT NULL default 'warning'::text
+  title text NOT NULL
+  detail text
+  created_at timestamptz NOT NULL default now()
+
+[moderation_log]
+  id uuid NOT NULL default gen_random_uuid()
+  subject text NOT NULL
+  subject_id uuid NOT NULL
+  actor_id uuid NOT NULL
+  action text NOT NULL
+  notes jsonb
+  reason text
+  created_at timestamptz NOT NULL default now()
+
+[notification_categories]
+  code text NOT NULL
+  label text NOT NULL
+  sort_order int4 NOT NULL default 0
+  is_active bool NOT NULL default true
+
+[notification_deliveries]
+  id uuid NOT NULL default gen_random_uuid()
+  notification_id uuid NOT NULL
+  profile_id uuid NOT NULL
+  channel text NOT NULL
+  status text NOT NULL
+  reason text
+  provider_id text
+  created_at timestamptz NOT NULL default now()
+
+[notification_pref_groups]
+  code text NOT NULL
+  section text NOT NULL
+  label text NOT NULL
+  sublabel text
+  default_on bool NOT NULL default true
+  is_locked bool NOT NULL default false
+  sort_order int4 NOT NULL default 0
+
+[notification_pref_values]
+  profile_id uuid NOT NULL
+  group_code text NOT NULL
+  enabled bool NOT NULL
+  updated_at timestamptz NOT NULL default now()
+
+[notification_prefs]
+  profile_id uuid NOT NULL
+  expiry_reminders bool NOT NULL default true
+  created_at timestamptz NOT NULL default now()
+  updated_at timestamptz NOT NULL default now()
+  push_enabled bool NOT NULL default true
+  email_enabled bool NOT NULL default true
+  whatsapp_enabled bool NOT NULL default false
+  marketing_consent bool NOT NULL default false
+  marketing_consent_at timestamptz
+  quiet_hours bool NOT NULL default true
+  quiet_start time
+  quiet_end time
+
+[notification_sends]
+  id uuid NOT NULL default gen_random_uuid()
+  profile_id uuid NOT NULL
+  kind text NOT NULL
+  subject_id uuid
+  milestone text NOT NULL default ''::text
+  sent_at timestamptz NOT NULL default now()
+
+[notification_settings]
+  id bool NOT NULL default true
+  retention_days int4 NOT NULL default 90
+  quiet_start time NOT NULL default '23:00:00'::time without time zone
+  quiet_end time NOT NULL default '07:00:00'::time without time zone
+  timezone text NOT NULL default 'Asia/Kolkata'::text
+  batch_window_minutes int4 NOT NULL default 1440
+  updated_at timestamptz NOT NULL default now()
+
+[notification_types]
+  code notification_type NOT NULL
+  category text NOT NULL
+  label text NOT NULL
+  lead_kind text NOT NULL default 'icon'::text
+  lead_icon text
+  lead_tone text NOT NULL default 'neutral'::text
+  href_template text
+  actions jsonb NOT NULL default '[]'::jsonb
+  is_urgent bool NOT NULL default false
+  is_marketing bool NOT NULL default false
+  default_push bool NOT NULL default true
+  default_email bool NOT NULL default false
+  group_window_minutes int4 NOT NULL default 0
+  show_thumb bool NOT NULL default false
+  sort_order int4 NOT NULL default 0
+  pref_group text
+
+[notifications]
+  id uuid NOT NULL default gen_random_uuid()
+  profile_id uuid NOT NULL
+  type notification_type NOT NULL
+  title text NOT NULL
+  body text
+  thread_id uuid
+  actor_id uuid
+  data jsonb NOT NULL default '{}'::jsonb
+  read_at timestamptz
+  created_at timestamptz NOT NULL default now()
+  category text NOT NULL
+  group_key text
+  group_count int4 NOT NULL default 1
+  last_event_at timestamptz NOT NULL default now()
+  href text
+  thumb_url text
+  actions jsonb NOT NULL default '[]'::jsonb
+  action_taken text
+  action_taken_at timestamptz
+  action_result text
+  dismissed_at timestamptz
+  hold_until timestamptz
+  is_marketing bool NOT NULL default false
+  entity_kind text
+  entity_id uuid
+
+[number_patterns]
+  id uuid NOT NULL default gen_random_uuid()
+  label text NOT NULL
+  pattern text NOT NULL
+  sample text
+  action text NOT NULL default 'flag'::text
+  is_active bool NOT NULL default true
+  created_at timestamptz NOT NULL default now()
+
+[number_requests]
+  id uuid NOT NULL default gen_random_uuid()
+  thread_id uuid NOT NULL
+  requester_id uuid NOT NULL
+  target_id uuid NOT NULL
+  status number_req_status NOT NULL default 'requested'::number_req_status
+  message_id uuid
+  responded_at timestamptz
+  created_at timestamptz NOT NULL default now()
+
+[orders]
+  id uuid NOT NULL default gen_random_uuid()
+  profile_id uuid NOT NULL
+  kind billing_kind NOT NULL
+  catalog_code text NOT NULL
+  terms_snapshot jsonb NOT NULL
+  base_paise int8 NOT NULL
+  discount_paise int8 NOT NULL default 0
+  taxable_paise int8 NOT NULL
+  cgst_paise int8 NOT NULL default 0
+  sgst_paise int8 NOT NULL default 0
+  igst_paise int8 NOT NULL default 0
+  total_paise int8 NOT NULL
+  currency text NOT NULL default 'INR'::text
+  coupon_id uuid
+  coupon_code text
+  gstin text
+  place_of_supply text NOT NULL default 'GJ'::text
+  razorpay_order_id text
+  status order_status NOT NULL default 'created'::order_status
+  idempotency_key text
+  boost_request jsonb
+  created_at timestamptz NOT NULL default now()
+  updated_at timestamptz NOT NULL default now()
+
+[payments]
+  id uuid NOT NULL default gen_random_uuid()
+  order_id uuid NOT NULL
+  profile_id uuid NOT NULL
+  razorpay_payment_id text
+  status payment_status NOT NULL default 'pending'::payment_status
+  method text
+  method_detail text
+  amount_paise int8 NOT NULL
+  currency text NOT NULL default 'INR'::text
+  failure_reason text
+  refund_id text
+  refund_reason text
+  refunded_at timestamptz
+  captured_at timestamptz
+  created_at timestamptz NOT NULL default now()
+  updated_at timestamptz NOT NULL default now()
+
+[plan_adjustments]
+  id uuid NOT NULL default gen_random_uuid()
+  profile_id uuid NOT NULL
+  user_plan_id uuid
+  kind consumption_kind NOT NULL
+  delta int4 NOT NULL
+  reason text NOT NULL
+  actor_id uuid
+  actor_name text NOT NULL
+  created_at timestamptz NOT NULL default now()
+
+[plan_catalog]
+  code text NOT NULL
+  kind billing_kind NOT NULL
+  name text NOT NULL
+  sub_label text
+  price_paise int8 NOT NULL
+  period_days int4
+  roles _text NOT NULL default '{owner,broker,builder}'::text[]
+  features _text NOT NULL default '{}'::text[]
+  listing_quota int4 NOT NULL default 0
+  requirement_quota int4 NOT NULL default 0
+  requirement_days int4
+  proposal_quota int4 NOT NULL default 0
+  proposals_expire_with_plan bool NOT NULL default false
+  sort_order int4 NOT NULL default 0
+  is_active bool NOT NULL default true
+  created_at timestamptz NOT NULL default now()
+  updated_at timestamptz NOT NULL default now()
+  project_quota int4 NOT NULL default 0
+  requirement_access bool NOT NULL default false
+
+[plan_consumptions]
+  id uuid NOT NULL default gen_random_uuid()
+  user_plan_id uuid NOT NULL
+  profile_id uuid NOT NULL
+  kind consumption_kind NOT NULL
+  qty int4 NOT NULL default 1
+  ref_type text
+  ref_id uuid
+  note text
+  reverted_at timestamptz
+  revert_reason text
+  created_at timestamptz NOT NULL default now()
+
+[plan_reminders]
+  id uuid NOT NULL default gen_random_uuid()
+  user_plan_id uuid NOT NULL
+  profile_id uuid NOT NULL
+  milestone int4 NOT NULL
+  expires_at timestamptz NOT NULL
+  sent_at timestamptz NOT NULL default now()
+
+[platform_daily_stats]
+  day date NOT NULL
+  signups int4 NOT NULL default 0
+  listings_created int4 NOT NULL default 0
+  listings_live int4 NOT NULL default 0
+  inquiries int4 NOT NULL default 0
+  leads int4 NOT NULL default 0
+  revenue_paise int8 NOT NULL default 0
+  plan_revenue_paise int8 NOT NULL default 0
+  boost_revenue_paise int8 NOT NULL default 0
+  topup_revenue_paise int8 NOT NULL default 0
+  payment_failures int4 NOT NULL default 0
+
+[profiles]
+  id uuid NOT NULL default gen_random_uuid()
+  phone text NOT NULL
+  role user_role
+  name text
+  city_id uuid
+  photo_url text
+  bio text
+  state account_state NOT NULL default 'active'::account_state
+  is_registered bool NOT NULL default false
+  last_active_at timestamptz NOT NULL default now()
+  created_at timestamptz NOT NULL default now()
+  updated_at timestamptz NOT NULL default now()
+  username text
+  email text
+  company_logo_url text
+  established_year int4
+  projects_done int4
+  office_address text
+  areas_covered _text
+  response_label text
+  bio_flagged_at timestamptz
+  bio_flag_reason text
+  bio_flag_outcome text
+  bio_flag_resolved_at timestamptz
+  bio_flag_resolved_by uuid
+
+[project_photos]
+  id uuid NOT NULL default gen_random_uuid()
+  project_id uuid NOT NULL
+  profile_id uuid NOT NULL
+  storage_key text NOT NULL
+  url text
+  bucket text NOT NULL default 'listing-photos'::text
+  alt_text text
+  position int4 NOT NULL default 0
+  width int4
+  height int4
+  variants jsonb
+  status text NOT NULL default 'uploading'::text
+  error text
+  created_at timestamptz NOT NULL default now()
+
+[project_types]
+  code text NOT NULL
+  label text NOT NULL
+  category text NOT NULL
+  unit_types _text NOT NULL default '{}'::text[]
+  field_config jsonb NOT NULL default '{}'::jsonb
+  sort_order int4 NOT NULL default 0
+  is_active bool NOT NULL default true
+  created_at timestamptz NOT NULL default now()
+  updated_at timestamptz NOT NULL default now()
+
+[project_units]
+  id uuid NOT NULL default gen_random_uuid()
+  project_id uuid NOT NULL
+  unit_type text NOT NULL
+  area_sqft int4
+  price_from_paise int8
+  floor_plan_url text
+  available bool NOT NULL default true
+  position int4 NOT NULL default 0
+  carpet_sqft int4
+  units_available int4
+
+[projects]
+  id uuid NOT NULL default gen_random_uuid()
+  profile_id uuid NOT NULL
+  slot_id uuid
+  name text NOT NULL
+  status listing_state NOT NULL default 'draft'::listing_state
+  rera_number text
+  rera_exempt bool NOT NULL default false
+  rera_exempt_reason text
+  build_status text
+  possession_date date
+  towers int4
+  floors int4
+  total_units int4
+  available_units int4
+  bank_approvals _text NOT NULL default '{}'::text[]
+  amenities _text NOT NULL default '{}'::text[]
+  description text
+  state_id uuid
+  city_id uuid
+  area_id uuid
+  area_label text
+  brochure_key text
+  brochure_scanned bool NOT NULL default false
+  cover_url text
+  approved_at timestamptz
+  live_at timestamptz
+  expires_at timestamptz
+  deleted_at timestamptz
+  created_at timestamptz NOT NULL default now()
+  updated_at timestamptz NOT NULL default now()
+  brochure_bucket text NOT NULL default 'private-docs'::text
+  pincode text
+  review_notes jsonb
+  reject_reason text
+  reject_count int4 NOT NULL default 0
+  is_locked bool NOT NULL default false
+  submitted_at timestamptz
+  edited_since_approval bool NOT NULL default false
+  district_id uuid
+  taluka_id uuid
+  project_type text
+  attributes jsonb NOT NULL default '{}'::jsonb
+  photo_count int4 NOT NULL default 0
+  hidden_at timestamptz
+  story_suppressed_at timestamptz
+
+[property_types]
+  code text NOT NULL
+  label text NOT NULL
+  category text NOT NULL
+  roles _text NOT NULL default '{owner,broker,builder}'::text[]
+  kinds _listing_kind NOT NULL default '{sell,rent}'::listing_kind[]
+  field_config jsonb NOT NULL default '{}'::jsonb
+  sort_order int4 NOT NULL default 0
+  is_active bool NOT NULL default true
+  created_at timestamptz NOT NULL default now()
+  updated_at timestamptz NOT NULL default now()
+
+[proposals]
+  id uuid NOT NULL default gen_random_uuid()
+  requirement_id uuid NOT NULL
+  sender_id uuid NOT NULL
+  poster_id uuid NOT NULL
+  mode proposal_mode NOT NULL default 'chat'::proposal_mode
+  listing_id uuid
+  message text NOT NULL
+  status proposal_status NOT NULL default 'pending'::proposal_status
+  consumption_id uuid
+  thread_id uuid
+  responded_at timestamptz
+  expires_at timestamptz NOT NULL
+  created_at timestamptz NOT NULL default now()
+  updated_at timestamptz NOT NULL default now()
+
+[push_tokens]
+  profile_id uuid NOT NULL
+  token text NOT NULL
+  platform text NOT NULL default 'web'::text
+  created_at timestamptz NOT NULL default now()
+  last_seen_at timestamptz NOT NULL default now()
+  browser text
+  os text
+  device_label text
+  standalone bool NOT NULL default false
+  user_agent text
+
+[queue_depths]
+  id uuid NOT NULL default gen_random_uuid()
+  queue text NOT NULL
+  depth int4 NOT NULL default 0
+  workers int4 NOT NULL default 0
+  oldest_age_seconds int4 NOT NULL default 0
+  checked_at timestamptz NOT NULL default now()
+
+[rate_limits]
+  key text NOT NULL
+  label text NOT NULL
+  scope text NOT NULL default 'ip'::text
+  window_seconds int4 NOT NULL
+  max_requests int4 NOT NULL
+  block_seconds int4 NOT NULL default 0
+  is_active bool NOT NULL default true
+  updated_at timestamptz NOT NULL default now()
+
+[reconciliation_items]
+  id uuid NOT NULL default gen_random_uuid()
+  run_id uuid NOT NULL
+  payment_id uuid
+  gateway_ref text
+  platform_paise int8
+  gateway_paise int8
+  state text NOT NULL default 'matched'::text
+  rechecked_at timestamptz
+  note text
+
+[reconciliation_runs]
+  id uuid NOT NULL default gen_random_uuid()
+  window_start timestamptz NOT NULL
+  window_end timestamptz NOT NULL
+  platform_count int4 NOT NULL default 0
+  gateway_count int4 NOT NULL default 0
+  matched int4 NOT NULL default 0
+  mismatched int4 NOT NULL default 0
+  status text NOT NULL default 'ok'::text
+  ran_at timestamptz NOT NULL default now()
+
+[reject_templates]
+  code text NOT NULL
+  subject_type text NOT NULL default 'listing'::text
+  label text NOT NULL
+  body text NOT NULL
+  sort_order int4 NOT NULL default 0
+  is_active bool NOT NULL default true
+
+[report_actions]
+  id uuid NOT NULL default gen_random_uuid()
+  report_id uuid NOT NULL
+  action text NOT NULL
+  reason text
+  actor_id uuid
+  reporter_notified_at timestamptz
+  created_at timestamptz NOT NULL default now()
+
+[reports]
+  id uuid NOT NULL default gen_random_uuid()
+  reporter_id uuid NOT NULL
+  subject_type report_subject NOT NULL
+  subject_id uuid NOT NULL
+  reason text NOT NULL
+  note text
+  status report_status NOT NULL default 'open'::report_status
+  created_at timestamptz NOT NULL default now()
+
+[requirements]
+  id uuid NOT NULL default gen_random_uuid()
+  profile_id uuid NOT NULL
+  kind listing_kind NOT NULL default 'sell'::listing_kind
+  type_code text NOT NULL
+  bhk int4
+  budget_min_paise int8
+  budget_max_paise int8
+  area_ids _uuid NOT NULL default '{}'::uuid[]
+  area_label text
+  city_id uuid
+  urgency requirement_urgency NOT NULL default 'immediate'::requirement_urgency
+  notes text
+  status requirement_state NOT NULL default 'draft'::requirement_state
+  is_active bool NOT NULL default true
+  reject_count int4 NOT NULL default 0
+  review_notes jsonb
+  reject_reason text
+  is_locked bool NOT NULL default false
+  flagged_reason text
+  consumption_id uuid
+  slot_consumed_at timestamptz
+  submitted_at timestamptz
+  approved_at timestamptz
+  live_at timestamptz
+  expires_at timestamptz
+  fulfilled_at timestamptz
+  deleted_at timestamptz
+  created_at timestamptz NOT NULL default now()
+  updated_at timestamptz NOT NULL default now()
+  edited_since_approval bool NOT NULL default false
+
+[retention_settings]
+  key text NOT NULL
+  label text NOT NULL
+  days int4 NOT NULL
+  is_locked bool NOT NULL default false
+  note text
+  updated_at timestamptz NOT NULL default now()
+
+[review_locks]
+  subject_type text NOT NULL
+  subject_id uuid NOT NULL
+  locked_by uuid
+  locked_at timestamptz NOT NULL default now()
+  expires_at timestamptz NOT NULL default (now() + '00:10:00'::interval)
+
+[role_change_requests]
+  id uuid NOT NULL default gen_random_uuid()
+  profile_id uuid NOT NULL
+  from_role user_role
+  to_role user_role NOT NULL
+  status request_status NOT NULL default 'pending'::request_status
+  created_at timestamptz NOT NULL default now()
+
+[save_collections]
+  id uuid NOT NULL default gen_random_uuid()
+  profile_id uuid NOT NULL
+  name text NOT NULL
+  created_at timestamptz NOT NULL default now()
+
+[saved_searches]
+  id uuid NOT NULL default gen_random_uuid()
+  profile_id uuid NOT NULL
+  mode text NOT NULL default 'property'::text
+  label text NOT NULL
+  params jsonb NOT NULL default '{}'::jsonb
+  alerts_enabled bool NOT NULL default true
+  last_alerted_at timestamptz NOT NULL default now()
+  last_match_count int4 NOT NULL default 0
+  created_at timestamptz NOT NULL default now()
+  updated_at timestamptz NOT NULL default now()
+
+[saves]
+  id uuid NOT NULL default gen_random_uuid()
+  profile_id uuid NOT NULL
+  listing_id uuid NOT NULL
+  created_at timestamptz NOT NULL default now()
+  collection_id uuid
+  saved_price_paise int8
+
+[search_filter_facets]
+  field_key text NOT NULL
+  label text
+  control text NOT NULL
+  buckets jsonb
+  source text NOT NULL default 'attribute'::text
+  column_name text
+  sort_order int4 NOT NULL default 0
+  is_active bool NOT NULL default true
+  created_at timestamptz NOT NULL default now()
+  updated_at timestamptz NOT NULL default now()
+
+[search_recents]
+  id uuid NOT NULL default gen_random_uuid()
+  profile_id uuid NOT NULL
+  mode text NOT NULL default 'property'::text
+  query text NOT NULL
+  target_kind text
+  target_slug text
+  created_at timestamptz NOT NULL default now()
+
+[seed_ledger]
+  batch text NOT NULL
+  table_name text NOT NULL
+  row_id text NOT NULL
+  created_at timestamptz NOT NULL default now()
+
+[seo_content_templates]
+  id uuid NOT NULL default gen_random_uuid()
+  slot text NOT NULL
+  page_kind text
+  variant int2 NOT NULL
+  body text NOT NULL
+  is_active bool NOT NULL default true
+  created_at timestamptz NOT NULL default now()
+
+[seo_faq_templates]
+  id uuid NOT NULL default gen_random_uuid()
+  page_kind text NOT NULL default 'landing'::text
+  sort_order int4 NOT NULL default 0
+  question text NOT NULL
+  answer text NOT NULL
+  requires _text NOT NULL default '{}'::text[]
+  is_active bool NOT NULL default true
+  created_at timestamptz NOT NULL default now()
+
+[staff]
+  profile_id uuid NOT NULL
+  level text NOT NULL default 'staff'::text
+  is_active bool NOT NULL default true
+  created_at timestamptz NOT NULL default now()
+  email text
+  display_name text
+  added_by uuid
+  invited_at timestamptz
+  last_login_at timestamptz
+  is_online bool NOT NULL default false
+  state text NOT NULL default 'active'::text
+  google_sub text
+  phone text
+  notify_escalations bool NOT NULL default true
+  daily_digest bool NOT NULL default true
+
+[staff_sessions]
+  id uuid NOT NULL default gen_random_uuid()
+  staff_id uuid NOT NULL
+  started_at timestamptz NOT NULL default now()
+  last_seen_at timestamptz NOT NULL default now()
+  ended_at timestamptz
+  ip text
+  device text
+  jti text
+  revoked_at timestamptz
+  revoke_reason text
+
+[storage_orphans]
+  id uuid NOT NULL default gen_random_uuid()
+  storage_key text NOT NULL
+  bucket text NOT NULL
+  reason text NOT NULL
+  attempts int4 NOT NULL default 0
+  last_error text
+  created_at timestamptz NOT NULL default now()
+  updated_at timestamptz NOT NULL default now()
+
+[story_aggregates]
+  day date NOT NULL
+  city_id uuid NOT NULL
+  impressions int4 NOT NULL default 0
+  taps int4 NOT NULL default 0
+
+[story_seen]
+  profile_id uuid NOT NULL
+  city_id uuid NOT NULL
+  segment_id uuid NOT NULL
+  seen_at timestamptz NOT NULL default now()
+
+[support_tickets]
+  id uuid NOT NULL default gen_random_uuid()
+  number text NOT NULL
+  profile_id uuid
+  subject text NOT NULL
+  category text NOT NULL
+  priority text NOT NULL default 'normal'::text
+  status text NOT NULL default 'open'::text
+  assignee_id uuid
+  payment_id uuid
+  listing_id uuid
+  is_grievance bool NOT NULL default false
+  acked_at timestamptz
+  sla_due_at timestamptz
+  resolution text
+  closed_at timestamptz
+  last_activity_at timestamptz NOT NULL default now()
+  created_at timestamptz NOT NULL default now()
+  payment_ref text
+  alt_contact text
+  report_link text
+  reopened_at timestamptz
+  reopen_count int4 NOT NULL default 0
+
+[thread_participants]
+  thread_id uuid NOT NULL
+  profile_id uuid NOT NULL
+  role thread_role NOT NULL
+  pinned bool NOT NULL default false
+  muted bool NOT NULL default false
+  archived bool NOT NULL default false
+  last_read_at timestamptz NOT NULL default '1970-01-01 00:00:00+00'::timestamp with time zone
+  cleared_at timestamptz
+  created_at timestamptz NOT NULL default now()
+  updated_at timestamptz NOT NULL default now()
+
+[ticket_messages]
+  id uuid NOT NULL default gen_random_uuid()
+  ticket_id uuid NOT NULL
+  author_kind text NOT NULL default 'user'::text
+  author_id uuid
+  author_name text NOT NULL
+  body text NOT NULL
+  is_internal bool NOT NULL default false
+  created_at timestamptz NOT NULL default now()
+
+[trash_items]
+  id uuid NOT NULL default gen_random_uuid()
+  entity_type text NOT NULL
+  entity_id uuid NOT NULL
+  label text NOT NULL
+  deleted_by_kind text NOT NULL default 'user'::text
+  deleted_by uuid
+  deleted_by_name text
+  reason text
+  deleted_at timestamptz NOT NULL default now()
+  purge_at timestamptz NOT NULL default (now() + '30 days'::interval)
+  restored_at timestamptz
+  restored_by uuid
+
+[ui_strings]
+  key text NOT NULL
+  area text NOT NULL default 'common'::text
+  en text NOT NULL
+  gu text
+  hi text
+  updated_at timestamptz NOT NULL default now()
+
+[user_plans]
+  id uuid NOT NULL default gen_random_uuid()
+  profile_id uuid NOT NULL
+  order_id uuid
+  catalog_code text NOT NULL
+  name text NOT NULL
+  terms jsonb NOT NULL
+  listing_quota int4 NOT NULL default 0
+  listing_used int4 NOT NULL default 0
+  requirement_quota int4 NOT NULL default 0
+  requirement_used int4 NOT NULL default 0
+  proposal_quota int4 NOT NULL default 0
+  proposal_used int4 NOT NULL default 0
+  purchased_at timestamptz NOT NULL default now()
+  starts_at timestamptz NOT NULL default now()
+  expires_at timestamptz
+  status user_plan_status NOT NULL default 'active'::user_plan_status
+  is_trial bool NOT NULL default false
+  granted_by uuid
+  revoked_reason text
+  created_at timestamptz NOT NULL default now()
+  updated_at timestamptz NOT NULL default now()
+  project_quota int4 NOT NULL default 0
+  project_used int4 NOT NULL default 0
+
+[user_settings]
+  profile_id uuid NOT NULL
+  locale text NOT NULL default 'en'::text
+  show_number_default bool NOT NULL default false
+  show_last_seen bool NOT NULL default true
+  show_activity bool NOT NULL default true
+  findable_by_phone bool NOT NULL default true
+  updated_at timestamptz NOT NULL default now()
+
+[velocity_rules]
+  key text NOT NULL
+  label text NOT NULL
+  threshold int4 NOT NULL
+  window_hours int4 NOT NULL
+  action text NOT NULL default 'flag'::text
+  is_active bool NOT NULL default true
+
+[verifications]
+  id uuid NOT NULL default gen_random_uuid()
+  profile_id uuid NOT NULL
+  level verify_level NOT NULL
+  status verify_status NOT NULL default 'not_started'::verify_status
+  doc_type text
+  doc_key text
+  rera_number text
+  reason text
+  valid_till date
+  submitted_at timestamptz
+  reviewed_at timestamptz
+  created_at timestamptz NOT NULL default now()
+  updated_at timestamptz NOT NULL default now()
+  reviewed_by uuid
+
+[visits]
+  id uuid NOT NULL default gen_random_uuid()
+  listing_id uuid
+  requirement_id uuid
+  buyer_id uuid NOT NULL
+  poster_id uuid NOT NULL
+  scheduled_at timestamptz NOT NULL
+  note text
+  status visit_status NOT NULL default 'proposed'::visit_status
+  outcome visit_outcome
+  cancel_reason text
+  reschedule_of uuid
+  thread_id uuid
+  created_at timestamptz NOT NULL default now()
+  updated_at timestamptz NOT NULL default now()
+
+[webhook_events]
+  id uuid NOT NULL default gen_random_uuid()
+  provider text NOT NULL default 'razorpay'::text
+  event_id text NOT NULL
+  event_type text
+  payload jsonb
+  status text NOT NULL default 'processed'::text
+  note text
+  received_at timestamptz NOT NULL default now()

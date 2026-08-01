@@ -395,10 +395,88 @@ const ALL_STATUS_KEYS = [
   "archived",
 ];
 
+/* ══════════════════════════════════ P5a — coupons and grants ══════════════ */
+
+/**
+ * A14 — template 1218-1240.
+ *
+ * The design's four chips are four DERIVED states (migration 0102): a coupon is
+ * exhausted when its cap fills and expired when its date passes, so neither can
+ * be a stored column that goes stale.
+ */
+export const couponResource: ListResource = {
+  name: "coupons",
+  table: "admin_coupon_list",
+  select:
+    "id, code, label, discount_type, discount_value, max_discount_paise, min_value_paise, applies_to, catalog_codes, per_user_limit, usage_cap, used_count, starts_at, expires_at, is_active, created_at, usage_pct, status_key",
+  searchColumns: ["code", "label"],
+  sortColumns: ["created_at", "code", "used_count", "expires_at"],
+  defaultSort: { column: "created_at", ascending: false },
+  filters: [
+    { key: "applies", column: "applies_to", kind: "in", options: ["plans", "boosts", "both"] },
+    { key: "from", column: "created_at", kind: "dateFrom" },
+    { key: "to", column: "created_at", kind: "dateTo" },
+  ],
+  tabs: [
+    { key: "active", label: "Active", apply: (q) => q.eq("status_key", "active") },
+    { key: "scheduled", label: "Scheduled", apply: (q) => q.eq("status_key", "scheduled") },
+    { key: "expired", label: "Expired", apply: (q) => q.eq("status_key", "expired") },
+    { key: "exhausted", label: "Exhausted", apply: (q) => q.eq("status_key", "exhausted") },
+  ],
+  minRole: "admin",
+  // template 1231 — Code · Discount · Applies to · Scope · Usage · Per user ·
+  // Validity · Status
+  columns: [
+    { key: "code", label: "Code", field: "code" },
+    { key: "discount", label: "Discount", field: "discount_value" },
+    { key: "applies", label: "Applies to", field: "applies_to" },
+    { key: "scope", label: "Scope", field: "catalog_codes" },
+    { key: "usage", label: "Usage", field: "used_count" },
+    { key: "per_user", label: "Per user", field: "per_user_limit" },
+    { key: "validity", label: "Validity", field: "expires_at" },
+    { key: "status", label: "Status", field: "status_key" },
+  ],
+};
+
+/** A15 — template 1252-1272. Active · Expired · All. */
+export const grantResource: ListResource = {
+  name: "grants",
+  table: "admin_grant_list",
+  select:
+    "id, profile_id, user_name, user_role, user_photo, kind, catalog_code, contents, duration_days, reason, granted_by, granted_by_name, user_plan_id, revoked_at, created_at, expires_at, plan_status, listing_quota, listing_used, requirement_quota, requirement_used, proposal_quota, proposal_used, status_key, expiring_soon",
+  searchColumns: ["user_name", "reason", "granted_by_name"],
+  sortColumns: ["created_at", "expires_at", "user_name"],
+  defaultSort: { column: "created_at", ascending: false },
+  filters: [
+    { key: "role", column: "user_role", kind: "in", options: ["owner", "broker", "builder"] },
+    { key: "by", column: "granted_by", kind: "in" },
+    { key: "from", column: "created_at", kind: "dateFrom" },
+    { key: "to", column: "created_at", kind: "dateTo" },
+  ],
+  tabs: [
+    { key: "active", label: "Active", apply: (q) => q.eq("status_key", "active") },
+    { key: "expired", label: "Expired", apply: (q) => q.eq("status_key", "expired") },
+    { key: "all", label: "All", apply: (q) => q },
+  ],
+  minRole: "admin",
+  // template 1261 — User · Granted · Duration · Expires · Reason · Granted by · Date
+  columns: [
+    { key: "user", label: "User", field: "user_name" },
+    { key: "granted", label: "Granted", field: "contents" },
+    { key: "duration", label: "Duration", field: "duration_days" },
+    { key: "expires", label: "Expires", field: "expires_at" },
+    { key: "reason", label: "Reason", field: "reason" },
+    { key: "by", label: "Granted by", field: "granted_by_name" },
+    { key: "date", label: "Date", field: "created_at" },
+  ],
+};
+
 export const ADMIN_RESOURCES: Record<string, ListResource> = {
   audit: auditResource,
   users: userResource,
   "listings-master": listingMasterResource,
+  coupons: couponResource,
+  grants: grantResource,
   listings: listingQueueResource,
   requirements: requirementQueueResource,
   boosts: boostQueueResource,
