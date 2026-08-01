@@ -5,6 +5,7 @@ import { getProfileById } from "@/lib/profile/service";
 import { rateLimit } from "@/lib/auth/rate-limit";
 import { createListing, getPropertyType, sanitizeAttributes, NoSlotError } from "@/lib/listings/service";
 import { validateListing } from "@/lib/listings/validate";
+import { scanAndRecord } from "@/lib/moderation/rules";
 import { listingCardDTO } from "@/lib/listings/dto";
 import { getUserPrefs } from "@/lib/settings/service";
 import { canPostListing } from "@/lib/listings/capabilities";
@@ -88,7 +89,21 @@ export async function POST(req: NextRequest) {
     contact: { public: contactPublic, number: typeof body.contactNumber === "string" ? body.contactNumber : null },
   };
 
-  const { errors, warnings, flaggedReason } = validateListing(input, type, visible);
+  // The content rules live in `number_patterns` / `blocklist_words` and are
+  // read by lib/moderation/rules.ts (P6). Scanning here, before the validator,
+  // is what lets A19 disable a rule and have it really stop flagging — and
+  // every match is counted so A19's "Hits (30d)" is a query.
+  const scan = await scanAndRecord(`${input.title ?? ""}\n${input.description ?? ""}`, {
+    entityType: "listing",
+    field: "description",
+    profileId: claims.sub,
+  });
+  const { errors, warnings, flaggedReason } = validateListing(
+    input,
+    type,
+    visible,
+    Boolean(scan.blocked || scan.flagged.length),
+  );
   if (Object.keys(errors).length) return fail("VALIDATION_ERROR", { errors, warnings });
 
   try {

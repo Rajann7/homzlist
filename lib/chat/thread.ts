@@ -2,7 +2,8 @@ import "server-only";
 import { createServiceClient } from "@/lib/supabase/server";
 import { timeAgo } from "@/lib/listings/matching";
 import { formatShortRupees } from "@/lib/billing/money";
-import { MESSAGE_MAX, NUMBER_PATTERN, PROFANITY, PAGE } from "./service";
+import { MESSAGE_MAX, PAGE } from "./service";
+import { checkText, recordHits } from "@/lib/moderation/rules";
 import { notify, threadMutedFor } from "@/lib/notifications/service";
 import { pingThread, pingInbox } from "./realtime";
 import { getUserPrefs } from "@/lib/settings/service";
@@ -268,8 +269,14 @@ export async function sendMessage(
   if (input.photoUrl) return { ok: false, reason: "photo_disabled" };
   if (!text.trim()) return { ok: false, reason: "empty" };
 
-  const numberFlag = NUMBER_PATTERN.test(text);
-  const profanityFlag = PROFANITY.some((w) => text.toLowerCase().includes(w));
+  // Both flags come from the rules A19 edits (P6). Before that, chat carried
+  // its own regex and its own four-word array, so an admin adding a word on
+  // A19 changed listings and not chat — two moderation policies for one site.
+  // The message id does not exist yet, so the hit rows are written after the
+  // insert, below.
+  const chatScan = await checkText(text, "chat");
+  const numberFlag = chatScan.some((m) => m.kind === "pattern");
+  const profanityFlag = chatScan.some((m) => m.kind === "word");
 
   // Link preview (Doc2 §10.2). Resolved SERVER-side, and only for our own
   // property/project URLs — a HomzList link becomes the rich card the design
@@ -287,6 +294,14 @@ export async function sendMessage(
     meta: preview ?? {},
     number_flag: numberFlag, profanity_flag: profanityFlag,
   }).select("*").single();
+
+  // Counted against the rule, now that there is a message to point at.
+  await recordHits(chatScan, {
+    entityType: "chat",
+    entityId: (data as { id?: string } | null)?.id ?? null,
+    field: "body",
+    profileId: me,
+  });
 
   // A new message auto-unarchives the thread for both sides (Doc2 §10.2).
   await db().from("thread_participants").update({ archived: false }).eq("thread_id", threadId);

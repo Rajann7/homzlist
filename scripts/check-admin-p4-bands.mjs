@@ -45,7 +45,7 @@ for (const [band, w, h] of BANDS) {
   console.log(`\n${band} · ${w}×${h}`);
   await s.setViewport(w, h, 1, band === "mobile");
 
-  for (const path of ["/users", "/listings", "/coupons", "/grants", "/plans"]) {
+  for (const path of ["/users", "/listings", "/coupons", "/grants", "/plans", "/payments", "/finance"]) {
     s.consoleErrors.length = 0;
     await s.goto(`${BASE}${path}`, { waitMs: 2000 });
     // A12 asks for ten tab counts over a union view; on a cold route that is
@@ -80,6 +80,16 @@ for (const [band, w, h] of BANDS) {
           const g = document.querySelector('main [class*="md:grid-cols-2"]');
           return g ? getComputedStyle(g).gridTemplateColumns.split(' ').length : 0;
         })(),
+        // A16's "By product / By city" pair — template 1165 splits it at TABLET
+        finCols: (() => {
+          const g = document.querySelector('main [class*="md:grid-cols-[1.4fr_1fr]"]');
+          return g ? getComputedStyle(g).gridTemplateColumns.split(' ').length : 0;
+        })(),
+        // A16's KPI row is flex-wrap with minWidth:150 (template 1155), so what
+        // matters is that all four are on screen and none of them is clipped
+        finKpis: [...document.querySelectorAll('main div')].filter(
+          (e) => visible(e) && /^(Total revenue|Transactions|Avg order value|Refunds)$/.test(e.textContent.trim()),
+        ).length,
         // text the browser is cutting off inside an overflow:hidden box
         clipped: [...document.querySelectorAll('main td, main th')].filter(
           (e) => visible(e) && e.scrollWidth > e.clientWidth + 2 &&
@@ -103,6 +113,30 @@ for (const [band, w, h] of BANDS) {
         m.planCols,
         band === "mobile" ? 1 : 2,
       );
+      continue;
+    }
+
+    // A16 is tabs over cards and charts, not a table. Its one viewport branch
+    // is the By-product / By-city pair (template 1165, `mobile?'1fr':'1.4fr 1fr'`).
+    if (path === "/finance") {
+      check(`/finance ${band} · all four KPIs on screen`, m.finKpis, 4);
+      check(
+        `/finance ${band} · ${band === "mobile" ? "one" : "two"} column(s)`,
+        m.finCols,
+        band === "mobile" ? 1 : 2,
+      );
+      continue;
+    }
+
+    if (path === "/payments") {
+      if (band === "mobile") {
+        check(`/payments mobile · card list, no table`, m.tables, 0);
+        check(`/payments mobile · cards rendered`, m.cards > 0, true);
+      } else {
+        check(`/payments ${band} · table renders`, m.tables, 1);
+        // template 1137 drops Method and Date on tablet: 8 → 6
+        check(`/payments ${band} · visible columns`, m.columns, band === "tablet" ? 6 : 8);
+      }
       continue;
     }
 

@@ -28,10 +28,10 @@ const PAGE = 50;
 const DECLINE_COOLDOWN_DAYS = 30;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-// A 10-digit run (with optional separators) → soft number-pattern warning
-// (Doc2 §10.2). Does NOT block sending; flags for admin.
-const NUMBER_PATTERN = /(?:\D|^)(\d[\s-]?){9}\d(?:\D|$)/;
-const PROFANITY = ["fraud", "scam", "cheat", "bakwaas"]; // seed blocklist (admin-editable later)
+// The number regex and the four-word profanity list that used to live here are
+// rows in `number_patterns` / `blocklist_words` (migration 0106). Chat reads
+// them through lib/moderation/rules.ts, the same detector listings use, so
+// there is one moderation policy for the site rather than one per surface.
 
 // ---------------------------------------------------------------------------
 // Types
@@ -1123,4 +1123,4 @@ export async function reportUserById(me: string, userId: string, reason: string,
   return { ok: true };
 }
 
-export { PAGE, MESSAGE_MAX, NUMBER_PATTERN, PROFANITY, UUID_RE };
+export { PAGE, MESSAGE_MAX, UUID_RE };

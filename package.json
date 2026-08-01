@@ -50,7 +50,9 @@
     "check:admin-links": "node scripts/check-admin-links.mjs",
     "check:admin-p4": "node scripts/check-admin-p4.mjs",
     "check:admin-p4-bands": "node scripts/check-admin-p4-bands.mjs",
-    "check:admin-p5a": "node scripts/check-admin-p5a.mjs"
+    "check:admin-p5a": "node scripts/check-admin-p5a.mjs",
+    "check:admin-p5b": "node scripts/check-admin-p5b.mjs",
+    "check:bundle-secrets": "node scripts/check-bundle-secrets.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1091.0",

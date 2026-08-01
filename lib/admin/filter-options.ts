@@ -144,3 +144,30 @@ export async function sellablePlans(): Promise<{ code: string; name: string }[]>
     name: p.name,
   }));
 }
+
+/**
+ * A17's Method and Item pills — the methods and products that have ACTUALLY
+ * been paid with. Offering every gateway method Razorpay supports would be a
+ * filter with rows behind two of its eight options.
+ */
+export async function paymentFilterOptions(): Promise<{ methods: Options; items: Options }> {
+  const db = createServiceClient();
+  const [{ data: methods }, { data: catalog }] = await Promise.all([
+    db.from("payments").select("method").not("method", "is", null).limit(2000),
+    db.from("plan_catalog").select("code, name"),
+  ]);
+  const used = new Set(((methods ?? []) as { method: string }[]).map((m) => m.method));
+  return {
+    methods: [...used].sort().map((m) => ({ value: m, label: m.toUpperCase() })),
+    items: ((catalog ?? []) as { code: string; name: string }[]).map((c) => ({
+      value: c.code,
+      label: c.name,
+    })),
+  };
+}
+
+export async function paymentCount(): Promise<number> {
+  const db = createServiceClient();
+  const { count } = await db.from("admin_payment_list").select("id", { count: "exact", head: true });
+  return count ?? 0;
+}

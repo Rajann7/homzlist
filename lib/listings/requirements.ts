@@ -2,7 +2,7 @@ import "server-only";
 import { createServiceClient } from "@/lib/supabase/server";
 import { consumeQuota, releaseQuota } from "@/lib/billing/service";
 import { stopBoostsForSubject, pauseBoostsForSubject, resumeBoostsForSubject } from "@/lib/billing/boost";
-import { detectNumberInText } from "./validate";
+import { scanAndRecord } from "@/lib/moderation/rules";
 
 /**
  * Requirements — the "Post a requirement" flow (P6 S4, Doc7 §62).
@@ -94,6 +94,8 @@ export function validateRequirement(
   input: RequirementInput,
   typeExists: boolean,
   kindAllowed = true,
+  /** The caller's already-awaited scan against `number_patterns` (P6). */
+  contentFlag = false,
 ): RequirementValidation {
   const errors: Record<string, string> = {};
   const warnings: Record<string, string> = {};
@@ -124,7 +126,7 @@ export function validateRequirement(
   // Number in the notes → warn the user AND flag for the admin queue, but never
   // block the post (Doc2 §5.3 warnings-only).
   let flaggedReason: string | null = null;
-  if (notes && detectNumberInText(notes)) {
+  if (notes && contentFlag) {
     warnings.notes = "Sharing your number here is risky — buyers can request it safely in chat.";
     flaggedReason = "number_in_notes";
   }
@@ -174,7 +176,19 @@ export async function createRequirement(profileId: string, input: RequirementInp
   // trust the browser).
   const kindOk = Boolean(type) && ((type as { kinds?: string[] } | null)?.kinds ?? []).includes(input.kind);
 
-  const v = validateRequirement(input, Boolean(type), kindOk);
+  // The number rules are rows now (P6) — read them here, count the match, and
+  // hand the validator the answer rather than a second hardcoded regex.
+  const scan = await scanAndRecord(input.notes ?? "", {
+    entityType: "requirement",
+    field: "notes",
+    profileId,
+  });
+  const v = validateRequirement(
+    input,
+    Boolean(type),
+    kindOk,
+    Boolean(scan.blocked || scan.flagged.length),
+  );
   if (Object.keys(v.errors).length) return { ok: false, reason: "validation", errors: v.errors };
 
   const areaIds = (input.areaIds ?? []).slice(0, MAX_AREAS);
@@ -352,7 +366,17 @@ export async function updateRequirementContent(
     .maybeSingle();
 
   const kindOk = Boolean(type) && ((type as { kinds?: string[] } | null)?.kinds ?? []).includes(input.kind);
-  const v = validateRequirement(input, Boolean(type), kindOk);
+  const editScan = await scanAndRecord(input.notes ?? "", {
+    entityType: "requirement",
+    field: "notes",
+    profileId,
+  });
+  const v = validateRequirement(
+    input,
+    Boolean(type),
+    kindOk,
+    Boolean(editScan.blocked || editScan.flagged.length),
+  );
   if (Object.keys(v.errors).length) return { ok: false, reason: "validation", errors: v.errors };
 
   const areaIds = (input.areaIds ?? []).slice(0, MAX_AREAS);

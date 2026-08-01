@@ -471,11 +471,146 @@ export const grantResource: ListResource = {
   ],
 };
 
+/* ═══════════════════════════════════════ P5b — the payments list ══════════ */
+
+/**
+ * A17 — template 1114-1146.
+ *
+ * The design's seven chips are six payment states plus ABANDONED, and abandoned
+ * is not a payment at all — it is an order that never produced one. So this
+ * resource has six tabs and A17 renders the seventh from
+ * `admin_abandoned_checkouts`; a tab here would have been a chip that could
+ * only ever be empty.
+ */
+export const paymentResource: ListResource = {
+  name: "payments",
+  table: "admin_payment_list",
+  select:
+    "id, razorpay_payment_id, profile_id, user_name, order_id, catalog_code, item_name, order_kind, amount_paise, strike_paise, coupon_code, gst_paise, method, method_detail, method_label, status_key, failure_reason, refunded_at, captured_at, created_at, razorpay_order_id, has_chargeback, invoice_number",
+  // template 1119 — "payment ID / order ID / phone"
+  searchColumns: ["razorpay_payment_id", "razorpay_order_id", "user_name", "item_name"],
+  sortColumns: ["created_at", "amount_paise", "user_name"],
+  defaultSort: { column: "created_at", ascending: false },
+  filters: [
+    { key: "method", column: "method", kind: "in" },
+    { key: "item", column: "catalog_code", kind: "in" },
+    { key: "from", column: "created_at", kind: "dateFrom" },
+    { key: "to", column: "created_at", kind: "dateTo" },
+  ],
+  tabs: [
+    { key: "all", label: "All", apply: (q) => q },
+    { key: "success", label: "Success", apply: (q) => q.eq("status_key", "success") },
+    { key: "pending", label: "Pending", apply: (q) => q.eq("status_key", "pending") },
+    { key: "failed", label: "Failed", apply: (q) => q.eq("status_key", "failed") },
+    { key: "refunded", label: "Refunded", apply: (q) => q.eq("status_key", "refunded") },
+    { key: "chargeback", label: "Chargebacks", apply: (q) => q.eq("status_key", "chargeback") },
+  ],
+  minRole: "admin",
+  // template 1136 — Payment ID · User · Item · Amount · Method · Status · Date
+  columns: [
+    { key: "payment", label: "Payment ID", field: "razorpay_payment_id" },
+    { key: "user", label: "User", field: "user_name" },
+    { key: "item", label: "Item", field: "item_name" },
+    { key: "amount", label: "Amount", field: "amount_paise" },
+    { key: "method", label: "Method", field: "method_label" },
+    { key: "status", label: "Status", field: "status_key" },
+    { key: "date", label: "Date", field: "created_at" },
+  ],
+};
+
+/* ════════════════════════════════ A16's three finance exports ════════════ */
+
+/**
+ * The design lists three finance exports (template 1160). They are RESOURCES
+ * rather than a bespoke download path, so they run through the same machinery
+ * every other export uses: one `exports` table, one private bucket, one
+ * personal-data flag, one audit rule. A second downloader here would be a
+ * second place for that flag to be forgotten.
+ *
+ * They have no tabs and no filters an admin sets by hand — the screen passes
+ * the date range it is already showing.
+ */
+export const financeInvoiceResource: ListResource = {
+  name: "finance-invoices",
+  table: "invoices",
+  select: "id, number, order_id, payment_id, profile_id, gstin, totals, issued_at, emailed_at",
+  searchColumns: ["number", "gstin"],
+  sortColumns: ["issued_at", "number"],
+  defaultSort: { column: "issued_at", ascending: false },
+  filters: [
+    { key: "from", column: "issued_at", kind: "dateFrom" },
+    { key: "to", column: "issued_at", kind: "dateTo" },
+  ],
+  minRole: "admin",
+  columns: [
+    { key: "number", label: "Invoice", field: "number" },
+    { key: "issued", label: "Issued", field: "issued_at" },
+    { key: "gstin", label: "GSTIN", field: "gstin" },
+    { key: "totals", label: "Totals", field: "totals" },
+    { key: "emailed", label: "Emailed", field: "emailed_at" },
+  ],
+};
+
+export const financeRevenueResource: ListResource = {
+  name: "finance-revenue",
+  table: "orders",
+  select:
+    "id, catalog_code, kind, base_paise, discount_paise, taxable_paise, cgst_paise, sgst_paise, igst_paise, total_paise, coupon_code, place_of_supply, status, created_at",
+  searchColumns: ["catalog_code", "coupon_code"],
+  sortColumns: ["created_at", "total_paise"],
+  defaultSort: { column: "created_at", ascending: false },
+  filters: [
+    { key: "from", column: "created_at", kind: "dateFrom" },
+    { key: "to", column: "created_at", kind: "dateTo" },
+    { key: "status", column: "status", kind: "in" },
+  ],
+  minRole: "admin",
+  columns: [
+    { key: "date", label: "Date", field: "created_at" },
+    { key: "product", label: "Product", field: "catalog_code" },
+    { key: "base", label: "Base", field: "base_paise" },
+    { key: "discount", label: "Discount", field: "discount_paise" },
+    { key: "cgst", label: "CGST", field: "cgst_paise" },
+    { key: "sgst", label: "SGST", field: "sgst_paise" },
+    { key: "igst", label: "IGST", field: "igst_paise" },
+    { key: "total", label: "Total", field: "total_paise" },
+    { key: "status", label: "Status", field: "status" },
+  ],
+};
+
+export const financeRefundResource: ListResource = {
+  name: "finance-refunds",
+  table: "admin_payment_list",
+  select:
+    "id, razorpay_payment_id, user_name, item_name, amount_paise, status_key, refunded_at, created_at, invoice_number",
+  searchColumns: ["razorpay_payment_id", "user_name"],
+  sortColumns: ["refunded_at", "amount_paise"],
+  defaultSort: { column: "refunded_at", ascending: false },
+  filters: [
+    { key: "from", column: "refunded_at", kind: "dateFrom" },
+    { key: "to", column: "refunded_at", kind: "dateTo" },
+  ],
+  tabs: [{ key: "refunded", label: "Refunded", apply: (q) => q.eq("status_key", "refunded") }],
+  minRole: "admin",
+  columns: [
+    { key: "payment", label: "Payment", field: "razorpay_payment_id" },
+    { key: "user", label: "User", field: "user_name" },
+    { key: "item", label: "Item", field: "item_name" },
+    { key: "amount", label: "Amount", field: "amount_paise" },
+    { key: "refunded", label: "Refunded on", field: "refunded_at" },
+    { key: "invoice", label: "Invoice", field: "invoice_number" },
+  ],
+};
+
 export const ADMIN_RESOURCES: Record<string, ListResource> = {
   audit: auditResource,
   users: userResource,
   "listings-master": listingMasterResource,
   coupons: couponResource,
+  payments: paymentResource,
+  "finance-invoices": financeInvoiceResource,
+  "finance-revenue": financeRevenueResource,
+  "finance-refunds": financeRefundResource,
   grants: grantResource,
   listings: listingQueueResource,
   requirements: requirementQueueResource,

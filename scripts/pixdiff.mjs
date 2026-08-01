@@ -396,6 +396,19 @@ function screenMap(fx) {
         designState: { grantFilter: "active" },
         url: `${APP_ADMIN}/grants` },
     ]),
+
+    // ---- P13 · P5b --------------------------------------------------------
+    // A17 has a real mobile card branch and a tablet column drop (template
+    // 1137); A16 splits By-product / By-city at tablet (1165). Both are pinned
+    // to their default tab so a previous shot's tab cannot leak into the diff.
+    ...["mobile", "tablet", "desktop"].flatMap((band) => [
+      { id: `37-admin-finance-${band}`, page: "P13", screen: "finance", band, as: "admin",
+        designState: { finTab: "revenue" },
+        url: `${APP_ADMIN}/finance` },
+      { id: `38-admin-payments-${band}`, page: "P13", screen: "payments", band, as: "admin",
+        designState: { payFilter: "all" },
+        url: `${APP_ADMIN}/payments` },
+    ]),
   ];
 }
 

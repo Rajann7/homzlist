@@ -19,18 +19,16 @@ export interface ValidationResult {
   flaggedReason: string | null;
 }
 
-/** 10-digit runs, and the spaced/dashed forms people use to dodge a naive check. */
-const NUMBER_PATTERNS = [
-  /\b[6-9]\d{9}\b/,
-  /\b[6-9]\d{2}[\s.-]\d{3}[\s.-]\d{4}\b/,
-  /\b\+?91[\s.-]?[6-9]\d{9}\b/,
-  /\b[6-9](?:[\s.-]?\d){9}\b/,
-];
-
-export function detectNumberInText(text: string): boolean {
-  const t = text ?? "";
-  return NUMBER_PATTERNS.some((re) => re.test(t));
-}
+/**
+ * The four regexes that used to live here are now ROWS in `number_patterns`
+ * (migration 0106), because A19 is the screen that edits them and a rule an
+ * admin can turn off must actually turn off. The detector is
+ * lib/moderation/rules.ts; this file only reports what it was told.
+ *
+ * `contentFlag` is the caller's already-awaited scan result: these validators
+ * are synchronous and called from three places, and making them async to run a
+ * database read inside would have pushed that change through every one.
+ */
 
 /** Per-type sanity bands (warning-only — Doc2 §5.1). Values in paise. */
 const PRICE_BANDS: Record<string, [number, number]> = {
@@ -59,7 +57,12 @@ export interface ListingInput {
  * required field the seller could not see must not block the submit — a plot
  * has no BHK, and a ready-to-move flat has no possession date to give.
  */
-export function validateListing(input: ListingInput, type: PropertyTypeRow, visible?: Set<string>): ValidationResult {
+export function validateListing(
+  input: ListingInput,
+  type: PropertyTypeRow,
+  visible?: Set<string>,
+  contentFlag?: boolean,
+): ValidationResult {
   const errors: Record<string, string> = {};
   const warnings: Record<string, string> = {};
 
@@ -172,7 +175,7 @@ export function validateListing(input: ListingInput, type: PropertyTypeRow, visi
 
   // Numbers in free text bypass the number-privacy rule → flag for admin, but
   // never block the post (Doc2 §5.1).
-  const flagged = detectNumberInText(desc) || detectNumberInText(title);
+  const flagged = Boolean(contentFlag);
   if (flagged) warnings.description = "Phone numbers in the description are removed by our team — use the contact settings instead";
 
   return { errors, warnings, flaggedReason: flagged ? "phone_number_in_text" : null };

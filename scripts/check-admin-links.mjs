@@ -66,12 +66,13 @@ const SCREENS = [
   // P4 built these two, so the marker is their own copy, not the placeholder.
   ["/users", "No users match|users"],
   ["/listings", "No listings here|Listings"],
-  ["/payments", UNBUILT],
-  ["/finance", UNBUILT],
   // P5a built these three.
   ["/plans", "Plans|grandfathering"],
   ["/coupons", "Coupons|No coupons here"],
   ["/grants", "Grants|never shown to users"],
+  // P5b built these two.
+  ["/finance", "Finance|Reconciliation"],
+  ["/payments", "Payments|Abandoned"],
   ["/master-data", UNBUILT],
   ["/cms", UNBUILT],
   ["/templates", UNBUILT],
