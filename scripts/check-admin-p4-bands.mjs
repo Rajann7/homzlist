@@ -41,11 +41,27 @@ await s.eval(
   `fetch('/api/v1/admin/auth/dev',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email:${JSON.stringify(E.ADMIN_DEV_EMAIL)}})}).then(r=>r.json())`,
 );
 
+const PATHS = [
+  "/users", "/listings", "/coupons", "/grants", "/plans", "/payments", "/finance",
+  "/master-data", "/cms", "/templates",
+];
+
+// Warm every route once before measuring anything.
+//
+// `next dev` compiles a route on its FIRST request, which is slower than the
+// readiness wait below. Mobile is the first band in the loop, so a cold route
+// always failed at mobile and passed at the other two — which reads exactly
+// like a missing mobile branch and is not one. (It reported /cms as having no
+// table at 390 while the same table rendered at 768 and 1440.)
+for (const path of PATHS) {
+  await s.goto(`${BASE}${path}`, { waitMs: 500 });
+}
+
 for (const [band, w, h] of BANDS) {
   console.log(`\n${band} · ${w}×${h}`);
   await s.setViewport(w, h, 1, band === "mobile");
 
-  for (const path of ["/users", "/listings", "/coupons", "/grants", "/plans", "/payments", "/finance"]) {
+  for (const path of PATHS) {
     s.consoleErrors.length = 0;
     await s.goto(`${BASE}${path}`, { waitMs: 2000 });
     // A12 asks for ten tab counts over a union view; on a cold route that is
@@ -85,6 +101,14 @@ for (const [band, w, h] of BANDS) {
           const g = document.querySelector('main [class*="md:grid-cols-[1.4fr_1fr]"]');
           return g ? getComputedStyle(g).gridTemplateColumns.split(' ').length : 0;
         })(),
+        // A19's location tree and A20's FAQ sidebar are both two-column splits
+        // that start at TABLET (templates 2067 and 2207), not at desktop.
+        splitCols: (() => {
+          const g = document.querySelector(
+            'main [class*="md:grid-cols-[320px_1fr]"], main [class*="md:grid-cols-[240px_1fr]"]',
+          );
+          return g ? getComputedStyle(g).gridTemplateColumns.split(' ').length : 0;
+        })(),
         // A16's KPI row is flex-wrap with minWidth:150 (template 1155), so what
         // matters is that all four are on screen and none of them is clipped
         finKpis: [...document.querySelectorAll('main div')].filter(
@@ -101,7 +125,7 @@ for (const [band, w, h] of BANDS) {
     check(`${path} ${band} · no horizontal page scroll`, m.scrollW <= m.innerW + 1, true);
     check(`${path} ${band} · no clipped cell`, m.clipped, 0);
     check(`${path} ${band} · no console errors`, s.consoleErrors.length, 0);
-    if (s.consoleErrors.length) console.log("       ", s.consoleErrors[0]?.slice(0, 160));
+    if (s.consoleErrors.length) console.log("       ", s.consoleErrors[0]?.slice(0, 400));
 
     // A13 is a CARD GRID at every band (template 1216) — one column on mobile,
     // two above it. There is no table and no column drop to assert, so it is
@@ -113,6 +137,26 @@ for (const [band, w, h] of BANDS) {
         m.planCols,
         band === "mobile" ? 1 : 2,
       );
+      continue;
+    }
+
+    // A19 opens on Locations: a tree beside a detail pane, split at tablet
+    // (template 2067, `mobile ? column : '320px 1fr'`).
+    if (path === "/master-data") {
+      check(
+        `/master-data ${band} · ${band === "mobile" ? "stacked" : "two column(s)"}`,
+        m.splitCols,
+        band === "mobile" ? 1 : 2,
+      );
+      continue;
+    }
+
+    // A20 opens on Pages, which is a plain dtable at every band — the design
+    // gives it no mobile card branch (template 2166), the same as the twelve
+    // other table-on-mobile screens check-p13-bands.mjs found. What matters is
+    // that the PAGE never scrolls sideways; the table's own box may.
+    if (path === "/cms" || path === "/templates") {
+      check(`${path} ${band} · table renders`, m.tables, 1);
       continue;
     }
 

@@ -409,6 +409,22 @@ function screenMap(fx) {
         designState: { payFilter: "all" },
         url: `${APP_ADMIN}/payments` },
     ]),
+
+    // ---- P13 · P6 ---------------------------------------------------------
+    // Each opens on its first tab, pinned so a previous shot cannot leak in.
+    // A19's Locations tab is the only one of the three with a real viewport
+    // branch (the 320px tree beside the detail pane, template 2067).
+    ...["mobile", "tablet", "desktop"].flatMap((band) => [
+      { id: `39-admin-master-data-${band}`, page: "P13", screen: "masterData", band, as: "admin",
+        designState: { mdTab: "locations" },
+        url: `${APP_ADMIN}/master-data` },
+      { id: `40-admin-cms-${band}`, page: "P13", screen: "cms", band, as: "admin",
+        designState: { cmsTab: "pages" },
+        url: `${APP_ADMIN}/cms` },
+      { id: `41-admin-templates-${band}`, page: "P13", screen: "templates", band, as: "admin",
+        designState: { tplTab: "email" },
+        url: `${APP_ADMIN}/templates` },
+    ]),
   ];
 }
 

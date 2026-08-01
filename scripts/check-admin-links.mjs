@@ -73,9 +73,10 @@ const SCREENS = [
   // P5b built these two.
   ["/finance", "Finance|Reconciliation"],
   ["/payments", "Payments|Abandoned"],
-  ["/master-data", UNBUILT],
-  ["/cms", UNBUILT],
-  ["/templates", UNBUILT],
+  // P6 built these three.
+  ["/master-data", "Master data|Locations"],
+  ["/cms", "Content|Broadcasts"],
+  ["/templates", "Templates|UI strings"],
   ["/settings", UNBUILT],
   ["/tickets", UNBUILT],
   ["/disputes", UNBUILT],

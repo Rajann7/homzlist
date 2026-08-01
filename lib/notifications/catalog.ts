@@ -22,6 +22,11 @@ export type NotificationType =
   | "listing_approved" | "listing_changes_requested" | "listing_rejected" | "still_available"
   | "saved_listing_status" | "price_drop" | "report_outcome" | "suspension_lifted"
   | "performance_nudge" | "area_added" | "weekly_digest" | "city_launched"
+  // A19's area-request outcomes. "added" reuses `area_added` — the user asked
+  // for an area and the area now exists, which is the same event; the dismissal
+  // needed its own type (migration 0108) because nothing else tells someone a
+  // request was refused and why.
+  | "area_request_dismissed"
   // boost
   | "boost_approved" | "boost_rejected" | "boost_expiring" | "boost_expired" | "boost_stopped"
   // requirements / proposals / matching

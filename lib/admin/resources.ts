@@ -602,6 +602,325 @@ export const financeRefundResource: ListResource = {
   ],
 };
 
+/* ═════════════════════════ P6 — master data, content, templates ══════════ */
+
+/**
+ * Twelve more lists, and not one of them gets its own filter bar: they are the
+ * same engine with different props, which is what P1 was built for.
+ *
+ * Note which of these have NO tabs. A19's amenity and pattern tables and A21's
+ * channel tables are drawn by the design as a plain `dtable` with a "+ Add"
+ * button (templates 2118, 2155, 2270) — no chips, no filter row. Adding chips
+ * "for consistency" is the same class of mistake P5a's pixel diff caught on A14
+ * and A15.
+ */
+
+/** A19 · Amenities — template 2118. */
+export const amenityResource: ListResource = {
+  name: "amenities",
+  table: "admin_amenity_list",
+  select: "id, code, label, category, categories, icon, sort_order, is_active, usage_count",
+  searchColumns: ["label", "code"],
+  sortColumns: ["sort_order", "label", "usage_count"],
+  defaultSort: { column: "sort_order", ascending: true },
+  filters: [{ key: "category", column: "category", kind: "in" }],
+  minRole: "admin",
+  columns: [
+    { key: "name", label: "Name", field: "label" },
+    { key: "applies", label: "Applies to", field: "categories" },
+    { key: "usage", label: "Usage", field: "usage_count" },
+    { key: "status", label: "Status", field: "is_active" },
+  ],
+};
+
+/** A19 · Property types — template 2131. */
+export const propertyTypeResource: ListResource = {
+  name: "property-types",
+  table: "admin_property_type_list",
+  select:
+    "id, code, label, category, roles, kinds, field_config, sort_order, is_active, field_count, listings_count",
+  searchColumns: ["label", "code"],
+  sortColumns: ["sort_order", "label", "listings_count"],
+  defaultSort: { column: "sort_order", ascending: true },
+  filters: [
+    { key: "category", column: "category", kind: "in", options: ["residential", "commercial", "plot", "pg"] },
+  ],
+  minRole: "admin",
+  columns: [
+    { key: "type", label: "Type", field: "label" },
+    { key: "category", label: "Category", field: "category" },
+    { key: "roles", label: "Available to", field: "roles" },
+    { key: "fields", label: "Fields config", field: "field_count" },
+    { key: "listings", label: "Listings", field: "listings_count" },
+    { key: "status", label: "Status", field: "is_active" },
+  ],
+};
+
+/**
+ * A19 · Blocklist — template 2144.
+ *
+ * The design's four language tabs (English · ગુજરાતી · हिन्दी · Transliterated)
+ * are TABS on `script`, so each one re-queries and its rows are really that
+ * script's — not one list relabelled four times.
+ */
+export const blocklistResource: ListResource = {
+  name: "blocklist",
+  table: "admin_blocklist",
+  select: "id, word, script, severity, applies_to, is_active, note, created_at, hits_30d",
+  searchColumns: ["word", "note"],
+  sortColumns: ["created_at", "word", "hits_30d"],
+  defaultSort: { column: "hits_30d", ascending: false },
+  filters: [
+    { key: "severity", column: "severity", kind: "in", options: ["block", "flag"] },
+    { key: "active", column: "is_active", kind: "bool", options: ["true", "false"] },
+  ],
+  tabs: [
+    { key: "en", label: "English", apply: (q) => q.eq("script", "latin") },
+    { key: "gu", label: "ગુજરાતી", apply: (q) => q.eq("script", "gujarati") },
+    { key: "hi", label: "हिन्दी", apply: (q) => q.eq("script", "devanagari") },
+    { key: "tr", label: "Transliterated", apply: (q) => q.eq("script", "translit") },
+  ],
+  minRole: "admin",
+  columns: [
+    { key: "word", label: "Word / phrase", field: "word" },
+    { key: "severity", label: "Severity", field: "severity" },
+    { key: "where", label: "Where", field: "applies_to" },
+    { key: "hits", label: "Hits (30d)", field: "hits_30d" },
+  ],
+};
+
+/** A19 · Number patterns — template 2155. */
+export const patternResource: ListResource = {
+  name: "patterns",
+  table: "admin_number_pattern_list",
+  select: "id, label, pattern, pattern_posix, sample, action, applies_to, is_active, created_at, hits_30d",
+  searchColumns: ["label", "pattern"],
+  sortColumns: ["created_at", "label", "hits_30d"],
+  defaultSort: { column: "hits_30d", ascending: false },
+  filters: [{ key: "action", column: "action", kind: "in", options: ["block", "flag"] }],
+  minRole: "admin",
+  columns: [
+    { key: "pattern", label: "Pattern", field: "pattern" },
+    { key: "description", label: "Description", field: "label" },
+    { key: "hits", label: "Hits", field: "hits_30d" },
+    { key: "status", label: "Status", field: "is_active" },
+  ],
+};
+
+/** A19 · Area requests — template 2170. */
+export const areaRequestResource: ListResource = {
+  name: "area-requests",
+  table: "admin_area_request_list",
+  select:
+    "id, name, status, note, created_at, resolved_at, created_area_id, profile_id, requester_name, requester_photo, city_id, city_name, ask_count",
+  searchColumns: ["name", "requester_name", "city_name"],
+  sortColumns: ["created_at", "ask_count", "name"],
+  // The one people asked for most, first — that is what makes the queue worth
+  // opening.
+  defaultSort: { column: "ask_count", ascending: false },
+  filters: [{ key: "city", column: "city_name", kind: "in" }],
+  // The schema's own vocabulary — `area_requests_status_check` allows exactly
+  // pending / added / rejected.
+  tabs: [
+    { key: "pending", label: "Pending", apply: (q) => q.eq("status", "pending") },
+    { key: "added", label: "Added", apply: (q) => q.eq("status", "added") },
+    { key: "rejected", label: "Dismissed", apply: (q) => q.eq("status", "rejected") },
+  ],
+  minRole: "admin",
+  columns: [
+    { key: "area", label: "Requested area", field: "name" },
+    { key: "city", label: "City", field: "city_name" },
+    { key: "by", label: "Requested by", field: "requester_name" },
+    { key: "date", label: "Date", field: "created_at" },
+    { key: "count", label: "Count", field: "ask_count" },
+    { key: "status", label: "Status", field: "status" },
+  ],
+};
+
+/** A20 · Pages — template 2166. */
+export const cmsPageResource: ListResource = {
+  name: "cms-pages",
+  table: "admin_cms_page_list",
+  select:
+    "id, slug, title, kind, version, version_label, status_key, effective_date, requires_reacceptance, updated_at, updated_by, updated_by_name, version_count",
+  searchColumns: ["title", "slug"],
+  sortColumns: ["updated_at", "title", "version"],
+  defaultSort: { column: "updated_at", ascending: false },
+  filters: [{ key: "status", column: "status_key", kind: "in", options: ["published", "draft"] }],
+  minRole: "admin",
+  columns: [
+    { key: "page", label: "Page", field: "title" },
+    { key: "version", label: "Version", field: "version_label" },
+    { key: "status", label: "Status", field: "status_key" },
+    { key: "effective", label: "Effective", field: "effective_date" },
+    { key: "by", label: "Updated by", field: "updated_by_name" },
+    { key: "updated", label: "Updated", field: "updated_at" },
+  ],
+};
+
+/** A20 · Blog — template 2181. */
+export const blogResource: ListResource = {
+  name: "blog",
+  table: "admin_blog_list",
+  select:
+    "id, slug, title, category, status_key, author_name, cover_url, view_count, scheduled_at, published_at, created_at, updated_at, is_featured",
+  searchColumns: ["title", "slug", "author_name"],
+  sortColumns: ["created_at", "published_at", "view_count", "title"],
+  defaultSort: { column: "created_at", ascending: false },
+  filters: [{ key: "category", column: "category", kind: "in" }],
+  tabs: [
+    { key: "all", label: "All", apply: (q) => q },
+    { key: "published", label: "Published", apply: (q) => q.eq("status_key", "published") },
+    { key: "scheduled", label: "Scheduled", apply: (q) => q.eq("status_key", "scheduled") },
+    { key: "draft", label: "Draft", apply: (q) => q.eq("status_key", "draft") },
+  ],
+  minRole: "admin",
+  columns: [
+    { key: "post", label: "Post", field: "title" },
+    { key: "category", label: "Category", field: "category" },
+    { key: "status", label: "Status", field: "status_key" },
+    { key: "author", label: "Author", field: "author_name" },
+    { key: "views", label: "Views", field: "view_count" },
+    { key: "date", label: "Date", field: "created_at" },
+  ],
+};
+
+/** A20 · FAQs — template 2194. */
+export const faqResource: ListResource = {
+  name: "faqs",
+  table: "admin_faq_list",
+  select:
+    "id, question, answer, category, sort_order, is_active, view_count, helpful_yes, helpful_no, votes, helpful_pct, updated_at",
+  searchColumns: ["question", "answer"],
+  sortColumns: ["sort_order", "view_count", "helpful_pct", "updated_at"],
+  defaultSort: { column: "sort_order", ascending: true },
+  filters: [{ key: "category", column: "category", kind: "in" }],
+  minRole: "admin",
+  columns: [
+    { key: "question", label: "Question", field: "question" },
+    { key: "category", label: "Category", field: "category" },
+    { key: "views", label: "Views", field: "view_count" },
+    { key: "helpful", label: "Helpful", field: "helpful_pct" },
+    { key: "status", label: "Status", field: "is_active" },
+  ],
+};
+
+/** A20 · Banners — template 2210. */
+export const bannerResource: ListResource = {
+  name: "banners",
+  table: "admin_banner_list",
+  select:
+    "id, title, subtitle, placement, image_url, target_url, target_cities, target_roles, target_plan_status, starts_at, ends_at, is_active, impressions, clicks, sort_order, created_at, status_key",
+  searchColumns: ["title", "subtitle"],
+  sortColumns: ["created_at", "starts_at", "impressions"],
+  defaultSort: { column: "created_at", ascending: false },
+  filters: [{ key: "placement", column: "placement", kind: "in" }],
+  tabs: [
+    { key: "all", label: "All", apply: (q) => q },
+    { key: "active", label: "Active", apply: (q) => q.eq("status_key", "active") },
+    { key: "scheduled", label: "Scheduled", apply: (q) => q.eq("status_key", "scheduled") },
+    { key: "expired", label: "Expired", apply: (q) => q.eq("status_key", "expired") },
+  ],
+  minRole: "admin",
+  columns: [
+    { key: "banner", label: "Banner", field: "title" },
+    { key: "targeting", label: "Targeting", field: "target_roles" },
+    { key: "window", label: "Window", field: "starts_at" },
+    { key: "status", label: "Status", field: "status_key" },
+    { key: "impressions", label: "Impressions", field: "impressions" },
+  ],
+};
+
+/** A20 · Broadcasts — template 2223. */
+export const broadcastResource: ListResource = {
+  name: "broadcasts",
+  table: "admin_broadcast_list",
+  select:
+    "id, title, body, channels, audience, recipient_count, status_key, scheduled_at, sent_at, sent_by, sent_by_name, created_at, delivered_count, attempted_count, delivered_pct",
+  searchColumns: ["title", "body"],
+  sortColumns: ["created_at", "sent_at", "recipient_count"],
+  defaultSort: { column: "created_at", ascending: false },
+  filters: [{ key: "status", column: "status_key", kind: "in" }],
+  minRole: "admin",
+  columns: [
+    { key: "message", label: "Message", field: "title" },
+    { key: "channels", label: "Channels", field: "channels" },
+    { key: "audience", label: "Audience", field: "recipient_count" },
+    { key: "when", label: "Sent/Scheduled", field: "sent_at" },
+    { key: "delivered", label: "Delivered", field: "delivered_count" },
+    { key: "status", label: "Status", field: "status_key" },
+  ],
+};
+
+/**
+ * A21 · Templates — template 2270.
+ *
+ * The design's five tabs are four CHANNELS and the string table, so the channel
+ * is a tab here and A21 renders UI strings from its own resource. A template
+ * exists per (code, channel), so "Listing approved" legitimately appears under
+ * both Email and Push — that is two rows, not one row shown twice.
+ */
+export const templateResource: ListResource = {
+  name: "templates",
+  table: "admin_template_list",
+  select:
+    "id, code, channel, name, subject, body, variables, provider_ref, is_active, last_test_at, updated_at, updated_by_name, has_en, has_gu, has_hi",
+  searchColumns: ["name", "code", "subject"],
+  sortColumns: ["updated_at", "name", "code"],
+  defaultSort: { column: "name", ascending: true },
+  filters: [{ key: "active", column: "is_active", kind: "bool", options: ["true", "false"] }],
+  tabs: [
+    { key: "email", label: "Email", apply: (q) => q.eq("channel", "email") },
+    { key: "sms", label: "SMS", apply: (q) => q.eq("channel", "sms") },
+    { key: "whatsapp", label: "WhatsApp", apply: (q) => q.eq("channel", "whatsapp") },
+    { key: "push", label: "Push", apply: (q) => q.eq("channel", "push") },
+  ],
+  minRole: "admin",
+  columns: [
+    { key: "name", label: "Name", field: "name" },
+    { key: "trigger", label: "Trigger", field: "code" },
+    { key: "languages", label: "Languages", field: "has_gu" },
+    { key: "status", label: "Status", field: "is_active" },
+    { key: "edited", label: "Last edited", field: "updated_at" },
+  ],
+};
+
+/**
+ * A21 · UI strings — template 2300.
+ *
+ * The design's chips are "All · Missing GU 42 · Missing HI 18 · Recently
+ * changed", and the two "missing" counts are the reason 0106 computes
+ * `missing_gu` / `missing_hi` as columns: a chip whose count is a real count
+ * over the whole table cannot promise rows the table then fails to show.
+ */
+export const uiStringResource: ListResource = {
+  name: "ui-strings",
+  table: "admin_ui_string_list",
+  select: "id, key, area, en, gu, hi, updated_at, missing_gu, missing_hi",
+  searchColumns: ["key", "en", "gu", "hi"],
+  sortColumns: ["key", "updated_at", "area"],
+  defaultSort: { column: "key", ascending: true },
+  filters: [{ key: "area", column: "area", kind: "in" }],
+  tabs: [
+    { key: "all", label: "All", apply: (q) => q },
+    { key: "missgu", label: "Missing GU", apply: (q) => q.eq("missing_gu", true) },
+    { key: "misshi", label: "Missing HI", apply: (q) => q.eq("missing_hi", true) },
+    {
+      key: "recent",
+      label: "Recently changed",
+      apply: (q) => q.gte("updated_at", new Date(Date.now() - 7 * 86_400_000).toISOString()),
+    },
+  ],
+  minRole: "admin",
+  columns: [
+    { key: "key", label: "Key", field: "key" },
+    { key: "screen", label: "Screen", field: "area" },
+    { key: "en", label: "English", field: "en" },
+    { key: "gu", label: "ગુજરાતી", field: "gu" },
+    { key: "hi", label: "हिन्दी", field: "hi" },
+  ],
+};
+
 export const ADMIN_RESOURCES: Record<string, ListResource> = {
   audit: auditResource,
   users: userResource,
@@ -618,6 +937,18 @@ export const ADMIN_RESOURCES: Record<string, ListResource> = {
   verifications: verificationQueueResource,
   appeals: appealQueueResource,
   reports: reportQueueResource,
+  amenities: amenityResource,
+  "property-types": propertyTypeResource,
+  blocklist: blocklistResource,
+  patterns: patternResource,
+  "area-requests": areaRequestResource,
+  "cms-pages": cmsPageResource,
+  blog: blogResource,
+  faqs: faqResource,
+  banners: bannerResource,
+  broadcasts: broadcastResource,
+  templates: templateResource,
+  "ui-strings": uiStringResource,
 };
 
 export function resourceByName(name: string): ListResource | null {

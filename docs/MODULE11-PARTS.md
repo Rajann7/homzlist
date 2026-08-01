@@ -14,7 +14,7 @@ type-check.
 | P3 | A3–A9 queues + review detail | ✅ done |
 | P4 | A10, A11, A12, A31 (+ the payment panel A11 pushes) | ✅ done |
 | P5a | A13 Plans · A14 Coupons · A15 Grants | ✅ done |
-| P5b | A16 Finance · A17–A18 Payments | ⬜ |
+| P5b | A16 Finance · A17–A18 Payments | ✅ done |
 | P6 | A19–A21 | ⬜ |
 | P7 | A22–A30 | ⬜ |
 

@@ -18,7 +18,8 @@
  * the viewport here, so they are `fixed`. Everything else is the design's value.
  */
 
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import { RowDots, ToolCol, type ToolItem } from "./primitives";
 import { AdminIcon } from "./icons";
 
 /** Esc closes the top-most surface — template 263. */
@@ -331,5 +332,31 @@ export function CenteredDrop({
         {children}
       </div>
     </div>
+  );
+}
+
+/**
+ * The design's `rowDots(items)` in one piece.
+ *
+ * `RowDots` in primitives.tsx is only the ⋯ button; the design's helper also
+ * OPENS the menu. P3, P4 and P5 each re-wired that themselves (button + open
+ * state + SheetMenu + ToolCol). P6 adds eleven more row menus, so it is one
+ * component here rather than eleven copies of the same four lines.
+ *
+ * It lives in overlays rather than primitives to keep the import direction
+ * one-way: overlays already knows nothing about primitives except these two
+ * leaf components, and primitives must not reach back into overlays.
+ */
+export function RowMenu({ items }: { items: (ToolItem | null | false)[] }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <RowDots onOpen={() => setOpen(true)} />
+      {open ? (
+        <SheetMenu onClose={() => setOpen(false)}>
+          <ToolCol items={items} onPick={() => setOpen(false)} />
+        </SheetMenu>
+      ) : null}
+    </>
   );
 }

@@ -118,7 +118,13 @@ export function QueueTable<R>({
 /* ── template 2021-2029 — dtable(cols,rows,onRow) ───────────────────────────
    The shared master-data table: scrollable, sticky header row, per-row accent
    rail via `_hl`, and the tablet-only 820px min-width.                       */
-export function DTable<R extends { _hl?: string }>({
+/**
+ * `R` was constrained to `{ _hl?: string }` — the same WEAK TYPE mistake
+ * QueueTable had above. TypeScript rejects any row object with no property in
+ * common with it, so every real row shape failed to compile against a table
+ * that renders it perfectly. The accent rail is read defensively instead.
+ */
+export function DTable<R>({
   cols,
   rows,
   onRow,
@@ -154,7 +160,7 @@ export function DTable<R extends { _hl?: string }>({
               style={{
                 borderTop: "1px solid var(--divider)",
                 cursor: onRow ? "pointer" : "default",
-                borderLeft: `3px solid ${r._hl ?? "transparent"}`,
+                borderLeft: `3px solid ${(r as { _hl?: string })?._hl ?? "transparent"}`,
               }}
             >
               {cols.map((c, j) => (
