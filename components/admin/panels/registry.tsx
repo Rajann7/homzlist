@@ -20,6 +20,17 @@ import { PaymentPanelBody } from "./PaymentPanel";
 import { ChatPanelBody } from "./ChatPanel";
 import { PlanEditPanelBody, PlanPurchasesPanelBody } from "../catalog/PlanEditPanel";
 import { CouponEditPanelBody } from "../catalog/CouponEditPanel";
+import { FieldConfigPanelBody } from "../masterdata/FieldConfigPanel";
+import { TemplateEditPanelBody } from "../templates/TemplateEditPanel";
+import { TicketPanelBody } from "../ops/TicketPanel";
+import { DisputePanelBody } from "../ops/DisputePanel";
+import { StaffPerfPanelBody } from "../ops/StaffPerfPanel";
+import {
+  BannerEditPanelBody,
+  BlogEditPanelBody,
+  BroadcastEditPanelBody,
+  PageEditPanelBody,
+} from "../content/ContentPanels";
 
 /**
  * P5a's editors need the plan catalog to render their scope pickers, and a
@@ -62,6 +73,47 @@ const REGISTRY: PanelRegistry = {
   chat: {
     crumb: (p) => `Chat · ${String(p.data.who ?? "")}`.trim(),
     body: (p) => <ChatPanelBody panel={p} />,
+  },
+
+  /* ── P6 / P7 ────────────────────────────────────────────────────────────
+     Nine more the design opens with `pushPanel`. The first pass built every
+     one of them as a centred `Modal`, which §5 forbids: the surface type is
+     part of the design, and a modal has no breadcrumb and cannot be stacked. */
+  fieldConfig: {
+    crumb: (p) => `${p.data.label ?? "Type"} · fields`,
+    body: (p) => <FieldConfigPanelBody panel={p} />,
+  },
+  tplEdit: {
+    crumb: (p) => `${p.data.name ?? "Template"} · ${p.data.channel ?? ""}`.trim(),
+    body: (p) => <TemplateEditPanelBody panel={p} />,
+  },
+  pageEdit: {
+    crumb: (p) => String(p.data.title ?? "Page"),
+    body: (p) => <PageEditPanelBody panel={p} />,
+  },
+  blogEdit: {
+    crumb: (p) => String(p.data.title ?? "New post"),
+    body: (p) => <BlogEditPanelBody panel={p} />,
+  },
+  bannerEdit: {
+    crumb: (p) => String(p.data.title ?? "New banner"),
+    body: (p) => <BannerEditPanelBody panel={p} />,
+  },
+  broadcastEdit: {
+    crumb: (p) => String(p.data.title ?? "New broadcast"),
+    body: (p) => <BroadcastEditPanelBody panel={p} />,
+  },
+  ticket: {
+    crumb: (p) => String(p.data.number ?? "Ticket"),
+    body: (p) => <TicketPanelBody panel={p} />,
+  },
+  dispute: {
+    crumb: (p) => String(p.data.number ?? "Dispute"),
+    body: (p) => <DisputePanelBody panel={p} />,
+  },
+  staffPerf: {
+    crumb: (p) => String(p.data.display_name ?? "Staff"),
+    body: (p) => <StaffPerfPanelBody panel={p} />,
   },
 };
 

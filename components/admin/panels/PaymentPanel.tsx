@@ -66,7 +66,7 @@ const label = (s: unknown) => {
 export function PaymentPanelBody({ panel }: { panel: PanelEntry }) {
   const id = String(panel.data.id ?? "");
   const toast = useToast();
-  const { pushPanel } = usePanels();
+  const { pushPanel, notifyChanged } = usePanels();
   const [detail, setDetail] = useState<Detail | null>(null);
   const [loading, setLoading] = useState(true);
   const [nonce, setNonce] = useState(0);
@@ -323,6 +323,7 @@ export function PaymentPanelBody({ panel }: { panel: PanelEntry }) {
             setRefunding(false);
             toast(message);
             setNonce((n) => n + 1);
+            notifyChanged();
           }}
           paymentId={id}
         />

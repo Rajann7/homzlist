@@ -65,7 +65,7 @@ export function CouponEditPanelBody({
 }) {
   const id = (panel.data.id as string) ?? null;
   const toast = useToast();
-  const { popPanel } = usePanels();
+  const { popPanel, notifyChanged } = usePanels();
 
   const [draft, setDraft] = useState<Draft | null>(null);
   const [used, setUsed] = useState(0);
@@ -182,6 +182,7 @@ export function CouponEditPanelBody({
     setBusy(false);
     if (!json?.ok) return setError(json?.error?.message ?? "That didn't save");
     toast(`${json.data?.summary} · logged`);
+    notifyChanged();
     popPanel();
   }
 

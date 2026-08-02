@@ -114,8 +114,14 @@ export function PaymentsScreen({
   options: { methods: { value: string; label: string }[]; items: { value: string; label: string }[] };
   total: number;
 }) {
-  const { pushPanel } = usePanels();
+  const { pushPanel, changed } = usePanels();
   const list = useAdminList<Row>("payments", FILTER_KEYS, "all");
+
+  // A refund issued in the panel changes this row's status and the tab counts.
+  useEffect(() => {
+    if (changed) list.reload();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [changed]);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [rangeOpen, setRangeOpen] = useState(false);
   const [abandoned, setAbandoned] = useState(false);

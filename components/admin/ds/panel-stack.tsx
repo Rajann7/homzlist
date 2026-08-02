@@ -48,6 +48,15 @@ type PanelCtx = {
   /** pop back to a given depth — 0 closes them all */
   popTo: (depth: number) => void;
   setPanelTab: (tab: string) => void;
+  /**
+   * A panel calls this after it changes something, and the screen underneath
+   * reloads. Without it a panel edit leaves the list behind it stale until the
+   * next navigation — which is what P5a's coupon editor did: save, close, and
+   * the row still showed the old code.
+   */
+  notifyChanged: () => void;
+  /** bumps on every `notifyChanged` — screens watch it and reload. */
+  changed: number;
 };
 
 const Ctx = createContext<PanelCtx | null>(null);
@@ -92,9 +101,12 @@ export function PanelStackProvider({
     );
   }, []);
 
+  const [changed, setChanged] = useState(0);
+  const notifyChanged = useCallback(() => setChanged((n) => n + 1), []);
+
   const value = useMemo<PanelCtx>(
-    () => ({ panels, pushPanel, popPanel, popTo, setPanelTab }),
-    [panels, pushPanel, popPanel, popTo, setPanelTab],
+    () => ({ panels, pushPanel, popPanel, popTo, setPanelTab, notifyChanged, changed }),
+    [panels, pushPanel, popPanel, popTo, setPanelTab, notifyChanged, changed],
   );
 
   return (

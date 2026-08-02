@@ -55,7 +55,7 @@ export function ListingPanelBody({ panel }: { panel: PanelEntry }) {
   const id = String(panel.data.id ?? "");
   const kind = (panel.data.kind as string) === "project" ? "project" : "listing";
   const toast = useToast();
-  const { setPanelTab, pushPanel, popPanel } = usePanels();
+  const { setPanelTab, pushPanel, popPanel, notifyChanged } = usePanels();
 
   const tab = ((panel.tab as Tab) ?? "preview") as Tab;
   const [header, setHeader] = useState<Header | null>(null);
@@ -107,9 +107,12 @@ export function ListingPanelBody({ panel }: { panel: PanelEntry }) {
       }
       toast(`${json.data?.summary ?? "Done"} · logged`);
       setNonce((n) => n + 1);
+      // …and the queue behind this panel, which was still listing an approved
+      // listing as pending until you navigated away.
+      notifyChanged();
       return true;
     },
-    [id, kind, toast],
+    [id, kind, toast, notifyChanged],
   );
 
   const title = String(header?.title ?? "Listing");

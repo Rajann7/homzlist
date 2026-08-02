@@ -12,7 +12,7 @@
  * `!tablet && th(…)` (1085) drops Type, Location, Stats and Posted on tablet.
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   AdminIcon,
@@ -141,8 +141,13 @@ export function ListingsMaster({
 }) {
   const router = useRouter();
   const toast = useToast();
-  const { pushPanel } = usePanels();
+  const { pushPanel, changed } = usePanels();
   const list = useAdminList<Row>("listings-master", FILTER_KEYS, "all");
+
+  useEffect(() => {
+    if (changed) list.reload();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [changed]);
   const [sheet, setSheet] = useState<"filters" | "columns" | "export" | "views" | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
   const [rowMenu, setRowMenu] = useState<Row | null>(null);

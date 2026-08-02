@@ -110,7 +110,14 @@ type PageRow = {
 function PagesTab() {
   const toast = useToast();
   const list = useAdminList<PageRow>("cms-pages", ["status"]);
-  const [editing, setEditing] = useState<PageRow | null>(null);
+  const { pushPanel, changed } = usePanels();
+
+  // The panel edits what this table prints, so a change in the panel reloads
+  // the list under it — a modal used to leave the row stale.
+  useEffect(() => {
+    if (changed) list.reload();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [changed]);
 
   const act = async (body: Record<string, unknown>) => {
     const json = await post(body);
@@ -145,7 +152,7 @@ function PagesTab() {
       cell: (r) => (
         <RowMenu
           items={[
-            ["Edit page", () => setEditing(r)],
+            ["Edit page", () => pushPanel("pageEdit", r as unknown as Record<string, unknown>)],
             [
               "Copy public link",
               () => {
@@ -166,7 +173,7 @@ function PagesTab() {
         <Shimmer h={240} />
       ) : (
         <>
-          <DTable cols={cols} rows={list.data?.rows ?? []} onRow={(r) => setEditing(r)} />
+          <DTable cols={cols} rows={list.data?.rows ?? []} onRow={(r) => pushPanel("pageEdit", r as unknown as Record<string, unknown>)} />
           <Pager
             page={list.data?.page ?? 1}
             pageSize={list.data?.pageSize ?? 50}
@@ -175,148 +182,10 @@ function PagesTab() {
           />
         </>
       )}
-      {editing ? (
-        <PageEditor
-          row={editing}
-          onClose={() => setEditing(null)}
-          onDone={(msg) => {
-            toast(msg);
-            setEditing(null);
-            list.reload();
-          }}
-        />
-      ) : null}
     </div>
   );
 }
 
-function PageEditor({
-  row,
-  onClose,
-  onDone,
-}: {
-  row: PageRow;
-  onClose: () => void;
-  onDone: (msg: string) => void;
-}) {
-  const [data, setData] = useState<{ body_md: string; versions: { version: number; created_at: string; is_material: boolean; note: string | null }[] } | null>(null);
-  const [title, setTitle] = useState(row.title);
-  const [body, setBody] = useState("");
-  const [material, setMaterial] = useState(false);
-  const [note, setNote] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    void (async () => {
-      const res = await fetch(`/api/v1/admin/content?what=page&id=${row.id}`, {
-        cache: "no-store",
-      }).catch(() => null);
-      const json = (await res?.json().catch(() => null)) as
-        | { ok?: boolean; data?: { body_md: string; versions: never[] } }
-        | null;
-      if (json?.ok && json.data) {
-        setData(json.data as never);
-        setBody(json.data.body_md ?? "");
-      }
-    })();
-  }, [row.id]);
-
-  const save = async (publish: boolean) => {
-    setBusy(true);
-    setError("");
-    const json = await post({
-      action: "page_save",
-      id: row.id,
-      title,
-      body_md: body,
-      publish,
-      requires_reacceptance: material,
-      note,
-    });
-    setBusy(false);
-    if (json?.ok) onDone(String(json.data?.summary ?? "Saved"));
-    else setError(json?.error?.message ?? "That didn't save");
-  };
-
-  return (
-    <Modal
-      title={`Edit — ${row.title}`}
-      onClose={onClose}
-      footer={
-        <>
-          <Btn
-            label={busy ? "Saving…" : "Save draft"}
-            kind="outline"
-            style={{ flex: 1 }}
-            onClick={() => void save(false)}
-          />
-          <Btn
-            label={busy ? "Publishing…" : "Publish"}
-            kind="primary"
-            style={{ flex: 1 }}
-            onClick={() => void save(true)}
-          />
-        </>
-      }
-    >
-      {data === null ? (
-        <Shimmer h={200} />
-      ) : (
-        <>
-          <FField label="Title">
-            <input value={title} onChange={(e) => setTitle(e.target.value)} style={F_INPUT_STYLE} />
-          </FField>
-          <FField label="Body" helper="Markdown. This is what the public page renders.">
-            <textarea
-              value={body}
-              onChange={(e) => setBody(e.target.value)}
-              style={{ ...F_TEXTAREA_STYLE, height: 240 }}
-            />
-          </FField>
-          <FField label="Change note" helper="Kept on the version row, so a wording change is explicable later">
-            <input value={note} onChange={(e) => setNote(e.target.value)} style={F_INPUT_STYLE} />
-          </FField>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0" }}>
-            <Switch on={material} onClick={() => setMaterial((v) => !v)} />
-            <span style={{ fontSize: 13, fontWeight: 600 }}>Material change — ask users to re-accept</span>
-          </div>
-          <NoteStrip tone="info">
-            A draft save does not cut a version. Publishing does, and the version number is what a
-            user&apos;s acceptance is recorded against.
-          </NoteStrip>
-          {data.versions?.length ? (
-            <div style={{ marginTop: 12 }}>
-              <div style={{ fontSize: 11, color: "var(--ink3)", marginBottom: 6 }}>Version history</div>
-              {data.versions.slice(0, 6).map((v) => (
-                <div
-                  key={v.version}
-                  style={{
-                    display: "flex",
-                    gap: 8,
-                    fontSize: 12,
-                    color: "var(--ink2)",
-                    padding: "4px 0",
-                  }}
-                >
-                  <Mono>v{v.version}</Mono>
-                  <span>{shortDate(v.created_at)}</span>
-                  {v.is_material ? (
-                    <Badge bg="var(--warningSoft)" fg="var(--warning)">
-                      re-accept
-                    </Badge>
-                  ) : null}
-                  <span style={{ color: "var(--ink3)" }}>{v.note ?? ""}</span>
-                </div>
-              ))}
-            </div>
-          ) : null}
-          {error ? <NoteStrip tone="warn">{error}</NoteStrip> : null}
-        </>
-      )}
-    </Modal>
-  );
-}
 
 /* ═══════════════════════════════════════════════════════ tab 2 · blog ══════ */
 
@@ -336,8 +205,14 @@ type BlogRow = {
 function BlogTab() {
   const toast = useToast();
   const list = useAdminList<BlogRow>("blog", ["category"], "all");
-  const [editing, setEditing] = useState<BlogRow | null>(null);
-  const [adding, setAdding] = useState(false);
+  const { pushPanel, changed } = usePanels();
+
+  // The panel edits what this table prints, so a change in the panel reloads
+  // the list under it — a modal used to leave the row stale.
+  useEffect(() => {
+    if (changed) list.reload();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [changed]);
 
   const act = async (body: Record<string, unknown>) => {
     const json = await post(body);
@@ -387,7 +262,7 @@ function BlogTab() {
       cell: (r) => (
         <RowMenu
           items={[
-            ["Edit post", () => setEditing(r)],
+            ["Edit post", () => pushPanel("blogEdit", r as unknown as Record<string, unknown>)],
             [
               "Copy public link",
               () => {
@@ -415,13 +290,13 @@ function BlogTab() {
         onSelect={list.setTab}
       />
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
-        <Btn label="+ New post" kind="primary" onClick={() => setAdding(true)} />
+        <Btn label="+ New post" kind="primary" onClick={() => pushPanel("blogEdit", {})} />
       </div>
       {list.loading ? (
         <Shimmer h={240} />
       ) : (
         <>
-          <DTable cols={cols} rows={list.data?.rows ?? []} onRow={(r) => setEditing(r)} />
+          <DTable cols={cols} rows={list.data?.rows ?? []} onRow={(r) => pushPanel("blogEdit", r as unknown as Record<string, unknown>)} />
           <Pager
             page={list.data?.page ?? 1}
             pageSize={list.data?.pageSize ?? 50}
@@ -430,113 +305,10 @@ function BlogTab() {
           />
         </>
       )}
-      {adding || editing ? (
-        <BlogEditor
-          row={editing}
-          onClose={() => {
-            setAdding(false);
-            setEditing(null);
-          }}
-          onDone={(msg) => {
-            toast(msg);
-            setAdding(false);
-            setEditing(null);
-            list.reload();
-          }}
-        />
-      ) : null}
     </div>
   );
 }
 
-function BlogEditor({
-  row,
-  onClose,
-  onDone,
-}: {
-  row: BlogRow | null;
-  onClose: () => void;
-  onDone: (msg: string) => void;
-}) {
-  const [title, setTitle] = useState(row?.title ?? "");
-  const [category, setCategory] = useState(row?.category ?? "Buying Guide");
-  const [status, setStatus] = useState(row?.status_key ?? "draft");
-  const [scheduledAt, setScheduledAt] = useState("");
-  const [body, setBody] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-
-  return (
-    <Modal
-      title={row ? `Edit — ${row.title}` : "New post"}
-      onClose={onClose}
-      footer={
-        <>
-          <Btn label="Cancel" kind="outline" onClick={onClose} style={{ flex: 1 }} />
-          <Btn
-            label={busy ? "Saving…" : "Save"}
-            kind="primary"
-            style={{ flex: 1 }}
-            onClick={async () => {
-              setBusy(true);
-              setError("");
-              const json = await post({
-                action: "blog_save",
-                id: row?.id,
-                title,
-                category,
-                status,
-                scheduled_at: scheduledAt || null,
-                body_md: body,
-              });
-              setBusy(false);
-              if (json?.ok) onDone(String(json.data?.summary ?? "Saved"));
-              else setError(json?.error?.message ?? "That didn't save");
-            }}
-          />
-        </>
-      }
-    >
-      <FField label="Title">
-        <input value={title} onChange={(e) => setTitle(e.target.value)} style={F_INPUT_STYLE} />
-      </FField>
-      <FField label="Category">
-        <select value={category} onChange={(e) => setCategory(e.target.value)} style={F_INPUT_STYLE}>
-          {["Buying Guide", "Legal", "Area Guide", "Product", "Market"].map((c) => (
-            <option key={c} value={c}>
-              {c}
-            </option>
-          ))}
-        </select>
-      </FField>
-      <FField label="Body" helper="Markdown. The read time is computed from this, not typed.">
-        <textarea
-          value={body}
-          onChange={(e) => setBody(e.target.value)}
-          style={{ ...F_TEXTAREA_STYLE, height: 200 }}
-        />
-      </FField>
-      <FField label="Status">
-        <select value={status} onChange={(e) => setStatus(e.target.value)} style={F_INPUT_STYLE}>
-          <option value="draft">Draft</option>
-          <option value="scheduled">Scheduled</option>
-          <option value="published">Published</option>
-        </select>
-      </FField>
-      {status === "scheduled" ? (
-        <FField label="Publish at" helper="A scheduled post needs a date, and it has to be ahead">
-          <input
-            type="datetime-local"
-            value={scheduledAt}
-            onChange={(e) => setScheduledAt(e.target.value)}
-            style={F_INPUT_STYLE}
-          />
-        </FField>
-      ) : null}
-      {error ? <NoteStrip tone="warn">{error}</NoteStrip> : null}
-    </Modal>
-  );
-}
 
 /* ═══════════════════════════════════════════════════════ tab 3 · FAQs ══════ */
 
@@ -791,8 +563,14 @@ type BannerRow = {
 function BannersTab() {
   const toast = useToast();
   const list = useAdminList<BannerRow>("banners", ["placement"], "all");
-  const [editing, setEditing] = useState<BannerRow | null>(null);
-  const [adding, setAdding] = useState(false);
+  const { pushPanel, changed } = usePanels();
+
+  // The panel edits what this table prints, so a change in the panel reloads
+  // the list under it — a modal used to leave the row stale.
+  useEffect(() => {
+    if (changed) list.reload();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [changed]);
 
   return (
     <div>
@@ -807,7 +585,7 @@ function BannersTab() {
         onSelect={list.setTab}
       />
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
-        <Btn label="+ New banner" kind="primary" onClick={() => setAdding(true)} />
+        <Btn label="+ New banner" kind="primary" onClick={() => pushPanel("bannerEdit", {})} />
       </div>
 
       {list.loading ? (
@@ -818,7 +596,7 @@ function BannersTab() {
           {(list.data?.rows ?? []).map((b) => (
             <div
               key={b.id}
-              onClick={() => setEditing(b)}
+              onClick={() => pushPanel("bannerEdit", b as unknown as Record<string, unknown>)}
               style={{
                 border: "1px solid var(--border)",
                 borderRadius: 12,
@@ -886,115 +664,10 @@ function BannersTab() {
           ))}
         </div>
       )}
-
-      {adding || editing ? (
-        <BannerEditor
-          row={editing}
-          onClose={() => {
-            setAdding(false);
-            setEditing(null);
-          }}
-          onDone={(msg) => {
-            toast(msg);
-            setAdding(false);
-            setEditing(null);
-            list.reload();
-          }}
-        />
-      ) : null}
     </div>
   );
 }
 
-function BannerEditor({
-  row,
-  onClose,
-  onDone,
-}: {
-  row: BannerRow | null;
-  onClose: () => void;
-  onDone: (msg: string) => void;
-}) {
-  const [title, setTitle] = useState(row?.title ?? "");
-  const [subtitle, setSubtitle] = useState(row?.subtitle ?? "");
-  const [roles, setRoles] = useState<string[]>(row?.target_roles ?? []);
-  const [starts, setStarts] = useState(row?.starts_at?.slice(0, 10) ?? "");
-  const [ends, setEnds] = useState(row?.ends_at?.slice(0, 10) ?? "");
-  const [active, setActive] = useState(row?.is_active ?? true);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-
-  return (
-    <Modal
-      title={row ? `Edit — ${row.title}` : "New banner"}
-      onClose={onClose}
-      footer={
-        <>
-          <Btn label="Cancel" kind="outline" onClick={onClose} style={{ flex: 1 }} />
-          <Btn
-            label={busy ? "Saving…" : "Save"}
-            kind="primary"
-            style={{ flex: 1 }}
-            onClick={async () => {
-              setBusy(true);
-              setError("");
-              const json = await post({
-                action: "banner_save",
-                id: row?.id,
-                title,
-                subtitle,
-                target_roles: roles,
-                starts_at: starts ? new Date(starts).toISOString() : null,
-                ends_at: ends ? new Date(ends).toISOString() : null,
-                is_active: active,
-              });
-              setBusy(false);
-              if (json?.ok) onDone(String(json.data?.summary ?? "Saved"));
-              else setError(json?.error?.message ?? "That didn't save");
-            }}
-          />
-        </>
-      }
-    >
-      <FField label="Title">
-        <input value={title} onChange={(e) => setTitle(e.target.value)} style={F_INPUT_STYLE} />
-      </FField>
-      <FField label="Subtitle">
-        <input value={subtitle} onChange={(e) => setSubtitle(e.target.value)} style={F_INPUT_STYLE} />
-      </FField>
-      <FField label="Show to" helper="Leave all unticked to show it to everyone">
-        <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-          {["owner", "broker", "builder"].map((r) => (
-            <label key={r} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}>
-              <input
-                type="checkbox"
-                checked={roles.includes(r)}
-                onChange={(e) =>
-                  setRoles((v) => (e.target.checked ? [...v, r] : v.filter((x) => x !== r)))
-                }
-                style={{ accentColor: "var(--accent)" }}
-              />
-              {r[0].toUpperCase() + r.slice(1)}
-            </label>
-          ))}
-        </div>
-      </FField>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-        <FField label="Starts">
-          <input type="date" value={starts} onChange={(e) => setStarts(e.target.value)} style={F_INPUT_STYLE} />
-        </FField>
-        <FField label="Ends">
-          <input type="date" value={ends} onChange={(e) => setEnds(e.target.value)} style={F_INPUT_STYLE} />
-        </FField>
-      </div>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0" }}>
-        <Switch on={active} onClick={() => setActive((v) => !v)} />
-        <span style={{ fontSize: 13, fontWeight: 600 }}>Active</span>
-      </div>
-      {error ? <NoteStrip tone="warn">{error}</NoteStrip> : null}
-    </Modal>
-  );
-}
 
 /* ═════════════════════════════════════════════════ tab 5 · broadcasts ══════ */
 
@@ -1014,7 +687,14 @@ type BroadcastRow = {
 function BroadcastsTab() {
   const toast = useToast();
   const list = useAdminList<BroadcastRow>("broadcasts", ["status"]);
-  const [composing, setComposing] = useState(false);
+  const { pushPanel, changed } = usePanels();
+
+  // The panel edits what this table prints, so a change in the panel reloads
+  // the list under it — a modal used to leave the row stale.
+  useEffect(() => {
+    if (changed) list.reload();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [changed]);
   const [busy, setBusy] = useState<string | null>(null);
 
   const act = async (body: Record<string, unknown>) => {
@@ -1113,7 +793,7 @@ function BroadcastsTab() {
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
-        <Btn label="+ New broadcast" kind="primary" onClick={() => setComposing(true)} />
+        <Btn label="+ New broadcast" kind="primary" onClick={() => pushPanel("broadcastEdit", {})} />
       </div>
       {list.loading ? (
         <Shimmer h={240} />
@@ -1128,137 +808,7 @@ function BroadcastsTab() {
           />
         </>
       )}
-      {composing ? (
-        <BroadcastComposer
-          onClose={() => setComposing(false)}
-          onDone={(msg) => {
-            toast(msg);
-            setComposing(false);
-            list.reload();
-          }}
-        />
-      ) : null}
     </div>
   );
 }
 
-function BroadcastComposer({
-  onClose,
-  onDone,
-}: {
-  onClose: () => void;
-  onDone: (msg: string) => void;
-}) {
-  const [title, setTitle] = useState("");
-  const [body, setBody] = useState("");
-  const [channels, setChannels] = useState<string[]>(["in_app"]);
-  const [roles, setRoles] = useState<string[]>([]);
-  const [count, setCount] = useState<number | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-
-  // The live audience count runs the SAME resolver the send runs, so the number
-  // on screen is the number of people who will actually receive it.
-  useEffect(() => {
-    const audience = roles.length ? { role: roles } : {};
-    const t = setTimeout(async () => {
-      const res = await fetch(
-        `/api/v1/admin/content?what=audience&audience=${encodeURIComponent(JSON.stringify(audience))}`,
-        { cache: "no-store" },
-      ).catch(() => null);
-      const json = (await res?.json().catch(() => null)) as
-        | { ok?: boolean; data?: { count: number } }
-        | null;
-      setCount(json?.ok ? (json.data?.count ?? 0) : null);
-    }, 250);
-    return () => clearTimeout(t);
-  }, [roles]);
-
-  return (
-    <Modal
-      title="New broadcast"
-      onClose={onClose}
-      footer={
-        <>
-          <Btn label="Cancel" kind="outline" onClick={onClose} style={{ flex: 1 }} />
-          <Btn
-            label={busy ? "Saving…" : "Save draft"}
-            kind="primary"
-            style={{ flex: 1 }}
-            onClick={async () => {
-              setBusy(true);
-              setError("");
-              const json = await post({
-                action: "broadcast_save",
-                title,
-                body,
-                channels,
-                audience: roles.length ? { role: roles } : {},
-              });
-              setBusy(false);
-              if (json?.ok) onDone(String(json.data?.summary ?? "Saved"));
-              else setError(json?.error?.message ?? "That didn't save");
-            }}
-          />
-        </>
-      }
-    >
-      <FField label="Subject">
-        <input value={title} onChange={(e) => setTitle(e.target.value)} style={F_INPUT_STYLE} />
-      </FField>
-      <FField label="Message">
-        <textarea
-          value={body}
-          onChange={(e) => setBody(e.target.value)}
-          style={{ ...F_TEXTAREA_STYLE, height: 120 }}
-        />
-      </FField>
-      <FField label="Channels">
-        <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-          {[
-            ["in_app", "In-app"],
-            ["email", "Email"],
-            ["whatsapp", "WhatsApp"],
-          ].map(([k, l]) => (
-            <label key={k} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}>
-              <input
-                type="checkbox"
-                checked={channels.includes(k)}
-                onChange={(e) =>
-                  setChannels((v) => (e.target.checked ? [...v, k] : v.filter((x) => x !== k)))
-                }
-                style={{ accentColor: "var(--accent)" }}
-              />
-              {l}
-            </label>
-          ))}
-        </div>
-      </FField>
-      <FField label="Audience" helper="Leave all unticked to send to every active user">
-        <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-          {["owner", "broker", "builder"].map((r) => (
-            <label key={r} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}>
-              <input
-                type="checkbox"
-                checked={roles.includes(r)}
-                onChange={(e) =>
-                  setRoles((v) => (e.target.checked ? [...v, r] : v.filter((x) => x !== r)))
-                }
-                style={{ accentColor: "var(--accent)" }}
-              />
-              {r[0].toUpperCase() + r.slice(1)}
-            </label>
-          ))}
-        </div>
-      </FField>
-      <NoteStrip tone={count === 0 ? "warn" : "info"}>
-        {count === null
-          ? "Counting…"
-          : count === 0
-            ? "Nobody matches this audience — the send would go to no one."
-            : `${count.toLocaleString("en-IN")} people will receive this.`}
-      </NoteStrip>
-      {error ? <NoteStrip tone="warn">{error}</NoteStrip> : null}
-    </Modal>
-  );
-}

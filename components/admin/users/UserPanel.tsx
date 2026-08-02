@@ -121,7 +121,7 @@ export function UserPanelBody({ panel }: { panel: PanelEntry }) {
   const userId = String(panel.data.id ?? "");
   const toast = useToast();
   const role = useAdminRole();
-  const { pushPanel, setPanelTab, popPanel } = usePanels();
+  const { pushPanel, setPanelTab, popPanel, notifyChanged } = usePanels();
 
   const tab = ((panel.tab as Tab) ?? "overview") as Tab;
   const [header, setHeader] = useState<Header | null>(null);
@@ -170,7 +170,13 @@ export function UserPanelBody({ panel }: { panel: PanelEntry }) {
       .catch(() => setTemplates([]));
   }, []);
 
-  const reload = () => setNonce((n) => n + 1);
+  // Reload this panel AND tell the list behind it. Suspending a user from here
+  // changed the row's badge in the panel and left A2's table showing "Active"
+  // until the next navigation.
+  const reload = () => {
+    setNonce((n) => n + 1);
+    notifyChanged();
+  };
   const done = (message: string) => {
     setOverlay(null);
     setExpireReq(null);

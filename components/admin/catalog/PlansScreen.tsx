@@ -86,10 +86,16 @@ export function planContents(p: PlanRow): string[] {
 
 export function PlansScreen() {
   const toast = useToast();
-  const { pushPanel } = usePanels();
+  const { pushPanel, changed } = usePanels();
   const [rows, setRows] = useState<PlanRow[] | null>(null);
   const [menu, setMenu] = useState<PlanRow | null>(null);
   const [nonce, setNonce] = useState(0);
+
+  // The plan editor is a panel over this grid; saving it must repaint the card
+  // underneath, price and quotas included.
+  useEffect(() => {
+    if (changed) setNonce((n) => n + 1);
+  }, [changed]);
 
   const load = useCallback(async () => {
     const res = await fetch("/api/v1/admin/plans", { cache: "no-store" }).catch(() => null);

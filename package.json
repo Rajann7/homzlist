@@ -54,6 +54,7 @@
     "check:admin-p5b": "node scripts/check-admin-p5b.mjs",
     "check:admin-p6": "node scripts/check-admin-p6.mjs",
     "check:admin-p7": "node scripts/check-admin-p7.mjs",
+    "check:admin-surfaces": "node scripts/check-admin-surfaces.mjs",
     "check:bundle-secrets": "node scripts/check-bundle-secrets.mjs"
   },
   "dependencies": {

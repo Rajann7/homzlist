@@ -590,11 +590,17 @@ export async function pauseBoost(
 
   if (!resume) {
     if (b.status !== "active") return { ok: false, reason: "bad_state", message: "Already paused" };
-    await db()
+    // Read the error and the row. The `.eq("status","active")` guard means a
+    // concurrent pause makes this a no-op, and without checking we would have
+    // answered "paused" over a boost that is still running.
+    const { data: paused, error } = await db()
       .from("boosts")
       .update({ status: "paused", paused_at: new Date().toISOString() })
       .eq("id", b.id)
-      .eq("status", "active");
+      .eq("status", "active")
+      .select("id");
+    if (error || !paused?.length)
+      return { ok: false, reason: "bad_state", message: "Already paused" };
     return { ok: true, label: "Boost", summary: "Boost paused — remaining days preserved" };
   }
 
@@ -605,11 +611,14 @@ export async function pauseBoost(
   // they paid for.
   const pausedMs = Date.now() - new Date(b.paused_at).getTime();
   const newEnds = new Date(new Date(b.ends_at).getTime() + pausedMs).toISOString();
-  await db()
+  const { data: resumed, error: resumeError } = await db()
     .from("boosts")
     .update({ status: "active", paused_at: null, ends_at: newEnds })
     .eq("id", b.id)
-    .eq("status", "paused");
+    .eq("status", "paused")
+    .select("id");
+  if (resumeError || !resumed?.length)
+    return { ok: false, reason: "bad_state", message: "Not paused" };
   void me;
   return {
     ok: true,

@@ -1032,7 +1032,14 @@ type TypeRow = {
 function TypesTab() {
   const toast = useToast();
   const list = useAdminList<TypeRow>("property-types", ["category"]);
-  const [configOf, setConfigOf] = useState<TypeRow | null>(null);
+  const { pushPanel, changed } = usePanels();
+
+  // A config saved in the panel changes the field COUNT this table prints, so
+  // the list under it has to reload when the panel reports a change.
+  useEffect(() => {
+    if (changed) list.reload();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [changed]);
 
   const act = async (body: Record<string, unknown>) => {
     const json = await post(body);
@@ -1075,7 +1082,7 @@ function TypesTab() {
           <span
             onClick={(e) => {
               e.stopPropagation();
-              setConfigOf(r);
+              pushPanel("fieldConfig", r as unknown as Record<string, unknown>);
             }}
             style={{ color: "var(--accent)", fontWeight: 600, cursor: "pointer" }}
           >
@@ -1103,116 +1110,10 @@ function TypesTab() {
       ) : (
         <DTable cols={cols} rows={list.data?.rows ?? []} />
       )}
-      {configOf ? (
-        <FieldConfigEditor
-          row={configOf}
-          onClose={() => setConfigOf(null)}
-          onDone={(msg) => {
-            toast(msg);
-            setConfigOf(null);
-            list.reload();
-          }}
-        />
-      ) : null}
     </div>
   );
 }
 
-/**
- * template 2137's "Edit config" — the JSON field-config editor Doc5 A19 asks
- * for. It is a full-height sheet rather than a modal because the JSON is 40
- * lines and a modal would scroll inside a scroll.
- */
-function FieldConfigEditor({
-  row,
-  onClose,
-  onDone,
-}: {
-  row: TypeRow;
-  onClose: () => void;
-  onDone: (msg: string) => void;
-}) {
-  const [text, setText] = useState(() => JSON.stringify(row.field_config ?? {}, null, 2));
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const [known, setKnown] = useState<{ key: string; label: string }[]>([]);
-
-  useEffect(() => {
-    void (async () => {
-      const res = await fetch("/api/v1/admin/master-data?what=fields", { cache: "no-store" }).catch(
-        () => null,
-      );
-      const json = (await res?.json().catch(() => null)) as
-        | { ok?: boolean; data?: { fields: { key: string; label: string }[] } }
-        | null;
-      setKnown(json?.ok ? (json.data?.fields ?? []) : []);
-    })();
-  }, []);
-
-  return (
-    <Modal
-      title={`Field config — ${row.label}`}
-      onClose={onClose}
-      footer={
-        <>
-          <Btn label="Cancel" kind="outline" onClick={onClose} style={{ flex: 1 }} />
-          <Btn
-            label={busy ? "Saving…" : "Save config"}
-            kind="primary"
-            style={{ flex: 1 }}
-            onClick={async () => {
-              setBusy(true);
-              setError("");
-              const json = await post({ action: "type_config", id: row.code, config: text });
-              setBusy(false);
-              if (json?.ok) onDone(String(json.data?.summary ?? "Saved"));
-              else setError(json?.error?.message ?? "That config was refused");
-            }}
-          />
-        </>
-      }
-    >
-      <NoteStrip tone="info">
-        This decides which fields a seller sees for a {row.label}. Every key is checked against the
-        field catalogue on save — an unknown key is refused rather than producing a form nobody can
-        submit.
-      </NoteStrip>
-      <textarea
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        spellCheck={false}
-        style={{
-          ...F_TEXTAREA_STYLE,
-          height: 320,
-          fontFamily: "ui-monospace,SFMono-Regular,Menlo,monospace",
-          fontSize: 12,
-        }}
-      />
-      {error ? <NoteStrip tone="warn">{error}</NoteStrip> : null}
-      <div style={{ marginTop: 12 }}>
-        <div style={{ fontSize: 11, color: "var(--ink3)", marginBottom: 6 }}>
-          {known.length} keys available
-        </div>
-        <div style={{ display: "flex", gap: 4, flexWrap: "wrap", maxHeight: 120, overflowY: "auto" }}>
-          {known.map((k) => (
-            <Mono
-              key={k.key}
-              style={{
-                background: "var(--s2)",
-                border: "1px solid var(--border)",
-                borderRadius: 6,
-                padding: "3px 6px",
-                color: "var(--ink2)",
-              }}
-            >
-              {k.key}
-            </Mono>
-          ))}
-        </div>
-      </div>
-    </Modal>
-  );
-}
 
 /* ══════════════════════════════════════════ tabs 4 & 5 · the rule tables ══ */
 

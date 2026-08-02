@@ -458,12 +458,29 @@ console.log("\nA19 Hits (30d) and the field-config editor");
 /* ═══════════════════════════════════════════ 5 · A19 · area requests ═════ */
 console.log("\nA19 Area requests — approving one CREATES the location and tells the asker");
 {
+  // SEED the two pending requests this section consumes.
+  //
+  // The first version read whatever happened to be pending, approved one and
+  // dismissed another — and then had nothing to act on next run, so eleven
+  // checks silently skipped and the script still said PASS. A check that
+  // quietly stops checking is worse than one that fails.
+  await sql.query(`delete from area_requests where name like 'P6 probe area%'`);
+  const asker = await one(`select id from profiles where state='active' limit 1`);
+  const city = await one(`select id from locations where level='city' and is_launched limit 1`);
+  for (const n of [1, 2]) {
+    await sql.query(
+      `insert into area_requests (profile_id, name, city_id, status)
+       values ($1, $2, $3, 'pending')`,
+      [asker.id, `P6 probe area ${n}`, city?.id ?? null],
+    );
+  }
+
   const list = await api("/list/area-requests?tab=pending");
   check("pending list → 200", list.status, 200);
   const dbPending = Number((await one(`select count(*) n from area_requests where status='pending'`)).n);
   check("pending count is real", list.json.data.total, dbPending);
 
-  const target = list.json.data.rows[0];
+  const target = list.json.data.rows.find((r) => String(r.name).startsWith("P6 probe area")) ?? list.json.data.rows[0];
   if (!target) {
     note("no pending area requests to act on — seed one to exercise this");
   } else {
@@ -490,7 +507,9 @@ console.log("\nA19 Area requests — approving one CREATES the location and tell
     check("approving twice is refused", second.status, 422);
   }
 
-  const anotherPending = await one(`select id from area_requests where status='pending' limit 1`);
+  const anotherPending = await one(
+    `select id from area_requests where status='pending' and name like 'P6 probe area%' limit 1`,
+  );
   if (anotherPending) {
     const noReason = await md({ action: "area_dismiss", id: anotherPending.id, reason: "" });
     check("dismissing without a reason is refused", noReason.status, 422);

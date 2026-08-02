@@ -107,7 +107,7 @@ type Draft = {
 export function PlanEditPanelBody({ panel }: { panel: PanelEntry }) {
   const code = (panel.data.code as string) ?? null;
   const toast = useToast();
-  const { popPanel } = usePanels();
+  const { popPanel, notifyChanged } = usePanels();
 
   const [draft, setDraft] = useState<Draft | null>(null);
   const [holders, setHolders] = useState(0);
@@ -246,6 +246,7 @@ export function PlanEditPanelBody({ panel }: { panel: PanelEntry }) {
     setConfirming(false);
     if (!json?.ok) return toast(json?.error?.message ?? "That didn't save");
     toast(`${json.data?.summary} · logged`);
+    notifyChanged();
     popPanel();
   }
 

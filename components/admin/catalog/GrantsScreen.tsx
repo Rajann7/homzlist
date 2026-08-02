@@ -15,7 +15,7 @@
  * user everything anyway.
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   AdminIcon,
   Avatar,
@@ -87,8 +87,13 @@ export function expiresLabel(r: GrantRow): string {
 
 export function GrantsScreen() {
   const toast = useToast();
-  const { pushPanel } = usePanels();
+  const { pushPanel, changed } = usePanels();
   const list = useAdminList<GrantRow>("grants", FILTER_KEYS, "active");
+
+  useEffect(() => {
+    if (changed) list.reload();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [changed]);
   const [rowMenu, setRowMenu] = useState<GrantRow | null>(null);
   const [dialog, setDialog] = useState<"extend" | "revoke" | null>(null);
   const [newGrant, setNewGrant] = useState<{ id: string; name: string } | null>(null);

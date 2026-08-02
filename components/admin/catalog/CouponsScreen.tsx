@@ -11,7 +11,7 @@
  * remembers to flip at 500/500.
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   AdminIcon,
   Badge,
@@ -88,8 +88,13 @@ const day = (iso: string | null) =>
 
 export function CouponsScreen({ planNames }: { planNames: Record<string, string> }) {
   const toast = useToast();
-  const { pushPanel } = usePanels();
+  const { pushPanel, changed } = usePanels();
   const list = useAdminList<CouponRow>("coupons", FILTER_KEYS, "active");
+
+  useEffect(() => {
+    if (changed) list.reload();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [changed]);
   const [rowMenu, setRowMenu] = useState<CouponRow | null>(null);
 
   const tab = list.tab ?? "active";

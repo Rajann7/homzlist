@@ -115,8 +115,15 @@ export function UsersScreen({
   total: number;
 }) {
   const toast = useToast();
-  const { pushPanel } = usePanels();
+  const { pushPanel, changed } = usePanels();
   const list = useAdminList<UserRow>("users", FILTER_KEYS);
+
+  // A suspend/verify/role change happens inside the panel; this table prints
+  // the same columns and must not keep showing the pre-action values.
+  useEffect(() => {
+    if (changed) list.reload();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [changed]);
   const [sheet, setSheet] = useState<"filters" | "columns" | "export" | "views" | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
   const [rowMenu, setRowMenu] = useState<UserRow | null>(null);
