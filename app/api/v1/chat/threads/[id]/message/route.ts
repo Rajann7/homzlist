@@ -16,7 +16,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const auth = await requireActive();
   if ("error" in auth) return fail(auth.error);
   if (!UUID_RE.test(params.id)) return fail("NOT_FOUND");
-  const limited = await rateLimit(`chat-send:${auth.id}`, 120, 60);
+  const limited = await rateLimit(`chat-send:${auth.id}`, 120, 60, "chat_message");
   if (!limited.allowed) return fail("RATE_LIMITED");
 
   let body: Record<string, unknown>;

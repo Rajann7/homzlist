@@ -24,9 +24,26 @@ export async function GET(req: NextRequest, { params }: { params: { resource: st
   if (!resource) return fail("NOT_FOUND");
 
   try {
-    await requireAdmin(resource.minRole);
-    const listParams = parseListParams(new URL(req.url), resource);
-    const result = await runList(resource, listParams);
+    const me = await requireAdmin(resource.minRole);
+
+    // A23's "Assigned to me" is the one tab that cannot be a static predicate:
+    // it depends on WHO is asking. Resolving it here — server-side, from the
+    // verified session — is what stops it from being a client-supplied
+    // assignee filter that any admin could point at anyone.
+    const effective =
+      resource.name === "tickets"
+        ? {
+            ...resource,
+            tabs: resource.tabs?.map((t) =>
+              t.key === "mine"
+                ? { ...t, apply: (q: ReturnType<typeof t.apply>) => q.eq("assignee_id", me.id) }
+                : t,
+            ),
+          }
+        : resource;
+
+    const listParams = parseListParams(new URL(req.url), effective);
+    const result = await runList(effective, listParams);
     return ok(result);
   } catch (e) {
     return adminErrorResponse(e);

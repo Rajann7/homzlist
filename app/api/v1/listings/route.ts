@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
   // rather than depending on how the type table happens to be seeded.
   if (!canPostListing(profile.role)) return fail("FORBIDDEN");
 
-  const limited = await rateLimit(`listing-create:${claims.sub}`, 30, 3600);
+  const limited = await rateLimit(`listing-create:${claims.sub}`, 30, 3600, "listing_create");
   if (!limited.allowed) return fail("RATE_LIMITED");
 
   let body: Record<string, any>;

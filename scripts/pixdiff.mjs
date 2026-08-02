@@ -425,6 +425,37 @@ function screenMap(fx) {
         designState: { tplTab: "email" },
         url: `${APP_ADMIN}/templates` },
     ]),
+
+    // ---- P13 · P7 — the last nine ----------------------------------------
+    // Each pinned to its first tab. A27 and A28 are the two with real viewport
+    // branches (the 4-up health/KPI grids collapse to 2 on mobile, templates
+    // 2610 and 2666); the rest are tables the design keeps at every band.
+    ...["mobile", "tablet", "desktop"].flatMap((band) => [
+      { id: `42-admin-settings-${band}`, page: "P13", screen: "settings", band, as: "admin",
+        designState: { setTab: "flags" },
+        url: `${APP_ADMIN}/settings` },
+      { id: `43-admin-tickets-${band}`, page: "P13", screen: "tickets", band, as: "admin",
+        designState: { ticketTab: "open" },
+        url: `${APP_ADMIN}/tickets` },
+      { id: `44-admin-disputes-${band}`, page: "P13", screen: "disputes", band, as: "admin",
+        designState: { dispTab: "open" },
+        url: `${APP_ADMIN}/disputes` },
+      { id: `45-admin-staff-${band}`, page: "P13", screen: "staff", band, as: "admin",
+        url: `${APP_ADMIN}/staff` },
+      { id: `46-admin-audit-${band}`, page: "P13", screen: "audit", band, as: "admin",
+        designState: { auditExp: {} },
+        url: `${APP_ADMIN}/audit` },
+      { id: `47-admin-cron-${band}`, page: "P13", screen: "cron", band, as: "admin",
+        url: `${APP_ADMIN}/cron` },
+      { id: `48-admin-analytics-${band}`, page: "P13", screen: "analytics", band, as: "admin",
+        designState: { anTab: "funnel" },
+        url: `${APP_ADMIN}/analytics` },
+      { id: `49-admin-trash-${band}`, page: "P13", screen: "trash", band, as: "admin",
+        designState: { trashFilter: "all" },
+        url: `${APP_ADMIN}/trash` },
+      { id: `50-admin-exports-${band}`, page: "P13", screen: "exports", band, as: "admin",
+        url: `${APP_ADMIN}/exports` },
+    ]),
   ];
 }
 

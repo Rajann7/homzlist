@@ -921,6 +921,270 @@ export const uiStringResource: ListResource = {
   ],
 };
 
+/* ═════════════════════════════════ P7 — A22–A30, the last nine screens ═══ */
+
+/** A22 · Feature flags — template 2337. Super-only, like the whole screen. */
+export const flagResource: ListResource = {
+  name: "flags",
+  table: "admin_flag_list",
+  select: "id, key, label, description, enabled, scope, scope_value, updated_at, updated_by_name",
+  searchColumns: ["label", "key", "description"],
+  sortColumns: ["label", "updated_at"],
+  defaultSort: { column: "label", ascending: true },
+  filters: [{ key: "scope", column: "scope", kind: "in" }],
+  minRole: "super",
+  columns: [
+    { key: "feature", label: "Feature", field: "label" },
+    { key: "description", label: "Description", field: "description" },
+    { key: "scope", label: "Scope", field: "scope" },
+    { key: "status", label: "Status", field: "enabled" },
+    { key: "changed", label: "Last changed", field: "updated_at" },
+  ],
+};
+
+/** A22 · Rate limits — template 2367. */
+export const rateLimitResource: ListResource = {
+  name: "rate-limits",
+  table: "admin_rate_limit_list",
+  select: "id, key, label, scope, window_seconds, max_requests, block_seconds, is_active, hits_24h",
+  searchColumns: ["label", "key"],
+  sortColumns: ["label", "hits_24h"],
+  defaultSort: { column: "label", ascending: true },
+  filters: [{ key: "scope", column: "scope", kind: "in" }],
+  minRole: "super",
+  columns: [
+    { key: "endpoint", label: "Endpoint", field: "label" },
+    { key: "limit", label: "Limit", field: "max_requests" },
+    { key: "scope", label: "Scope", field: "scope" },
+    { key: "hits", label: "Hits (24h)", field: "hits_24h" },
+    { key: "status", label: "Status", field: "is_active" },
+  ],
+};
+
+export const velocityResource: ListResource = {
+  name: "velocity",
+  table: "admin_velocity_list",
+  select: "id, key, label, threshold, window_hours, action, is_active, hits_24h",
+  searchColumns: ["label", "key"],
+  sortColumns: ["label"],
+  defaultSort: { column: "label", ascending: true },
+  filters: [{ key: "action", column: "action", kind: "in", options: ["flag", "throttle", "block"] }],
+  minRole: "super",
+  columns: [
+    { key: "action_label", label: "Action", field: "label" },
+    { key: "threshold", label: "Threshold", field: "threshold" },
+    { key: "then", label: "Then", field: "action" },
+    { key: "status", label: "Status", field: "is_active" },
+  ],
+};
+
+/**
+ * A23 · Tickets — template 2432.
+ *
+ * The design's five tabs, and "Assigned to me" is the one that cannot be a
+ * static filter: it depends on WHO is asking. The engine resolves it per
+ * request from the caller's identity (see the route), which is why it is
+ * declared here as a tab with no `apply` of its own.
+ */
+export const ticketResource: ListResource = {
+  name: "tickets",
+  table: "admin_ticket_list",
+  select:
+    "id, number, subject, category, priority, status, is_grievance, sla_due_at, acked_at, closed_at, last_activity_at, created_at, reopen_count, profile_id, user_name, user_photo, user_role, user_phone, assignee_id, assignee_name, payment_id, listing_id, sla_state, sla_seconds_left",
+  // template 2444 — "Ticket ID, phone, subject"
+  searchColumns: ["number", "subject", "user_name", "user_phone"],
+  sortColumns: ["created_at", "sla_due_at", "priority", "last_activity_at"],
+  // The one closest to breaching its SLA, first.
+  defaultSort: { column: "sla_due_at", ascending: true },
+  filters: [
+    { key: "category", column: "category", kind: "in" },
+    { key: "priority", column: "priority", kind: "in", options: ["low", "normal", "high", "urgent"] },
+    { key: "assignee", column: "assignee_id", kind: "in" },
+    { key: "sla", column: "sla_state", kind: "in", options: ["over", "warn", "ok", "none"] },
+    { key: "from", column: "created_at", kind: "dateFrom" },
+    { key: "to", column: "created_at", kind: "dateTo" },
+  ],
+  tabs: [
+    { key: "open", label: "Open", apply: (q) => q.in("status", ["open", "replied"]) },
+    // `mine` is rewritten per request with the caller's id — see the route.
+    { key: "mine", label: "Assigned to me", apply: (q) => q },
+    { key: "unassigned", label: "Unassigned", apply: (q) => q.is("assignee_id", null).neq("status", "closed") },
+    { key: "replied", label: "Replied", apply: (q) => q.eq("status", "replied") },
+    { key: "closed", label: "Closed", apply: (q) => q.eq("status", "closed") },
+  ],
+  minRole: "admin",
+  columns: [
+    { key: "ticket", label: "Ticket", field: "number" },
+    { key: "category", label: "Category", field: "category" },
+    { key: "user", label: "User", field: "user_name" },
+    { key: "priority", label: "Priority", field: "priority" },
+    { key: "assignee", label: "Assignee", field: "assignee_name" },
+    { key: "sla", label: "SLA", field: "sla_state" },
+    { key: "status", label: "Status", field: "status" },
+  ],
+};
+
+/** A24 · Disputes — template 2489. */
+export const disputeResource: ListResource = {
+  name: "disputes",
+  table: "admin_dispute_list",
+  select:
+    "id, number, category, summary, amount_claimed_paise, status, outcome, resolution, evidence_preserved, created_at, resolved_at, listing_id, listing_title, listing_cover, thread_id, party_a, party_a_name, party_a_photo, party_b, party_b_name, party_b_photo",
+  searchColumns: ["number", "summary", "party_a_name", "party_b_name"],
+  sortColumns: ["created_at", "amount_claimed_paise"],
+  defaultSort: { column: "created_at", ascending: false },
+  filters: [{ key: "category", column: "category", kind: "in" }],
+  tabs: [
+    { key: "open", label: "Open", apply: (q) => q.eq("status", "open") },
+    { key: "review", label: "Under review", apply: (q) => q.eq("status", "investigating") },
+    { key: "resolved", label: "Resolved", apply: (q) => q.in("status", ["resolved", "closed"]) },
+  ],
+  minRole: "admin",
+  columns: [
+    { key: "dispute", label: "Dispute", field: "number" },
+    { key: "parties", label: "Parties", field: "party_a_name" },
+    { key: "related", label: "Related", field: "listing_title" },
+    { key: "amount", label: "Amount claimed", field: "amount_claimed_paise" },
+    { key: "raised", label: "Raised", field: "created_at" },
+    { key: "status", label: "Status", field: "status" },
+  ],
+};
+
+/** A25 · Staff — template 2523. Super-only. */
+export const staffResource: ListResource = {
+  name: "staff",
+  table: "admin_staff_list",
+  select:
+    "id, profile_id, email, display_name, level, is_active, state, created_at, invited_at, last_login_at, added_by, added_by_name, is_online, pending_first_login, action_count",
+  searchColumns: ["display_name", "email"],
+  sortColumns: ["display_name", "created_at", "last_login_at"],
+  defaultSort: { column: "created_at", ascending: true },
+  filters: [
+    { key: "level", column: "level", kind: "in", options: ["staff", "admin", "super"] },
+    { key: "active", column: "is_active", kind: "bool", options: ["true", "false"] },
+  ],
+  minRole: "super",
+  columns: [
+    { key: "staff", label: "Staff", field: "display_name" },
+    { key: "role", label: "Role", field: "level" },
+    { key: "by", label: "Added by", field: "added_by_name" },
+    { key: "added", label: "Added", field: "created_at" },
+    { key: "last", label: "Last login", field: "last_login_at" },
+    { key: "online", label: "Online", field: "is_online" },
+  ],
+};
+
+/** A27 · Cron jobs — template 2606. */
+export const cronResource: ListResource = {
+  name: "cron",
+  table: "admin_cron_list",
+  select:
+    "id, code, name, schedule, description, enabled, last_run_at, last_status, last_duration_ms, next_run_at, failure_count, last_error",
+  searchColumns: ["name", "code"],
+  sortColumns: ["name", "last_run_at", "next_run_at"],
+  defaultSort: { column: "name", ascending: true },
+  filters: [{ key: "status", column: "last_status", kind: "in" }],
+  minRole: "admin",
+  columns: [
+    { key: "job", label: "Job", field: "name" },
+    { key: "schedule", label: "Schedule", field: "schedule" },
+    { key: "last", label: "Last run", field: "last_run_at" },
+    { key: "status", label: "Status", field: "last_status" },
+    { key: "next", label: "Next run", field: "next_run_at" },
+  ],
+};
+
+/** A29 · Trash — template 2694. The design's eight chips are these tabs. */
+export const trashResource: ListResource = {
+  name: "trash",
+  table: "admin_trash_list",
+  select:
+    "id, entity_type, entity_id, label, deleted_by_kind, deleted_by, deleted_by_name, reason, deleted_at, purge_at, restored_at, purge_days_left, purge_state",
+  searchColumns: ["label", "reason", "deleted_by_name"],
+  sortColumns: ["deleted_at", "purge_at"],
+  // Whatever is closest to being destroyed forever, first.
+  defaultSort: { column: "purge_at", ascending: true },
+  filters: [{ key: "by", column: "deleted_by_kind", kind: "in", options: ["user", "admin", "system"] }],
+  tabs: [
+    { key: "all", label: "All", apply: (q) => q.is("restored_at", null) },
+    { key: "listings", label: "Listings", apply: (q) => q.eq("entity_type", "listing").is("restored_at", null) },
+    { key: "requirements", label: "Requirements", apply: (q) => q.eq("entity_type", "requirement").is("restored_at", null) },
+    { key: "users", label: "Users", apply: (q) => q.eq("entity_type", "user").is("restored_at", null) },
+    { key: "chats", label: "Chats", apply: (q) => q.eq("entity_type", "chat").is("restored_at", null) },
+    { key: "photos", label: "Photos", apply: (q) => q.eq("entity_type", "photo").is("restored_at", null) },
+    { key: "projects", label: "Projects", apply: (q) => q.eq("entity_type", "project").is("restored_at", null) },
+    { key: "coupons", label: "Coupons", apply: (q) => q.eq("entity_type", "coupon").is("restored_at", null) },
+  ],
+  minRole: "admin",
+  columns: [
+    { key: "item", label: "Item", field: "label" },
+    { key: "type", label: "Type", field: "entity_type" },
+    { key: "by", label: "Deleted by", field: "deleted_by_name" },
+    { key: "deleted", label: "Deleted on", field: "deleted_at" },
+    { key: "purge", label: "Purge in", field: "purge_at" },
+    { key: "reason", label: "Reason", field: "reason" },
+  ],
+};
+
+/** A30 · Exports — template 2721. */
+export const exportResource: ListResource = {
+  name: "exports",
+  table: "admin_export_list",
+  select:
+    "id, name, entity, filters, format, row_count, status, reason, contains_personal_data, file_key, requested_by, requested_by_name, expires_at, created_at, state_key, expires_in_seconds",
+  searchColumns: ["name", "entity", "requested_by_name"],
+  sortColumns: ["created_at", "row_count"],
+  defaultSort: { column: "created_at", ascending: false },
+  filters: [
+    { key: "entity", column: "entity", kind: "in" },
+    { key: "format", column: "format", kind: "in", options: ["csv", "xlsx"] },
+    { key: "personal", column: "contains_personal_data", kind: "bool", options: ["true", "false"] },
+  ],
+  tabs: [
+    { key: "all", label: "All", apply: (q) => q },
+    { key: "ready", label: "Ready", apply: (q) => q.eq("state_key", "ready") },
+    { key: "processing", label: "Processing", apply: (q) => q.eq("state_key", "processing") },
+    { key: "expired", label: "Expired", apply: (q) => q.eq("state_key", "expired") },
+    { key: "failed", label: "Failed", apply: (q) => q.eq("state_key", "failed") },
+  ],
+  minRole: "admin",
+  columns: [
+    { key: "export", label: "Export", field: "name" },
+    { key: "type", label: "Type", field: "entity" },
+    { key: "rows", label: "Rows", field: "row_count" },
+    { key: "format", label: "Format", field: "format" },
+    { key: "by", label: "Requested by", field: "requested_by_name" },
+    { key: "requested", label: "Requested", field: "created_at" },
+    { key: "status", label: "Status", field: "state_key" },
+    { key: "expires", label: "Expires", field: "expires_at" },
+  ],
+};
+
+/**
+ * A28's export (template 2637's download button).
+ *
+ * It exports the EVENT SUMMARY — one row per event with its 30-day count and
+ * the previous window — through the same machinery every other export uses, so
+ * it gets the same private bucket, expiry and audit rule. A bespoke download
+ * here would be a second place the personal-data flag could be forgotten.
+ */
+export const analyticsEventResource: ListResource = {
+  name: "analytics-events",
+  table: "admin_event_summary",
+  select: "id, name, count_30d, count_prev_30d, last_seen_at",
+  searchColumns: ["name"],
+  sortColumns: ["count_30d", "name", "last_seen_at"],
+  defaultSort: { column: "count_30d", ascending: false },
+  filters: [],
+  minRole: "admin",
+  columns: [
+    { key: "event", label: "Event", field: "name" },
+    { key: "count", label: "Count (30d)", field: "count_30d" },
+    { key: "prev", label: "Previous 30d", field: "count_prev_30d" },
+    { key: "last", label: "Last seen", field: "last_seen_at" },
+  ],
+};
+
 export const ADMIN_RESOURCES: Record<string, ListResource> = {
   audit: auditResource,
   users: userResource,
@@ -949,6 +1213,16 @@ export const ADMIN_RESOURCES: Record<string, ListResource> = {
   broadcasts: broadcastResource,
   templates: templateResource,
   "ui-strings": uiStringResource,
+  flags: flagResource,
+  "rate-limits": rateLimitResource,
+  velocity: velocityResource,
+  tickets: ticketResource,
+  disputes: disputeResource,
+  staff: staffResource,
+  cron: cronResource,
+  trash: trashResource,
+  exports: exportResource,
+  "analytics-events": analyticsEventResource,
 };
 
 export function resourceByName(name: string): ListResource | null {

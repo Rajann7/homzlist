@@ -1,36 +1,110 @@
 # PENDING — everything not finished, and exactly what to do when it unblocks
 
-Status as of **31 Jul 2026**.
+Status as of **2 Aug 2026**.
 
-> **Module 11 P3 closed A1, A5 and the reports half of A4.** Listings,
-> requirements, boosts, verifications, appeals and reports now have working
-> queues with real decisions behind them, so a seller's post can go live and a
-> paid boost can start. `npm run check:admin-p3` proves each one against real
-> rows. What P3 *found* is below as **M11.x** — those are new, and none of them
-> were in the prompt.
+> **MODULE 11 IS COMPLETE — P0 through P7, all 31 screens.** Everything on this
+> list that was "blocked on the admin panel" is now unblocked, because the admin
+> panel exists. What is left below is blocked on a CREDENTIAL or a DEPLOY STEP,
+> not on code — with the four exceptions marked 🔵, which are decisions for
+> Rajan.
+>
+> Each part's checks are repeatable and prove their claims from the database:
+> `check:admin-p2` · `p3` · `p4` · `p4-bands` · `p5a` · `p5b` · `p6` · `p7` ·
+> `admin-links` · `bundle-secrets`.
 
-Three kinds of pending work, in priority order:
+## What is actually left
 
 | # | Item | Blocked on | Costs money / breaks a flow? |
 |---|---|---|---|
-| **A1** | Boost approval never happens | **Module 11 — Admin Panel** (P13-14-15), not credentials | 🟡 Money is now safe (auto-refund after 48h), but boosts still can't go live |
-| **A2** | Trial grants unreachable | Module 11 — Admin Panel (P13-14-15) | No — feature simply unusable |
-| **A5** | Nothing a seller posts ever goes live | **Module 11 — Admin Panel** (P13-14-15) | 🔴 YES — see below |
-| **B1** | Razorpay webhook secret | Rajan (dashboard) | 🔴 YES — late payments never settle |
-| **B2** | Cron not scheduled in prod | Deploy step (`CRON_SECRET` on host) | 🔴 YES — expiry/refund/reminders never run |
-| **A3** | Boost never appears in feed/search | **Module 9 — Boost placement** | 🟡 Even an approved boost would show nowhere |
-| **A4** | Profile Block + Report buttons do nothing | **Module 7** (block) / **Module 11** (reports) | 🟡 UI claims success; nothing is saved |
-| **B3** | Reminder delivery (push/email) | FCM + Resend keys (**Module 10 — Notifications**) | No — reminders are recorded, not delivered |
-| **B4** | Cloudflare R2 | Rajan (keys) | No — Supabase Storage is the interim store |
-| **B5** | Redis / MSG91 / Resend / FCM | Rajan (keys) | Varies — see table at the end |
-| ~~C1~~ | ~~`EXPIRED10` has no expiry~~ | ✅ FIXED 22 Jul 2026 | — |
-| ~~C3~~ | ~~Quota charged for a requirement/listing that was never created~~ | ✅ FIXED 23 Jul 2026, migration 0024 | — |
-| **C2** | Checkout shows CGST+SGST, design shows one GST row | Rajan's decision | No |
-| **M6.3** | Story media never expires (public bucket, so signing is a no-op) | **B4 (R2 / private bucket)** | No — anti-scrape only; story viewer works |
-| **M6.4** | Same gap as A1, seen from Module 6 | **Module 11 — Admin Panel** | 🟡 Boost ranks correctly once active — it just can't get there |
+| **B1** | Razorpay webhook secret | 🔑 Rajan (Razorpay dashboard) | 🔴 YES — late payments never settle |
+| **B2** | Cron not scheduled in prod | 🚀 Deploy step (`CRON_SECRET` on host) | 🔴 YES — expiry/refund/reminders/anomalies never run |
+| **B3** | Reminder delivery (push/email) | 🔑 FCM + Resend keys | No — reminders are recorded, not delivered |
+| **B4** | Cloudflare R2 | 🔑 Rajan (keys) | No — Supabase Storage is the interim store |
+| **B5** | Redis / MSG91 / Resend / FCM | 🔑 Rajan (keys) | Varies — see the table at the end |
+| **C2** | Checkout shows CGST+SGST, design shows one GST row | 🔵 Rajan's decision | No |
+| **M6.3** | Story media never expires (public bucket, so signing is a no-op) | **B4** (R2 / private bucket) | No — anti-scrape only |
+| **M11.6** | Sentry / provider-billing cards on A27 | 🔑 Sentry DSN + provider billing APIs | No — the cards say "not connected" rather than showing zeros |
+| **M11.7** | Three of A22's six system actions have no worker | 🔵 Decide whether we want them | No — the endpoint refuses honestly instead of faking success |
 
-**Module 6 is NOT 100% closed** — M6.3 + M6.4 above are the only two left, and
-neither can be closed from inside Module 6. See the closure table in §A0-M6.
+**Nothing on that list is a half-built feature.** Each is either a key we do not
+have, a deploy step, or a decision — and in every case the code refuses honestly
+rather than pretending.
+
+## Closed by Module 11
+
+| # | Was | Closed by |
+|---|---|---|
+| ~~A1~~ | Boost approval never happens | **P3** — A6 boost queue, approve/reject+refund on the real state machine |
+| ~~A2~~ | Trial grants unreachable | **P5a** — A15 Grants, and migration 0099 gave a grant a catalog code it could actually use |
+| ~~A3~~ | Boost never appears in feed/search | Module 9, verified from A6 |
+| ~~A4~~ | Profile Block + Report do nothing | **P3** — A9 reports queue with six real actions |
+| ~~A5~~ | Nothing a seller posts ever goes live | **P3** — A3/A4 listings queue and review |
+| ~~M6.4~~ | Same gap as A1, from Module 6 | **P3** |
+| ~~M11.1~~ | `number_patterns` has no reader anywhere | **P6** — one detector reads both rule tables; disabling a rule really stops it |
+| ~~M11.2~~ | Anomaly banners have no detector | **P7** — `lib/admin/anomalies.ts` + `/api/v1/cron/anomalies`, five detectors, idempotent per window |
+| ~~M11.3~~ | `device_bans` had no reader | Enforced at the OTP door (Module 1) |
+| ~~M11.4~~ | Queued boosts with refunded orders | **P3** — `approveBoost` checks the money is still there |
+| ~~M11.5~~ | A9 "High priority" had no qualifying data | Data, not code — the chip counts correctly |
+
+### And three more the later parts found and closed in place
+
+- **`rate_limits` and `velocity_rules` had no reader either** (found in P7).
+  Thirteen rows of editable numbers that changed nothing, because every one of
+  ~40 call sites hardcoded its own. The limiter reads the table now
+  (`lib/auth/rate-limit.ts`), the blocks it issues are counted (migration
+  0110), and A22's "Hits (24h)" is a query. The hardcoded values remain as the
+  fallback, so a deleted or unreachable rule leaves the endpoint protected
+  rather than open.
+- **`broadcasts` had nine rows and no sender** (found in P6). No code in the
+  repo could send one, so A20's "Delivered · 96%" column had nothing to count.
+  There is a sender now, with a per-recipient ledger, batching, and a
+  percentage over ATTEMPTED rather than audience size — so a send that has not
+  run reads "—" instead of "0%".
+- **Two guards that could never fire** (found in P6/P7). "Legally required page
+  cannot be unpublished" tested `kind`, which is `'legal'` for the cookie
+  policy and `'terms'` for nothing — Terms of Service was one click from a 404.
+  "Authentication templates cannot be disabled" tested a `auth.` code prefix no
+  template carries — OTP, the sign-in path for every user, was disableable.
+  Both now match on the values the schema actually holds, and the check seeds
+  its way to each refusal so they are exercised rather than assumed.
+
+---
+
+## M11.6 — A27's error and cost cards have no source
+
+**What the design draws:** an "Errors" card (`Error rate: 0.02% (last 24h)`,
+"Open Sentry ↗") and a "Cost alerts" card (SMS / WhatsApp / Storage / CDN spend
+against a monthly cap).
+
+**What exists:** neither. There is no Sentry project and no provider billing
+integration on this environment.
+
+**What P7 did:** rendered the cards as "not connected on this environment"
+rather than printing `0.02%` and four zero bars. A fabricated error rate on the
+screen an admin opens *during an incident* is the worst possible place for one.
+
+### When the keys arrive — do this
+1. Add `SENTRY_DSN` (and `SENTRY_AUTH_TOKEN` for the API read).
+2. Cost alerts need per-provider billing endpoints — MSG91, Meta, R2,
+   Cloudflare. Each is a separate credential; there is no combined source.
+3. Replace the two `NoteStrip`s in `components/admin/ops/SystemScreen.tsx`.
+
+---
+
+## M11.7 — three of A22's six system actions have no worker
+
+`Regenerate sitemaps`, `Resend failed notifications` and `Clear rate-limit
+blocks` are **real** — they run and report what they did.
+
+`Purge CDN cache`, `Rebuild search index` and `Recalculate area stats` have no
+registered job. The endpoint looks the job up in `cron_jobs` and refuses with
+*"No job named X is registered — it cannot be triggered yet"*, rather than
+queueing a run nothing will pick up or showing a success toast over nothing.
+
+**Decision needed:** whether we want these three at all.
+- *CDN purge* only matters once R2/Cloudflare is live (**B4**).
+- *Search reindex* only matters if we move off Postgres FTS.
+- *Area stats* is genuinely useful and is the cheapest of the three to build.
 
 ---
 

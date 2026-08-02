@@ -691,22 +691,37 @@ export async function suspendUser(
   const row = data as { id: string; name: string | null } | null;
   if (!row) return { ok: false, reason: "bad_state", message: "Already suspended or not active" };
 
-  await db().from("account_suspensions").insert({
-    profile_id: id,
-    reason: reason.trim().slice(0, 300),
-    days,
-    suspended_by: me.id,
-  });
+  // The suspension's OWN timestamp is read back and reused as `hidden_at`
+  // below, so both are the same value from the same clock.
+  //
+  // They were two clocks before: `created_at` is Postgres `now()` when the
+  // insert lands, `hidden_at` was `new Date()` in Node when the payload was
+  // built — so the listing was stamped ~50 ms BEFORE the suspension that hid
+  // it, `hidden_at >= created_at` was false, and lifting the suspension
+  // restored nothing. The design's overlay promises "Listings and chats will
+  // be restored"; it had never restored a listing.
+  const { data: suspension } = await db()
+    .from("account_suspensions")
+    .insert({
+      profile_id: id,
+      reason: reason.trim().slice(0, 300),
+      days,
+      suspended_by: me.id,
+    })
+    .select("created_at")
+    .single();
+  const hiddenAt = (suspension as { created_at: string } | null)?.created_at ?? new Date().toISOString();
+
   // "Their listings will be hidden and chats frozen" — the warning strip is a
   // promise, so both halves happen here rather than being left to a cron.
   const { count: hidden } = await db()
     .from("listings")
-    .update({ status: "hidden", hidden_at: new Date().toISOString() }, { count: "exact" })
+    .update({ status: "hidden", hidden_at: hiddenAt }, { count: "exact" })
     .eq("profile_id", id)
     .eq("status", "live");
   await db()
     .from("projects")
-    .update({ status: "hidden", hidden_at: new Date().toISOString() })
+    .update({ status: "hidden", hidden_at: hiddenAt })
     .eq("profile_id", id)
     .eq("status", "live");
   // Frozen chats: every live session goes, so they cannot keep messaging from a
@@ -749,6 +764,10 @@ export async function liftSuspension(id: string, me: AdminIdentity): Promise<Use
 
   // Restore only what the suspension itself hid — a listing the admin hid for
   // its own reasons must not silently come back with the account.
+  //
+  // `suspendUser` stamps `hidden_at` with this row's own `created_at`, so the
+  // comparison below is an exact match on one clock rather than a race between
+  // Postgres's and Node's.
   const { data: susp } = await db()
     .from("account_suspensions")
     .select("created_at")

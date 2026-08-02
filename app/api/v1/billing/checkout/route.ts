@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
   if (!profile || profile.state !== "active") return fail("FORBIDDEN");
 
   // Anti-abuse: order creation is cheap for us but noisy — cap it per user.
-  const limited = await rateLimit(`checkout:${claims.sub}`, 20, 3600);
+  const limited = await rateLimit(`checkout:${claims.sub}`, 20, 3600, "checkout");
   if (!limited.allowed) return fail("RATE_LIMITED");
 
   let body: Record<string, unknown>;

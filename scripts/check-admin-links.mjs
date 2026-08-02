@@ -77,15 +77,16 @@ const SCREENS = [
   ["/master-data", "Master data|Locations"],
   ["/cms", "Content|Broadcasts"],
   ["/templates", "Templates|UI strings"],
-  ["/settings", UNBUILT],
-  ["/tickets", UNBUILT],
-  ["/disputes", UNBUILT],
-  ["/staff", UNBUILT],
-  ["/audit", UNBUILT],
-  ["/cron", UNBUILT],
-  ["/analytics", UNBUILT],
-  ["/trash", UNBUILT],
-  ["/exports", UNBUILT],
+  // P7 built the last nine.
+  ["/settings", "Settings|Feature flags"],
+  ["/tickets", "Tickets|Assigned to me"],
+  ["/disputes", "Disputes|intermediary"],
+  ["/staff", "Staff|Permission matrix"],
+  ["/audit", "Audit log|Entity ID"],
+  ["/cron", "System status|Cron jobs"],
+  ["/analytics", "Analytics|Funnel"],
+  ["/trash", "Trash|purge date"],
+  ["/exports", "Exports|private bucket"],
 ];
 
 const listing = await one(

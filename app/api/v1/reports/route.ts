@@ -15,7 +15,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 export async function POST(req: NextRequest) {
   const claims = await getCurrentUser();
   if (!claims) return fail("UNAUTHORIZED");
-  const limited = await rateLimit(`report:${claims.sub}`, 30, 3600);
+  const limited = await rateLimit(`report:${claims.sub}`, 30, 3600, "report_submit");
   if (!limited.allowed) return fail("RATE_LIMITED");
 
   let body: Record<string, unknown>;

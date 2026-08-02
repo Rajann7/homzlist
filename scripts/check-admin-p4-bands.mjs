@@ -44,6 +44,7 @@ await s.eval(
 const PATHS = [
   "/users", "/listings", "/coupons", "/grants", "/plans", "/payments", "/finance",
   "/master-data", "/cms", "/templates",
+  "/settings", "/tickets", "/disputes", "/staff", "/audit", "/cron", "/analytics", "/trash", "/exports",
 ];
 
 // Warm every route once before measuring anything.
@@ -109,6 +110,15 @@ for (const [band, w, h] of BANDS) {
           );
           return g ? getComputedStyle(g).gridTemplateColumns.split(' ').length : 0;
         })(),
+        // A27/A28's 4-up card grids, which halve on mobile
+        gridCols: (() => {
+          const g = document.querySelector('main [class*="md:grid-cols-4"]');
+          return g ? getComputedStyle(g).gridTemplateColumns.split(' ').length : 0;
+        })(),
+        // A28's funnel bars (template 2646) — the tab the screen opens on
+        funnelStages: [...document.querySelectorAll('main div')].filter(
+          (e) => visible(e) && /^(Signups|Plan purchased|Listing submitted|Lead received)$/.test(e.textContent.trim()),
+        ).length,
         // A16's KPI row is flex-wrap with minWidth:150 (template 1155), so what
         // matters is that all four are on screen and none of them is clipped
         finKpis: [...document.querySelectorAll('main div')].filter(
@@ -157,6 +167,33 @@ for (const [band, w, h] of BANDS) {
     // that the PAGE never scrolls sideways; the table's own box may.
     if (path === "/cms" || path === "/templates") {
       check(`${path} ${band} · table renders`, m.tables, 1);
+      continue;
+    }
+
+    // A27 and A28 collapse their 4-up card grids to 2 on mobile (templates
+    // 2610 and 2666). Everything else in P7 is a table the design keeps at
+    // every band — the same "table on mobile, its own box scrolls" branch
+    // check-p13-bands.mjs measured on twelve screens.
+    // A27's health strip is a 4-up grid that halves on mobile (template 2610).
+    if (path === "/cron") {
+      check(
+        `/cron ${band} · ${band === "mobile" ? "two" : "four"} card column(s)`,
+        m.gridCols,
+        band === "mobile" ? 2 : 4,
+      );
+      continue;
+    }
+    // A28 opens on FUNNEL, which is stacked bars with no card grid — the 4-up
+    // grid belongs to its Content tab (template 2666). Asserting the grid here
+    // asserted a tab the screen is not showing.
+    if (path === "/analytics") {
+      check(`/analytics ${band} · funnel rendered`, m.funnelStages > 0, true);
+      continue;
+    }
+    if (["/settings", "/tickets", "/disputes", "/staff", "/audit", "/trash", "/exports"].includes(path)) {
+      // A26 is expandable ROWS, not a table — it is checked for scroll,
+      // clipping and console errors only (above).
+      if (path !== "/audit") check(`${path} ${band} · table renders`, m.tables >= 1, true);
       continue;
     }
 

@@ -18,6 +18,14 @@ export interface KV {
   sadd(key: string, member: string): Promise<void>;
   srem(key: string, member: string): Promise<void>;
   smembers(key: string): Promise<string[]>;
+  /**
+   * Keys matching a glob. Used by A22's "Clear rate-limit blocks".
+   *
+   * The Redis driver uses SCAN, not KEYS: `KEYS *` is O(N) and BLOCKS the
+   * server for the whole scan, which on a production instance holding every
+   * session and counter is an outage triggered from an admin button.
+   */
+  scanKeys(pattern: string, limit?: number): Promise<string[]>;
 }
 
 class MemoryKV implements KV {
@@ -73,6 +81,15 @@ class MemoryKV implements KV {
   async smembers(key: string) {
     return Array.from(this.sets.get(key) ?? []);
   }
+  async scanKeys(pattern: string, limit = 10_000) {
+    const re = new RegExp(`^${pattern.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*")}$`);
+    const out: string[] = [];
+    for (const k of this.store.keys()) {
+      if (re.test(k) && this.alive(k)) out.push(k);
+      if (out.length >= limit) break;
+    }
+    return out;
+  }
 }
 
 class RedisKV implements KV {
@@ -109,6 +126,20 @@ class RedisKV implements KV {
   }
   async smembers(key: string) {
     return this.client().smembers(key);
+  }
+  async scanKeys(pattern: string, limit = 10_000) {
+    const redis = this.client();
+    const out: string[] = [];
+    let cursor = "0";
+    do {
+      // COUNT is a hint per iteration, not a total — SCAN yields between
+      // iterations, which is the whole point of using it over KEYS.
+      const [next, batch] = await redis.scan(cursor, "MATCH", pattern, "COUNT", 500);
+      cursor = next;
+      out.push(...batch);
+    } while (cursor !== "0" && out.length < limit);
+    // SCAN can return the same key twice across iterations.
+    return [...new Set(out)].slice(0, limit);
   }
 }
 

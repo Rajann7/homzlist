@@ -87,6 +87,8 @@ export function columnField(r: ListResource, key: string): string | null {
 /** The subset of the Supabase query builder this engine uses. */
 export type PgQuery = {
   eq: (c: string, v: unknown) => PgQuery;
+  /** A23's "Unassigned" tab is `assignee_id is null AND status <> closed`. */
+  neq: (c: string, v: unknown) => PgQuery;
   in: (c: string, v: unknown[]) => PgQuery;
   is: (c: string, v: unknown) => PgQuery;
   gte: (c: string, v: unknown) => PgQuery;

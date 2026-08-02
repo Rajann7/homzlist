@@ -65,7 +65,7 @@ export async function requestOtp(phone: string, ipHash: string): Promise<Request
 
   if (await isNumberLocked(phone)) return { ok: false, reason: "NUMBER_LOCKED" };
 
-  const perNumber = await rateLimit(`otp:num:${phone}`, OTP.SMS_PER_HOUR_NUMBER, 3600);
+  const perNumber = await rateLimit(`otp:num:${phone}`, OTP.SMS_PER_HOUR_NUMBER, 3600, "otp_send");
   const perIp = await rateLimit(`otp:ip:${ipHash}`, OTP.SMS_PER_DAY_IP, 86400);
   if (!perNumber.allowed || !perIp.allowed) {
     const worst = !perNumber.allowed ? perNumber : perIp;
@@ -119,7 +119,7 @@ export async function resendOtp(otpSession: string, ipHash: string): Promise<Res
   }
 
   // Audit L1: a resend is an SMS — charge the same per-number/per-IP caps.
-  const perNumber = await rateLimit(`otp:num:${s.phone}`, OTP.SMS_PER_HOUR_NUMBER, 3600);
+  const perNumber = await rateLimit(`otp:num:${s.phone}`, OTP.SMS_PER_HOUR_NUMBER, 3600, "otp_send");
   const perIp = await rateLimit(`otp:ip:${ipHash}`, OTP.SMS_PER_DAY_IP, 86400);
   if (!perNumber.allowed || !perIp.allowed) {
     const worst = !perNumber.allowed ? perNumber : perIp;

@@ -31,7 +31,7 @@ export const dynamic = "force-dynamic";
 export async function POST(req: NextRequest) {
   // A sign-in endpoint is reachable by anyone; the whitelist behind it answers
   // the same way every time, so the only thing to protect is the cost.
-  const limit = await rateLimit(`admin:signin:${clientIp(req.headers)}`, 20, 15 * 60);
+  const limit = await rateLimit(`admin:signin:${clientIp(req.headers)}`, 20, 15 * 60, "login");
   if (!limit.allowed) return fail("RATE_LIMITED", { retry_after: limit.retryAfterSec });
 
   // A new attempt clears the previous refusal, so the error card cannot outlive

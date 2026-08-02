@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
   // Min profile = name + CITY (Doc2 §10.1). The city half was never checked.
   if (!profile.name || !profile.city_id) return fail("PROFILE_INCOMPLETE", { field: profile.name ? "city" : "name" });
 
-  const limited = await rateLimit(`inquiry:${claims.sub}`, 100, 86_400); // Doc2 §15: 100/day
+  const limited = await rateLimit(`inquiry:${claims.sub}`, 100, 86_400, "inquiry_send"); // Doc2 §15: 100/day
   if (!limited.allowed) return fail("RATE_LIMITED");
 
   let body: Record<string, unknown>;
