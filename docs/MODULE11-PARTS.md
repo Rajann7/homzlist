@@ -16,7 +16,17 @@ type-check.
 | P5a | A13 Plans · A14 Coupons · A15 Grants | ✅ done |
 | P5b | A16 Finance · A17–A18 Payments | ✅ done |
 | P6 | A19–A21 | ✅ done |
-| P7 | A22–A30 | ⬜ |
+| P7 | A22–A30 | ✅ done |
+
+**Module 11 is complete — all 31 screens.** Every part's check is repeatable
+and proves its claims from the database:
+
+```bash
+npm run check:admin-p2    npm run check:admin-p5a   npm run check:admin-links
+npm run check:admin-p3    npm run check:admin-p5b   npm run check:admin-p4-bands
+npm run check:admin-p4    npm run check:admin-p6    npm run check:bundle-secrets
+                          npm run check:admin-p7
+```
 
 ## §0 — tooling
 
@@ -612,3 +622,88 @@ plans. The design's fourth card is "Custom / Enterprise", which the product does
 not have. A top-up IS a sellable product with a price, and no other screen
 prices it — leaving it off A13 would make its price uneditable anywhere in the
 panel. Boosts are excluded because A19's rate card owns them.
+
+## P5b — Finance and the payments list
+
+A16's four tabs and A17/A18. Every number re-derived by a second, independently
+written query (`check:admin-p5b`, 88 checks).
+
+- The reminder check could only ever pass **once** — it sends a 24h-throttled
+  nudge, so the second run read its own previous run as the throttle. It clears
+  the state it consumes now, like `check:admin-p3`.
+- The abandoned tab truncated at 100 rows and clamped a 30-day window without
+  saying either. Both are reported; the screen says "showing N of M".
+- A16's By-product/By-city pair split at DESKTOP; template 1165 splits it at
+  TABLET.
+- A16 drew two delta badges the design does not have and omitted the one it
+  does. The real badge compares against the previous window of the same length,
+  and a window with no sales before it gets no badge rather than "▲100%".
+- A17 had no date-range button, its All chip carried a count the design does not
+  draw, and its mobile branch rendered a filter bar template 1141 omits.
+
+## P6 — Master data, content, templates
+
+A19's six tabs, A20's five, A21's five. `check:admin-p6`, 130 checks.
+
+**The headline is what P6 had to fix before it could ship a single control.**
+`number_patterns` and `blocklist_words` held rows nothing read: the real
+detectors were four regexes in `validate.ts`, a fifth plus a four-word array in
+chat, and a hardcoded SQL function. A19 was about to ship a screen full of
+switches that switched nothing. There is one detector now
+(`lib/moderation/rules.ts`), the old hardcoded rules are seeded AS ROWS so
+behaviour was unchanged on the day it switched over, every match is counted in
+`content_flag_hits`, and `hz_has_number_pattern` reads the same table through
+the POSIX translation each row carries (0106/0107).
+
+What else it found:
+
+- `area_requests` allows pending/added/rejected. The endpoint wrote
+  'approved'/'dismissed', Postgres refused it, the error was not read, and the
+  API answered **200 over a row that never moved**.
+- The "legally required page cannot be unpublished" guard tested `kind`, which
+  is `'legal'` for the cookie policy and `'terms'` for nothing — so it never
+  fired and Terms of Service was one click from a 404.
+- The "authentication templates cannot be disabled" guard tested a `auth.` code
+  prefix no template carries — OTP was disableable.
+- `body.action` meant both the route action and the pattern's flag/block
+  verdict, so "Block" could never be saved.
+- The location tree printed 0 listings against every state, district and taluka:
+  the count was over `area_id` alone where the design's number is the whole
+  subtree.
+- `broadcasts` had nine rows and **no sender at all**.
+
+## P7 — the last nine screens
+
+A22-A30. `check:admin-p7`, 123 checks.
+
+- `rate_limits` and `velocity_rules` had no reader either — the same defect as
+  P6's rule tables, one screen later. The limiter reads them now, and its blocks
+  are counted so "Hits (24h)" is a query (0110).
+- **Lift suspension had never restored a listing.** `hidden_at` came from Node's
+  clock and the suspension's `created_at` from Postgres, so the listing was
+  stamped ~50 ms *before* the suspension that hid it and the `>=` was always
+  false. Both use one clock now.
+- `trash_items.purge_at` was NOT NULL, so Restore and Preserve-evidence both
+  wrote null, were refused, and returned 200 over rows that never moved (0111).
+- A28's funnel had four stages over `funnel_daily`, which has four columns and
+  no role or city — the design draws five stages and six segment chips. It reads
+  `analytics_events` now, which has both.
+- M11.2 closed: five anomaly detectors, idempotent per window
+  (`lib/admin/anomalies.ts`, `/api/v1/cron/anomalies`).
+
+### Two harness fixes, both of which had been lying
+
+- `check-admin-p4-bands` warmed nothing, so `next dev` compiled each route on
+  its first request — always at mobile, the first band — and a cold route read
+  exactly like a missing mobile branch.
+- `DTable`'s generic was `R extends { _hl?: string }`, a weak type TypeScript
+  rejects for every real row shape. Same defect `QueueTable` had already
+  documented directly above it.
+
+### What P7 deliberately did NOT fake
+
+A27's error-rate and cost-alert cards have no source on this environment
+(no Sentry, no provider billing APIs), and three of A22's six system actions
+have no registered worker. Both say so rather than printing zeros or showing a
+success toast over nothing. Tracked as **M11.6** and **M11.7** in
+docs/PENDING-INTEGRATIONS.md.

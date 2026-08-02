@@ -312,6 +312,98 @@ console.log("\nA19 Blocklist & patterns — the tables that had no reader until 
   gte("audit rows for the pattern lifecycle", await audited("pattern_delete"), 1);
 }
 
+/* ═════════════ 3b · the detector, through the REAL seller endpoint ═══════ */
+console.log("\nA19 — the rules run on a real submit, and the hit is counted");
+{
+  // Everything above proves the ADMIN side. This proves the other half: that a
+  // real user posting a real listing goes through the same rules, and that the
+  // match lands in `content_flag_hits` where A19's column reads it.
+  //
+  // Without this the whole part could pass with a detector nothing calls —
+  // which is precisely the bug P6 exists to fix, one level up.
+  const seller = await one(
+    `select p.id, p.phone from profiles p
+      join user_plans up on up.profile_id = p.id and up.status='active' and up.listing_quota > up.listing_used
+     where p.state='active' limit 1`,
+  );
+  if (!seller) {
+    note("no active seller with listing quota — the end-to-end submit cannot run here");
+  } else {
+    const jarU = jar();
+    const call = async (path, init = {}) => {
+      const r = await fetch(`http://seller.localhost:${PORT}${path}`, {
+        ...init,
+        headers: { "content-type": "application/json", cookie: jarU.header(), ...(init.headers ?? {}) },
+      });
+      jarU.absorb(r);
+      return { status: r.status, json: await r.json().catch(() => null) };
+    };
+    const start = await call("/api/v1/auth/otp/request", {
+      method: "POST",
+      body: JSON.stringify({ phone: seller.phone }),
+    });
+    const verified = start.json?.ok
+      ? await call("/api/v1/auth/otp/verify", {
+          method: "POST",
+          body: JSON.stringify({
+            otpSession: start.json.data.otpSession,
+            code: start.json.data.devCode ?? "123456",
+          }),
+        })
+      : { json: null };
+
+    if (!verified.json?.ok) {
+      note("could not sign the seller in (rate limit or dev OTP off) — skipping the live submit");
+    } else {
+      const hitsBefore = Number(
+        (await one(`select count(*) n from content_flag_hits where entity_type='listing'`)).n,
+      );
+      const type = await one(`select code from property_types where is_active limit 1`);
+      const posted = await call("/api/v1/listings", {
+        method: "POST",
+        body: JSON.stringify({
+          typeCode: type.code,
+          kind: "sell",
+          title: "P6 probe listing",
+          // The exact case A19's patterns exist for.
+          description: "Serious buyers only. Call me at 9825012345 to discuss.",
+          pricePaise: 5_000_000_00,
+          photoCount: 5,
+        }),
+      });
+      // A validation refusal is fine — what matters is that the SCAN ran.
+      check("the submit was accepted or refused, not crashed", posted.status < 500, true);
+
+      const hitsAfter = Number(
+        (await one(`select count(*) n from content_flag_hits where entity_type='listing'`)).n,
+      );
+      gte("a real submit recorded a rule hit", hitsAfter - hitsBefore, 1);
+      const hit = await one(
+        `select rule_kind, field from content_flag_hits where entity_type='listing'
+          order by created_at desc limit 1`,
+      );
+      check("…it was a number PATTERN", hit.rule_kind, "pattern");
+      check("…and it recorded where it was caught", hit.field, "description");
+
+      // And A19's column now reads it.
+      const counted = Number(
+        (await one(`select coalesce(sum(hits_30d),0) n from admin_number_pattern_list`)).n,
+      );
+      gte("A19's Hits (30d) column reflects it", counted, 1);
+
+      if (posted.json?.ok) {
+        // The listing was flagged rather than blocked (Doc2 §5.1 — warnings
+        // never block), which is the behaviour to prove, then cleaned up.
+        const created = await one(
+          `select id, flagged_reason from listings where title='P6 probe listing' order by created_at desc limit 1`,
+        );
+        check("…the listing was FLAGGED, not blocked", created?.flagged_reason, "phone_number_in_text");
+        await sql.query(`delete from listings where title='P6 probe listing'`);
+      }
+    }
+  }
+}
+
 /* ══════════════════════════════ 4 · A19 · hits, and the field config ═════ */
 console.log("\nA19 Hits (30d) and the field-config editor");
 {
