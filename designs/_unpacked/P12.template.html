@@ -1,0 +1,1824 @@
+<!DOCTYPE html>
+<html><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="e21a4407-1641-44ce-8d79-de5d324f1bc0"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<style>
+:root{--ez:cubic-bezier(.2,0,0,1)}
+body{--page:#FFFFFF;--sf1:#FFFFFF;--s2:#F5F5F5;--s3:#EFEFEF;--bd:#DBDBDB;--dv:#EFEFEF;--i1:#111111;--i2:#555555;--i3:#8E8E8E;--idis:#C7C7C7;--acc:#0F9D58;--accp:#0C7C46;--accs:#E6F4EC;--accd:#A8D5BD;--err:#ED4956;--errs:#FDECEE;--wrn:#F5A623;--wrnt:#9A6700;--wrns:#FEF5E7;--inf:#0095F6;--infs:#E7F3FD;--sh1:0 1px 2px rgba(0,0,0,.06);--sh2:0 4px 12px rgba(0,0,0,.10);--sh3:0 8px 24px rgba(0,0,0,.16);--out:#FAFAFA;--shim:rgba(255,255,255,.55);
+margin:0;background:var(--out);color:var(--i1);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;font-size:15px;line-height:1.4;-webkit-font-smoothing:antialiased}
+body[data-theme="dark"]{--page:#000000;--sf1:#121212;--s2:#1E1E1E;--s3:#262626;--bd:#363636;--dv:#262626;--i1:#F5F5F5;--i2:#B0B0B0;--i3:#8E8E8E;--idis:#4D4D4D;--acc:#1DB868;--accp:#17A05A;--accs:#0E2B1C;--accd:#1E4D34;--err:#FF5C6A;--errs:#2B1216;--wrn:#FFB74D;--wrnt:#FFB74D;--wrns:#2B2213;--inf:#3BA7F8;--infs:#0F2233;--sh1:none;--sh2:none;--sh3:none;--out:#0A0A0A;--shim:rgba(255,255,255,.07)}
+a{color:var(--acc);text-decoration:none}a:hover{color:var(--accp)}
+h1,h2,h3,p{margin:0}
+button{font-family:inherit;-webkit-tap-highlight-color:transparent}
+#app{max-width:470px;margin:0 auto;min-height:100vh;background:var(--page);position:relative}
+@media (min-width:768px){#app{border-left:1px solid var(--bd);border-right:1px solid var(--bd)}}
+body[data-vp="mobile"] #app{max-width:390px;border-left:1px solid var(--bd);border-right:1px solid var(--bd)}
+body[data-vp="tablet"] #app,body[data-vp="desktop"] #app{max-width:470px;border-left:1px solid var(--bd);border-right:1px solid var(--bd)}
+.scr{display:none;min-height:100vh;padding-bottom:40px;box-sizing:border-box}.scr.on{display:block}
+.hdr{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:4px;height:56px;padding:0 8px;background:var(--page);border-bottom:1px solid var(--dv)}
+.hdr h1{font-size:17px;font-weight:600;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 4px}
+.wm{font-size:20px;font-weight:700;color:var(--i1)}.wm b{color:var(--acc);font-weight:700}
+.ibtn{width:44px;height:44px;border:0;background:none;color:var(--i1);display:inline-flex;align-items:center;justify-content:center;border-radius:8px;cursor:pointer;flex:none;padding:0;transition:transform .1s var(--ez)}
+.ibtn:active{transform:scale(.98)}
+.ic{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.i16{width:16px;height:16px}.i20{width:20px;height:20px}.i32{width:32px;height:32px}.i48{width:48px;height:48px}.i96{width:96px;height:96px;stroke-width:1}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:44px;padding:0 16px;border-radius:8px;font-size:15px;font-weight:600;border:0;cursor:pointer;transition:transform .1s var(--ez),background .15s;box-sizing:border-box;white-space:nowrap}
+.btn:active{transform:scale(.98)}
+.b-pri{background:var(--acc);color:#fff}.b-pri:active{background:var(--accp)}
+.b-pri:disabled{background:var(--accd);cursor:default;transform:none}
+.b-sec{background:var(--s2);color:var(--i1)}
+.b-out{background:transparent;border:1px solid var(--bd);color:var(--i1)}
+.b-txt{background:transparent;color:var(--acc);padding:0 8px}
+.b-err{background:var(--err);color:#fff}.b-err:disabled{opacity:.4;cursor:default}
+.b-erro{background:transparent;border:1px solid var(--err);color:var(--err)}
+.b-sm{height:36px;font-size:13px;padding:0 12px}.b-blk{width:100%}
+.spin{width:18px;height:18px;border:2px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;animation:rot .7s linear infinite;box-sizing:border-box}
+.spin.dk{border-color:var(--s3);border-top-color:var(--acc)}
+@keyframes rot{to{transform:rotate(360deg)}}
+.chip{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 12px;border-radius:999px;background:var(--s2);color:var(--i1);font-size:13px;border:1px solid transparent;cursor:pointer;white-space:nowrap;transition:transform .1s var(--ez)}
+.chip:active{transform:scale(.98)}
+.chip.on{background:var(--accs);color:var(--acc);border-color:var(--acc);font-weight:600}
+.chiprow{display:flex;gap:8px;overflow-x:auto;padding:8px 16px;scrollbar-width:none}.chiprow::-webkit-scrollbar{display:none}
+.badge{display:inline-flex;align-items:center;gap:4px;height:20px;padding:0 6px;border-radius:4px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.3px;white-space:nowrap}
+.bg-acc{background:var(--accs);color:var(--acc)}.bg-inf{background:var(--infs);color:var(--inf)}.bg-wrn{background:var(--wrns);color:var(--wrnt)}.bg-err{background:var(--errs);color:var(--err)}.bg-mut{background:var(--s3);color:var(--i2)}.bg-sol{background:var(--acc);color:#fff}.bg-dark{background:rgba(17,17,17,.72);color:#fff}
+.dot{width:6px;height:6px;border-radius:50%;background:currentColor;flex:none}
+.card{background:var(--sf1);border:1px solid var(--bd);border-radius:12px;box-sizing:border-box}
+.lst .lrow{border-bottom:1px solid var(--dv)}.lst .lrow:last-child{border-bottom:0}
+.lrow{display:flex;align-items:center;gap:12px;min-height:56px;padding:8px 16px;cursor:pointer;background:none;border:0;width:100%;text-align:left;color:var(--i1);font-size:15px;box-sizing:border-box;transition:background .15s}
+.lrow:active{background:var(--s2)}
+.sec-h{font-size:13px;font-weight:600;color:var(--i3);text-transform:uppercase;letter-spacing:.3px;margin:24px 16px 8px}
+.t24{font-size:24px;font-weight:700;line-height:1.25}.t20{font-size:20px;font-weight:700;line-height:1.3}.t17{font-size:17px;font-weight:600}.t15b{font-size:15px;font-weight:600}.t13{font-size:13px}.t13b{font-size:13px;font-weight:600}.t11{font-size:11px}.t11b{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.3px}
+.mut2{color:var(--i2)}.mut3{color:var(--i3)}
+.inp{width:100%;height:44px;padding:0 12px;border:1px solid var(--bd);border-radius:8px;background:var(--sf1);color:var(--i1);font-size:15px;font-family:inherit;outline:none;box-sizing:border-box;transition:border-color .15s}
+.inp:focus{border-color:var(--acc);box-shadow:0 0 0 1px var(--acc)}
+.inp.errb{border-color:var(--err)}.inp.errb:focus{box-shadow:0 0 0 1px var(--err)}
+.inp:disabled{background:var(--s2);color:var(--idis)}
+.inp::placeholder,.ta::placeholder{color:var(--i3)}
+.ta{height:auto;padding:12px;resize:none;line-height:1.5}
+.lbl{font-size:13px;font-weight:600;display:block;margin:0 0 6px}
+.srch{display:flex;align-items:center;gap:8px;height:40px;background:var(--s2);border-radius:8px;padding:0 12px;color:var(--i3);margin:8px 16px 0}
+.srch input{flex:1;border:0;background:none;outline:none;font-size:15px;font-family:inherit;color:var(--i1);min-width:0}
+.srch input::placeholder{color:var(--i3)}
+.co{border-radius:8px;padding:12px;font-size:13px;line-height:1.5;display:flex;gap:10px;align-items:flex-start;color:var(--i1)}
+.co-acc{background:var(--accs)}.co-wrn{background:var(--wrns)}.co-inf{background:var(--infs)}.co-err{background:var(--errs)}
+.co .ic{width:18px;height:18px;margin-top:1px}
+.scrim{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:60;opacity:0;pointer-events:none;transition:opacity .25s var(--ez)}
+.scrim.on{opacity:1;pointer-events:auto}
+.sheet{position:fixed;left:50%;bottom:0;transform:translate(-50%,102%);width:100%;max-width:470px;background:var(--sf1);border-radius:12px 12px 0 0;z-index:61;transition:transform .3s var(--ez);box-sizing:border-box;max-height:82vh;display:flex;flex-direction:column;box-shadow:var(--sh3)}
+body[data-theme="dark"] .sheet{border:1px solid var(--bd);border-bottom:0}
+body[data-vp="mobile"] .sheet{max-width:390px}
+.sheet.on{transform:translate(-50%,0)}
+.sh-hd{padding:8px 16px 12px;border-bottom:1px solid var(--dv);position:relative;flex:none}
+.sh-handle{width:36px;height:4px;border-radius:999px;background:var(--bd);margin:0 auto 10px}
+.sh-t{font-size:17px;font-weight:600;text-align:center;padding:0 44px}
+.sh-x{position:absolute;right:4px;top:12px}
+.sh-bd{overflow-y:auto;padding:8px 0 16px;flex:1}
+.sh-ft{flex:none;padding:12px 16px;border-top:1px solid var(--dv)}
+.dlgw{position:fixed;inset:0;z-index:70;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.5);padding:24px;box-sizing:border-box}
+.dlgw.on{display:flex}
+.dlg{background:var(--sf1);border-radius:16px;width:100%;max-width:330px;padding:24px;box-shadow:var(--sh3);animation:pop .2s var(--ez);box-sizing:border-box;max-height:86vh;overflow-y:auto}
+body[data-theme="dark"] .dlg{border:1px solid var(--bd)}
+@keyframes pop{from{transform:scale(.96);opacity:0}}
+.toastc{position:fixed;left:50%;transform:translateX(-50%);bottom:80px;z-index:90;display:flex;flex-direction:column;gap:8px;align-items:center;pointer-events:none;width:max-content;max-width:90vw}
+.toast{background:var(--i1);color:var(--page);font-size:13px;padding:10px 16px;border-radius:8px;box-shadow:var(--sh2);animation:tin .2s var(--ez);display:flex;gap:12px;align-items:center;pointer-events:auto;transition:opacity .2s,transform .2s}
+.toast a{color:var(--acc);font-weight:600}
+.toast.terr{background:var(--err);color:#fff}
+.toast.out{opacity:0;transform:translateY(8px)}
+@keyframes tin{from{opacity:0;transform:translateY(8px)}}
+.sk{background:var(--s2);border-radius:8px;position:relative;overflow:hidden}
+.sk::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent,var(--shim),transparent);animation:shm 1.4s infinite}
+@keyframes shm{from{transform:translateX(-100%)}to{transform:translateX(100%)}}
+.av{border-radius:50%;background:var(--accs);color:var(--acc);display:inline-flex;align-items:center;justify-content:center;font-weight:600;flex:none;overflow:hidden;position:relative}
+.acc-a{overflow:hidden;max-height:0;transition:max-height .2s var(--ez)}
+.chd-i{transition:transform .2s var(--ez)}
+.open>.chd-i,.rot{transform:rotate(180deg)}
+.ph{background:linear-gradient(135deg,#B9CCC1,#7E9C8B);position:relative;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.75)}
+.ph2{background:linear-gradient(135deg,#C9C2B4,#948A74)}.ph3{background:linear-gradient(135deg,#B7C3CE,#71838F)}.ph4{background:linear-gradient(135deg,#D0BFB4,#9A8271)}.ph5{background:linear-gradient(135deg,#BFC7B4,#87926F)}.ph6{background:linear-gradient(135deg,#C4B9CC,#83758F)}
+.pad{padding:0 16px}
+.stk{display:flex;flex-direction:column}
+.rowf{display:flex;align-items:center}
+.gal-sec{padding:16px;border-bottom:8px solid var(--s2)}
+.spec{background:var(--s2);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:12px}
+.spec-l{font-size:11px;color:var(--i3);font-weight:600;text-transform:uppercase;letter-spacing:.3px}
+.tb{position:fixed;top:12px;right:12px;z-index:120;font-size:12px}
+.tb-btn{width:36px;height:36px;border-radius:8px;background:rgba(90,90,90,.92);color:#fff;border:0;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.25)}
+.tb-pan{display:none;position:absolute;top:42px;right:0;width:236px;max-height:74vh;overflow-y:auto;background:#242424;color:#DDD;border-radius:10px;padding:10px 10px 14px;box-shadow:0 8px 24px rgba(0,0,0,.35)}
+.tb.open .tb-pan{display:block}
+.tb-h{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.4px;color:#8a8a8a;margin:12px 2px 5px}
+.tb-h:first-child{margin-top:2px}
+.tb-g{display:flex;flex-wrap:wrap;gap:4px}
+.tb-c{background:#383838;border:0;color:#ddd;font-size:11px;padding:5px 9px;border-radius:6px;cursor:pointer}
+.tb-c.on{background:#0F9D58;color:#fff}
+.g-hdr{display:none}
+body.guest .g-ok .u-hdr{display:none}
+body.guest .g-ok .g-hdr{display:flex}
+.skel-alt,.empty-alt{display:none}
+body.st-skel .sk-swap .real{display:none}body.st-skel .sk-swap .skel-alt{display:block}
+body.st-empty .em-swap .real{display:none}body.st-empty .em-swap .empty-alt{display:block}
+#offbar{display:none;position:sticky;top:0;z-index:30;background:var(--i1);color:var(--page);font-size:13px;padding:8px 16px;text-align:center;align-items:center;justify-content:center;gap:8px}
+body.st-offline #offbar{display:flex}
+.emptyst{display:flex;flex-direction:column;align-items:center;text-align:center;padding:48px 32px;gap:8px}
+.emptyst .i96{color:var(--i3)}
+.chkc{stroke:var(--acc);stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.chk-draw .c1{stroke-dasharray:166;stroke-dashoffset:166;animation:dsh .5s var(--ez) forwards}
+.chk-draw .c2{stroke-dasharray:48;stroke-dashoffset:48;animation:dsh .35s .4s var(--ez) forwards}
+@keyframes dsh{to{stroke-dashoffset:0}}
+.otp-in{width:44px;height:52px;border:1px solid var(--bd);border-radius:8px;background:var(--sf1);color:var(--i1);font-size:24px;font-weight:700;text-align:center;outline:none}
+.otp-in:focus{border-color:var(--acc);box-shadow:0 0 0 1px var(--acc)}
+.longform{padding:16px;font-size:15px;line-height:1.6;color:var(--i1)}
+.longform h2{font-size:17px;font-weight:600;margin:24px 0 8px}
+.longform p{margin:0 0 12px}
+.longform ul,.longform ol{margin:0 0 12px;padding-left:22px;display:flex;flex-direction:column;gap:8px}
+.longform b{font-weight:600}
+.prog{position:sticky;top:56px;height:2px;background:var(--dv);z-index:19}
+.prog i{display:block;height:100%;width:0;background:var(--acc)}
+.tabsbar{display:flex;border-bottom:1px solid var(--dv)}
+.tabb{flex:1;height:44px;background:none;border:0;border-bottom:2px solid transparent;color:var(--i3);font-size:15px;font-weight:600;cursor:pointer}
+.tabb.on{color:var(--i1);border-bottom-color:var(--i1)}
+.bub{max-width:78%;border-radius:12px;padding:10px 12px;font-size:15px;line-height:1.45}
+.bub.me{background:var(--accs);align-self:flex-end;border-bottom-right-radius:4px}
+.bub.them{background:var(--s2);align-self:flex-start;border-bottom-left-radius:4px}
+.sysline{text-align:center;font-size:11px;color:var(--i3);padding:4px 24px}
+.upl{width:72px;height:72px;border:1.5px dashed var(--bd);border-radius:8px;background:none;color:var(--i3);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-size:10px;cursor:pointer;position:relative;font-family:inherit}
+.upl.up{border:1px solid var(--bd);overflow:visible}
+.upl .rmx{display:none;position:absolute;top:-7px;right:-7px;width:20px;height:20px;border-radius:50%;background:var(--i1);color:var(--page);border:0;font-size:11px;cursor:pointer;align-items:center;justify-content:center;padding:0}
+.upl.up .rmx{display:flex}
+.upl.up .addc{display:none}
+.upl .thumb{display:none;position:absolute;inset:0;border-radius:7px}
+.upl.up .thumb{display:flex}
+.radio{width:20px;height:20px;border-radius:50%;border:1.5px solid var(--bd);flex:none;display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box}
+.radio.on{border-color:var(--acc);border-width:6px}
+.checkb{width:20px;height:20px;border-radius:4px;border:1.5px solid var(--bd);flex:none;display:inline-flex;align-items:center;justify-content:center;color:#fff;box-sizing:border-box}
+.checkb.on{background:var(--acc);border-color:var(--acc)}
+.tgl{width:44px;height:26px;border-radius:999px;background:var(--s3);border:0;position:relative;cursor:pointer;transition:background .2s;flex:none;padding:0}
+.tgl::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.2);transition:transform .2s var(--ez)}
+.tgl.on{background:var(--acc)}.tgl.on::after{transform:translateX(18px)}
+.tgl:disabled{opacity:.4;cursor:default}
+.hide{display:none!important}
+body.payhold #ph-banner{display:flex!important}
+body.payhold #ph-note{display:block!important}
+body.payhold #del-open{border-color:var(--bd);color:var(--idis);pointer-events:none}
+@keyframes tydot{0%,60%,100%{opacity:.3;transform:translateY(0)}30%{opacity:1;transform:translateY(-3px)}}
+.tyd{width:6px;height:6px;border-radius:50%;background:var(--i3);animation:tydot 1.2s infinite}
+.ring{padding:2px;border-radius:50%;background:conic-gradient(var(--acc),#7BD9A8,var(--acc));display:inline-flex}
+.ring.seen{background:var(--bd)}
+.ring.proj{background:conic-gradient(#0095F6,#7CC4FA,#0095F6)}
+.ring.boost{background:conic-gradient(#F5A623,#FBD48A,#F5A623)}
+.ring>.av{border:2px solid var(--page)}
+.mini-empty{background:var(--sf1);border:1px solid var(--bd);border-radius:12px;padding:16px 12px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:4px}
+.mini-empty .ic{width:40px;height:40px;color:var(--i3);margin-bottom:4px}
+.bnav{display:flex;border-top:1px solid var(--dv);background:var(--sf1);border-radius:0 0 12px 12px}
+.bnav span{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 0 10px;color:var(--i3);font-size:11px;position:relative}
+.bnav span.onx{color:var(--i1);font-weight:600}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}
+</style>
+</helmet>
+<template id="__bundler_thumbnail" data-bg-color="#0F9D58">
+  <svg sc-camel-view-box="0 0 1200 800" xmlns="http://www.w3.org/2000/svg">
+    <rect width="1200" height="800" fill="#0F9D58"></rect>
+    <text x="600" y="430" font-family="-apple-system,Segoe UI,Roboto,Arial,sans-serif" font-size="150" font-weight="700" text-anchor="middle" fill="#ffffff">Homz<tspan fill="#0E2B1C">List</tspan></text>
+  </svg>
+</template>
+<svg style="display:none" aria-hidden="true"><defs>
+<symbol id="i-back" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"></path><path d="m12 19-7-7 7-7"></path></symbol>
+<symbol id="i-chr" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"></path></symbol>
+<symbol id="i-chd" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></symbol>
+<symbol id="i-srch" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></symbol>
+<symbol id="i-x" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></symbol>
+<symbol id="i-plus" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"></path><path d="M5 12h14"></path></symbol>
+<symbol id="i-doc" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><path d="M14 2v6h6"></path><path d="M16 13H8"></path><path d="M16 17H8"></path><path d="M10 9H8"></path></symbol>
+<symbol id="i-hset" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H3v-7a9 9 0 0 1 18 0v7h-3a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3"></path></symbol>
+<symbol id="i-chk" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></symbol>
+<symbol id="i-copy" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></symbol>
+<symbol id="i-share" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path><path d="m16 6-4-4-4 4"></path><path d="M12 2v13"></path></symbol>
+<symbol id="i-dl" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><path d="m7 10 5 5 5-5"></path><path d="M12 15V3"></path></symbol>
+<symbol id="i-pause" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="4" height="16" rx="1"></rect><rect x="14" y="4" width="4" height="16" rx="1"></rect></symbol>
+<symbol id="i-trash" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"></path><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><path d="M10 11v6"></path><path d="M14 11v6"></path></symbol>
+<symbol id="i-clock" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M12 6v6l4 2"></path></symbol>
+<symbol id="i-cloudoff" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22.61 16.95A5 5 0 0 0 18 10h-1.26a8 8 0 0 0-7.05-6M5 5a8 8 0 0 0 4 15h9a5 5 0 0 0 1.7-.3"></path><path d="m1 1 22 22"></path></symbol>
+<symbol id="i-wrench" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></symbol>
+<symbol id="i-img" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"></rect><circle cx="9" cy="9" r="2"></circle><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"></path></symbol>
+<symbol id="i-clip" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></symbol>
+<symbol id="i-send" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4z"></path><path d="M22 2 11 13"></path></symbol>
+<symbol id="i-shield" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></symbol>
+<symbol id="i-warnt" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3z"></path><path d="M12 9v4"></path><path d="M12 17h.01"></path></symbol>
+<symbol id="i-info" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4"></path><path d="M12 8h.01"></path></symbol>
+<symbol id="i-flame" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"></path></symbol>
+<symbol id="i-lock" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></symbol>
+<symbol id="i-home" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><path d="M9 22V12h6v10"></path></symbol>
+<symbol id="i-msg" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></symbol>
+<symbol id="i-phone" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"></path></symbol>
+<symbol id="i-user" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></symbol>
+<symbol id="i-bell" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"></path></symbol>
+<symbol id="i-eye" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"></path><circle cx="12" cy="12" r="3"></circle></symbol>
+<symbol id="i-heart" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></symbol>
+<symbol id="i-pin" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></symbol>
+<symbol id="i-sun" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2"></path><path d="M12 20v2"></path><path d="m4.93 4.93 1.41 1.41"></path><path d="m17.66 17.66 1.41 1.41"></path><path d="M2 12h2"></path><path d="M20 12h2"></path><path d="m6.34 17.66-1.41 1.41"></path><path d="m19.07 4.93-1.41 1.41"></path></symbol>
+<symbol id="i-moon" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></symbol>
+<symbol id="i-moreh" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1"></circle><circle cx="12" cy="12" r="1"></circle><circle cx="19" cy="12" r="1"></circle></symbol>
+<symbol id="i-bldg" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"></rect><path d="M9 22v-4h6v4"></path><path d="M8 6h.01"></path><path d="M16 6h.01"></path><path d="M12 6h.01"></path><path d="M8 10h.01"></path><path d="M16 10h.01"></path><path d="M12 10h.01"></path><path d="M8 14h.01"></path><path d="M16 14h.01"></path><path d="M12 14h.01"></path></symbol>
+<symbol id="i-key" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="15.5" r="5.5"></circle><path d="m21 2-9.6 9.6"></path><path d="m15.5 7.5 3 3L22 7l-3-3"></path></symbol>
+<symbol id="i-refresh" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36L21 8"></path><path d="M21 3v5h-5"></path></symbol>
+<symbol id="i-zap" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"></path></symbol>
+<symbol id="i-cal" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"></rect><path d="M16 2v4"></path><path d="M8 2v4"></path><path d="M3 10h18"></path></symbol>
+<symbol id="i-vbadge" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3.85 8.62a4 4 0 0 1 4.78-4.77 4 4 0 0 1 6.74 0 4 4 0 0 1 4.78 4.78 4 4 0 0 1 0 6.74 4 4 0 0 1-4.77 4.78 4 4 0 0 1-6.75 0 4 4 0 0 1-4.78-4.77 4 4 0 0 1 0-6.76z"></path><path d="m9 12 2 2 4-4"></path></symbol>
+<symbol id="i-wifioff" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m1 1 22 22"></path><path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"></path><path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"></path><path d="M10.71 5.05A16 16 0 0 1 22.58 9"></path><path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"></path><path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path><path d="M12 20h.01"></path></symbol>
+<symbol id="i-filter" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 3H2l8 9.46V19l4 2v-8.54z"></path></symbol>
+<symbol id="i-grid" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="14" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect></symbol>
+<symbol id="i-cam" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></symbol>
+<symbol id="i-logout" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><path d="m16 17 5-5-5-5"></path><path d="M21 12H9"></path></symbol>
+<symbol id="i-sliders" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21v-7"></path><path d="M4 10V3"></path><path d="M12 21v-9"></path><path d="M12 8V3"></path><path d="M20 21v-5"></path><path d="M20 12V3"></path><path d="M1 14h6"></path><path d="M9 8h6"></path><path d="M17 16h6"></path></symbol>
+<symbol id="i-mail" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"></rect><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"></path></symbol>
+<symbol id="i-ccard" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"></rect><path d="M2 10h20"></path></symbol>
+<symbol id="i-inbox" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"></path><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"></path></symbol>
+<symbol id="i-bkmk" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"></path></symbol>
+<symbol id="i-ban" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="m4.9 4.9 14.2 14.2"></path></symbol>
+<symbol id="i-rccw" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 2.64-6.36L3 8"></path><path d="M3 3v5h5"></path></symbol>
+<symbol id="i-book" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></symbol>
+<symbol id="i-qr" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="6" height="6" rx="1"></rect><rect x="15" y="3" width="6" height="6" rx="1"></rect><rect x="3" y="15" width="6" height="6" rx="1"></rect><path d="M15 15h2v2h-2z"></path><path d="M19 15h2v2h-2z"></path><path d="M15 19h2v2h-2z"></path><path d="M19 19h2v2h-2z"></path></symbol>
+<symbol id="i-bed" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4v16"></path><path d="M2 8h18a2 2 0 0 1 2 2v10"></path><path d="M2 17h20"></path><path d="M6 8v9"></path></symbol>
+<symbol id="i-max" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3"></path><path d="M21 8V5a2 2 0 0 0-2-2h-3"></path><path d="M3 16v3a2 2 0 0 0 2 2h3"></path><path d="M16 21h3a2 2 0 0 0 2-2v-3"></path></symbol>
+<symbol id="i-star" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m12 2 3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z"></path></symbol>
+<symbol id="i-wallet" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"></path><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"></path><path d="M18 12a2 2 0 0 0 0 4h4v-4z"></path></symbol>
+<symbol id="i-rupee" sc-camel-view-box="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12"></path><path d="M6 8h12"></path><path d="m6 13 8.5 8"></path><path d="M6 13h3a5 5 0 0 0 5-5V3"></path></symbol>
+</defs></svg>
+<div class="tb" id="devtb">
+  <button class="tb-btn" data-act="tb" aria-label="Dev toolbar"><svg class="ic i20"><use href="#i-sliders"></use></svg></button>
+  <div class="tb-pan">
+    <div class="tb-h">Screens</div>
+    <div class="tb-g">
+      <button class="tb-c" data-nav="s-home">Home</button><button class="tb-c" data-nav="s-help">Help</button><button class="tb-c" data-nav="s-help-cat">Help category</button><button class="tb-c" data-nav="s-help-art">Article</button><button class="tb-c" data-nav="s-support">Support</button><button class="tb-c" data-nav="s-tk-new">New ticket</button><button class="tb-c" data-nav="s-tk-success">Ticket success</button><button class="tb-c" data-nav="s-tk-thread">Thread</button><button class="tb-c" data-nav="s-tk-thread" data-arg="closed">Thread closed</button><button class="tb-c" data-nav="s-legal">Legal</button><button class="tb-c" data-nav="s-terms">Terms</button><button class="tb-c" data-nav="s-refund">Refund</button><button class="tb-c" data-nav="s-grievance">Grievance</button><button class="tb-c" data-nav="s-blog">Blog</button><button class="tb-c" data-nav="s-post">Blog post</button><button class="tb-c" data-nav="s-data">Data download</button><button class="tb-c" data-nav="s-account">Deactivate/Delete</button><button class="tb-c" data-nav="s-otp" data-arg="deactivate">OTP deactivate</button><button class="tb-c" data-nav="s-otp" data-arg="delete">OTP delete</button><button class="tb-c" data-nav="s-deactivated">Deactivated</button><button class="tb-c" data-nav="s-grace">Grace period</button><button class="tb-c" data-nav="s-offline">Offline</button><button class="tb-c" data-nav="s-maint">Maintenance</button><button class="tb-c" data-nav="s-gallery">Components</button>
+    </div>
+    <div class="tb-h">Sheets &amp; dialogs</div>
+    <div class="tb-g">
+      <button class="tb-c" data-sheet="sh-tkcat">Ticket category</button><button class="tb-c" data-sheet="sh-jump">Jump to section</button><button class="tb-c" data-sheet="sh-share">Share</button><button class="tb-c" data-dlg="dg-deact">Deactivate dialog</button><button class="tb-c" data-dlg="dg-del1">Delete dialog 1</button><button class="tb-c" data-dlg="dg-del2">Delete dialog 2</button><button class="tb-c" data-dlg="dg-terms">T&amp;C re-accept</button>
+    </div>
+    <div class="tb-h">States</div>
+    <div class="tb-g">
+      <button class="tb-c" data-act="tstate" data-v="st-skel">Skeleton</button><button class="tb-c" data-act="tstate" data-v="st-empty">Empty</button><button class="tb-c" data-act="tstate" data-v="st-offline">Offline banner</button><button class="tb-c" data-act="tstate" data-v="payhold">Payment hold</button>
+    </div>
+    <div class="tb-h">Theme</div>
+    <div class="tb-g"><button class="tb-c on" data-act="theme" data-v="light">Light</button><button class="tb-c" data-act="theme" data-v="dark">Dark</button></div>
+    <div class="tb-h">Viewport</div>
+    <div class="tb-g"><button class="tb-c on" data-act="vp" data-v="auto">Auto</button><button class="tb-c" data-act="vp" data-v="mobile">Mobile</button><button class="tb-c" data-act="vp" data-v="tablet">Tablet</button><button class="tb-c" data-act="vp" data-v="desktop">Desktop</button></div>
+    <div class="tb-h">Session</div>
+    <div class="tb-g"><button class="tb-c on" data-act="sess" data-v="user">Logged in</button><button class="tb-c" data-act="sess" data-v="guest">Guest</button></div>
+  </div>
+</div>
+<div id="app">
+<div id="offbar"><svg class="ic i16" style="stroke:var(--page)"><use href="#i-wifioff"></use></svg>You're offline — showing saved data</div>
+
+<section class="scr on" id="s-home" data-screen-label="Home hub">
+  <div class="hdr"><div style="width:8px"></div><span class="wm">Homz<b>List</b></span><span style="flex:1"></span><button class="ibtn" data-toast="Notifications are in another batch"><svg class="ic"><use href="#i-bell"></use></svg></button></div>
+  <p class="pad t13" style="color:var(--i2);margin-top:16px">Batch: Help &amp; Support · Legal · Blog · Account · System pages · Components. Other modules are placeholders.</p>
+  <h2 class="sec-h">Help &amp; support</h2>
+  <div class="lst">
+    <button class="lrow" data-nav="s-help"><svg class="ic" style="color:var(--acc)"><use href="#i-info"></use></svg><span style="flex:1">Help centre</span><svg class="ic i20" style="color:var(--i3)"><use href="#i-chr"></use></svg></button>
+    <button class="lrow" data-nav="s-support"><svg class="ic" style="color:var(--acc)"><use href="#i-hset"></use></svg><span style="flex:1">Support tickets</span><span class="badge bg-inf">1 open</span><svg class="ic i20" style="color:var(--i3)"><use href="#i-chr"></use></svg></button>
+    <button class="lrow" data-nav="s-legal"><svg class="ic" style="color:var(--acc)"><use href="#i-doc"></use></svg><span style="flex:1">Legal</span><svg class="ic i20" style="color:var(--i3)"><use href="#i-chr"></use></svg></button>
+    <button class="lrow" data-nav="s-blog"><svg class="ic" style="color:var(--acc)"><use href="#i-book"></use></svg><span style="flex:1">Blog</span><svg class="ic i20" style="color:var(--i3)"><use href="#i-chr"></use></svg></button>
+  </div>
+  <h2 class="sec-h">Account</h2>
+  <div class="lst">
+    <button class="lrow" data-nav="s-data"><svg class="ic" style="color:var(--acc)"><use href="#i-dl"></use></svg><span style="flex:1">Download your data</span><svg class="ic i20" style="color:var(--i3)"><use href="#i-chr"></use></svg></button>
+    <button class="lrow" data-nav="s-account"><svg class="ic" style="color:var(--acc)"><use href="#i-pause"></use></svg><span style="flex:1">Deactivate or delete account</span><svg class="ic i20" style="color:var(--i3)"><use href="#i-chr"></use></svg></button>
+  </div>
+  <h2 class="sec-h">System pages</h2>
+  <div class="lst">
+    <button class="lrow" data-nav="s-offline"><svg class="ic" style="color:var(--i2)"><use href="#i-cloudoff"></use></svg><span style="flex:1">Offline page</span><svg class="ic i20" style="color:var(--i3)"><use href="#i-chr"></use></svg></button>
+    <button class="lrow" data-nav="s-maint"><svg class="ic" style="color:var(--i2)"><use href="#i-wrench"></use></svg><span style="flex:1">Maintenance page</span><svg class="ic i20" style="color:var(--i3)"><use href="#i-chr"></use></svg></button>
+    <button class="lrow" data-nav="s-gallery"><svg class="ic" style="color:var(--i2)"><use href="#i-grid"></use></svg><span style="flex:1">Components gallery</span><svg class="ic i20" style="color:var(--i3)"><use href="#i-chr"></use></svg></button>
+  </div>
+  <h2 class="sec-h">Other batches</h2>
+  <div class="lst">
+    <button class="lrow" data-toast="Feed is part of another batch"><svg class="ic" style="color:var(--i3)"><use href="#i-home"></use></svg><span style="flex:1;color:var(--i2)">Home feed</span></button>
+    <button class="lrow" data-toast="Chats are part of another batch"><svg class="ic" style="color:var(--i3)"><use href="#i-msg"></use></svg><span style="flex:1;color:var(--i2)">Chats</span></button>
+    <button class="lrow" data-toast="Profile is part of another batch"><svg class="ic" style="color:var(--i3)"><use href="#i-user"></use></svg><span style="flex:1;color:var(--i2)">Profile</span></button>
+  </div>
+</section>
+
+<section class="scr" id="s-help" data-screen-label="S1 Help centre">
+  <div class="hdr"><button class="ibtn" data-back="1"><svg class="ic"><use href="#i-back"></use></svg></button><h1>Help centre</h1></div>
+  <div class="srch"><svg class="ic i20"><use href="#i-srch"></use></svg><input id="help-q" data-filter="help" placeholder="Search help articles…" aria-label="Search help articles"></div>
+  <div class="chiprow" id="help-chips">
+    <button class="chip" data-act="helpchip">Plans</button><button class="chip" data-act="helpchip">Listings</button><button class="chip" data-act="helpchip">Payments</button><button class="chip" data-act="helpchip">Chat &amp; Numbers</button><button class="chip" data-act="helpchip">Verification</button><button class="chip" data-act="helpchip">Account</button>
+  </div>
+  <div id="help-main">
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:8px 16px 0" id="help-cats">
+    <button class="lrow" data-search="getting started basics first" data-nav="s-help-cat" data-arg="Getting Started" style="flex-direction:column;align-items:flex-start;gap:8px;background:var(--s2);border-radius:12px;padding:16px"><svg class="ic i32" style="color:var(--acc)"><use href="#i-zap"></use></svg><span class="t13b">Getting Started</span><span class="t11" style="color:var(--i3);margin-top:-6px">6 articles</span></button>
+    <button class="lrow" data-search="plans pricing 999 plan subscription cost" data-nav="s-help-cat" data-arg="Plans &amp; Pricing" style="flex-direction:column;align-items:flex-start;gap:8px;background:var(--s2);border-radius:12px;padding:16px"><svg class="ic i32" style="color:var(--acc)"><use href="#i-rupee"></use></svg><span class="t13b">Plans &amp; Pricing</span><span class="t11" style="color:var(--i3);margin-top:-6px">8 articles</span></button>
+    <button class="lrow" data-search="posting listings photos post property sell" data-nav="s-help-cat" data-arg="Posting Listings" style="flex-direction:column;align-items:flex-start;gap:8px;background:var(--s2);border-radius:12px;padding:16px"><svg class="ic i32" style="color:var(--acc)"><use href="#i-bldg"></use></svg><span class="t13b">Posting Listings</span><span class="t11" style="color:var(--i3);margin-top:-6px">10 articles</span></button>
+    <button class="lrow" data-search="requirements slot buyer looking" data-nav="s-help-cat" data-arg="Requirements" style="flex-direction:column;align-items:flex-start;gap:8px;background:var(--s2);border-radius:12px;padding:16px"><svg class="ic i32" style="color:var(--acc)"><use href="#i-srch"></use></svg><span class="t13b">Requirements</span><span class="t11" style="color:var(--i3);margin-top:-6px">6 articles</span></button>
+    <button class="lrow" data-search="chat inquiries numbers messages contact" data-nav="s-help-cat" data-arg="Chat &amp; Inquiries" style="flex-direction:column;align-items:flex-start;gap:8px;background:var(--s2);border-radius:12px;padding:16px"><svg class="ic i32" style="color:var(--acc)"><use href="#i-msg"></use></svg><span class="t13b">Chat &amp; Inquiries</span><span class="t11" style="color:var(--i3);margin-top:-6px">7 articles</span></button>
+    <button class="lrow" data-search="payments invoices refund receipt upi" data-nav="s-help-cat" data-arg="Payments &amp; Invoices" style="flex-direction:column;align-items:flex-start;gap:8px;background:var(--s2);border-radius:12px;padding:16px"><svg class="ic i32" style="color:var(--acc)"><use href="#i-ccard"></use></svg><span class="t13b">Payments &amp; Invoices</span><span class="t11" style="color:var(--i3);margin-top:-6px">5 articles</span></button>
+    <button class="lrow" data-search="verification verified badge kyc" data-nav="s-help-cat" data-arg="Verification" style="flex-direction:column;align-items:flex-start;gap:8px;background:var(--s2);border-radius:12px;padding:16px"><svg class="ic i32" style="color:var(--acc)"><use href="#i-vbadge"></use></svg><span class="t13b">Verification</span><span class="t11" style="color:var(--i3);margin-top:-6px">4 articles</span></button>
+    <button class="lrow" data-search="account privacy delete data password" data-nav="s-help-cat" data-arg="Account &amp; Privacy" style="flex-direction:column;align-items:flex-start;gap:8px;background:var(--s2);border-radius:12px;padding:16px"><svg class="ic i32" style="color:var(--acc)"><use href="#i-shield"></use></svg><span class="t13b">Account &amp; Privacy</span><span class="t11" style="color:var(--i3);margin-top:-6px">6 articles</span></button>
+  </div>
+  <h2 class="sec-h">Popular articles</h2>
+  <div class="lst" id="help-pop">
+    <button class="lrow" data-search="999 plan work pricing" data-nav="s-help-art"><svg class="ic i20" style="color:var(--i3)"><use href="#i-doc"></use></svg><span style="flex:1">How does the ₹999 plan work?</span><svg class="ic i20" style="color:var(--i3)"><use href="#i-chr"></use></svg></button>
+    <button class="lrow" data-search="listing under review approval pending" data-nav="s-help-art"><svg class="ic i20" style="color:var(--i3)"><use href="#i-doc"></use></svg><span style="flex:1">Why is my listing under review?</span><svg class="ic i20" style="color:var(--i3)"><use href="#i-chr"></use></svg></button>
+    <button class="lrow" data-search="number shared phone contact" data-nav="s-help-art"><svg class="ic i20" style="color:var(--i3)"><use href="#i-doc"></use></svg><span style="flex:1">How do I get my number shared?</span><svg class="ic i20" style="color:var(--i3)"><use href="#i-chr"></use></svg></button>
+    <button class="lrow" data-search="requirement details locked see" data-nav="s-help-art"><svg class="ic i20" style="color:var(--i3)"><use href="#i-doc"></use></svg><span style="flex:1">Why can't I see requirement details?</span><svg class="ic i20" style="color:var(--i3)"><use href="#i-chr"></use></svg></button>
+    <button class="lrow" data-search="refunds work money back" data-nav="s-help-art"><svg class="ic i20" style="color:var(--i3)"><use href="#i-doc"></use></svg><span style="flex:1">How do refunds work?</span><svg class="ic i20" style="color:var(--i3)"><use href="#i-chr"></use></svg></button>
+    <button class="lrow" data-search="verified badge get verification" data-nav="s-help-art"><svg class="ic i20" style="color:var(--i3)"><use href="#i-doc"></use></svg><span style="flex:1">How do I get a verified badge?</span><svg class="ic i20" style="color:var(--i3)"><use href="#i-chr"></use></svg></button>
+  </div>
+  </div>
+  <div class="emptyst hide" id="help-empty">
+    <svg class="ic i96"><use href="#i-srch"></use></svg>
+    <p class="t17">No articles found for '<span id="help-empty-q">xyz</span>'</p>
+    <p class="t13" style="color:var(--i2)">Try different words or contact support</p>
+    <button class="btn b-out" style="margin-top:8px" data-nav="s-tk-new">Contact support</button>
+  </div>
+  <div class="pad" style="margin-top:24px">
+    <div style="background:var(--accs);border-radius:12px;padding:16px;display:flex;align-items:center;gap:12px">
+      <svg class="ic i32" style="color:var(--acc)"><use href="#i-hset"></use></svg>
+      <div style="flex:1"><p class="t15b">Still need help?</p><p class="t11" style="color:var(--i2)">Our team replies within 24 hours</p></div>
+      <button class="btn b-pri b-sm" data-nav="s-tk-new">Contact support</button>
+    </div>
+  </div>
+</section>
+
+<section class="scr" id="s-help-cat" data-screen-label="S1 Help category accordion">
+  <div class="hdr"><button class="ibtn" data-back="1"><svg class="ic"><use href="#i-back"></use></svg></button><h1 id="hcat-t">Plans &amp; Pricing</h1></div>
+  <div class="lst" style="margin-top:4px">
+    <div><button class="lrow" data-accx="1"><span style="flex:1" class="t15b">How does the ₹999 plan work?</span><svg class="ic i20 chd-i" style="color:var(--i3)"><use href="#i-chd"></use></svg></button><div class="acc-a"><p class="t13 pad" style="color:var(--i2);padding-bottom:16px">Pay ₹999 once and you get 1 lifetime listing, 1 requirement live for 30 days, and 10 proposals. Your listing never expires — we just check every 2 months that it's still available.</p></div></div>
+    <div><button class="lrow" data-accx="1"><span style="flex:1" class="t15b">What happens right after I pay?</span><svg class="ic i20 chd-i" style="color:var(--i3)"><use href="#i-chd"></use></svg></button><div class="acc-a"><p class="t13 pad" style="color:var(--i2);padding-bottom:16px">Your plan activates instantly. If payment succeeds but the plan doesn't activate within 10 minutes, we activate it or refund you automatically.</p></div></div>
+    <div><button class="lrow" data-accx="1"><span style="flex:1" class="t15b">Can I pause or transfer my plan?</span><svg class="ic i20 chd-i" style="color:var(--i3)"><use href="#i-chd"></use></svg></button><div class="acc-a"><p class="t13 pad" style="color:var(--i2);padding-bottom:16px">No. Plans can't be paused, transferred to another account, or moved to another property once used.</p></div></div>
+    <div><button class="lrow" data-accx="1"><span style="flex:1" class="t15b">How do refunds work?</span><svg class="ic i20 chd-i" style="color:var(--i3)"><use href="#i-chd"></use></svg></button><div class="acc-a"><p class="t13 pad" style="color:var(--i2);padding-bottom:16px">There are no refunds after purchase, except technical failures (payment deducted but plan not activated) and boosts rejected by our team — those are refunded in full within 5–7 working days.</p></div></div>
+    <div><button class="lrow" data-accx="1"><span style="flex:1" class="t15b">What is a boost?</span><svg class="ic i20 chd-i" style="color:var(--i3)"><use href="#i-chd"></use></svg></button><div class="acc-a"><p class="t13 pad" style="color:var(--i2);padding-bottom:16px">A boost promotes your listing at the top of its area for a fixed number of days. Boost days aren't refunded if you sell or remove the listing early.</p></div></div>
+    <div><button class="lrow" data-accx="1"><span style="flex:1" class="t15b">Do listings expire?</span><svg class="ic i20 chd-i" style="color:var(--i3)"><use href="#i-chd"></use></svg></button><div class="acc-a"><p class="t13 pad" style="color:var(--i2);padding-bottom:16px">No. Listings on the ₹999 plan are lifetime. Every 2 months we ask you to confirm the property is still available.</p></div></div>
+    <div><button class="lrow" data-accx="1"><span style="flex:1" class="t15b">What does the requirement slot include?</span><svg class="ic i20 chd-i" style="color:var(--i3)"><use href="#i-chd"></use></svg></button><div class="acc-a"><p class="t13 pad" style="color:var(--i2);padding-bottom:16px">One requirement live for 30 days with up to 10 proposals from owners. Turning off or deleting a requirement still uses its slot.</p></div></div>
+    <div><button class="lrow" data-accx="1"><span style="flex:1" class="t15b">How do I get an invoice?</span><svg class="ic i20 chd-i" style="color:var(--i3)"><use href="#i-chd"></use></svg></button><div class="acc-a"><p class="t13 pad" style="color:var(--i2);padding-bottom:16px">Every payment generates a GST invoice automatically. Find it under Payments → Details → Download invoice.</p></div></div>
+  </div>
+  <div class="pad" style="margin-top:24px">
+    <div style="background:var(--accs);border-radius:12px;padding:16px;display:flex;align-items:center;gap:12px">
+      <svg class="ic i32" style="color:var(--acc)"><use href="#i-hset"></use></svg>
+      <div style="flex:1"><p class="t15b">Still need help?</p><p class="t11" style="color:var(--i2)">Our team replies within 24 hours</p></div>
+      <button class="btn b-pri b-sm" data-nav="s-tk-new">Contact support</button>
+    </div>
+  </div>
+</section>
+
+<section class="scr" id="s-help-art" data-screen-label="S1 Help article">
+  <div class="hdr"><button class="ibtn" data-back="1"><svg class="ic"><use href="#i-back"></use></svg></button><h1>Help centre</h1><button class="ibtn" data-sheet="sh-share"><svg class="ic"><use href="#i-share"></use></svg></button></div>
+  <div class="longform">
+    <h1 class="t20" style="line-height:1.3">How does the ₹999 plan work?</h1>
+    <p class="t11" style="color:var(--i3);margin:6px 0 16px">Updated 12 Jan 2025 · 2 min read</p>
+    <p>The ₹999 plan is HomzList's single owner plan. You pay once — there's no subscription, no renewal, and no hidden charges.</p>
+    <p><b>What's included:</b></p>
+    <ul>
+      <li><b>1 lifetime listing</b> — post one property that stays live until it's sold or you remove it</li>
+      <li><b>1 requirement for 30 days</b> — tell owners what you're looking for</li>
+      <li><b>10 proposals</b> — send your listing to matching requirements</li>
+    </ul>
+    <div class="co co-acc" style="margin:0 0 12px"><svg class="ic" style="color:var(--acc)"><use href="#i-info"></use></svg><span>Your listing never expires — but we check every 2 months if it's still available.</span></div>
+    <div class="co co-wrn" style="margin:0 0 12px"><svg class="ic" style="color:var(--wrn)"><use href="#i-warnt"></use></svg><span>Turning off or deleting a requirement still uses its slot.</span></div>
+    <p>Once your payment succeeds the plan activates instantly. You can post your listing right away — it goes live after a quick review, usually within a few hours.</p>
+  </div>
+  <h2 class="sec-h">Related articles</h2>
+  <div class="lst">
+    <button class="lrow" data-nav="s-help-art"><svg class="ic i20" style="color:var(--i3)"><use href="#i-doc"></use></svg><span style="flex:1">How do refunds work?</span><svg class="ic i20" style="color:var(--i3)"><use href="#i-chr"></use></svg></button>
+    <button class="lrow" data-nav="s-help-art"><svg class="ic i20" style="color:var(--i3)"><use href="#i-doc"></use></svg><span style="flex:1">Why is my listing under review?</span><svg class="ic i20" style="color:var(--i3)"><use href="#i-chr"></use></svg></button>
+  </div>
+  <div class="pad" style="margin-top:16px">
+    <div class="fbk" id="art-fbk" style="background:var(--s2);border-radius:12px;padding:16px;text-align:center">
+      <p class="t13b">Was this helpful?</p>
+      <div class="fbk-btns" style="display:flex;gap:12px;justify-content:center;margin-top:12px">
+        <button class="btn b-out b-sm" style="min-width:88px" data-act="fb-yes">Yes</button>
+        <button class="btn b-out b-sm" style="min-width:88px" data-act="fb-no">No</button>
+      </div>
+      <p class="fbk-thanks t13 hide" style="color:var(--acc);margin-top:12px">Thanks for your feedback</p>
+      <div class="fbk-no hide" style="margin-top:12px;display:flex;flex-direction:column;gap:12px">
+        <textarea class="inp ta" rows="3" placeholder="Tell us what's missing"></textarea>
+        <button class="btn b-pri b-blk" data-act="fb-send">Send</button>
+      </div>
+    </div>
+  </div>
+  <div class="pad" style="margin-top:16px">
+    <div style="background:var(--accs);border-radius:12px;padding:16px;display:flex;align-items:center;gap:12px">
+      <svg class="ic i32" style="color:var(--acc)"><use href="#i-hset"></use></svg>
+      <div style="flex:1"><p class="t15b">Still need help?</p><p class="t11" style="color:var(--i2)">Our team replies within 24 hours</p></div>
+      <button class="btn b-pri b-sm" data-nav="s-tk-new">Contact support</button>
+    </div>
+  </div>
+</section>
+
+<section class="scr" id="s-support" data-screen-label="S2 Support tickets">
+  <div class="hdr"><button class="ibtn" data-back="1"><svg class="ic"><use href="#i-back"></use></svg></button><h1>Support</h1><button class="ibtn" data-nav="s-tk-new" aria-label="New ticket"><svg class="ic"><use href="#i-plus"></use></svg></button></div>
+  <div class="tabsbar" data-tabs="tk">
+    <button class="tabb on" data-tab="open">Open 1</button><button class="tabb" data-tab="replied">Replied 1</button><button class="tabb" data-tab="closed">Closed 3</button>
+  </div>
+  <div class="sk-swap em-swap">
+  <div class="real stk" style="gap:12px;padding:16px">
+    <button class="card lrow" data-tabv="open" data-tabgrp="tk" data-nav="s-tk-thread" style="flex-direction:column;align-items:stretch;gap:8px;padding:12px;min-height:0">
+      <span class="rowf" style="justify-content:space-between"><span class="t11" style="color:var(--i3)">#TKT-2841</span><span class="badge bg-inf">Open</span></span>
+      <span class="t15b">Payment deducted but plan not activated</span>
+      <span><span class="chip" style="height:22px;font-size:11px;pointer-events:none">Refund request</span></span>
+      <span class="t13" style="color:var(--i3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">You: Payment ID is PAY-88213, deducted from UPI at 11:42 AM…</span>
+      <span class="rowf" style="justify-content:space-between"><span class="t11" style="color:var(--i3)">Updated 2h ago · 3 messages</span><svg class="ic i16" style="color:var(--i3)"><use href="#i-chr"></use></svg></span>
+    </button>
+    <button class="card lrow" data-tabv="replied" data-tabgrp="tk" data-nav="s-tk-thread" style="flex-direction:column;align-items:stretch;gap:8px;padding:12px;min-height:0;display:none">
+      <span class="rowf" style="justify-content:space-between"><span class="t11" style="color:var(--i3)">#TKT-2836</span><span class="badge bg-acc"><span class="dot"></span>Replied</span></span>
+      <span class="t15b">Listing photos look blurry after upload</span>
+      <span><span class="chip" style="height:22px;font-size:11px;pointer-events:none">Bug or technical problem</span></span>
+      <span class="t13" style="color:var(--i3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Support: Can you share the original photo so we can check the upload…</span>
+      <span class="rowf" style="justify-content:space-between"><span class="t11" style="color:var(--i3)">Updated yesterday · 5 messages</span><svg class="ic i16" style="color:var(--i3)"><use href="#i-chr"></use></svg></span>
+    </button>
+    <button class="card lrow" data-tabv="closed" data-tabgrp="tk" data-nav="s-tk-thread" data-arg="closed" style="flex-direction:column;align-items:stretch;gap:8px;padding:12px;min-height:0;display:none">
+      <span class="rowf" style="justify-content:space-between"><span class="t11" style="color:var(--i3)">#TKT-2790</span><span class="badge bg-mut">Closed</span></span>
+      <span class="t15b">Change my registered number</span>
+      <span><span class="chip" style="height:22px;font-size:11px;pointer-events:none">Something else</span></span>
+      <span class="t13" style="color:var(--i3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Support: Done! Your number ending 4482 is now active. Closing this…</span>
+      <span class="rowf" style="justify-content:space-between"><span class="t11" style="color:var(--i3)">Updated 4 Jan · 6 messages</span><svg class="ic i16" style="color:var(--i3)"><use href="#i-chr"></use></svg></span>
+    </button>
+    <button class="card lrow" data-tabv="closed" data-tabgrp="tk" data-nav="s-tk-thread" data-arg="closed" style="flex-direction:column;align-items:stretch;gap:8px;padding:12px;min-height:0;display:none">
+      <span class="rowf" style="justify-content:space-between"><span class="t11" style="color:var(--i3)">#TKT-2764</span><span class="badge bg-mut">Closed</span></span>
+      <span class="t15b">Boost not showing on top in Mavdi</span>
+      <span><span class="chip" style="height:22px;font-size:11px;pointer-events:none">Bug or technical problem</span></span>
+      <span class="t13" style="color:var(--i3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Support: This was a caching issue — fixed now. Refund of 1 boost day…</span>
+      <span class="rowf" style="justify-content:space-between"><span class="t11" style="color:var(--i3)">Updated 28 Dec · 4 messages</span><svg class="ic i16" style="color:var(--i3)"><use href="#i-chr"></use></svg></span>
+    </button>
+    <button class="card lrow" data-tabv="closed" data-tabgrp="tk" data-nav="s-tk-thread" data-arg="closed" style="flex-direction:column;align-items:stretch;gap:8px;padding:12px;min-height:0;display:none">
+      <span class="rowf" style="justify-content:space-between"><span class="t11" style="color:var(--i3)">#TKT-2711</span><span class="badge bg-mut">Closed</span></span>
+      <span class="t15b">Invoice shows wrong name</span>
+      <span><span class="chip" style="height:22px;font-size:11px;pointer-events:none">Payment or refund</span></span>
+      <span class="t13" style="color:var(--i3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Support: Corrected invoice attached. Sorry for the mix-up!</span>
+      <span class="rowf" style="justify-content:space-between"><span class="t11" style="color:var(--i3)">Updated 15 Dec · 3 messages</span><svg class="ic i16" style="color:var(--i3)"><use href="#i-chr"></use></svg></span>
+    </button>
+  </div>
+  <div class="skel-alt" style="padding:16px">
+    <div class="stk" style="gap:12px">
+      <div class="sk" style="height:132px;border-radius:12px"></div>
+      <div class="sk" style="height:132px;border-radius:12px"></div>
+      <div class="sk" style="height:132px;border-radius:12px"></div>
+    </div>
+  </div>
+  <div class="empty-alt">
+    <div class="emptyst">
+      <svg class="ic i96"><use href="#i-hset"></use></svg>
+      <p class="t17" style="margin-top:8px">No support tickets</p>
+      <p class="t13" style="color:var(--i2)">Contact us if something isn't working</p>
+      <button class="btn b-pri" style="margin-top:12px" data-nav="s-tk-new">Contact support</button>
+    </div>
+  </div>
+  </div>
+</section>
+
+<section class="scr" id="s-tk-new" data-screen-label="S2 New ticket">
+  <div class="hdr"><button class="ibtn" data-back="1"><svg class="ic"><use href="#i-back"></use></svg></button><h1>Contact support</h1></div>
+  <div class="stk" style="gap:16px;padding:16px">
+    <div><span class="lbl">Category</span>
+      <button class="inp rowf" data-sheet="sh-tkcat" style="justify-content:space-between;cursor:pointer;text-align:left;gap:8px"><span id="tkcat-val" style="color:var(--i3)">Choose a category</span><svg class="ic i20" style="color:var(--i3)"><use href="#i-chd"></use></svg></button>
+    </div>
+    <div class="tk-cond hide" id="tk-c-pay">
+      <span class="lbl">Payment ID</span>
+      <input class="inp" placeholder="e.g. PAY-88213">
+      <p class="t11" style="color:var(--i3);margin-top:6px">Find it in Payments → Details · <a href="#payments" data-toast="Payments are part of another batch">Open payments</a></p>
+    </div>
+    <div class="tk-cond hide" id="tk-c-num">
+      <div class="co co-wrn" style="margin-bottom:12px"><svg class="ic" style="color:var(--wrn)"><use href="#i-warnt"></use></svg><span>You'll be asked to verify ownership. Our team will contact you on your alternate number or email.</span></div>
+      <span class="lbl">Alternate number or email</span>
+      <input class="inp" placeholder="+91 · or you@email.com">
+    </div>
+    <div class="tk-cond hide" id="tk-c-rep">
+      <span class="lbl">Link to the user or listing</span>
+      <input class="inp" placeholder="Paste a HomzList profile or listing link">
+    </div>
+    <div><span class="lbl">Subject</span><input class="inp" placeholder="One line about your issue"></div>
+    <div><span class="lbl">Description</span>
+      <textarea class="inp ta" rows="5" data-count="1000" placeholder="What happened? Include dates, amounts and screenshots if you can."></textarea>
+      <p class="cnt t11" style="color:var(--i3);text-align:right;margin-top:4px">0 / 1000</p>
+    </div>
+    <div><span class="lbl">Attachments</span>
+      <div class="rowf" style="gap:12px">
+        <button class="upl" data-act="att"><span class="addc stk" style="align-items:center;gap:4px"><svg class="ic i20"><use href="#i-img"></use></svg>Add screenshot</span><span class="thumb ph" style="align-items:center;justify-content:center"><svg class="ic i20"><use href="#i-img"></use></svg></span></button><button class="rmx" data-act="att-rm">✕</button>
+        <button class="upl" data-act="att"><span class="addc stk" style="align-items:center;gap:4px"><svg class="ic i20"><use href="#i-img"></use></svg>Add screenshot</span><span class="thumb ph3" style="align-items:center;justify-content:center"><svg class="ic i20"><use href="#i-img"></use></svg></span></button><button class="rmx" data-act="att-rm">✕</button>
+        <button class="upl" data-act="att"><span class="addc stk" style="align-items:center;gap:4px"><svg class="ic i20"><use href="#i-img"></use></svg>Add screenshot</span><span class="thumb ph4" style="align-items:center;justify-content:center"><svg class="ic i20"><use href="#i-img"></use></svg></span></button><button class="rmx" data-act="att-rm">✕</button>
+      </div>
+    </div>
+    <p class="t11" style="color:var(--i3);background:var(--s2);border-radius:8px;padding:12px;line-height:1.5">You'll get a ticket number instantly. We reply within 24 hours (grievance complaints: acknowledged in 24 hours, resolved within 15 days).</p>
+    <button class="btn b-pri b-blk" data-act="submit-ticket">Submit ticket</button>
+  </div>
+</section>
+
+<section class="scr" id="s-tk-success" data-screen-label="S2 Ticket created">
+  <div class="hdr"><button class="ibtn" data-nav="s-support"><svg class="ic"><use href="#i-x"></use></svg></button><h1></h1></div>
+  <div class="emptyst" style="padding-top:64px">
+    <svg class="chk-draw" width="96" height="96" sc-camel-view-box="0 0 56 56"><circle class="chkc c1" cx="28" cy="28" r="26"></circle><path class="chkc c2" d="M17 29l8 8 15-16"></path></svg>
+    <p class="t17" style="margin-top:16px">Ticket #TKT-2842 created</p>
+    <p class="t13" style="color:var(--i2);max-width:280px">We've emailed you a confirmation. We'll reply within 24 hours.</p>
+    <button class="btn b-pri" style="margin-top:16px;min-width:180px" data-nav="s-tk-thread">View ticket</button>
+  </div>
+</section>
+
+<section class="scr" id="s-tk-thread" data-screen-label="S2 Ticket thread">
+  <div class="hdr"><button class="ibtn" data-back="1"><svg class="ic"><use href="#i-back"></use></svg></button><h1 class="rowf" style="gap:8px">#TKT-2841 <span class="badge bg-inf" id="th-badge">Open</span></h1><button class="ibtn" data-toast="Ticket options are in another batch"><svg class="ic"><use href="#i-moreh"></use></svg></button></div>
+  <div style="background:var(--s2);padding:10px 16px" class="t13b">Payment deducted but plan not activated</div>
+  <div class="stk" id="th-msgs" style="gap:10px;padding:16px">
+    <div class="sysline">Ticket acknowledged automatically — 12 Jan, 2:35 PM</div>
+    <div class="bub me">Hi, I paid ₹999 at 2:31 PM today from UPI but my plan still shows inactive. Payment ID PAY-88213.</div>
+    <div class="bub me"><span class="ph rowf" style="width:120px;height:80px;border-radius:8px;margin-bottom:6px"><svg class="ic i20"><use href="#i-img"></use></svg></span>Screenshot of the payment attached.</div>
+    <div class="rowf" style="gap:8px;align-self:flex-start;max-width:85%">
+      <span class="av" style="width:28px;height:28px;font-size:13px;align-self:flex-end">H</span>
+      <div class="stk" style="gap:2px">
+        <span class="t11b" style="color:var(--acc);letter-spacing:.3px">HomzList Support</span>
+        <div class="bub them" style="max-width:100%">Thanks for the details — we can see the payment (PAY-88213). We've flagged this with our payments team. If the plan doesn't activate in the next hour, we'll refund it automatically. — Kinjal</div>
+      </div>
+    </div>
+    <div class="sysline">12 Jan, 3:12 PM</div>
+  </div>
+  <div class="rowf" id="th-composer" style="gap:8px;padding:12px 16px;border-top:1px solid var(--dv);position:sticky;bottom:0;background:var(--page)">
+    <button class="ibtn" data-toast="Attachment picker (demo)"><svg class="ic"><use href="#i-clip"></use></svg></button>
+    <input class="inp" id="th-in" placeholder="Write a reply…" style="flex:1">
+    <button class="ibtn" data-act="send-msg" style="color:var(--acc)"><svg class="ic"><use href="#i-send"></use></svg></button>
+  </div>
+  <div class="stk hide" id="th-closedbar" style="gap:12px;padding:16px;border-top:1px solid var(--dv);align-items:center">
+    <p class="t13" style="color:var(--i3)">This ticket is closed</p>
+    <button class="btn b-out" data-act="reopen"><svg class="ic i20"><use href="#i-rccw"></use></svg>Reopen ticket</button>
+  </div>
+</section>
+
+<div class="sheet" id="sh-tkcat" data-screen-label="Ticket category sheet">
+  <div class="sh-hd"><div class="sh-handle"></div><p class="sh-t">Choose a category</p><button class="ibtn sh-x" data-close="1"><svg class="ic"><use href="#i-x"></use></svg></button></div>
+  <div class="sh-bd lst">
+    <button class="lrow" data-act="tkcat" data-v="Payment or refund"><svg class="ic" style="color:var(--i2)"><use href="#i-ccard"></use></svg><span style="flex:1">Payment or refund</span></button>
+    <button class="lrow" data-act="tkcat" data-v="Listing not approved"><svg class="ic" style="color:var(--i2)"><use href="#i-bldg"></use></svg><span style="flex:1">Listing not approved</span></button>
+    <button class="lrow" data-act="tkcat" data-v="Lost access to my number"><svg class="ic" style="color:var(--i2)"><use href="#i-phone"></use></svg><span style="flex:1">Lost access to my number</span></button>
+    <button class="lrow" data-act="tkcat" data-v="Report a user or listing"><svg class="ic" style="color:var(--i2)"><use href="#i-warnt"></use></svg><span style="flex:1">Report a user or listing</span></button>
+    <button class="lrow" data-act="tkcat" data-v="Verification issue"><svg class="ic" style="color:var(--i2)"><use href="#i-vbadge"></use></svg><span style="flex:1">Verification issue</span></button>
+    <button class="lrow" data-act="tkcat" data-v="Bug or technical problem"><svg class="ic" style="color:var(--i2)"><use href="#i-wrench"></use></svg><span style="flex:1">Bug or technical problem</span></button>
+    <button class="lrow" data-act="tkcat" data-v="Something else"><svg class="ic" style="color:var(--i2)"><use href="#i-moreh"></use></svg><span style="flex:1">Something else</span></button>
+  </div>
+</div>
+
+<section class="scr g-ok" id="s-legal" data-screen-label="S3 Legal index">
+  <div class="hdr u-hdr"><button class="ibtn" data-back="1"><svg class="ic"><use href="#i-back"></use></svg></button><h1>Legal</h1></div>
+  <div class="hdr g-hdr"><button class="ibtn" data-back="1"><svg class="ic"><use href="#i-back"></use></svg></button><span class="wm" style="font-size:17px">Homz<b>List</b></span></div>
+  <div class="lst" style="margin-top:4px">
+    <button class="lrow" data-nav="s-terms"><svg class="ic i20" style="color:var(--i3)"><use href="#i-doc"></use></svg><span style="flex:1">Terms of Service</span><svg class="ic i20" style="color:var(--i3)"><use href="#i-chr"></use></svg></button>
+    <button class="lrow" data-nav="s-terms"><svg class="ic i20" style="color:var(--i3)"><use href="#i-doc"></use></svg><span style="flex:1">Privacy Policy</span><svg class="ic i20" style="color:var(--i3)"><use href="#i-chr"></use></svg></button>
+    <button class="lrow" data-nav="s-refund"><svg class="ic i20" style="color:var(--i3)"><use href="#i-doc"></use></svg><span style="flex:1">Refund Policy</span><svg class="ic i20" style="color:var(--i3)"><use href="#i-chr"></use></svg></button>
+    <button class="lrow" data-nav="s-terms"><svg class="ic i20" style="color:var(--i3)"><use href="#i-doc"></use></svg><span style="flex:1">Community Guidelines</span><svg class="ic i20" style="color:var(--i3)"><use href="#i-chr"></use></svg></button>
+    <button class="lrow" data-nav="s-terms"><svg class="ic i20" style="color:var(--i3)"><use href="#i-doc"></use></svg><span style="flex:1">Disclaimer</span><svg class="ic i20" style="color:var(--i3)"><use href="#i-chr"></use></svg></button>
+    <button class="lrow" data-nav="s-grievance"><svg class="ic i20" style="color:var(--i3)"><use href="#i-shield"></use></svg><span style="flex:1">Grievance Officer</span><svg class="ic i20" style="color:var(--i3)"><use href="#i-chr"></use></svg></button>
+    <button class="lrow" data-nav="s-terms"><svg class="ic i20" style="color:var(--i3)"><use href="#i-info"></use></svg><span style="flex:1">About HomzList</span><svg class="ic i20" style="color:var(--i3)"><use href="#i-chr"></use></svg></button>
+  </div>
+</section>
+
+<section class="scr g-ok" id="s-terms" data-screen-label="S3 Terms of Service">
+  <div class="hdr u-hdr"><button class="ibtn" data-back="1"><svg class="ic"><use href="#i-back"></use></svg></button><h1>Terms of Service</h1></div>
+  <div class="hdr g-hdr"><button class="ibtn" data-back="1"><svg class="ic"><use href="#i-back"></use></svg></button><span class="wm" style="font-size:17px">Homz<b>List</b></span><span style="flex:1"></span><span class="t13b" style="padding-right:12px">Terms of Service</span></div>
+  <div class="pad" style="margin-top:12px">
+    <div class="rowf t11" style="background:var(--s2);border-radius:8px;padding:10px 12px;gap:8px;color:var(--i3)">Version 1.2 · Effective 1 Jan 2025<span style="flex:1"></span><a href="#versions" data-toast="Previous versions (demo)">View previous versions</a></div>
+    <div class="card" style="margin-top:12px;overflow:hidden">
+      <button class="lrow" data-act="toc" style="min-height:48px"><span class="t13b" style="flex:1">Table of contents</span><svg class="ic i20 chd-i" style="color:var(--i3)"><use href="#i-chd"></use></svg></button>
+      <div class="acc-a" id="toc-body"><div class="stk t13" style="gap:8px;padding:0 16px 16px">
+        <a href="#t1x" data-jump="t-s1">1. About HomzList</a><a href="#t2x" data-jump="t-s2">2. Your account</a><a href="#t3x" data-jump="t-s3">3. Posting rules</a><a href="#t4x" data-jump="t-s4">4. Plans and payments</a><a href="#t5x" data-jump="t-s5">5. Prohibited content</a><a href="#t6x" data-jump="t-s6">6. Limitation of liability</a><a href="#t7x" data-jump="t-s7">7. Indemnity</a><a href="#t8x" data-jump="t-s8">8. Governing law</a><a href="#t9x" data-jump="t-s9">9. Arbitration</a><a href="#t10x" data-jump="t-s10">10. Changes to these terms</a>
+      </div></div>
+    </div>
+  </div>
+  <div class="longform">
+    <h2 id="t-s1" style="margin-top:12px">1. About HomzList</h2>
+    <p>HomzList is an online marketplace that connects property owners with people looking for property in and around Rajkot. HomzList is an <b>intermediary under Section 79 of the Information Technology Act, 2000</b>.</p>
+    <p>All listings, photos, prices and claims on HomzList are <b>user-generated content</b>. HomzList does not own, sell, verify the title of, or guarantee any property shown on the platform. Any transaction — token, agreement, registration or payment for a property — is <b>solely between users</b>.</p>
+    <h2 id="t-s2">2. Your account</h2>
+    <ol><li>You must be <b>18 years or older</b> to use HomzList.</li><li>One account per mobile number. Keep your number active — it's how buyers reach you.</li><li>Accounts and plans are <b>not transferable</b> to another person or number.</li></ol>
+    <h2 id="t-s3">3. Posting rules</h2>
+    <ol><li>Post only <b>truthful information</b> — real price, real size, real photos.</li><li>You must have the <b>legal right to list</b> the property (owner or authorised by the owner).</li><li>Photos must be <b>your own</b>. Stock photos and other people's photos are removed.</li></ol>
+    <h2 id="t-s4">4. Plans and payments</h2>
+    <ol><li>HomzList is <b>payment-first</b>: features unlock after payment succeeds.</li><li>Plans cannot be <b>paused, transferred or exchanged</b> once purchased.</li><li>See the <a href="#refund" data-nav="s-refund">Refund Policy</a> for the narrow cases where money is returned.</li></ol>
+    <h2 id="t-s5">5. Prohibited content</h2>
+    <p>No fake or duplicate listings, no illegal properties, no discriminatory conditions, no spam, no contact details hidden inside photos, and no attempts to take payments through HomzList chat.</p>
+    <h2 id="t-s6">6. Limitation of liability</h2>
+    <p>HomzList provides the platform "as is". To the maximum extent permitted by law, our total liability for any claim is limited to the <b>amount you paid us in the 12 months</b> before the claim arose.</p>
+    <h2 id="t-s7">7. Indemnity</h2>
+    <p>You agree to indemnify HomzList against claims arising from your listings, your content, or your dealings with other users.</p>
+    <h2 id="t-s8">8. Governing law</h2>
+    <p>These terms are governed by the laws of India. Disputes are subject to the <b>exclusive jurisdiction of the courts in Rajkot, Gujarat</b>.</p>
+    <h2 id="t-s9">9. Arbitration</h2>
+    <p>Before going to court, disputes are first referred to arbitration by a sole arbitrator in Rajkot under the Arbitration and Conciliation Act, 1996. Proceedings are in English.</p>
+    <h2 id="t-s10">10. Changes to these terms</h2>
+    <p>We may update these terms. For significant changes we'll ask you to review and accept them again before you continue using HomzList.</p>
+    <p class="t11" style="color:var(--i3);margin-top:24px">Last updated 1 Jan 2025</p>
+    <div class="rowf" style="gap:12px;margin-top:12px">
+      <button class="btn b-out b-sm" data-toast="Downloading terms-of-service-v1.2.pdf"><svg class="ic i16"><use href="#i-dl"></use></svg>Download PDF</button>
+      <button class="btn b-out b-sm" data-sheet="sh-share"><svg class="ic i16"><use href="#i-share"></use></svg>Share</button>
+    </div>
+  </div>
+</section>
+
+<section class="scr g-ok" id="s-refund" data-screen-label="S3 Refund Policy">
+  <div class="hdr u-hdr"><button class="ibtn" data-back="1"><svg class="ic"><use href="#i-back"></use></svg></button><h1>Refund Policy</h1></div>
+  <div class="hdr g-hdr"><button class="ibtn" data-back="1"><svg class="ic"><use href="#i-back"></use></svg></button><span class="wm" style="font-size:17px">Homz<b>List</b></span><span style="flex:1"></span><span class="t13b" style="padding-right:12px">Refund Policy</span></div>
+  <div class="pad" style="margin-top:12px">
+    <div class="rowf t11" style="background:var(--s2);border-radius:8px;padding:10px 12px;gap:8px;color:var(--i3)">Version 1.1 · Effective 1 Jan 2025<span style="flex:1"></span><a href="#versions2" data-toast="Previous versions (demo)">View previous versions</a></div>
+  </div>
+  <div class="longform">
+    <h2 style="margin-top:12px">1. The rule</h2>
+    <p><b>No refunds or cancellations after purchase.</b> Plans and boosts are digital services that activate immediately, so once purchased they cannot be cancelled.</p>
+    <h2>2. Exception — technical failures</h2>
+    <p>If your payment succeeds but your plan isn't activated, we'll either <b>activate it or refund you automatically</b> — you don't need to raise a ticket, though you can if you'd like an update.</p>
+    <h2>3. Boosts</h2>
+    <ol><li>Boosts <b>rejected by our team</b> are refunded in full.</li><li>There are <b>no refunds for unused boost days</b> if a listing is sold or removed early.</li></ol>
+    <h2>4. Timelines</h2>
+    <p>Approved refunds reach your account in <b>5–7 working days</b>, to the same payment method you used.</p>
+    <p>Questions about a specific payment? <a href="#contact" data-nav="s-tk-new">Contact support</a> with your Payment ID.</p>
+    <p class="t11" style="color:var(--i3);margin-top:24px">Last updated 1 Jan 2025</p>
+    <div class="rowf" style="gap:12px;margin-top:12px">
+      <button class="btn b-out b-sm" data-toast="Downloading refund-policy-v1.1.pdf"><svg class="ic i16"><use href="#i-dl"></use></svg>Download PDF</button>
+      <button class="btn b-out b-sm" data-sheet="sh-share"><svg class="ic i16"><use href="#i-share"></use></svg>Share</button>
+    </div>
+  </div>
+</section>
+
+<section class="scr g-ok" id="s-grievance" data-screen-label="S3 Grievance Officer">
+  <div class="hdr u-hdr"><button class="ibtn" data-back="1"><svg class="ic"><use href="#i-back"></use></svg></button><h1>Grievance Officer</h1></div>
+  <div class="hdr g-hdr"><button class="ibtn" data-back="1"><svg class="ic"><use href="#i-back"></use></svg></button><span class="wm" style="font-size:17px">Homz<b>List</b></span><span style="flex:1"></span><span class="t13b" style="padding-right:12px">Grievance Officer</span></div>
+  <div class="pad" style="margin-top:12px">
+    <div class="rowf t11" style="background:var(--s2);border-radius:8px;padding:10px 12px;gap:8px;color:var(--i3)">Version 1.0 · Effective 1 Jan 2025<span style="flex:1"></span><a href="#versions3" data-toast="Previous versions (demo)">View previous versions</a></div>
+  </div>
+  <div class="longform">
+    <p>Under the Information Technology (Intermediary Guidelines and Digital Media Ethics Code) Rules, 2021, HomzList has appointed a Grievance Officer for complaints about content, accounts, or how the platform works.</p>
+    <div class="stk" style="background:var(--s2);border-radius:12px;padding:16px;gap:8px;margin:12px 0">
+      <svg class="ic i32" style="color:var(--acc)"><use href="#i-shield"></use></svg>
+      <p class="t15b">Grievance Officer</p>
+      <p class="t13">Name: [Officer Name]</p>
+      <p class="t13 rowf" style="gap:6px">Email: <a href="#mail" data-copy="grievance@homzlist.com">grievance@homzlist.com</a><button class="ibtn" style="width:28px;height:28px" data-copy="grievance@homzlist.com"><svg class="ic i16" style="color:var(--i3)"><use href="#i-copy"></use></svg></button></p>
+      <p class="t13">Address: HomzList, Rajkot, Gujarat 360001</p>
+      <p class="t13" style="color:var(--i2)">We acknowledge complaints within 24 hours and resolve them within 15 days.</p>
+      <button class="btn b-pri" style="margin-top:8px" data-nav="s-tk-new" data-arg="grievance">Raise a grievance</button>
+    </div>
+    <h2>What to include</h2>
+    <ul><li>Your name and registered mobile number</li><li>A link to the listing, profile or content you're complaining about</li><li>What went wrong, with dates and screenshots if possible</li></ul>
+    <p class="t11" style="color:var(--i3);margin-top:24px">Last updated 1 Jan 2025</p>
+    <div class="rowf" style="gap:12px;margin-top:12px">
+      <button class="btn b-out b-sm" data-toast="Downloading grievance-policy-v1.0.pdf"><svg class="ic i16"><use href="#i-dl"></use></svg>Download PDF</button>
+      <button class="btn b-out b-sm" data-sheet="sh-share"><svg class="ic i16"><use href="#i-share"></use></svg>Share</button>
+    </div>
+  </div>
+</section>
+
+<div class="dlgw" id="dg-terms" data-screen-label="T&amp;C re-acceptance">
+  <div class="dlg stk" style="gap:12px;max-width:360px">
+    <svg class="ic i32" style="color:var(--acc)"><use href="#i-doc"></use></svg>
+    <p class="t20">We've updated our Terms</p>
+    <p style="color:var(--i2)">We've clarified how numbers are shared and how requirement slots are counted.</p>
+    <ul class="t13" style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:8px;color:var(--i2)">
+      <li>Your number is shared only after you accept an inquiry</li>
+      <li>Deleted requirements still count towards your slot</li>
+      <li>Clearer refund language for failed payments</li>
+    </ul>
+    <div id="tprev" class="t13" style="height:120px;overflow-y:auto;border:1px solid var(--bd);border-radius:8px;padding:12px;color:var(--i2);line-height:1.6">
+      <b style="color:var(--i1)">Summary of changes (v1.2)</b><br><br>
+      <b>Numbers.</b> Your mobile number is never shown publicly. It is shared with a specific user only after you accept their inquiry, or when you send a proposal to their requirement.<br><br>
+      <b>Requirement slots.</b> Each plan includes one requirement slot. A requirement that you turn off or delete before its 30 days end still uses that slot.<br><br>
+      <b>Refunds.</b> If a payment succeeds but the plan doesn't activate, we activate it or refund automatically. All other purchases remain non-refundable.<br><br>
+      Scroll to the end to enable the accept button. By continuing, you accept Terms of Service v1.2.
+    </div>
+    <div class="rowf" style="gap:8px;justify-content:space-between;margin-top:4px">
+      <button class="btn b-txt" data-nav="s-terms" data-close-first="1">Read full terms</button>
+      <button class="btn b-pri" id="agree-btn" data-act="agree" disabled="disabled">I agree and continue</button>
+    </div>
+  </div>
+</div>
+
+<section class="scr g-ok" id="s-blog" data-screen-label="S4 Blog list">
+  <div class="hdr u-hdr"><button class="ibtn" data-back="1"><svg class="ic"><use href="#i-back"></use></svg></button><h1>Blog</h1><button class="ibtn" data-toast="Blog search (demo)"><svg class="ic"><use href="#i-srch"></use></svg></button></div>
+  <div class="hdr g-hdr"><button class="ibtn" data-back="1"><svg class="ic"><use href="#i-back"></use></svg></button><span class="wm" style="font-size:17px">Homz<b>List</b></span><span style="flex:1"></span><span class="t13b" style="padding-right:12px">Blog</span></div>
+  <div class="pad" style="margin-top:12px">
+    <button class="card lrow" data-nav="s-post" style="flex-direction:column;align-items:stretch;padding:0;overflow:hidden;gap:0;min-height:0">
+      <span class="ph" style="aspect-ratio:16/9;width:100%"><svg class="ic i48"><use href="#i-bldg"></use></svg></span>
+      <span class="stk" style="padding:16px;gap:8px;align-items:flex-start">
+        <span class="badge bg-acc">Guide</span>
+        <span class="t20" style="line-height:1.3;text-align:left">Buying a flat in Rajkot: a 2025 checklist</span>
+        <span class="t11" style="color:var(--i3)">8 min read · 12 Jan</span>
+      </span>
+    </button>
+  </div>
+  <div class="chiprow">
+    <button class="chip on" data-cgrp="blogcat">All</button><button class="chip" data-cgrp="blogcat">Buying</button><button class="chip" data-cgrp="blogcat">Renting</button><button class="chip" data-cgrp="blogcat">Legal</button><button class="chip" data-cgrp="blogcat">Rajkot market</button><button class="chip" data-cgrp="blogcat">HomzList tips</button>
+  </div>
+  <div class="lst" id="blog-rows">
+    <button class="lrow" data-cat="Buying" data-nav="s-post"><span class="ph2 rowf" style="width:72px;height:72px;border-radius:8px;justify-content:center"><svg class="ic i20"><use href="#i-doc"></use></svg></span><span class="stk" style="flex:1;gap:4px"><span class="t15b" style="text-align:left;line-height:1.35">How to check property documents before you pay a token</span><span class="t11" style="color:var(--i3)">5 min read · 8 Jan</span></span><svg class="ic i20" style="color:var(--i3)"><use href="#i-chr"></use></svg></button>
+    <button class="lrow" data-cat="Rajkot market" data-nav="s-post"><span class="ph3 rowf" style="width:72px;height:72px;border-radius:8px;justify-content:center"><svg class="ic i20"><use href="#i-pin"></use></svg></span><span class="stk" style="flex:1;gap:4px"><span class="t15b" style="text-align:left;line-height:1.35">Mavdi vs University Road: which area fits you?</span><span class="t11" style="color:var(--i3)">6 min read · 5 Jan</span></span><svg class="ic i20" style="color:var(--i3)"><use href="#i-chr"></use></svg></button>
+    <button class="lrow" data-cat="Legal" data-nav="s-post"><span class="ph4 rowf" style="width:72px;height:72px;border-radius:8px;justify-content:center"><svg class="ic i20"><use href="#i-shield"></use></svg></span><span class="stk" style="flex:1;gap:4px"><span class="t15b" style="text-align:left;line-height:1.35">RERA explained for first-time buyers</span><span class="t11" style="color:var(--i3)">7 min read · 2 Jan</span></span><svg class="ic i20" style="color:var(--i3)"><use href="#i-chr"></use></svg></button>
+    <button class="lrow" data-cat="Buying" data-nav="s-post"><span class="ph5 rowf" style="width:72px;height:72px;border-radius:8px;justify-content:center"><svg class="ic i20"><use href="#i-max"></use></svg></span><span class="stk" style="flex:1;gap:4px"><span class="t15b" style="text-align:left;line-height:1.35">What 'carpet area' actually means</span><span class="t11" style="color:var(--i3)">4 min read · 28 Dec</span></span><svg class="ic i20" style="color:var(--i3)"><use href="#i-chr"></use></svg></button>
+    <button class="lrow" data-cat="HomzList tips" data-nav="s-post"><span class="ph6 rowf" style="width:72px;height:72px;border-radius:8px;justify-content:center"><svg class="ic i20"><use href="#i-cam"></use></svg></span><span class="stk" style="flex:1;gap:4px"><span class="t15b" style="text-align:left;line-height:1.35">10 photos that make your listing sell faster</span><span class="t11" style="color:var(--i3)">5 min read · 22 Dec</span></span><svg class="ic i20" style="color:var(--i3)"><use href="#i-chr"></use></svg></button>
+  </div>
+  <div class="pad" style="margin-top:16px"><button class="btn b-out b-blk" data-act="load-more">Load more</button></div>
+</section>
+
+<section class="scr g-ok" id="s-post" data-screen-label="S4 Blog post">
+  <div class="hdr u-hdr"><button class="ibtn" data-back="1"><svg class="ic"><use href="#i-back"></use></svg></button><h1></h1><button class="ibtn" data-sheet="sh-share"><svg class="ic"><use href="#i-share"></use></svg></button></div>
+  <div class="hdr g-hdr"><button class="ibtn" data-back="1"><svg class="ic"><use href="#i-back"></use></svg></button><span class="wm" style="font-size:17px">Homz<b>List</b></span><span style="flex:1"></span><button class="ibtn" data-sheet="sh-share"><svg class="ic"><use href="#i-share"></use></svg></button></div>
+  <div class="prog"><i id="post-prog"></i></div>
+  <div class="ph" style="aspect-ratio:16/9;width:100%"><svg class="ic i48"><use href="#i-bldg"></use></svg></div>
+  <div class="longform">
+    <span class="badge bg-acc">Guide</span>
+    <h1 class="t24" style="margin:10px 0 12px">Buying a flat in Rajkot: a 2025 checklist</h1>
+    <div class="rowf" style="gap:8px;margin-bottom:20px">
+      <span class="av" style="width:24px;height:24px;font-size:11px">H</span>
+      <span class="t13b">HomzList Team</span>
+      <span class="t11" style="color:var(--i3)">12 Jan 2025 · 8 min read</span>
+    </div>
+    <p>Rajkot's market moved fast in 2024 — new schemes on Kalawad Road, steady demand in Mavdi, and prices up roughly 8–12% in the popular western belt. If you're buying your first flat in 2025, this checklist keeps you out of trouble.</p>
+    <h2>1. Fix your real budget first</h2>
+    <p>Your budget isn't the flat price. Add stamp duty (4.9% for most buyers in Gujarat), registration, society deposit, and interiors. On a <b>₹45 Lakh</b> flat, expect ₹3–4 Lakh on top.</p>
+    <h2>2. Shortlist the area, not just the flat</h2>
+    <ul>
+      <li><b>Mavdi</b> — newer stock, good value, fast-growing</li>
+      <li><b>University Road</b> — established, walkable, pricier</li>
+      <li><b>Kalawad Road</b> — premium schemes, wide roads</li>
+      <li><b>150 Feet Ring Road</b> — best connectivity, commercial buzz</li>
+    </ul>
+    <blockquote style="margin:16px 0;padding:4px 0 4px 16px;border-left:3px solid var(--acc);font-size:17px;font-style:italic;color:var(--i2)">"Most buyers regret the area before they regret the flat. Spend your Sundays walking the lane, not the sample flat."</blockquote>
+    <h2>3. Check the paperwork</h2>
+    <p>Ask for the title deed, NA order, approved plan and BU permission. For under-construction schemes, verify the <b>RERA registration number</b> on the Gujarat RERA portal.</p>
+    <div class="co co-acc" style="margin:0 0 12px"><svg class="ic" style="color:var(--acc)"><use href="#i-info"></use></svg><span>On HomzList, listings with a verified badge have had their ownership documents checked by our team.</span></div>
+    <h2>4. Negotiate like a local</h2>
+    <p>Quoted prices in Rajkot usually carry 3–7% room. Compare per-sq-ft rates across at least three similar listings in the same lane before you make an offer.</p>
+    <div class="ph3" style="aspect-ratio:16/9;border-radius:12px;margin:16px 0 6px"><svg class="ic i48"><use href="#i-cam"></use></svg></div>
+    <p class="t11" style="color:var(--i3);margin-bottom:16px">New residential schemes coming up along Kalawad Road, Rajkot</p>
+    <p>Finally — never pay a token in cash without a written receipt that names the flat, the price and the refund condition. It's the single cheapest insurance you can buy.</p>
+  </div>
+  <div class="pad">
+    <div class="stk" style="background:var(--accs);border-radius:12px;padding:16px;gap:12px">
+      <p class="t15b">Looking in Mavdi?</p>
+      <div class="rowf" style="gap:12px;overflow-x:auto">
+        <button class="card stk" data-toast="Listings are part of another batch" style="width:150px;flex:none;overflow:hidden;padding:0;border:1px solid var(--bd);cursor:pointer;background:var(--sf1)"><span class="ph rowf" style="height:84px;justify-content:center"><svg class="ic i20"><use href="#i-home"></use></svg></span><span class="stk" style="padding:8px;gap:2px;align-items:flex-start"><span class="t13b">₹52 Lakh</span><span class="t11" style="color:var(--i3)">2 BHK · Mavdi</span></span></button>
+        <button class="card stk" data-toast="Listings are part of another batch" style="width:150px;flex:none;overflow:hidden;padding:0;border:1px solid var(--bd);cursor:pointer;background:var(--sf1)"><span class="ph2 rowf" style="height:84px;justify-content:center"><svg class="ic i20"><use href="#i-home"></use></svg></span><span class="stk" style="padding:8px;gap:2px;align-items:flex-start"><span class="t13b">₹68 Lakh</span><span class="t11" style="color:var(--i3)">3 BHK · Mavdi</span></span></button>
+        <button class="card stk" data-toast="Listings are part of another batch" style="width:150px;flex:none;overflow:hidden;padding:0;border:1px solid var(--bd);cursor:pointer;background:var(--sf1)"><span class="ph5 rowf" style="height:84px;justify-content:center"><svg class="ic i20"><use href="#i-home"></use></svg></span><span class="stk" style="padding:8px;gap:2px;align-items:flex-start"><span class="t13b">₹45 Lakh</span><span class="t11" style="color:var(--i3)">2 BHK · Mavdi</span></span></button>
+      </div>
+      <a href="#mavdi" data-toast="Listings are part of another batch" class="t13b">See all listings in Mavdi →</a>
+    </div>
+    <div class="rowf" style="gap:12px;margin-top:20px">
+      <span class="t13b" style="flex:1">Share this article</span>
+      <button class="ibtn" style="background:var(--s2);border-radius:50%" data-toast="Opening WhatsApp… (demo)"><svg class="ic i20"><use href="#i-msg"></use></svg></button>
+      <button class="ibtn" style="background:var(--s2);border-radius:50%" data-copy="https://homzlist.com/blog/buying-a-flat-in-rajkot-2025"><svg class="ic i20"><use href="#i-copy"></use></svg></button>
+      <button class="ibtn" style="background:var(--s2);border-radius:50%" data-sheet="sh-share"><svg class="ic i20"><use href="#i-moreh"></use></svg></button>
+    </div>
+  </div>
+  <h2 class="sec-h">Related posts</h2>
+  <div class="lst">
+    <button class="lrow" data-nav="s-post"><span class="ph4 rowf" style="width:56px;height:56px;border-radius:8px;justify-content:center"><svg class="ic i20"><use href="#i-shield"></use></svg></span><span class="stk" style="flex:1;gap:4px"><span class="t15b" style="text-align:left">RERA explained for first-time buyers</span><span class="t11" style="color:var(--i3)">7 min read · 2 Jan</span></span><svg class="ic i20" style="color:var(--i3)"><use href="#i-chr"></use></svg></button>
+    <button class="lrow" data-nav="s-post"><span class="ph2 rowf" style="width:56px;height:56px;border-radius:8px;justify-content:center"><svg class="ic i20"><use href="#i-doc"></use></svg></span><span class="stk" style="flex:1;gap:4px"><span class="t15b" style="text-align:left">How to check property documents before you pay a token</span><span class="t11" style="color:var(--i3)">5 min read · 8 Jan</span></span><svg class="ic i20" style="color:var(--i3)"><use href="#i-chr"></use></svg></button>
+  </div>
+  <p class="pad t11" style="color:var(--i3);margin-top:24px"><a href="#terms" data-nav="s-terms" style="color:var(--i3)">Terms</a> · <a href="#privacy" data-nav="s-terms" style="color:var(--i3)">Privacy</a> · <a href="#refunds" data-nav="s-refund" style="color:var(--i3)">Refunds</a> · © 2025 HomzList, Rajkot</p>
+</section>
+
+<section class="scr" id="s-data" data-screen-label="S5 Download your data">
+  <div class="hdr"><button class="ibtn" data-back="1"><svg class="ic"><use href="#i-back"></use></svg></button><h1>Download your data</h1></div>
+  <div class="stk" style="gap:16px;padding:16px">
+    <div class="stk" style="background:var(--s2);border-radius:12px;padding:16px;gap:12px">
+      <p class="t13" style="color:var(--i2)">Get a copy of your HomzList data — profile, listings, requirements, your own chat messages and payment records.</p>
+      <div class="stk t13" style="gap:8px">
+        <span class="rowf" style="gap:8px"><svg class="ic i16" style="color:var(--acc)"><use href="#i-chk"></use></svg>Profile and account details</span>
+        <span class="rowf" style="gap:8px"><svg class="ic i16" style="color:var(--acc)"><use href="#i-chk"></use></svg>Your listings and requirements</span>
+        <span class="rowf" style="gap:8px"><svg class="ic i16" style="color:var(--acc)"><use href="#i-chk"></use></svg>Messages you sent</span>
+        <span class="rowf" style="gap:8px"><svg class="ic i16" style="color:var(--acc)"><use href="#i-chk"></use></svg>Payment history and invoices</span>
+        <span class="rowf" style="gap:8px;color:var(--i3)"><span style="width:16px;text-align:center">—</span>Messages other people sent to you</span>
+        <span class="rowf" style="gap:8px;color:var(--i3)"><span style="width:16px;text-align:center">—</span>Other users' contact details</span>
+      </div>
+      <p class="t11" style="color:var(--i3)">We protect other people's privacy — only your own messages are included.</p>
+    </div>
+    <div class="rowf" style="gap:8px"><span class="t13b" style="margin-right:4px">Format</span>
+      <button class="chip on" data-cgrp="datafmt">JSON</button><button class="chip" data-cgrp="datafmt">CSV</button>
+    </div>
+    <div id="data-idle"><button class="btn b-pri b-blk" data-act="data-req">Request data</button></div>
+    <div class="hide" id="data-requested">
+      <div class="rowf" style="background:var(--infs);border-radius:12px;padding:16px;gap:12px">
+        <span class="spin dk"></span>
+        <div class="stk" style="gap:2px"><p class="t15b">Preparing your data…</p><p class="t11" style="color:var(--i2)">This usually takes a few minutes. We'll notify you when it's ready.</p></div>
+      </div>
+    </div>
+    <div class="hide" id="data-ready">
+      <div class="stk" style="background:var(--accs);border-radius:12px;padding:16px;gap:8px">
+        <span class="rowf" style="gap:8px"><svg class="ic" style="color:var(--acc)"><use href="#i-chk"></use></svg><span class="t15b">Your data is ready</span></span>
+        <p class="t11" style="color:var(--i3)">homzlist-data-12jan2025.zip · 4.2 MB</p>
+        <button class="btn b-pri" data-act="data-dl" style="margin-top:4px"><svg class="ic i20" style="stroke:#fff"><use href="#i-dl"></use></svg>Download</button>
+        <p class="t11" style="color:var(--i3)">This link expires in 48 hours.</p>
+      </div>
+    </div>
+    <div class="stk" style="gap:0">
+      <h2 class="sec-h" style="margin-left:0">Previous requests</h2>
+      <div class="rowf" style="min-height:48px;justify-content:space-between;border-top:1px solid var(--dv)">
+        <span class="t13" style="color:var(--i3)">Requested 5 Jan · Expired</span>
+        <button class="btn b-txt b-sm" data-act="data-req">Request again</button>
+      </div>
+      <div class="rowf" style="min-height:48px;justify-content:space-between;border-top:1px solid var(--dv)">
+        <span class="t13" style="color:var(--i3)">Requested 12 Nov · Expired</span>
+        <button class="btn b-txt b-sm" data-act="data-req">Request again</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="scr" id="s-account" data-screen-label="S6 Deactivate or delete">
+  <div class="hdr"><button class="ibtn" data-back="1"><svg class="ic"><use href="#i-back"></use></svg></button><h1>Account</h1></div>
+  <div class="stk" style="gap:12px;padding:16px">
+    <div class="card stk" style="padding:16px;gap:12px;background:var(--accs);border-color:var(--accd)">
+      <svg class="ic i32" style="color:var(--i2)"><use href="#i-pause"></use></svg>
+      <p class="t17">Deactivate temporarily</p>
+      <ul class="t13" style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:8px;color:var(--i2)">
+        <li>Your profile and listings are hidden</li>
+        <li>Chats are paused</li>
+        <li>Everything comes back when you log in again</li>
+        <li>Your plans stay as they are</li>
+      </ul>
+      <button class="btn b-out" data-dlg="dg-deact" style="background:var(--sf1)">Deactivate account</button>
+    </div>
+    <div class="card stk" style="padding:16px;gap:12px;border-color:var(--err)">
+      <div class="co co-wrn hide" id="ph-banner"><svg class="ic" style="color:var(--wrn)"><use href="#i-warnt"></use></svg><span>You made a payment 3 days ago. Deletion is available 7 days after a payment.</span></div>
+      <svg class="ic i32" style="color:var(--err)"><use href="#i-trash"></use></svg>
+      <p class="t17">Delete permanently</p>
+      <ul class="t13" style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:8px;color:var(--i2)">
+        <li>Your listings, requirements and chats are removed</li>
+        <li><b style="color:var(--i1)">Active plans are lost — no refund</b></li>
+        <li>Payment records are kept for 7 years as required by law (anonymised)</li>
+        <li>You have 30 days to change your mind</li>
+      </ul>
+      <button class="btn b-erro" id="del-open" data-dlg="dg-del1">Delete account</button>
+      <p class="t11 hide" id="ph-note" style="color:var(--i3)">Available from 19 Jan</p>
+    </div>
+  </div>
+</section>
+
+<section class="scr" id="s-otp" data-screen-label="S6 OTP re-verify">
+  <div class="hdr"><button class="ibtn" data-back="1"><svg class="ic"><use href="#i-back"></use></svg></button><h1 id="otp-t">Confirm deactivation</h1></div>
+  <div class="stk" style="padding:32px 16px;gap:16px;align-items:center;text-align:center">
+    <svg class="ic i48" style="color:var(--acc)"><use href="#i-lock"></use></svg>
+    <p class="t17">Enter the code we sent you</p>
+    <p class="t13" style="color:var(--i2)">A 6-digit code was sent to +91 98••• ••482</p>
+    <div class="rowf otp-grp" style="gap:8px;justify-content:center">
+      <input class="otp-in" inputmode="numeric" maxlength="2"><input class="otp-in" inputmode="numeric" maxlength="2"><input class="otp-in" inputmode="numeric" maxlength="2"><input class="otp-in" inputmode="numeric" maxlength="2"><input class="otp-in" inputmode="numeric" maxlength="2"><input class="otp-in" inputmode="numeric" maxlength="2">
+    </div>
+    <button class="btn b-pri b-blk" style="max-width:320px" data-act="otp-verify" disabled="disabled"><span id="otp-btn-t">Verify &amp; deactivate</span></button>
+    <button class="btn b-txt" data-toast="New code sent">Resend code</button>
+  </div>
+</section>
+
+<section class="scr" id="s-deactivated" data-screen-label="S6 Deactivated confirmation">
+  <div class="emptyst" style="padding-top:96px">
+    <svg class="ic i96"><use href="#i-pause"></use></svg>
+    <p class="t20" style="margin-top:16px">Account deactivated</p>
+    <p style="color:var(--i2);max-width:280px">Your profile and listings are hidden. Log in anytime to reactivate.</p>
+    <button class="btn b-pri" style="margin-top:16px;min-width:180px" data-act="cancel-del"><svg class="ic i20" style="stroke:#fff"><use href="#i-logout"></use></svg>Log out</button>
+  </div>
+</section>
+
+<section class="scr" id="s-grace" data-screen-label="S6 Deletion grace period">
+  <div class="emptyst" style="padding-top:96px">
+    <svg class="ic i96"><use href="#i-clock"></use></svg>
+    <p class="t20" style="margin-top:16px">Account scheduled for deletion</p>
+    <p style="color:var(--i2);max-width:300px">Your account will be deleted on <b style="color:var(--i1)">12 Feb 2025</b>. Log in before then to cancel.</p>
+    <button class="btn b-pri" style="margin-top:16px;min-width:200px" data-act="cancel-del">Cancel deletion</button>
+    <button class="btn b-txt" data-toast="Logged out (demo)">Log out</button>
+  </div>
+</section>
+
+<div class="dlgw" id="dg-deact">
+  <div class="dlg stk" style="gap:12px">
+    <p class="t17">Deactivate your account?</p>
+    <p class="t13" style="color:var(--i2)">Your listings and profile will be hidden until you log in again.</p>
+    <div class="rowf" style="gap:8px;justify-content:flex-end;margin-top:8px">
+      <button class="btn b-sec" data-close="1">Cancel</button>
+      <button class="btn b-pri" data-nav="s-otp" data-arg="deactivate">Deactivate</button>
+    </div>
+  </div>
+</div>
+
+<div class="dlgw" id="dg-del1">
+  <div class="dlg stk" style="gap:12px">
+    <p class="t17">Delete your account?</p>
+    <ul class="t13" style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:8px;color:var(--i2)">
+      <li>All listings, requirements and chats removed</li>
+      <li>Active plans lost — <b style="color:var(--i1)">no refund</b></li>
+      <li>Anonymised payment records kept 7 years (legal requirement)</li>
+      <li>30-day grace period to change your mind</li>
+    </ul>
+    <p class="t13b" style="margin-top:4px">Why are you leaving?</p>
+    <div class="stk rsn-grp" style="gap:0">
+      <button class="lrow" data-act="reason" style="min-height:44px;padding:8px 4px"><span class="radio"></span><span class="t13" style="flex:1">Found a property</span></button>
+      <button class="lrow" data-act="reason" style="min-height:44px;padding:8px 4px"><span class="radio"></span><span class="t13" style="flex:1">Too many messages</span></button>
+      <button class="lrow" data-act="reason" style="min-height:44px;padding:8px 4px"><span class="radio"></span><span class="t13" style="flex:1">Not useful</span></button>
+      <button class="lrow" data-act="reason" style="min-height:44px;padding:8px 4px"><span class="radio"></span><span class="t13" style="flex:1">Privacy concerns</span></button>
+      <button class="lrow" data-act="reason" style="min-height:44px;padding:8px 4px"><span class="radio"></span><span class="t13" style="flex:1">Other</span></button>
+    </div>
+    <div class="rowf" style="gap:8px;justify-content:flex-end">
+      <button class="btn b-sec" data-close="1">Cancel</button>
+      <button class="btn b-err" id="del1-go" data-dlg="dg-del2" disabled="disabled">Continue</button>
+    </div>
+  </div>
+</div>
+
+<div class="dlgw" id="dg-del2">
+  <div class="dlg stk" style="gap:12px">
+    <p class="t17">This will delete everything</p>
+    <div class="co co-wrn"><svg class="ic" style="color:var(--wrn)"><use href="#i-warnt"></use></svg><span>You have 1 active ₹999 plan and 1 live listing. These will be lost and won't be refunded.</span></div>
+    <div><span class="lbl">Type DELETE to confirm</span><input class="inp" id="del-in" autocomplete="off" placeholder="DELETE"></div>
+    <div class="rowf" style="gap:8px;justify-content:flex-end;margin-top:4px">
+      <button class="btn b-sec" data-close="1">Cancel</button>
+      <button class="btn b-err" id="del-go" data-nav="s-otp" data-arg="delete" disabled="disabled">Delete account</button>
+    </div>
+  </div>
+</div>
+
+<section class="scr" id="s-offline" data-screen-label="S7 Offline page">
+  <div class="emptyst" style="padding-top:80px">
+    <span style="position:relative"><svg class="ic i96"><use href="#i-cloudoff"></use></svg><svg class="ic i20" style="position:absolute;right:-4px;bottom:8px;color:var(--acc)"><use href="#i-refresh"></use></svg></span>
+    <p class="t20" style="margin-top:16px">You're offline</p>
+    <p style="color:var(--i2);max-width:280px">Check your connection. You can still browse recently viewed properties.</p>
+    <button class="btn b-pri" style="margin-top:16px;min-width:160px" data-act="retry"><span class="rlbl">Retry</span><span class="spin hide"></span></button>
+    <button class="btn b-out" style="min-width:220px" data-toast="Showing cached properties (demo)">Browse cached properties</button>
+  </div>
+  <h2 class="sec-h">Recently viewed</h2>
+  <div class="rowf" style="gap:12px;padding:0 16px;overflow-x:auto">
+    <div class="card stk" style="width:150px;flex:none;overflow:hidden;opacity:.68"><span class="ph rowf" style="height:84px;justify-content:center;position:relative"><svg class="ic i20"><use href="#i-home"></use></svg><svg class="ic i16" style="position:absolute;top:6px;right:6px;color:#fff"><use href="#i-cloudoff"></use></svg></span><span class="stk" style="padding:8px;gap:2px"><span class="t13b">₹85 Lakh</span><span class="t11" style="color:var(--i3)">3 BHK · Kalawad Road</span></span></div>
+    <div class="card stk" style="width:150px;flex:none;overflow:hidden;opacity:.68"><span class="ph3 rowf" style="height:84px;justify-content:center;position:relative"><svg class="ic i20"><use href="#i-home"></use></svg><svg class="ic i16" style="position:absolute;top:6px;right:6px;color:#fff"><use href="#i-cloudoff"></use></svg></span><span class="stk" style="padding:8px;gap:2px"><span class="t13b">₹52 Lakh</span><span class="t11" style="color:var(--i3)">2 BHK · Mavdi</span></span></div>
+    <div class="card stk" style="width:150px;flex:none;overflow:hidden;opacity:.68"><span class="ph4 rowf" style="height:84px;justify-content:center;position:relative"><svg class="ic i20"><use href="#i-home"></use></svg><svg class="ic i16" style="position:absolute;top:6px;right:6px;color:#fff"><use href="#i-cloudoff"></use></svg></span><span class="stk" style="padding:8px;gap:2px"><span class="t13b">₹18,000/mo</span><span class="t11" style="color:var(--i3)">2 BHK · University Road</span></span></div>
+  </div>
+  <p class="t11" style="color:var(--i3);text-align:center;padding:24px 32px 0">Anything you do offline (saves, messages) will sync automatically when you're back.</p>
+</section>
+
+<section class="scr" id="s-maint" data-screen-label="S8 Maintenance page">
+  <div class="emptyst" style="padding-top:80px;min-height:70vh">
+    <svg class="ic i96"><use href="#i-wrench"></use></svg>
+    <p class="t20" style="margin-top:16px">We'll be back shortly</p>
+    <p style="color:var(--i2);max-width:300px">HomzList is getting a quick update. Your listings and data are safe.</p>
+    <span class="chip" style="pointer-events:none;margin-top:8px"><svg class="ic i16"><use href="#i-clock"></use></svg>Estimated: 30 minutes</span>
+    <button class="btn b-pri" style="margin-top:16px;min-width:160px" data-act="retry-m"><span class="rlbl">Try again</span><span class="spin hide"></span></button>
+    <button class="btn b-txt" data-toast="Opening WhatsApp status page (demo)">Check status on WhatsApp</button>
+  </div>
+  <div class="stk" style="align-items:center;gap:8px;padding-bottom:24px">
+    <span class="wm" style="font-size:15px">Homz<b>List</b></span>
+    <p class="t11" style="color:var(--i3)">Started 2:00 PM IST</p>
+  </div>
+</section>
+
+<div class="sheet" id="sh-share" data-screen-label="Share sheet">
+  <div class="sh-hd"><div class="sh-handle"></div><p class="sh-t">Share</p><button class="ibtn sh-x" data-close="1"><svg class="ic"><use href="#i-x"></use></svg></button></div>
+  <div class="sh-bd">
+    <div class="rowf" style="gap:20px;padding:8px 24px 16px;justify-content:center">
+      <div class="stk" style="align-items:center;gap:6px"><button class="ibtn" style="width:56px;height:56px;background:var(--accs);border-radius:50%;color:var(--acc)" data-toast="Opening WhatsApp… (demo)"><svg class="ic"><use href="#i-msg"></use></svg></button><span class="t11">WhatsApp</span></div>
+      <div class="stk" style="align-items:center;gap:6px"><button class="ibtn" style="width:56px;height:56px;background:var(--s2);border-radius:50%" data-copy="https://homzlist.com/share/x8k2"><svg class="ic"><use href="#i-copy"></use></svg></button><span class="t11">Copy link</span></div>
+      <div class="stk" style="align-items:center;gap:6px"><button class="ibtn" style="width:56px;height:56px;background:var(--s2);border-radius:50%" data-toast="Opening mail app (demo)"><svg class="ic"><use href="#i-mail"></use></svg></button><span class="t11">Email</span></div>
+      <div class="stk" style="align-items:center;gap:6px"><button class="ibtn" style="width:56px;height:56px;background:var(--s2);border-radius:50%" data-toast="System share sheet (demo)"><svg class="ic"><use href="#i-moreh"></use></svg></button><span class="t11">More</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="sheet" id="sh-jump" data-screen-label="Jump to section sheet">
+  <div class="sh-hd"><div class="sh-handle"></div><p class="sh-t">Jump to section</p><button class="ibtn sh-x" data-close="1"><svg class="ic"><use href="#i-x"></use></svg></button></div>
+  <div class="sh-bd lst">
+    <button class="lrow" style="min-height:48px" data-jump="g-colors">Colors</button>
+    <button class="lrow" style="min-height:48px" data-jump="g-type">Typography</button>
+    <button class="lrow" style="min-height:48px" data-jump="g-buttons">Buttons</button>
+    <button class="lrow" style="min-height:48px" data-jump="g-inputs">Inputs</button>
+    <button class="lrow" style="min-height:48px" data-jump="g-chips">Chips</button>
+    <button class="lrow" style="min-height:48px" data-jump="g-badges">Badges</button>
+    <button class="lrow" style="min-height:48px" data-jump="g-cards">Cards</button>
+    <button class="lrow" style="min-height:48px" data-jump="g-sheets">Sheets</button>
+    <button class="lrow" style="min-height:48px" data-jump="g-dialogs">Dialogs</button>
+    <button class="lrow" style="min-height:48px" data-jump="g-toasts">Toasts</button>
+    <button class="lrow" style="min-height:48px" data-jump="g-empty">Empty states</button>
+    <button class="lrow" style="min-height:48px" data-jump="g-skel">Skeletons</button>
+    <button class="lrow" style="min-height:48px" data-jump="g-avatars">Avatars</button>
+    <button class="lrow" style="min-height:48px" data-jump="g-bars">Bars</button>
+    <button class="lrow" style="min-height:48px" data-jump="g-misc">Misc</button>
+  </div>
+</div>
+
+<section class="scr" id="s-gallery" data-screen-label="S9 Components gallery">
+  <div class="hdr"><button class="ibtn" data-back="1"><svg class="ic"><use href="#i-back"></use></svg></button><h1>Components</h1><button class="ibtn" data-act="themetgl" aria-label="Toggle theme"><svg class="ic"><use href="#i-moon"></use></svg></button><button class="ibtn" data-sheet="sh-jump"><svg class="ic"><use href="#i-moreh"></use></svg></button></div>
+  <div class="chiprow" style="position:sticky;top:56px;z-index:19;background:var(--page);border-bottom:1px solid var(--dv);padding:8px 16px">
+    <button class="chip" data-jump="g-colors">Colors</button><button class="chip" data-jump="g-type">Type</button><button class="chip" data-jump="g-buttons">Buttons</button><button class="chip" data-jump="g-inputs">Inputs</button><button class="chip" data-jump="g-chips">Chips</button><button class="chip" data-jump="g-badges">Badges</button><button class="chip" data-jump="g-cards">Cards</button><button class="chip" data-jump="g-sheets">Sheets</button><button class="chip" data-jump="g-dialogs">Dialogs</button><button class="chip" data-jump="g-toasts">Toasts</button><button class="chip" data-jump="g-empty">Empty states</button><button class="chip" data-jump="g-skel">Skeletons</button><button class="chip" data-jump="g-avatars">Avatars</button><button class="chip" data-jump="g-bars">Bars</button><button class="chip" data-jump="g-misc">Misc</button>
+  </div>
+
+  <div class="gal-sec" id="g-colors">
+    <h2 class="sec-h" style="margin:0 0 12px">Colors — light</h2>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
+      <div><div style="height:40px;border-radius:8px;background:#FFFFFF;border:1px solid var(--bd)"></div><p class="t11" style="margin-top:4px">page<br><span style="color:var(--i3)">#FFFFFF</span></p></div>
+      <div><div style="height:40px;border-radius:8px;background:#FFFFFF;border:1px solid var(--bd)"></div><p class="t11" style="margin-top:4px">surface1<br><span style="color:var(--i3)">#FFFFFF</span></p></div>
+      <div><div style="height:40px;border-radius:8px;background:#F5F5F5;border:1px solid var(--bd)"></div><p class="t11" style="margin-top:4px">surface2<br><span style="color:var(--i3)">#F5F5F5</span></p></div>
+      <div><div style="height:40px;border-radius:8px;background:#EFEFEF;border:1px solid var(--bd)"></div><p class="t11" style="margin-top:4px">surface3<br><span style="color:var(--i3)">#EFEFEF</span></p></div>
+      <div><div style="height:40px;border-radius:8px;background:#DBDBDB"></div><p class="t11" style="margin-top:4px">border<br><span style="color:var(--i3)">#DBDBDB</span></p></div>
+      <div><div style="height:40px;border-radius:8px;background:#EFEFEF"></div><p class="t11" style="margin-top:4px">divider<br><span style="color:var(--i3)">#EFEFEF</span></p></div>
+      <div><div style="height:40px;border-radius:8px;background:#111111"></div><p class="t11" style="margin-top:4px">ink1<br><span style="color:var(--i3)">#111111</span></p></div>
+      <div><div style="height:40px;border-radius:8px;background:#555555"></div><p class="t11" style="margin-top:4px">ink2<br><span style="color:var(--i3)">#555555</span></p></div>
+      <div><div style="height:40px;border-radius:8px;background:#8E8E8E"></div><p class="t11" style="margin-top:4px">ink3<br><span style="color:var(--i3)">#8E8E8E</span></p></div>
+      <div><div style="height:40px;border-radius:8px;background:#C7C7C7"></div><p class="t11" style="margin-top:4px">inkDisabled<br><span style="color:var(--i3)">#C7C7C7</span></p></div>
+      <div><div style="height:40px;border-radius:8px;background:#0F9D58"></div><p class="t11" style="margin-top:4px">accent<br><span style="color:var(--i3)">#0F9D58</span></p></div>
+      <div><div style="height:40px;border-radius:8px;background:#0C7C46"></div><p class="t11" style="margin-top:4px">accentPressed<br><span style="color:var(--i3)">#0C7C46</span></p></div>
+      <div><div style="height:40px;border-radius:8px;background:#E6F4EC"></div><p class="t11" style="margin-top:4px">accentSoft<br><span style="color:var(--i3)">#E6F4EC</span></p></div>
+      <div><div style="height:40px;border-radius:8px;background:#A8D5BD"></div><p class="t11" style="margin-top:4px">accentDisabled<br><span style="color:var(--i3)">#A8D5BD</span></p></div>
+      <div><div style="height:40px;border-radius:8px;background:#ED4956"></div><p class="t11" style="margin-top:4px">error<br><span style="color:var(--i3)">#ED4956</span></p></div>
+      <div><div style="height:40px;border-radius:8px;background:#FDECEE"></div><p class="t11" style="margin-top:4px">errorSoft<br><span style="color:var(--i3)">#FDECEE</span></p></div>
+      <div><div style="height:40px;border-radius:8px;background:#F5A623"></div><p class="t11" style="margin-top:4px">warning<br><span style="color:var(--i3)">#F5A623</span></p></div>
+      <div><div style="height:40px;border-radius:8px;background:#FEF5E7"></div><p class="t11" style="margin-top:4px">warningSoft<br><span style="color:var(--i3)">#FEF5E7</span></p></div>
+      <div><div style="height:40px;border-radius:8px;background:#0095F6"></div><p class="t11" style="margin-top:4px">info<br><span style="color:var(--i3)">#0095F6</span></p></div>
+      <div><div style="height:40px;border-radius:8px;background:#E7F3FD"></div><p class="t11" style="margin-top:4px">infoSoft<br><span style="color:var(--i3)">#E7F3FD</span></p></div>
+    </div>
+    <h2 class="sec-h" style="margin:20px 0 12px">Colors — dark</h2>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;background:#000;border-radius:12px;padding:12px">
+      <div><div style="height:40px;border-radius:8px;background:#000000;border:1px solid #363636"></div><p class="t11" style="margin-top:4px;color:#B0B0B0">page<br><span style="color:#8E8E8E">#000000</span></p></div>
+      <div><div style="height:40px;border-radius:8px;background:#121212;border:1px solid #363636"></div><p class="t11" style="margin-top:4px;color:#B0B0B0">surface1<br><span style="color:#8E8E8E">#121212</span></p></div>
+      <div><div style="height:40px;border-radius:8px;background:#1E1E1E;border:1px solid #363636"></div><p class="t11" style="margin-top:4px;color:#B0B0B0">surface2<br><span style="color:#8E8E8E">#1E1E1E</span></p></div>
+      <div><div style="height:40px;border-radius:8px;background:#262626;border:1px solid #363636"></div><p class="t11" style="margin-top:4px;color:#B0B0B0">surface3<br><span style="color:#8E8E8E">#262626</span></p></div>
+      <div><div style="height:40px;border-radius:8px;background:#363636"></div><p class="t11" style="margin-top:4px;color:#B0B0B0">border<br><span style="color:#8E8E8E">#363636</span></p></div>
+      <div><div style="height:40px;border-radius:8px;background:#262626"></div><p class="t11" style="margin-top:4px;color:#B0B0B0">divider<br><span style="color:#8E8E8E">#262626</span></p></div>
+      <div><div style="height:40px;border-radius:8px;background:#F5F5F5"></div><p class="t11" style="margin-top:4px;color:#B0B0B0">ink1<br><span style="color:#8E8E8E">#F5F5F5</span></p></div>
+      <div><div style="height:40px;border-radius:8px;background:#B0B0B0"></div><p class="t11" style="margin-top:4px;color:#B0B0B0">ink2<br><span style="color:#8E8E8E">#B0B0B0</span></p></div>
+      <div><div style="height:40px;border-radius:8px;background:#8E8E8E"></div><p class="t11" style="margin-top:4px;color:#B0B0B0">ink3<br><span style="color:#8E8E8E">#8E8E8E</span></p></div>
+      <div><div style="height:40px;border-radius:8px;background:#4D4D4D"></div><p class="t11" style="margin-top:4px;color:#B0B0B0">inkDisabled<br><span style="color:#8E8E8E">#4D4D4D</span></p></div>
+      <div><div style="height:40px;border-radius:8px;background:#1DB868"></div><p class="t11" style="margin-top:4px;color:#B0B0B0">accent<br><span style="color:#8E8E8E">#1DB868</span></p></div>
+      <div><div style="height:40px;border-radius:8px;background:#17A05A"></div><p class="t11" style="margin-top:4px;color:#B0B0B0">accentPressed<br><span style="color:#8E8E8E">#17A05A</span></p></div>
+      <div><div style="height:40px;border-radius:8px;background:#0E2B1C"></div><p class="t11" style="margin-top:4px;color:#B0B0B0">accentSoft<br><span style="color:#8E8E8E">#0E2B1C</span></p></div>
+      <div><div style="height:40px;border-radius:8px;background:#FF5C6A"></div><p class="t11" style="margin-top:4px;color:#B0B0B0">error<br><span style="color:#8E8E8E">#FF5C6A</span></p></div>
+      <div><div style="height:40px;border-radius:8px;background:#FFB74D"></div><p class="t11" style="margin-top:4px;color:#B0B0B0">warning<br><span style="color:#8E8E8E">#FFB74D</span></p></div>
+      <div><div style="height:40px;border-radius:8px;background:#3BA7F8"></div><p class="t11" style="margin-top:4px;color:#B0B0B0">info<br><span style="color:#8E8E8E">#3BA7F8</span></p></div>
+    </div>
+    <p class="t11" style="color:var(--i3);margin-top:8px">Dark mode: no shadows → 1px borders.</p>
+  </div>
+
+  <div class="gal-sec" id="g-type">
+    <h2 class="sec-h" style="margin:0 0 12px">Typography</h2>
+    <div class="spec">
+      <div><p class="spec-l">24 / 700 — page title</p><p class="t24">₹85 Lakh · Kalawad Road</p></div>
+      <div><p class="spec-l">20 / 700 — article H1</p><p class="t20">Buying a flat in Rajkot</p></div>
+      <div><p class="spec-l">17 / 600 — emphasis / headers</p><p class="t17">3 BHK in Mavdi, ready to move</p></div>
+      <div><p class="spec-l">15 / 400 — body</p><p>The listing goes live after a quick review, usually within a few hours.</p></div>
+      <div><p class="spec-l">15 / 600 — buttons</p><p class="t15b">Contact support</p></div>
+      <div><p class="spec-l">13 / 400 — secondary</p><p class="t13" style="color:var(--i2)">Updated 2h ago · 3 messages</p></div>
+      <div><p class="spec-l">13 / 600 — labels</p><p class="t13b">Payment ID</p></div>
+      <div><p class="spec-l">11 / 400 — meta</p><p class="t11" style="color:var(--i3)">8 min read · 12 Jan</p></div>
+      <div><p class="spec-l">11 / 600 — badges, uppercase +0.3px</p><p class="t11b">Under review</p></div>
+      <div><p class="spec-l">Indian numbers &amp; currency</p><p class="t15b">₹85 Lakh · ₹1.2 Cr · ₹18,000/mo</p><p class="t13" style="color:var(--i2);margin-top:4px">12.4K views · 2h ago · Yesterday · 12 Jan</p></div>
+    </div>
+  </div>
+
+  <div class="gal-sec" id="g-buttons">
+    <h2 class="sec-h" style="margin:0 0 12px">Buttons</h2>
+    <div class="spec">
+      <div><p class="spec-l">Primary — default / pressed / loading / disabled</p>
+        <div class="rowf" style="gap:8px;flex-wrap:wrap"><button class="btn b-pri">Post listing</button><button class="btn b-pri" style="background:var(--accp);transform:scale(.98)">Post listing</button><button class="btn b-pri"><span class="spin"></span>Posting…</button><button class="btn b-pri" disabled="disabled">Post listing</button></div></div>
+      <div><p class="spec-l">Secondary</p>
+        <div class="rowf" style="gap:8px;flex-wrap:wrap"><button class="btn b-sec">Save draft</button><button class="btn b-sec" style="background:var(--s3);transform:scale(.98)">Save draft</button><button class="btn b-sec"><span class="spin dk"></span>Saving…</button><button class="btn b-sec" style="color:var(--idis)">Save draft</button></div></div>
+      <div><p class="spec-l">Outline</p>
+        <div class="rowf" style="gap:8px;flex-wrap:wrap"><button class="btn b-out">Contact support</button><button class="btn b-out" style="background:var(--s2);transform:scale(.98)">Contact support</button><button class="btn b-out"><span class="spin dk"></span>Loading…</button><button class="btn b-out" style="color:var(--idis);border-color:var(--dv)">Contact support</button></div></div>
+      <div><p class="spec-l">Text link</p>
+        <div class="rowf" style="gap:8px;flex-wrap:wrap"><button class="btn b-txt">View all</button><button class="btn b-txt" style="color:var(--accp);transform:scale(.98)">View all</button><button class="btn b-txt" style="color:var(--accd)">View all</button></div></div>
+      <div><p class="spec-l">Icon button 44×44</p>
+        <div class="rowf" style="gap:8px"><button class="ibtn" style="border:1px solid var(--bd);border-radius:8px"><svg class="ic"><use href="#i-heart"></use></svg></button><button class="ibtn" style="border:1px solid var(--bd);border-radius:8px;background:var(--s2);transform:scale(.98)"><svg class="ic"><use href="#i-heart"></use></svg></button><button class="ibtn" style="border:1px solid var(--dv);border-radius:8px;color:var(--idis)"><svg class="ic"><use href="#i-heart"></use></svg></button></div></div>
+      <div><p class="spec-l">Destructive</p>
+        <div class="rowf" style="gap:8px;flex-wrap:wrap"><button class="btn b-err">Delete account</button><button class="btn b-erro">Delete account</button><button class="btn b-err" disabled="disabled">Delete account</button></div></div>
+    </div>
+  </div>
+
+  <div class="gal-sec" id="g-inputs">
+    <h2 class="sec-h" style="margin:0 0 12px">Inputs</h2>
+    <div class="spec">
+      <div><p class="spec-l">Text — default / focus / error / disabled / filled</p>
+        <div class="stk" style="gap:8px">
+          <input class="inp" placeholder="Society or landmark">
+          <input class="inp" style="border-color:var(--acc);box-shadow:0 0 0 1px var(--acc)" placeholder="Society or landmark">
+          <div><input class="inp errb" value="98 42"><p class="t11" style="color:var(--err);margin-top:4px">Enter a valid 10-digit number</p></div>
+          <input class="inp" disabled="disabled" placeholder="Locked after verification">
+          <input class="inp" value="Shivalik Residency, Mavdi">
+        </div></div>
+      <div><p class="spec-l">Textarea + counter</p>
+        <div><textarea class="inp ta" rows="3" placeholder="Describe your property…"></textarea><p class="t11" style="color:var(--i3);text-align:right;margin-top:4px">142 / 500</p></div></div>
+      <div><p class="spec-l">Phone with +91 prefix</p>
+        <div class="rowf" style="gap:0"><span class="rowf" style="height:44px;padding:0 12px;border:1px solid var(--bd);border-right:0;border-radius:8px 0 0 8px;background:var(--s2);font-weight:600;font-size:15px">+91</span><input class="inp" style="border-radius:0 8px 8px 0" value="98242 55482"></div></div>
+      <div><p class="spec-l">Price with word-line</p>
+        <div><input class="inp" value="₹85,00,000"><p class="t11" style="color:var(--acc);margin-top:4px">Eighty-five lakh rupees</p></div></div>
+      <div><p class="spec-l">OTP boxes</p>
+        <div class="rowf" style="gap:8px"><input class="otp-in" value="4"><input class="otp-in" value="8"><input class="otp-in" value="2"><input class="otp-in"><input class="otp-in"><input class="otp-in"></div></div>
+      <div><p class="spec-l">Select row</p>
+        <button class="inp rowf" style="justify-content:space-between;cursor:pointer"><span>2 BHK</span><svg class="ic i20" style="color:var(--i3)"><use href="#i-chd"></use></svg></button></div>
+      <div><p class="spec-l">Search bar h40</p>
+        <div class="srch" style="margin:0"><svg class="ic i20"><use href="#i-srch"></use></svg><input placeholder="Search Mavdi, 2 BHK…"></div></div>
+      <div><p class="spec-l">Checkbox / radio</p>
+        <div class="rowf" style="gap:16px;flex-wrap:wrap">
+          <span class="rowf" style="gap:8px"><span class="checkb on"><svg class="ic i16" style="stroke:#fff"><use href="#i-chk"></use></svg></span><span class="t13">Checked</span></span>
+          <span class="rowf" style="gap:8px"><span class="checkb"></span><span class="t13">Unchecked</span></span>
+          <span class="rowf" style="gap:8px"><span class="radio on"></span><span class="t13">Selected</span></span>
+          <span class="rowf" style="gap:8px"><span class="radio"></span><span class="t13">Default</span></span>
+        </div></div>
+      <div><p class="spec-l">Toggle — on / off / disabled</p>
+        <div class="rowf" style="gap:16px"><button class="tgl on" data-act="tglx"></button><button class="tgl" data-act="tglx"></button><button class="tgl" disabled="disabled"></button></div></div>
+      <div><p class="spec-l">Slider</p>
+        <input type="range" min="0" max="100" sc-camel-default-value="60" style="width:100%;accent-color:var(--acc)"></div>
+      <div><p class="spec-l">Dual-range (budget ₹30L – ₹80L)</p>
+        <div style="position:relative;height:24px">
+          <div style="position:absolute;top:10px;left:0;right:0;height:4px;border-radius:999px;background:var(--s3)"></div>
+          <div style="position:absolute;top:10px;left:25%;right:30%;height:4px;border-radius:999px;background:var(--acc)"></div>
+          <div style="position:absolute;top:2px;left:25%;width:20px;height:20px;margin-left:-10px;border-radius:50%;background:var(--sf1);border:1.5px solid var(--acc);box-shadow:var(--sh1)"></div>
+          <div style="position:absolute;top:2px;right:30%;width:20px;height:20px;margin-right:-10px;border-radius:50%;background:var(--sf1);border:1.5px solid var(--acc);box-shadow:var(--sh1)"></div>
+        </div>
+        <div class="rowf t11" style="justify-content:space-between;color:var(--i2)"><span>₹30 Lakh</span><span>₹80 Lakh</span></div></div>
+    </div>
+  </div>
+
+  <div class="gal-sec" id="g-chips">
+    <h2 class="sec-h" style="margin:0 0 12px">Chips</h2>
+    <div class="spec">
+      <div><p class="spec-l">Filter chip — default / selected / with count</p>
+        <div class="rowf" style="gap:8px;flex-wrap:wrap"><span class="chip">2 BHK</span><span class="chip on">2 BHK</span><span class="chip on">Mavdi <span class="t11b" style="background:var(--acc);color:#fff;border-radius:999px;padding:1px 6px">12</span></span></div></div>
+      <div><p class="spec-l">Type chip</p>
+        <div class="rowf" style="gap:8px;flex-wrap:wrap"><span class="chip" style="height:24px;font-size:11px">Flat</span><span class="chip" style="height:24px;font-size:11px">Tenament</span><span class="chip" style="height:24px;font-size:11px">Plot</span></div></div>
+      <div><p class="spec-l">Removable chip</p>
+        <span class="chip">University Road<svg class="ic i16" style="margin-right:-4px"><use href="#i-x"></use></svg></span></div>
+      <div><p class="spec-l">Urgency chip</p>
+        <span class="chip" style="background:var(--errs);color:var(--err);font-weight:600"><svg class="ic i16"><use href="#i-flame"></use></svg>Urgent — needs by March</span></div>
+    </div>
+  </div>
+
+  <div class="gal-sec" id="g-badges">
+    <h2 class="sec-h" style="margin:0 0 12px">Badges — full set</h2>
+    <div class="spec">
+      <div class="rowf" style="gap:8px;flex-wrap:wrap">
+        <span class="badge bg-sol"><svg class="ic i16" style="stroke:#fff;width:12px;height:12px"><use href="#i-zap"></use></svg>Promoted</span>
+        <span class="badge bg-acc"><svg class="ic" style="width:12px;height:12px"><use href="#i-vbadge"></use></svg>Verified</span>
+        <span class="badge bg-acc"><svg class="ic" style="width:12px;height:12px"><use href="#i-vbadge"></use></svg>Verified owner</span>
+        <span class="badge bg-acc"><svg class="ic" style="width:12px;height:12px"><use href="#i-vbadge"></use></svg>Verified + docs</span>
+        <span class="badge bg-acc">For Sale</span>
+        <span class="badge bg-inf">For Rent</span>
+        <span class="badge bg-inf">New Project</span>
+        <span class="badge bg-mut">Rented</span>
+        <span class="badge bg-wrn">Under Review</span>
+        <span class="badge bg-wrn">Changes Requested</span>
+        <span class="badge bg-err">Rejected</span>
+        <span class="badge bg-mut">Expired</span>
+        <span class="badge bg-acc">Fulfilled</span>
+        <span class="badge bg-acc"><span class="dot"></span>Active</span>
+        <span class="badge bg-wrn">Pending</span>
+        <span class="badge bg-err">Failed</span>
+        <span class="badge bg-inf">Refunded</span>
+        <span class="badge bg-inf">Trial</span>
+        <span class="badge bg-wrn">Grace</span>
+      </div>
+      <div><p class="spec-l">Sold — ribbon variant</p>
+        <div class="ph" style="width:160px;height:100px;border-radius:12px;overflow:hidden;position:relative"><svg class="ic i20"><use href="#i-home"></use></svg><span style="position:absolute;top:12px;left:-28px;transform:rotate(-38deg);background:var(--err);color:#fff;font-size:11px;font-weight:600;letter-spacing:.3px;text-transform:uppercase;padding:3px 32px">Sold</span></div></div>
+    </div>
+  </div>
+
+  <div class="gal-sec" id="g-cards">
+    <h2 class="sec-h" style="margin:0 0 12px">Cards</h2>
+    <div class="spec">
+      <div><p class="spec-l">PropertyCard — sale</p>
+        <div class="card" style="overflow:hidden;box-shadow:var(--sh1)">
+          <div class="ph" style="aspect-ratio:16/9;position:relative"><svg class="ic i48"><use href="#i-home"></use></svg>
+            <span class="badge bg-sol" style="position:absolute;top:8px;left:8px"><svg class="ic" style="width:12px;height:12px;stroke:#fff"><use href="#i-zap"></use></svg>Promoted</span>
+            <button class="ibtn" style="position:absolute;top:2px;right:2px;color:#fff"><svg class="ic"><use href="#i-heart"></use></svg></button>
+          </div>
+          <div class="stk" style="padding:12px 16px;gap:4px">
+            <div class="rowf" style="justify-content:space-between"><span class="t17">₹85 Lakh</span><span class="badge bg-acc">For Sale</span></div>
+            <p class="t15b">3 BHK flat in Shivalik Residency</p>
+            <p class="t13" style="color:var(--i2)"><svg class="ic i16" style="vertical-align:-3px"><use href="#i-pin"></use></svg> Kalawad Road, Rajkot</p>
+            <div class="rowf t13" style="gap:12px;color:var(--i2);margin-top:4px"><span class="rowf" style="gap:4px"><svg class="ic i16"><use href="#i-bed"></use></svg>3 BHK</span><span class="rowf" style="gap:4px"><svg class="ic i16"><use href="#i-max"></use></svg>1,450 sq ft</span><span class="rowf" style="gap:4px"><svg class="ic i16"><use href="#i-cal"></use></svg>Ready</span></div>
+            <div class="rowf" style="justify-content:space-between;margin-top:8px;border-top:1px solid var(--dv);padding-top:8px"><span class="rowf t11" style="gap:4px;color:var(--acc);font-weight:600"><svg class="ic i16"><use href="#i-vbadge"></use></svg>Verified owner</span><span class="t11" style="color:var(--i3)">12.4K views · 2h ago</span></div>
+          </div>
+        </div></div>
+      <div><p class="spec-l">PropertyCard — rent</p>
+        <div class="card" style="overflow:hidden;box-shadow:var(--sh1)">
+          <div class="ph3" style="aspect-ratio:16/9;position:relative"><svg class="ic i48"><use href="#i-home"></use></svg><button class="ibtn" style="position:absolute;top:2px;right:2px;color:#fff"><svg class="ic"><use href="#i-heart"></use></svg></button></div>
+          <div class="stk" style="padding:12px 16px;gap:4px">
+            <div class="rowf" style="justify-content:space-between"><span class="t17">₹18,000/mo</span><span class="badge bg-inf">For Rent</span></div>
+            <p class="t15b">2 BHK semi-furnished near RK University</p>
+            <p class="t13" style="color:var(--i2)"><svg class="ic i16" style="vertical-align:-3px"><use href="#i-pin"></use></svg> University Road, Rajkot</p>
+            <div class="rowf t13" style="gap:12px;color:var(--i2);margin-top:4px"><span class="rowf" style="gap:4px"><svg class="ic i16"><use href="#i-bed"></use></svg>2 BHK</span><span class="rowf" style="gap:4px"><svg class="ic i16"><use href="#i-max"></use></svg>1,050 sq ft</span><span class="rowf" style="gap:4px"><svg class="ic i16"><use href="#i-cal"></use></svg>From 1 Feb</span></div>
+          </div>
+        </div></div>
+      <div><p class="spec-l">ProjectCard</p>
+        <div class="card" style="overflow:hidden;box-shadow:var(--sh1)">
+          <div class="ph2" style="aspect-ratio:16/9;position:relative"><svg class="ic i48"><use href="#i-bldg"></use></svg><span class="badge bg-inf" style="position:absolute;top:8px;left:8px">New Project</span></div>
+          <div class="stk" style="padding:12px 16px;gap:4px">
+            <p class="t17">Sterling Heights</p>
+            <p class="t13" style="color:var(--i2)">2 &amp; 3 BHK · Nana Mava Circle · Possession Dec 2026</p>
+            <div class="rowf" style="justify-content:space-between;margin-top:4px"><span class="t15b">₹45 Lakh – ₹1.2 Cr</span><span class="t11" style="color:var(--i3)">RERA: PR/GJ/RAJKOT/2025/1182</span></div>
+          </div>
+        </div></div>
+      <div><p class="spec-l">RequirementCard — unlocked</p>
+        <div class="card stk" style="padding:12px 16px;gap:8px">
+          <div class="rowf" style="justify-content:space-between"><span class="badge bg-acc"><span class="dot"></span>Active</span><span class="t11" style="color:var(--i3)">Posted 3d ago · 22 days left</span></div>
+          <p class="t15b">Looking for a 2 BHK flat in Mavdi or Nana Mava</p>
+          <p class="t13" style="color:var(--i2)">Budget ₹40–55 Lakh · Ready to move · Family of 4</p>
+          <div class="rowf" style="gap:8px;border-top:1px solid var(--dv);padding-top:8px"><span class="av" style="width:32px;height:32px;font-size:13px">RM</span><div class="stk" style="flex:1"><span class="t13b">Rakesh M.</span><span class="t11" style="color:var(--i3)">+91 98242 •••82</span></div><button class="btn b-pri b-sm">Send proposal</button></div>
+        </div></div>
+      <div><p class="spec-l">LockedRequirementCard</p>
+        <div class="card stk" style="padding:12px 16px;gap:8px;position:relative;overflow:hidden">
+          <div class="rowf" style="justify-content:space-between"><span class="badge bg-acc"><span class="dot"></span>Active</span><span class="t11" style="color:var(--i3)">Posted 1d ago</span></div>
+          <p class="t15b">Looking for a 3 BHK in <span style="filter:blur(5px)">Kalawad Road</span></p>
+          <p class="t13" style="color:var(--i2);filter:blur(5px)">Budget ₹70–90 Lakh · New scheme preferred · Contact 98242 55482</p>
+          <div class="rowf" style="gap:8px;background:var(--s2);border-radius:8px;padding:10px 12px"><svg class="ic i20" style="color:var(--i2)"><use href="#i-lock"></use></svg><span class="t13" style="flex:1;color:var(--i2)">Unlock details with a plan</span><button class="btn b-pri b-sm">View plans</button></div>
+        </div></div>
+      <div><p class="spec-l">ProposalCard</p>
+        <div class="card stk" style="padding:12px 16px;gap:8px">
+          <div class="rowf" style="justify-content:space-between"><span class="t11" style="color:var(--i3)">Sent 2 Jan · to Rakesh M.'s requirement</span><span class="badge bg-wrn">Pending</span></div>
+          <div class="rowf" style="gap:12px"><span class="ph rowf" style="width:56px;height:56px;border-radius:8px;justify-content:center"><svg class="ic i20"><use href="#i-home"></use></svg></span><div class="stk" style="flex:1;gap:2px"><span class="t15b">₹52 Lakh · 2 BHK in Mavdi</span><span class="t13" style="color:var(--i2)">"Ready to move, near D-Mart, society parking…"</span></div></div>
+          <p class="t11" style="color:var(--i3)">7 of 10 proposals used this month</p>
+        </div></div>
+      <div><p class="spec-l">LeadCard</p>
+        <div class="card stk" style="padding:12px 16px;gap:8px">
+          <div class="rowf" style="gap:12px"><span class="av" style="width:48px;height:48px">PS</span><div class="stk" style="flex:1;gap:2px"><span class="t15b">Priya S. <span class="badge bg-acc" style="vertical-align:2px"><svg class="ic" style="width:12px;height:12px"><use href="#i-vbadge"></use></svg>Verified</span></span><span class="t13" style="color:var(--i2)">Interested in your 3 BHK on Kalawad Road</span><span class="t11" style="color:var(--i3)">Inquired 25 min ago</span></div></div>
+          <div class="rowf" style="gap:8px"><button class="btn b-pri b-sm" style="flex:1"><svg class="ic i16" style="stroke:#fff"><use href="#i-phone"></use></svg>Call</button><button class="btn b-out b-sm" style="flex:1"><svg class="ic i16"><use href="#i-msg"></use></svg>Chat</button></div>
+        </div></div>
+      <div><p class="spec-l">Plan card</p>
+        <div class="card stk" style="padding:16px;gap:8px;border-color:var(--acc)">
+          <div class="rowf" style="justify-content:space-between"><span class="t17">Owner Plan</span><span class="badge bg-acc"><span class="dot"></span>Active</span></div>
+          <p class="t24" style="color:var(--acc)">₹999 <span class="t13" style="color:var(--i3);font-weight:400">one-time</span></p>
+          <div class="stk t13" style="gap:8px;color:var(--i2)">
+            <span class="rowf" style="gap:8px"><svg class="ic i16" style="color:var(--acc)"><use href="#i-chk"></use></svg>1 lifetime listing — used</span>
+            <span class="rowf" style="gap:8px"><svg class="ic i16" style="color:var(--acc)"><use href="#i-chk"></use></svg>1 requirement (30 days) — 22 days left</span>
+            <span class="rowf" style="gap:8px"><svg class="ic i16" style="color:var(--acc)"><use href="#i-chk"></use></svg>10 proposals — 7 used</span>
+          </div>
+          <div style="height:6px;border-radius:999px;background:var(--s3);overflow:hidden"><div style="width:70%;height:100%;background:var(--acc)"></div></div>
+          <p class="t11" style="color:var(--i3)">Purchased 14 Dec 2024 · PAY-88213</p>
+        </div></div>
+      <div><p class="spec-l">Boost card</p>
+        <div class="card stk" style="padding:16px;gap:8px">
+          <div class="rowf" style="justify-content:space-between"><span class="rowf t15b" style="gap:6px"><svg class="ic i20" style="color:var(--wrn)"><use href="#i-zap"></use></svg>Boost — Mavdi area</span><span class="badge bg-acc"><span class="dot"></span>Active</span></div>
+          <p class="t13" style="color:var(--i2)">Your 2 BHK is showing at the top of Mavdi results</p>
+          <div style="height:6px;border-radius:999px;background:var(--s3);overflow:hidden"><div style="width:43%;height:100%;background:var(--wrn)"></div></div>
+          <div class="rowf" style="justify-content:space-between"><span class="t11" style="color:var(--i3)">3 of 7 days used</span><span class="t11" style="color:var(--i3)">+340% views</span></div>
+        </div></div>
+      <div><p class="spec-l">Visit card</p>
+        <div class="card stk" style="padding:12px 16px;gap:8px">
+          <div class="rowf" style="gap:12px"><div class="stk" style="width:48px;height:52px;border-radius:8px;background:var(--accs);align-items:center;justify-content:center"><span class="t11b" style="color:var(--acc)">Jan</span><span class="t20" style="color:var(--acc)">18</span></div><div class="stk" style="flex:1;gap:2px"><span class="t15b">Site visit · 5:30 PM</span><span class="t13" style="color:var(--i2)">3 BHK, Shivalik Residency with Priya S.</span></div><span class="badge bg-inf">Upcoming</span></div>
+          <div class="rowf" style="gap:8px"><button class="btn b-out b-sm" style="flex:1">Reschedule</button><button class="btn b-sec b-sm" style="flex:1">Directions</button></div>
+        </div></div>
+      <div><p class="spec-l">Ticket row</p>
+        <div class="card stk" style="padding:12px;gap:8px">
+          <div class="rowf" style="justify-content:space-between"><span class="t11" style="color:var(--i3)">#TKT-2841</span><span class="badge bg-inf">Open</span></div>
+          <span class="t15b">Payment deducted but plan not activated</span>
+          <div class="rowf" style="justify-content:space-between"><span class="t11" style="color:var(--i3)">Updated 2h ago · 3 messages</span><svg class="ic i16" style="color:var(--i3)"><use href="#i-chr"></use></svg></div>
+        </div></div>
+    </div>
+  </div>
+
+  <div class="gal-sec" id="g-sheets">
+    <h2 class="sec-h" style="margin:0 0 12px">Sheets</h2>
+    <div class="spec">
+      <div><p class="spec-l">Bottom sheet anatomy</p>
+        <div style="border:1px solid var(--bd);border-radius:12px 12px 0 0;overflow:hidden;background:var(--sf1)">
+          <div class="sh-hd"><div class="sh-handle"></div><p class="sh-t">Sheet title</p><span class="ibtn sh-x"><svg class="ic"><use href="#i-x"></use></svg></span></div>
+          <div style="padding:16px" class="t13 mut2">Content area — scrolls independently. Handle 36×4 r999 · title 17/600 centred · X 44×44.</div>
+          <div class="sh-ft"><span class="btn b-pri b-blk" style="pointer-events:none">Sticky footer action</span></div>
+        </div></div>
+      <div><p class="spec-l">Stacked sheets — back closes top</p>
+        <button class="btn b-out b-sm" data-act="stackdemo">Open stacked-sheet demo</button></div>
+      <div><p class="spec-l">Scrim spec</p><p class="t13 mut2">rgba(0,0,0,.5) · fade 250ms · tap to close · sheet slides 300ms in / 250ms out, ease-out cubic-bezier(0.2,0,0,1)</p></div>
+    </div>
+  </div>
+
+  <div class="gal-sec" id="g-dialogs">
+    <h2 class="sec-h" style="margin:0 0 12px">Dialogs</h2>
+    <div class="spec">
+      <div><p class="spec-l">Standard confirm</p>
+        <div class="dlg" style="animation:none;box-shadow:var(--sh2);margin:0 auto"><div class="stk" style="gap:12px"><p class="t17">Mark as sold?</p><p class="t13 mut2">Your listing will move to Sold and stop getting inquiries.</p><div class="rowf" style="gap:8px;justify-content:flex-end"><span class="btn b-sec" style="pointer-events:none">Cancel</span><span class="btn b-pri" style="pointer-events:none">Mark sold</span></div></div></div></div>
+      <div><p class="spec-l">Destructive</p>
+        <div class="dlg" style="animation:none;box-shadow:var(--sh2);margin:0 auto"><div class="stk" style="gap:12px"><p class="t17">Remove this listing?</p><p class="t13 mut2">This can't be undone. Your plan's listing slot stays used.</p><div class="rowf" style="gap:8px;justify-content:flex-end"><span class="btn b-sec" style="pointer-events:none">Cancel</span><span class="btn b-err" style="pointer-events:none">Remove</span></div></div></div></div>
+      <div><p class="spec-l">Double-confirm with typed word</p>
+        <div class="dlg" style="animation:none;box-shadow:var(--sh2);margin:0 auto"><div class="stk" style="gap:12px"><p class="t17">This will delete everything</p><div><span class="lbl">Type DELETE to confirm</span><input class="inp" placeholder="DELETE"></div><div class="rowf" style="gap:8px;justify-content:flex-end"><span class="btn b-sec" style="pointer-events:none">Cancel</span><span class="btn b-err" style="opacity:.4;pointer-events:none">Delete account</span></div></div></div></div>
+      <div><p class="spec-l">Info popup</p>
+        <div class="dlg" style="animation:none;box-shadow:var(--sh2);margin:0 auto"><div class="stk" style="gap:12px;align-items:center;text-align:center"><svg class="ic i32" style="color:var(--acc)"><use href="#i-info"></use></svg><p class="t17">What is a verified badge?</p><p class="t13 mut2">Our team checked this owner's documents against the listing. It's not a guarantee of title.</p><span class="btn b-pri b-blk" style="pointer-events:none">Got it</span></div></div></div>
+    </div>
+  </div>
+
+  <div class="gal-sec" id="g-toasts">
+    <h2 class="sec-h" style="margin:0 0 12px">Toasts</h2>
+    <div class="spec">
+      <div><p class="spec-l">Plain</p><span class="toast" style="animation:none;align-self:flex-start">Ticket created</span></div>
+      <div><p class="spec-l">With action link</p><span class="toast" style="animation:none;align-self:flex-start">Listing saved <a href="#viewsaved">View</a></span></div>
+      <div><p class="spec-l">Error</p><span class="toast terr" style="animation:none;align-self:flex-start">Still offline</span></div>
+      <div><p class="spec-l">Spec</p><p class="t13 mut2">Position: bottom 80px, above nav · in 200ms · hold 3s · out 200ms</p>
+        <button class="btn b-out b-sm" data-toast="Live toast demo">Fire a toast</button></div>
+    </div>
+  </div>
+
+  <div class="gal-sec" id="g-empty">
+    <h2 class="sec-h" style="margin:0 0 12px">Empty states — full family</h2>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="mini-empty"><svg class="ic"><use href="#i-msg"></use></svg><p class="t15b">No chats yet</p><p class="t11 mut3">Chats start when someone inquires on your listing</p><span class="btn b-txt b-sm">Browse listings</span></div>
+      <div class="mini-empty"><svg class="ic"><use href="#i-msg"></use></svg><p class="t15b">No buying chats</p><p class="t11 mut3">Inquire on a property to start one</p><span class="btn b-txt b-sm">Explore Rajkot</span></div>
+      <div class="mini-empty"><svg class="ic"><use href="#i-msg"></use></svg><p class="t15b">No selling chats</p><p class="t11 mut3">Buyers will appear here when they inquire</p><span class="btn b-txt b-sm">Boost listing</span></div>
+      <div class="mini-empty"><svg class="ic"><use href="#i-chk"></use></svg><p class="t15b">All caught up</p><p class="t11 mut3">No unread messages</p><span class="btn b-txt b-sm">View all chats</span></div>
+      <div class="mini-empty"><svg class="ic"><use href="#i-bldg"></use></svg><p class="t15b">No listings</p><p class="t11 mut3">Post your property in under 5 minutes</p><span class="btn b-txt b-sm">Post listing</span></div>
+      <div class="mini-empty"><svg class="ic"><use href="#i-bkmk"></use></svg><p class="t15b">No saved properties</p><p class="t11 mut3">Tap the heart on any listing to save it</p><span class="btn b-txt b-sm">Start browsing</span></div>
+      <div class="mini-empty"><svg class="ic"><use href="#i-srch"></use></svg><p class="t15b">No requirements</p><p class="t11 mut3">Tell owners what you're looking for</p><span class="btn b-txt b-sm">Post requirement</span></div>
+      <div class="mini-empty"><svg class="ic"><use href="#i-filter"></use></svg><p class="t15b">No results</p><p class="t11 mut3">Try widening your budget or area</p><span class="btn b-txt b-sm">Clear filters</span></div>
+      <div class="mini-empty"><svg class="ic"><use href="#i-bell"></use></svg><p class="t15b">No notifications</p><p class="t11 mut3">We'll nudge you when something happens</p><span class="btn b-txt b-sm">Notification settings</span></div>
+      <div class="mini-empty"><svg class="ic"><use href="#i-cal"></use></svg><p class="t15b">No visits</p><p class="t11 mut3">Scheduled site visits show up here</p><span class="btn b-txt b-sm">Browse listings</span></div>
+      <div class="mini-empty"><svg class="ic"><use href="#i-send"></use></svg><p class="t15b">No proposals</p><p class="t11 mut3">Send your listing to matching requirements</p><span class="btn b-txt b-sm">See requirements</span></div>
+      <div class="mini-empty"><svg class="ic"><use href="#i-doc"></use></svg><p class="t15b">No drafts</p><p class="t11 mut3">Half-finished listings are saved here</p><span class="btn b-txt b-sm">Start a listing</span></div>
+      <div class="mini-empty"><svg class="ic"><use href="#i-pin"></use></svg><p class="t15b">New here?</p><p class="t11 mut3">Be the first to list in your area of Rajkot</p><span class="btn b-txt b-sm">Post the first listing</span></div>
+      <div class="mini-empty"><svg class="ic"><use href="#i-user"></use></svg><p class="t15b">No leads yet</p><p class="t11 mut3">Boost your listing to reach more buyers</p><span class="btn b-txt b-sm">Boost now</span></div>
+      <div class="mini-empty"><svg class="ic"><use href="#i-trash"></use></svg><p class="t15b">Trash is empty</p><p class="t11 mut3">Deleted listings stay here for 30 days</p><span class="btn b-txt b-sm">Back to listings</span></div>
+      <div class="mini-empty"><svg class="ic"><use href="#i-ban"></use></svg><p class="t15b">No blocked users</p><p class="t11 mut3">People you block will appear here</p><span class="btn b-txt b-sm">Privacy settings</span></div>
+      <div class="mini-empty"><svg class="ic"><use href="#i-ccard"></use></svg><p class="t15b">No payments</p><p class="t11 mut3">Your invoices and receipts will live here</p><span class="btn b-txt b-sm">See plans</span></div>
+    </div>
+  </div>
+
+  <div class="gal-sec" id="g-skel">
+    <h2 class="sec-h" style="margin:0 0 12px">Skeletons</h2>
+    <div class="spec">
+      <div><p class="spec-l">Feed card</p>
+        <div class="stk" style="gap:8px"><div class="sk" style="aspect-ratio:16/9;border-radius:12px"></div><div class="sk" style="height:16px;width:40%"></div><div class="sk" style="height:12px;width:70%"></div></div></div>
+      <div><p class="spec-l">List row</p>
+        <div class="rowf" style="gap:12px"><div class="sk" style="width:56px;height:56px"></div><div class="stk" style="flex:1;gap:8px"><div class="sk" style="height:14px;width:80%"></div><div class="sk" style="height:10px;width:45%"></div></div></div></div>
+      <div><p class="spec-l">Profile</p>
+        <div class="rowf" style="gap:12px"><div class="sk" style="width:64px;height:64px;border-radius:50%"></div><div class="stk" style="flex:1;gap:8px"><div class="sk" style="height:16px;width:50%"></div><div class="sk" style="height:10px;width:70%"></div><div class="sk" style="height:10px;width:30%"></div></div></div></div>
+      <div><p class="spec-l">Grid</p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><div class="sk" style="aspect-ratio:1"></div><div class="sk" style="aspect-ratio:1"></div></div></div>
+      <div><p class="spec-l">Chat</p>
+        <div class="stk" style="gap:8px"><div class="sk" style="height:36px;width:60%;border-radius:12px 12px 12px 4px"></div><div class="sk" style="height:36px;width:50%;border-radius:12px 12px 4px 12px;align-self:flex-end"></div><div class="sk" style="height:36px;width:65%;border-radius:12px 12px 12px 4px"></div></div></div>
+      <div><p class="spec-l">Shimmer spec</p><p class="t13 mut2">surface2 base · linear-gradient sweep · 1.4s loop · respects reduced-motion</p></div>
+    </div>
+  </div>
+
+  <div class="gal-sec" id="g-avatars">
+    <h2 class="sec-h" style="margin:0 0 12px">Avatars</h2>
+    <div class="spec">
+      <div><p class="spec-l">Sizes 24 / 32 / 48 / 64 / 84</p>
+        <div class="rowf" style="gap:12px;align-items:flex-end"><span class="av" style="width:24px;height:24px;font-size:10px">R</span><span class="av" style="width:32px;height:32px;font-size:13px">RM</span><span class="av" style="width:48px;height:48px;font-size:17px">RM</span><span class="av" style="width:64px;height:64px;font-size:20px">RM</span><span class="av" style="width:84px;height:84px;font-size:24px">RM</span></div></div>
+      <div><p class="spec-l">Photo / initials / fallback icon</p>
+        <div class="rowf" style="gap:12px"><span class="av ph" style="width:48px;height:48px"><svg class="ic i20" style="color:#fff"><use href="#i-user"></use></svg></span><span class="av" style="width:48px;height:48px;font-size:17px">PS</span><span class="av" style="width:48px;height:48px;background:var(--s3);color:var(--i3)"><svg class="ic i20"><use href="#i-user"></use></svg></span></div></div>
+      <div><p class="spec-l">Story rings — unseen / seen / project / boosted</p>
+        <div class="rowf" style="gap:12px"><span class="ring"><span class="av ph2" style="width:48px;height:48px"></span></span><span class="ring seen"><span class="av ph3" style="width:48px;height:48px"></span></span><span class="ring proj"><span class="av ph4" style="width:48px;height:48px"></span></span><span class="ring boost"><span class="av ph5" style="width:48px;height:48px"></span></span></div></div>
+      <div><p class="spec-l">With verified badge overlay</p>
+        <span class="av" style="width:64px;height:64px;font-size:20px;overflow:visible">RM<svg class="ic i20" style="position:absolute;right:-2px;bottom:-2px;color:var(--acc);background:var(--page);border-radius:50%;padding:1px"><use href="#i-vbadge"></use></svg></span></div>
+    </div>
+  </div>
+
+  <div class="gal-sec" id="g-bars">
+    <h2 class="sec-h" style="margin:0 0 12px">Bars</h2>
+    <div class="spec">
+      <div><p class="spec-l">Header — default / scroll-morphed</p>
+        <div class="stk" style="gap:8px">
+          <div class="rowf" style="height:56px;background:var(--sf1);border:1px solid var(--dv);border-radius:8px;padding:0 8px;gap:4px"><svg class="ic" style="margin:0 10px"><use href="#i-back"></use></svg><span class="t17">3 BHK in Shivalik Residency</span></div>
+          <div class="rowf" style="height:48px;background:var(--sf1);border:1px solid var(--dv);border-radius:8px;padding:0 8px;gap:4px;box-shadow:var(--sh2)"><svg class="ic" style="margin:0 10px"><use href="#i-back"></use></svg><span class="stk"><span class="t13b">₹85 Lakh · 3 BHK</span><span class="t11 mut3">Kalawad Road</span></span></div>
+        </div></div>
+      <div><p class="spec-l">Bottom nav — 5 tabs (Home active · Chats unread)</p>
+        <div class="bnav" style="border:1px solid var(--dv);border-radius:12px">
+          <span class="onx"><svg class="ic"><use href="#i-home"></use></svg>Home</span>
+          <span><svg class="ic"><use href="#i-srch"></use></svg>Search</span>
+          <span><span style="width:36px;height:36px;border-radius:10px;background:var(--acc);display:flex;align-items:center;justify-content:center;margin-top:-10px"><svg class="ic i20" style="stroke:#fff"><use href="#i-plus"></use></svg></span>Post</span>
+          <span><svg class="ic"><use href="#i-msg"></use></svg>Chats<i style="position:absolute;top:6px;right:22%;width:16px;height:16px;border-radius:50%;background:var(--err);color:#fff;font-size:9px;font-style:normal;font-weight:600;display:flex;align-items:center;justify-content:center">3</i></span>
+          <span><svg class="ic"><use href="#i-user"></use></svg>Profile</span>
+        </div></div>
+      <div><p class="spec-l">Sticky detail bar — 3 variants</p>
+        <div class="stk" style="gap:8px">
+          <div class="rowf" style="gap:8px;background:var(--sf1);border:1px solid var(--dv);border-radius:8px;padding:12px"><span class="btn b-out" style="flex:1;pointer-events:none"><svg class="ic i20"><use href="#i-msg"></use></svg>Chat</span><span class="btn b-pri" style="flex:1;pointer-events:none"><svg class="ic i20" style="stroke:#fff"><use href="#i-phone"></use></svg>Call owner</span></div>
+          <div class="rowf" style="gap:12px;background:var(--sf1);border:1px solid var(--dv);border-radius:8px;padding:12px"><span class="stk" style="flex:1"><span class="t13b">Owner's number is locked</span><span class="t11 mut3">Unlock with the ₹999 plan</span></span><span class="btn b-pri" style="pointer-events:none"><svg class="ic i20" style="stroke:#fff"><use href="#i-lock"></use></svg>Unlock</span></div>
+          <div class="rowf" style="gap:8px;background:var(--sf1);border:1px solid var(--dv);border-radius:8px;padding:12px"><span class="ibtn" style="border:1px solid var(--bd);border-radius:8px"><svg class="ic"><use href="#i-heart"></use></svg></span><span class="btn b-pri" style="flex:1;pointer-events:none"><svg class="ic i20" style="stroke:#fff"><use href="#i-send"></use></svg>Send proposal</span></div>
+        </div></div>
+      <div><p class="spec-l">Usage bar</p>
+        <div class="stk" style="gap:6px"><div class="rowf" style="justify-content:space-between"><span class="t13b">Proposals</span><span class="t13 mut2">7 of 10 used</span></div><div style="height:6px;border-radius:999px;background:var(--s3);overflow:hidden"><div style="width:70%;height:100%;background:var(--acc)"></div></div></div></div>
+      <div><p class="spec-l">Progress dots</p>
+        <div class="rowf" style="gap:6px"><span style="width:8px;height:8px;border-radius:50%;background:var(--acc)"></span><span style="width:8px;height:8px;border-radius:50%;background:var(--acc)"></span><span style="width:8px;height:8px;border-radius:50%;background:var(--s3)"></span><span style="width:8px;height:8px;border-radius:50%;background:var(--s3)"></span><span style="width:8px;height:8px;border-radius:50%;background:var(--s3)"></span></div></div>
+      <div><p class="spec-l">Countdown bar</p>
+        <div class="stk" style="gap:6px"><div class="rowf" style="justify-content:space-between"><span class="rowf t13b" style="gap:4px"><svg class="ic i16" style="color:var(--wrn)"><use href="#i-clock"></use></svg>Boost ends in 3d 14h</span><span class="t13" style="color:var(--acc);font-weight:600">Extend</span></div><div style="height:4px;border-radius:999px;background:var(--s3);overflow:hidden"><div style="width:52%;height:100%;background:var(--wrn)"></div></div></div></div>
+      <div><p class="spec-l">"New listings" pill</p>
+        <span class="rowf" style="align-self:center;gap:6px;background:var(--acc);color:#fff;border-radius:999px;padding:8px 16px;font-size:13px;font-weight:600;box-shadow:var(--sh2)"><svg class="ic i16" style="stroke:#fff;transform:rotate(-90deg)"><use href="#i-chr"></use></svg>12 new listings</span></div>
+      <div><p class="spec-l">Offline banner</p>
+        <div class="rowf" style="gap:8px;background:var(--i1);color:var(--page);border-radius:8px;padding:8px 16px;font-size:13px;justify-content:center"><svg class="ic i16" style="stroke:var(--page)"><use href="#i-wifioff"></use></svg>You're offline — showing saved data</div></div>
+      <div><p class="spec-l">Admin banner slot</p>
+        <div class="rowf" style="gap:8px;border:1.5px dashed var(--bd);border-radius:8px;padding:10px 16px;font-size:13px;color:var(--i3);justify-content:center">Admin announcement slot · dismissible · infoSoft bg</div></div>
+    </div>
+  </div>
+
+  <div class="gal-sec" id="g-misc" style="border-bottom:0">
+    <h2 class="sec-h" style="margin:0 0 12px">Misc</h2>
+    <div class="spec">
+      <div><p class="spec-l">NumberCard</p>
+        <div class="card stk" style="padding:16px;gap:8px;border-color:var(--acc)">
+          <p class="t11b mut3">Owner's number</p>
+          <div class="rowf" style="justify-content:space-between"><span class="t20">+91 98242 55482</span><span class="btn b-pri b-sm" style="pointer-events:none"><svg class="ic i16" style="stroke:#fff"><use href="#i-phone"></use></svg>Call</span></div>
+          <p class="t11 mut3">Shared with you after Rakesh accepted your inquiry · 12 Jan</p>
+        </div></div>
+      <div><p class="spec-l">System message card</p>
+        <div style="background:var(--s2);border-radius:8px;padding:10px 16px;text-align:center" class="t11 mut3">Rakesh accepted your inquiry. His number is now visible to you.</div></div>
+      <div><p class="spec-l">Quoted reply</p>
+        <div class="bub me" style="max-width:100%"><div style="border-left:3px solid var(--acc);background:rgba(0,0,0,.05);border-radius:6px;padding:6px 10px;font-size:13px;color:var(--i2);margin-bottom:6px">Is the society pet-friendly?</div>Yes — small pets are fine, there's a register at the gate.</div></div>
+      <div><p class="spec-l">Reaction chip</p>
+        <span class="chip" style="height:26px;padding:0 10px"><svg class="ic i16" style="color:var(--err);fill:var(--err)"><use href="#i-heart"></use></svg><span class="t11b" style="text-transform:none">2</span></span></div>
+      <div><p class="spec-l">Date separator / unread divider</p>
+        <div class="stk" style="gap:10px">
+          <div class="rowf" style="gap:12px"><span style="flex:1;height:1px;background:var(--dv)"></span><span class="t11 mut3">Yesterday</span><span style="flex:1;height:1px;background:var(--dv)"></span></div>
+          <div class="rowf" style="gap:12px"><span style="flex:1;height:1px;background:var(--err)"></span><span class="t11b" style="color:var(--err)">Unread messages</span><span style="flex:1;height:1px;background:var(--err)"></span></div>
+        </div></div>
+      <div><p class="spec-l">Typing indicator</p>
+        <span class="bub them rowf" style="gap:4px;width:56px;justify-content:center"><span class="tyd"></span><span class="tyd" style="animation-delay:.15s"></span><span class="tyd" style="animation-delay:.3s"></span></span></div>
+      <div><p class="spec-l">Coach mark</p>
+        <div style="position:relative;padding-top:10px"><span style="position:absolute;top:2px;left:28px;width:14px;height:14px;background:var(--i1);transform:rotate(45deg)"></span><div style="background:var(--i1);color:var(--page);border-radius:8px;padding:12px 16px;font-size:13px;max-width:260px">Tap the flame to mark your requirement urgent — owners reply 2× faster.<div class="rowf" style="justify-content:space-between;margin-top:8px"><span class="t11" style="opacity:.6">1 of 3</span><span class="t13b" style="color:var(--acc)">Next</span></div></div></div></div>
+      <div><p class="spec-l">QR card</p>
+        <div class="card rowf" style="padding:16px;gap:16px"><span style="width:84px;height:84px;border-radius:8px;background:var(--s2);display:flex;align-items:center;justify-content:center"><svg class="ic i48"><use href="#i-qr"></use></svg></span><div class="stk" style="gap:4px;flex:1"><span class="t15b">Share your listing offline</span><span class="t13 mut2">Print this QR for your window or society noticeboard</span><span class="t13b" style="color:var(--acc)">Download QR</span></div></div></div>
+      <div><p class="spec-l">OG share-image template (1200×630)</p>
+        <div style="aspect-ratio:1200/630;border-radius:12px;overflow:hidden;position:relative;border:1px solid var(--bd)" class="ph2">
+          <div style="position:absolute;inset:0;background:linear-gradient(0deg,rgba(0,0,0,.65),transparent 60%)"></div>
+          <span style="position:absolute;top:12px;left:14px;font-weight:700;color:#fff;font-size:15px">Homz<b style="color:#4ADE8C">List</b></span>
+          <div style="position:absolute;left:14px;bottom:12px;color:#fff"><p style="font-size:20px;font-weight:700">₹85 Lakh · 3 BHK</p><p style="font-size:13px;opacity:.85">Shivalik Residency, Kalawad Road, Rajkot</p></div>
+          <span class="badge bg-sol" style="position:absolute;top:12px;right:12px">For Sale</span>
+        </div></div>
+      <div><p class="spec-l">Watermark on photo</p>
+        <div class="ph4" style="aspect-ratio:16/9;border-radius:12px;position:relative;overflow:hidden"><svg class="ic i48"><use href="#i-home"></use></svg><span style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;transform:rotate(-18deg);font-weight:700;font-size:24px;color:rgba(255,255,255,.35);letter-spacing:2px">HomzList</span><span style="position:absolute;right:8px;bottom:6px;font-size:11px;color:rgba(255,255,255,.8)">HL-88213</span></div></div>
+      <div><p class="spec-l">Cascade section header</p>
+        <div class="rowf" style="gap:12px"><span class="t17">Mavdi</span><span class="t13 mut3">124 listings</span><span style="flex:1;height:1px;background:var(--dv)"></span><span class="t13b" style="color:var(--acc)">See all</span></div></div>
+      <div><p class="spec-l">Rich link preview</p>
+        <div class="card rowf" style="overflow:hidden"><span class="ph5 rowf" style="width:84px;height:84px;justify-content:center;flex:none"><svg class="ic i20"><use href="#i-home"></use></svg></span><div class="stk" style="padding:10px 12px;gap:2px;min-width:0"><span class="t13b" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">₹52 Lakh · 2 BHK in Mavdi — HomzList</span><span class="t11 mut3" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Ready to move · 1,050 sq ft · Verified owner</span><span class="t11 mut3">homzlist.com</span></div></div></div>
+      <div><p class="spec-l">Install prompt — Android</p>
+        <div class="card rowf" style="padding:12px 16px;gap:12px"><span style="width:44px;height:44px;border-radius:10px;background:var(--acc);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:20px">H</span><div class="stk" style="flex:1;gap:2px"><span class="t15b">Install HomzList</span><span class="t11 mut3">Fast, light, works offline</span></div><span class="btn b-pri b-sm" style="pointer-events:none">Install</span><svg class="ic i20 mut3"><use href="#i-x"></use></svg></div></div>
+      <div><p class="spec-l">iOS install guide overlay</p>
+        <div style="background:var(--i1);color:var(--page);border-radius:12px;padding:16px" class="stk">
+          <p class="t15b">Add HomzList to your Home Screen</p>
+          <p class="t13" style="opacity:.75;margin-top:4px">Tap the <svg class="ic i16" style="vertical-align:-3px;stroke:var(--page)"><use href="#i-share"></use></svg> Share button, then "Add to Home Screen".</p>
+          <span style="align-self:center;margin-top:10px;width:0;height:0;border-left:8px solid transparent;border-right:8px solid transparent;border-top:10px solid var(--i1);margin-bottom:-24px"></span>
+        </div></div>
+      <div><p class="spec-l">Cookie consent (guest first visit)</p>
+        <div class="stk" style="background:var(--sf1);border:1px solid var(--bd);border-radius:12px;padding:16px;gap:10px;box-shadow:var(--sh2)">
+          <p class="t13 mut2">We use cookies to keep you signed in and improve HomzList. Read our <a href="#priv" data-nav="s-terms">Privacy Policy</a> and <a href="#cook" data-nav="s-terms">Cookie Policy</a>.</p>
+          <div class="rowf" style="gap:8px"><button class="btn b-out b-sm" style="flex:1" data-toast="Cookie preferences (demo)">Manage</button><button class="btn b-pri b-sm" style="flex:1" data-toast="Cookies accepted">Accept</button></div>
+        </div></div>
+      <div><p class="spec-l">Error illustration family — one visual language</p>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;text-align:center">
+          <div class="stk" style="align-items:center;gap:6px;background:var(--sf1);border:1px solid var(--bd);border-radius:12px;padding:12px 4px"><span class="rowf" style="gap:2px;color:var(--i3);font-weight:700;font-size:17px">4<svg class="ic" style="color:var(--acc)"><use href="#i-home"></use></svg>4</span><span class="t11 mut3">Not found</span></div>
+          <div class="stk" style="align-items:center;gap:6px;background:var(--sf1);border:1px solid var(--bd);border-radius:12px;padding:12px 4px"><svg class="ic i32" style="color:var(--i3)"><use href="#i-cloudoff"></use></svg><span class="t11 mut3">Offline</span></div>
+          <div class="stk" style="align-items:center;gap:6px;background:var(--sf1);border:1px solid var(--bd);border-radius:12px;padding:12px 4px"><svg class="ic i32" style="color:var(--i3)"><use href="#i-wrench"></use></svg><span class="t11 mut3">Maintenance</span></div>
+          <div class="stk" style="align-items:center;gap:6px;background:var(--sf1);border:1px solid var(--bd);border-radius:12px;padding:12px 4px"><svg class="ic i32" style="color:var(--i3)"><use href="#i-warnt"></use></svg><span class="t11 mut3">Crash</span></div>
+        </div></div>
+    </div>
+  </div>
+</section>
+
+<div class="toastc" id="toastc"></div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script="">
+class Component extends DCLogic {
+  componentDidMount() {
+    const $ = (s, r) => (r || document).querySelector(s);
+    const $$ = (s, r) => [...(r || document).querySelectorAll(s)];
+    this.stack = ['s-home']; this.sheets = []; this.dlgs = [];
+    history.replaceState({ d: 1 }, '');
+    const scrim = document.createElement('div'); scrim.className = 'scrim'; document.body.appendChild(scrim); this.scrimEl = scrim;
+    scrim.addEventListener('click', () => history.back());
+
+    const toast = (msg, cls) => {
+      const c = $('#toastc'); if (!c) return;
+      const t = document.createElement('div'); t.className = 'toast' + (cls ? ' ' + cls : ''); t.textContent = msg;
+      c.appendChild(t);
+      setTimeout(() => { t.classList.add('out'); setTimeout(() => t.remove(), 220); }, 3000);
+    };
+    this.toast = toast;
+
+    const sw = (id) => {
+      $$('.scr.on').forEach(e => e.classList.remove('on'));
+      const el = document.getElementById(id);
+      if (el) el.classList.add('on');
+      window.scrollTo(0, 0);
+      this.afterShow(id);
+    };
+    this.sw = sw;
+    this.nav = (id, arg) => {
+      if (!document.getElementById(id)) { toast('Screen not built in this batch'); return; }
+      // force-close any open overlays (e.g. navigating from a dialog/sheet)
+      this.dlgs.forEach(d => document.getElementById(d)?.classList.remove('on'));
+      this.sheets.forEach(s => document.getElementById(s)?.classList.remove('on'));
+      this.dlgs = []; this.sheets = []; this.scrimEl.classList.remove('on');
+      this.prep(id, arg);
+      this.stack.push(id);
+      history.pushState({ d: this.stack.length + this.sheets.length + this.dlgs.length }, '');
+      sw(id);
+    };
+    const syncScrim = () => scrim.classList.toggle('on', this.sheets.length > 0);
+    this.openSheet = (id) => {
+      const el = document.getElementById(id); if (!el) return;
+      el.classList.add('on'); this.sheets.push(id); syncScrim();
+      history.pushState({ d: this.stack.length + this.sheets.length + this.dlgs.length }, '');
+    };
+    this.openDlg = (id) => {
+      const el = document.getElementById(id); if (!el) return;
+      el.classList.add('on'); this.dlgs.push(id);
+      history.pushState({ d: this.stack.length + this.sheets.length + this.dlgs.length }, '');
+      if (id === 'dg-terms') this.resetTerms();
+    };
+    const closeTop = () => {
+      if (this.dlgs.length) { const id = this.dlgs.pop(); document.getElementById(id)?.classList.remove('on'); return true; }
+      if (this.sheets.length) { const id = this.sheets.pop(); document.getElementById(id)?.classList.remove('on'); syncScrim(); return true; }
+      if (this.stack.length > 1) { this.stack.pop(); sw(this.stack[this.stack.length - 1]); return true; }
+      return false;
+    };
+    window.addEventListener('popstate', () => { closeTop(); });
+
+    // click delegation
+    document.addEventListener('click', (e) => {
+      const q = (a) => e.target.closest('[' + a + ']');
+      let t;
+      if ((t = q('data-back'))) { history.back(); return; }
+      if ((t = q('data-close'))) { history.back(); return; }
+      if ((t = q('data-nav'))) { this.nav(t.dataset.nav, t.dataset.arg); this.closeTB(t); return; }
+      if ((t = q('data-sheet'))) { this.openSheet(t.dataset.sheet); this.closeTB(t); return; }
+      if ((t = q('data-dlg'))) { this.openDlg(t.dataset.dlg); this.closeTB(t); return; }
+      if ((t = q('data-toast'))) { toast(t.dataset.toast); return; }
+      if ((t = q('data-copy'))) { try { navigator.clipboard.writeText(t.dataset.copy); } catch (err) {} toast('Copied to clipboard'); return; }
+      if ((t = q('data-jump'))) { this.jump(t.dataset.jump); if (this.sheets.length) history.back(); return; }
+      if ((t = q('data-tab'))) { this.tab(t); return; }
+      if ((t = q('data-accx'))) {
+        const body = t.nextElementSibling, open = body.style.maxHeight && body.style.maxHeight !== '0px';
+        body.style.maxHeight = open ? '0px' : body.scrollHeight + 'px';
+        const ch = t.querySelector('.chd-i'); if (ch) ch.classList.toggle('rot', !open);
+        return;
+      }
+      if ((t = q('data-cgrp'))) { // radio chip groups
+        $$('[data-cgrp="' + t.dataset.cgrp + '"]').forEach(c => c.classList.remove('on'));
+        t.classList.add('on');
+        if (t.dataset.cgrp === 'blogcat') this.blogFilter(t.textContent.trim());
+        return;
+      }
+      if ((t = q('data-act'))) { this.act(t.dataset.act, t, e); return; }
+    });
+
+    // input delegation
+    document.addEventListener('input', (e) => {
+      const el = e.target;
+      if (el.dataset.filter === 'help') this.helpFilter(el.value);
+      if (el.dataset.count) {
+        const max = el.dataset.count, c = el.parentElement.querySelector('.cnt');
+        if (c) c.textContent = el.value.length + ' / ' + max;
+        if (el.value.length > +max) el.value = el.value.slice(0, +max);
+      }
+      if (el.id === 'del-in') { const b = $('#del-go'); if (b) b.disabled = el.value.trim() !== 'DELETE'; }
+      if (el.classList.contains('otp-in')) {
+        el.value = el.value.replace(/\D/g, '').slice(-1);
+        if (el.value) { const nx = el.nextElementSibling; if (nx && nx.classList.contains('otp-in')) nx.focus(); }
+        const all = $$('.otp-in', el.closest('.otp-grp')), full = all.every(i => i.value);
+        const vb = el.closest('.scr, .dlg')?.querySelector('[data-act="otp-verify"]'); if (vb) vb.disabled = !full;
+      }
+    });
+    document.addEventListener('keydown', (e) => {
+      const el = e.target;
+      if (el.classList && el.classList.contains('otp-in') && e.key === 'Backspace' && !el.value) {
+        const pv = el.previousElementSibling; if (pv && pv.classList.contains('otp-in')) { pv.focus(); pv.value = ''; }
+      }
+      if (e.key === 'Escape' && (this.sheets.length || this.dlgs.length)) history.back();
+    });
+
+    // scroll: blog progress + terms preview gate
+    window.addEventListener('scroll', (e) => {
+      if (e.target === document && $('#s-post')?.classList.contains('on')) {
+        const h = document.documentElement, max = h.scrollHeight - h.clientHeight;
+        const p = max > 0 ? Math.min(100, (h.scrollTop || window.scrollY) / max * 100) : 0;
+        const bar = $('#post-prog'); if (bar) bar.style.width = p + '%';
+      }
+      const tv = e.target;
+      if (tv && tv.id === 'tprev' && tv.scrollTop + tv.clientHeight >= tv.scrollHeight - 8) {
+        const b = $('#agree-btn'); if (b) b.disabled = false;
+      }
+    }, true);
+
+    // sheet swipe-down
+    let sy = null, sEl = null;
+    document.addEventListener('touchstart', (e) => {
+      sEl = e.target.closest('.sheet.on'); if (!sEl) return;
+      const bd = sEl.querySelector('.sh-bd');
+      if (bd && bd.contains(e.target) && bd.scrollTop > 0) { sEl = null; return; }
+      sy = e.touches[0].clientY;
+    }, { passive: true });
+    document.addEventListener('touchmove', (e) => {
+      if (!sEl || sy == null) return;
+      const dy = e.touches[0].clientY - sy;
+      if (dy > 0) sEl.style.transform = 'translate(-50%,' + dy + 'px)';
+    }, { passive: true });
+    document.addEventListener('touchend', (e) => {
+      if (!sEl || sy == null) return;
+      const dy = e.changedTouches[0].clientY - sy;
+      sEl.style.transform = '';
+      if (dy > 90) history.back();
+      sEl = null; sy = null;
+    });
+  }
+
+  closeTB(t) { const tb = document.getElementById('devtb'); if (tb && tb.contains(t)) tb.classList.remove('open'); }
+
+  prep(id, arg) {
+    const $ = (s) => document.querySelector(s);
+    if (id === 's-help-cat' && arg) $('#hcat-t').textContent = arg.replace(/&amp;/g, '&');
+    if (id === 's-tk-thread') this.setThreadClosed(arg === 'closed');
+    if (id === 's-otp') {
+      const scr = $('#s-otp'); scr.dataset.flow = arg || 'deactivate';
+      $('#otp-t').textContent = arg === 'delete' ? 'Confirm deletion' : 'Confirm deactivation';
+      $('#otp-btn-t').textContent = arg === 'delete' ? 'Verify & delete' : 'Verify & deactivate';
+      scr.querySelectorAll('.otp-in').forEach(i => i.value = '');
+      const vb = scr.querySelector('[data-act="otp-verify"]'); if (vb) vb.disabled = true;
+    }
+    if (id === 's-tk-new' && arg === 'grievance') this.setTkCat('Grievance complaint');
+  }
+
+  afterShow(id) {
+    if (id === 's-tk-success') {
+      const w = document.querySelector('#s-tk-success .chk-draw');
+      if (w) { w.classList.remove('chk-draw'); void w.getBoundingClientRect(); w.classList.add('chk-draw'); }
+    }
+    if (id === 's-otp') setTimeout(() => document.querySelector('#s-otp .otp-in')?.focus(), 150);
+  }
+
+  setThreadClosed(closed) {
+    const scr = document.getElementById('s-tk-thread'); if (!scr) return;
+    scr.classList.toggle('closed', closed);
+    const b = scr.querySelector('#th-badge');
+    if (b) { b.className = 'badge ' + (closed ? 'bg-mut' : 'bg-inf'); b.textContent = closed ? 'Closed' : 'Open'; }
+    scr.querySelector('#th-composer')?.classList.toggle('hide', closed);
+    scr.querySelector('#th-closedbar')?.classList.toggle('hide', !closed);
+  }
+
+  setTkCat(v) {
+    const el = document.getElementById('tkcat-val');
+    if (el) { el.textContent = v; el.style.color = 'var(--i1)'; }
+    ['tk-c-pay', 'tk-c-num', 'tk-c-rep'].forEach(x => document.getElementById(x)?.classList.add('hide'));
+    if (v === 'Payment or refund') document.getElementById('tk-c-pay')?.classList.remove('hide');
+    if (v === 'Lost access to my number') document.getElementById('tk-c-num')?.classList.remove('hide');
+    if (v === 'Report a user or listing') document.getElementById('tk-c-rep')?.classList.remove('hide');
+  }
+
+  helpFilter(q) {
+    q = q.trim().toLowerCase();
+    const items = document.querySelectorAll('#s-help [data-search]');
+    let n = 0;
+    items.forEach(it => {
+      const hit = !q || (it.textContent + ' ' + it.dataset.search).toLowerCase().includes(q);
+      it.style.display = hit ? '' : 'none';
+      if (hit) n++;
+    });
+    const empty = document.getElementById('help-empty'), main = document.getElementById('help-main');
+    const none = q && n === 0;
+    empty.classList.toggle('hide', !none);
+    main.classList.toggle('hide', !!none);
+    document.getElementById('help-empty-q').textContent = q;
+  }
+
+  blogFilter(cat) {
+    document.querySelectorAll('#blog-rows [data-cat]').forEach(r => {
+      r.style.display = (cat === 'All' || r.dataset.cat === cat) ? '' : 'none';
+    });
+  }
+
+  jump(id) {
+    const el = document.getElementById(id); if (!el) return;
+    const y = el.getBoundingClientRect().top + window.scrollY - 108;
+    window.scrollTo({ top: y, behavior: 'smooth' });
+  }
+
+  tab(t) {
+    const bar = t.closest('[data-tabs]'); if (!bar) return;
+    bar.querySelectorAll('[data-tab]').forEach(b => b.classList.toggle('on', b === t));
+    const grp = bar.dataset.tabs, v = t.dataset.tab;
+    document.querySelectorAll('[data-tabv][data-tabgrp="' + grp + '"]').forEach(r => {
+      r.style.display = r.dataset.tabv.split(' ').includes(v) ? '' : 'none';
+    });
+  }
+
+  resetTerms() {
+    const b = document.getElementById('agree-btn'); if (b) b.disabled = true;
+    const p = document.getElementById('tprev'); if (p) p.scrollTop = 0;
+  }
+
+  act(name, t, e) {
+    const $ = (s) => document.querySelector(s);
+    const toast = this.toast;
+    switch (name) {
+      case 'tb': t.closest('.tb').classList.toggle('open'); break;
+      case 'theme': {
+        document.body.dataset.theme = t.dataset.v === 'dark' ? 'dark' : '';
+        document.querySelectorAll('[data-act="theme"]').forEach(b => b.classList.toggle('on', b.dataset.v === t.dataset.v));
+        break;
+      }
+      case 'themetgl': {
+        const dk = document.body.dataset.theme === 'dark';
+        document.body.dataset.theme = dk ? '' : 'dark';
+        document.querySelectorAll('[data-act="theme"]').forEach(b => b.classList.toggle('on', b.dataset.v === (dk ? 'light' : 'dark')));
+        break;
+      }
+      case 'vp': {
+        document.body.dataset.vp = t.dataset.v === 'auto' ? '' : t.dataset.v;
+        document.querySelectorAll('[data-act="vp"]').forEach(b => b.classList.toggle('on', b === t));
+        break;
+      }
+      case 'sess': {
+        document.body.classList.toggle('guest', t.dataset.v === 'guest');
+        document.querySelectorAll('[data-act="sess"]').forEach(b => b.classList.toggle('on', b === t));
+        toast(t.dataset.v === 'guest' ? 'Viewing as guest' : 'Viewing as logged-in user');
+        break;
+      }
+      case 'tstate': {
+        const on = document.body.classList.toggle(t.dataset.v);
+        t.classList.toggle('on', on);
+        break;
+      }
+      case 'helpchip': {
+        const q = t.textContent.trim();
+        const inp = $('#help-q'); inp.value = q;
+        document.querySelectorAll('#help-chips .chip').forEach(c => c.classList.toggle('on', c === t));
+        this.helpFilter(q === 'Chat & Numbers' ? 'chat' : q);
+        break;
+      }
+      case 'fb-yes': case 'fb-no': {
+        const w = t.closest('.fbk');
+        w.querySelector('.fbk-btns').classList.add('hide');
+        w.querySelector('.fbk-thanks').classList.remove('hide');
+        if (name === 'fb-no') w.querySelector('.fbk-no').classList.remove('hide');
+        break;
+      }
+      case 'fb-send': {
+        const w = t.closest('.fbk');
+        w.querySelector('.fbk-no').classList.add('hide');
+        toast('Thanks for your feedback');
+        break;
+      }
+      case 'tkcat': { this.setTkCat(t.dataset.v); history.back(); break; }
+      case 'att': {
+        if (t.classList.contains('up')) return;
+        t.classList.add('up');
+        break;
+      }
+      case 'att-rm': { e.stopPropagation(); t.closest('.upl').classList.remove('up'); break; }
+      case 'submit-ticket': this.nav('s-tk-success'); break;
+      case 'send-msg': {
+        const ta = $('#th-in'); const v = (ta.value || '').trim(); if (!v) return;
+        const list = $('#th-msgs');
+        const d = document.createElement('div');
+        d.className = 'bub me'; d.textContent = v;
+        list.appendChild(d);
+        const m = document.createElement('div'); m.className = 'sysline'; m.textContent = 'Just now';
+        list.appendChild(m);
+        ta.value = '';
+        break;
+      }
+      case 'reopen': { this.setThreadClosed(false); toast('Ticket reopened'); break; }
+      case 'reason': {
+        const box = t.closest('.rsn-grp');
+        box.querySelectorAll('.radio').forEach(r => r.classList.remove('on'));
+        t.querySelector('.radio').classList.add('on');
+        const b = $('#del1-go'); if (b) b.disabled = false;
+        break;
+      }
+      case 'otp-verify': {
+        const flow = $('#s-otp').dataset.flow;
+        this.nav(flow === 'delete' ? 's-grace' : 's-deactivated');
+        break;
+      }
+      case 'agree': { history.back(); toast('Thanks — terms accepted'); break; }
+      case 'data-req': {
+        $('#data-idle').classList.add('hide');
+        $('#data-requested').classList.remove('hide');
+        setTimeout(() => {
+          $('#data-requested').classList.add('hide');
+          $('#data-ready').classList.remove('hide');
+          toast('Your data is ready');
+        }, 2600);
+        break;
+      }
+      case 'data-dl': toast('Downloading homzlist-data-12jan2025.zip'); break;
+      case 'data-again': {
+        $('#data-ready').classList.add('hide');
+        $('#data-idle').classList.remove('hide');
+        break;
+      }
+      case 'retry': {
+        const lb = t.querySelector('.rlbl'), sp = t.querySelector('.spin');
+        lb.classList.add('hide'); sp.classList.remove('hide'); t.disabled = true;
+        setTimeout(() => { lb.classList.remove('hide'); sp.classList.add('hide'); t.disabled = false; toast('Still offline', 'terr'); }, 1500);
+        break;
+      }
+      case 'retry-m': {
+        const lb = t.querySelector('.rlbl'), sp = t.querySelector('.spin');
+        lb.classList.add('hide'); sp.classList.remove('hide'); t.disabled = true;
+        setTimeout(() => { lb.classList.remove('hide'); sp.classList.add('hide'); t.disabled = false; toast('Still under maintenance — try again soon'); }, 1500);
+        break;
+      }
+      case 'cancel-del': { toast('Deletion cancelled — welcome back'); this.nav('s-account'); break; }
+      case 'load-more': toast("You're all caught up"); break;
+      case 'tglx': t.classList.toggle('on'); break;
+      case 'stackdemo': { this.openSheet('sh-jump'); setTimeout(() => this.openSheet('sh-share'), 350); break; }
+      case 'toc': {
+        const body = $('#toc-body'), open = body.style.maxHeight && body.style.maxHeight !== '0px';
+        body.style.maxHeight = open ? '0px' : body.scrollHeight + 'px';
+        t.querySelector('.chd-i')?.classList.toggle('rot', !open);
+        break;
+      }
+    }
+  }
+
+  renderVals() { return {}; }
+}
+</script>
+
+
+</body></html>

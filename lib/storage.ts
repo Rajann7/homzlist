@@ -37,6 +37,10 @@ export const BUCKET = {
    *  accepting spreadsheets here never loosens the mime guard on the bucket
    *  holding user-uploaded ownership proofs and ID scans. */
   adminExports: "admin-exports",
+  /** A user's own DPDP data export (0113). Private, and separate from
+   *  `admin-exports` so a user download path can never be pointed at an
+   *  operator's export of everybody. */
+  userExports: "user-exports",
 } as const;
 
 export function storageDriver(): StorageDriver {

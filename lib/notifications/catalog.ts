@@ -40,7 +40,12 @@ export type NotificationType =
   // so the only way to send one was a cast — which compiles, runs, and hides
   // the next genuinely-missing type behind the same cast.
   | "verification_approved" | "verification_rejected" | "verification_revoked"
-  | "account_suspended" | "admin_message" | "role_changed";
+  | "account_suspended" | "admin_message" | "role_changed"
+  // Module 12 (P12). All four are critical and carry no pref_group — a ticket
+  // acknowledgement, an export link that expires in 48 hours and a scheduled
+  // account deletion are not things a preference switch should be able to hide.
+  | "support_ticket_created" | "support_ticket_replied"
+  | "data_export_ready" | "account_deletion_scheduled";
 
 export type NotificationCategory = "inquiry" | "listing" | "requirement" | "payment";
 

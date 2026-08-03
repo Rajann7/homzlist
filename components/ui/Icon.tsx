@@ -161,7 +161,19 @@ export type IconName =
   | "nav-search"
   | "nav-create"
   | "nav-message"
-  | "nav-profile";
+  | "nav-profile"
+  /* P12 draws six glyphs this set had never needed: the Help centre's
+   * Getting-Started bolt and Plans rupee, the maintenance wrench, the offline
+   * page's struck-through cloud (distinct from `wifi-off`, which the offline
+   * BANNER uses), the Blog book, and the deactivate pause. Traced from the
+   * design's own symbol defs so they are the same shapes, in the same 24x24 /
+   * 1.5px outline family. */
+  | "zap"
+  | "rupee"
+  | "wrench"
+  | "cloud-off"
+  | "book"
+  | "pause";
 
 interface IconProps extends React.SVGProps<SVGSVGElement> {
   name: IconName;
@@ -645,6 +657,36 @@ const PATHS: Record<IconName, (f: boolean) => React.ReactNode> = {
     <>
       <path d="M5 21V4" />
       <path d="M5 4h11l-2 3 2 3H5" />
+    </>
+  ),
+  zap: () => <path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z" />,
+  rupee: () => (
+    <>
+      <path d="M6 3h12" />
+      <path d="M6 8h12" />
+      <path d="m6 13 8.5 8" />
+      <path d="M6 13h3a5 5 0 0 0 5-5V3" />
+    </>
+  ),
+  wrench: () => (
+    <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
+  ),
+  "cloud-off": () => (
+    <>
+      <path d="M22.61 16.95A5 5 0 0 0 18 10h-1.26a8 8 0 0 0-7.05-6M5 5a8 8 0 0 0 4 15h9a5 5 0 0 0 1.7-.3" />
+      <path d="m1 1 22 22" />
+    </>
+  ),
+  book: () => (
+    <>
+      <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
+      <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
+    </>
+  ),
+  pause: () => (
+    <>
+      <rect x="6" y="4" width="4" height="16" rx="1" />
+      <rect x="14" y="4" width="4" height="16" rx="1" />
     </>
   ),
   headset: () => (

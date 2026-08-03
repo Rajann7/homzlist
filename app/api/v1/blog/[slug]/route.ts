@@ -1,0 +1,21 @@
+import type { NextRequest } from "next/server";
+import { ok, fail } from "@/lib/api";
+import { getBlogPost, recordBlogRead } from "@/lib/blog/service";
+import { getCurrentUser } from "@/lib/auth/current-user";
+import { visitorKey } from "@/lib/help/service";
+import { clientIp } from "@/lib/auth/rate-limit";
+
+/** GET /api/v1/blog/:slug — one post, its related rail, and a counted read. */
+export const dynamic = "force-dynamic";
+
+export async function GET(req: NextRequest, { params }: { params: { slug: string } }) {
+  const post = await getBlogPost(params.slug);
+  if (!post) return fail("NOT_FOUND");
+
+  const claims = await getCurrentUser();
+  await recordBlogRead(params.slug, {
+    profileId: claims?.sub ?? null,
+    visitorKey: claims ? null : visitorKey(clientIp(req.headers), req.headers.get("user-agent") ?? ""),
+  });
+  return ok(post);
+}

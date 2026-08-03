@@ -1,0 +1,44 @@
+import type { NextRequest } from "next/server";
+import { ok, fail } from "@/lib/api";
+import { getCurrentUser } from "@/lib/auth/current-user";
+import { listMyTickets, createTicket } from "@/lib/support/service";
+import { createServiceClient } from "@/lib/supabase/server";
+
+/**
+ * GET  /api/v1/support/tickets — my tickets + the three tab counts.
+ * POST /api/v1/support/tickets — raise one (Doc7 §192).
+ *
+ * Both are scoped to the caller. There is no ?profileId, and the list query
+ * filters on the session's own id, so there is nothing to tamper with.
+ */
+export const dynamic = "force-dynamic";
+
+export async function GET() {
+  const claims = await getCurrentUser();
+  if (!claims) return fail("UNAUTHORIZED");
+  return ok(await listMyTickets(claims.sub));
+}
+
+export async function POST(req: NextRequest) {
+  const claims = await getCurrentUser();
+  if (!claims) return fail("UNAUTHORIZED");
+
+  let body: Record<string, string | string[] | undefined>;
+  try { body = await req.json(); } catch { return fail("VALIDATION_ERROR"); }
+
+  const { data } = await createServiceClient()
+    .from("profiles").select("name").eq("id", claims.sub).maybeSingle();
+  const name = (data as { name: string | null } | null)?.name ?? "You";
+
+  const res = await createTicket(claims.sub, name, {
+    category: String(body.category ?? ""),
+    subject: String(body.subject ?? ""),
+    description: String(body.description ?? ""),
+    paymentRef: body.paymentRef ? String(body.paymentRef) : null,
+    altContact: body.altContact ? String(body.altContact) : null,
+    reportLink: body.reportLink ? String(body.reportLink) : null,
+    attachments: Array.isArray(body.attachments) ? (body.attachments as string[]) : [],
+  });
+  if (!res.ok) return fail("VALIDATION_ERROR", res.field ? { field: res.field } : undefined);
+  return ok({ id: res.id, number: res.number });
+}
