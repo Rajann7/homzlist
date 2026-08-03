@@ -30,6 +30,10 @@ export async function MaintenanceGate({ children }: { children: React.ReactNode 
       .from("staff")
       .select("level")
       .eq("profile_id", claims.sub)
+      // A suspended or never-accepted staff row is not a bypass. `is_active`
+      // and `state` are what A29 flips when someone leaves.
+      .eq("is_active", true)
+      .eq("state", "active")
       .maybeSingle();
     const level = (data as { level: string } | null)?.level;
     if (level && state.bypassRoles.includes(level)) return <>{children}</>;
