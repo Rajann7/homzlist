@@ -207,12 +207,27 @@ export interface CreateTicketInput {
 
 export type CreateOutcome =
   | { ok: true; id: string; number: string }
-  | { ok: false; reason: "VALIDATION_ERROR"; field?: string };
+  | { ok: false; reason: "VALIDATION_ERROR" | "SERVER_ERROR"; field?: string };
 
-/** TKT-2841 style, sequential per day, unique by construction. */
+/**
+ * TKT-2841 style.
+ *
+ * Counting the rows and adding one LOOKS like it produces the next number and
+ * does not: the numbers already in the table were not allocated contiguously
+ * (seeds, deletions), so `2800 + count + 1` lands on one that already exists and
+ * the unique index rejects the insert — which surfaced as "Submit ticket does
+ * nothing" for every user, because the failure came back as a validation error
+ * with no field.
+ *
+ * And even from a correct starting point, read-then-write races between two
+ * concurrent submissions. So the allocator is a Postgres SEQUENCE (migration
+ * 0119), started past everything already in the table: nextval() is atomic, so
+ * two people submitting in the same millisecond get different numbers.
+ */
 async function nextTicketNumber(): Promise<string> {
-  const { count } = await db().from("support_tickets").select("id", { count: "exact", head: true });
-  return `TKT-${2800 + (count ?? 0) + 1}`;
+  const { data, error } = await db().rpc("hz_next_ticket_number");
+  if (error || !data) throw new Error(`ticket number allocation failed: ${error?.message ?? "empty"}`);
+  return data as string;
 }
 
 export async function createTicket(
@@ -288,7 +303,13 @@ export async function createTicket(
     })
     .select("id, number")
     .single();
-  if (error || !ins) return { ok: false, reason: "VALIDATION_ERROR" };
+  if (error || !ins) {
+    // Distinguishable on purpose. Returning VALIDATION_ERROR for an insert
+    // failure is what let a colliding ticket number look like "the form is
+    // wrong" for every user instead of the server fault it was.
+    console.error("[support] ticket insert failed", error?.message);
+    return { ok: false, reason: "SERVER_ERROR" };
+  }
   const ticket = ins as { id: string; number: string };
 
   await db().from("ticket_messages").insert({

@@ -15,6 +15,19 @@
  *   `- ` / `1. `    →  the two list styles in .longform.
  */
 
+/**
+ * requires_reacceptance is seeded FALSE on this first real publish, and that is
+ * a deliberate call rather than an oversight.
+ *
+ * Turning it on walls EVERY existing account behind the interstitial on their
+ * next page load. The flag exists for a MATERIAL CHANGE — Doc10's own wording —
+ * and v1.0 is the first version, not a change to one. A20's "require
+ * re-acceptance" toggle is the switch, and flipping it is a decision with a
+ * user-visible cost that belongs to Rajan, not to a seed script.
+ *
+ * The gate itself is proven working either way by scripts/check-module12-live.mjs
+ * §9, which publishes a version nobody has accepted and walks the whole flow.
+ */
 const EFFECTIVE = "2026-08-01";
 
 export const LEGAL_PAGES = [
@@ -28,7 +41,7 @@ export const LEGAL_PAGES = [
     sort_order: 1,
     version: "1.0",
     effective_date: EFFECTIVE,
-    requires_reacceptance: true,
+    requires_reacceptance: false,
     seo_title: "Terms of Service — HomzList",
     seo_description:
       "The terms that govern your use of HomzList: intermediary status under Section 79 of the IT Act, posting rules, plans and payments, liability, and Rajkot jurisdiction.",
@@ -131,7 +144,7 @@ The interface may be translated, but the **legally binding version of this page 
     sort_order: 2,
     version: "1.0",
     effective_date: EFFECTIVE,
-    requires_reacceptance: true,
+    requires_reacceptance: false,
     seo_title: "Privacy Policy — HomzList",
     seo_description:
       "How HomzList collects, uses, shares and protects your personal data under the IT Act, the SPDI Rules and the DPDP Act, 2023 — including how phone numbers are kept private.",

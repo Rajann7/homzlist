@@ -121,11 +121,34 @@ export async function sitemapFor(type: SitemapType): Promise<UrlEntry[]> {
     }));
   }
 
-  // static — the pages that exist regardless of inventory.
+  // static — the pages that exist regardless of inventory. This is where the
+  // blog and the legal pages belong: they are public, indexable and stable, and
+  // leaving them out meant the site's largest organic surface was never
+  // submitted (Doc10: "Guest-accessible + SEO").
   const today = new Date().toISOString();
+  const [{ data: posts }, { data: legal }] = await Promise.all([
+    db().from("blog_posts").select("slug, updated_at")
+      .eq("status", "published").lte("published_at", today).order("published_at", { ascending: false }),
+    db().from("cms_pages").select("slug, updated_at").eq("is_published", true).order("sort_order"),
+  ]);
+
   return [
     { loc: "/", lastmod: today, changefreq: "daily", priority: 1.0 },
     { loc: "/search", lastmod: today, changefreq: "weekly", priority: 0.5 },
+    { loc: "/blog", lastmod: today, changefreq: "weekly", priority: 0.8 },
+    ...((posts ?? []) as { slug: string; updated_at: string }[]).map((p) => ({
+      loc: `/blog/${p.slug}`,
+      lastmod: p.updated_at,
+      changefreq: "monthly" as const,
+      priority: 0.7,
+    })),
+    { loc: "/legal", lastmod: today, changefreq: "monthly", priority: 0.4 },
+    ...((legal ?? []) as { slug: string; updated_at: string }[]).map((p) => ({
+      loc: `/legal/${p.slug}`,
+      lastmod: p.updated_at,
+      changefreq: "monthly" as const,
+      priority: 0.3,
+    })),
   ];
 }
 

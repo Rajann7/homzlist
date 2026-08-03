@@ -236,13 +236,23 @@ export async function acceptLegal(
 
   if (claimedVersion && claimedVersion !== page.version) return { ok: false, reason: "VERSION_STALE" };
 
-  await db().from("auth_consents").insert({
+  // The insert error is READ, not ignored. It was ignored once, and a CHECK
+  // constraint that rejected every CMS slug (migration 0120) turned "accept"
+  // into a 200 that wrote nothing — the gate reappeared on the next page load
+  // with no way for anyone to tell why.
+  const { error } = await db().from("auth_consents").insert({
     profile_id: profileId,
     kind: page.slug,
     version: page.version,
     accepted: true,
     ip_hash: createHash("sha256").update(`hz-consent:${ip}`).digest("hex").slice(0, 16),
   });
+  // 23505 = already accepted at this version. Idempotent, not a failure: a
+  // double-tap on "I agree" must not look like an error to the user.
+  if (error && error.code !== "23505") {
+    console.error("[legal] consent insert failed", error.message);
+    return { ok: false, reason: "NOT_FOUND" };
+  }
 
   const remaining = await pendingReacceptance(profileId);
   return { ok: true, remaining: remaining.length };

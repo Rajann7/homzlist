@@ -22,6 +22,8 @@ import { notify } from "@/lib/notifications/service";
 const db = () => createServiceClient();
 
 export const EXPORT_TTL_HOURS = 48;
+/** Minimum gap between two export BUILDS for one account (abuse floor). */
+export const EXPORT_COOLDOWN_SEC = 60;
 /**
  * Key for the OTP-bound intent (deactivate vs delete). It lives here rather
  * than in the route so both halves of the flow import it from one place — and
@@ -112,6 +114,47 @@ export async function requestDataExport(profileId: string, format: "json" | "csv
       .eq("id", (existing as { id: string }[])[0].id)
       .single();
     return toRow(data as Record<string, unknown>);
+  }
+
+  // A READY export in the same format is handed back rather than rebuilt.
+  //
+  // The in-flight guard above looks like it throttles this and does not: the
+  // build runs inline and finishes in well under a second, so a loop on
+  // "Request data" almost never catches a queued row — every press would run an
+  // eight-table scan, write a new object, and fire another "your data is ready"
+  // notification. Returning the live file is also the honest answer: it IS
+  // their data, and it is valid for 48 hours.
+  const { data: ready } = await db()
+    .from("data_export_requests")
+    .select("id, format, status, requested_at, ready_at, expires_at, size_bytes")
+    .eq("profile_id", profileId)
+    .eq("status", "ready")
+    .eq("format", format)
+    .gt("expires_at", new Date().toISOString())
+    .order("requested_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (ready) return toRow(ready as Record<string, unknown>);
+
+  // And a hard floor between builds, so switching format back and forth cannot
+  // be used to get around the reuse above.
+  const { data: recent } = await db()
+    .from("data_export_requests")
+    .select("requested_at")
+    .eq("profile_id", profileId)
+    .gt("requested_at", new Date(Date.now() - EXPORT_COOLDOWN_SEC * 1000).toISOString())
+    .order("requested_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (recent) {
+    const { data: last } = await db()
+      .from("data_export_requests")
+      .select("id, format, status, requested_at, ready_at, expires_at, size_bytes")
+      .eq("profile_id", profileId)
+      .order("requested_at", { ascending: false })
+      .limit(1)
+      .single();
+    return toRow(last as Record<string, unknown>);
   }
 
   const { data: created } = await db()
@@ -269,10 +312,15 @@ export async function getAccountLifecycle(profileId: string): Promise<AccountLif
   const d = db();
   const [{ data: prof }, { data: pay }, plans, listings, boosts] = await Promise.all([
     d.from("profiles").select("state, deactivated_at, deletion_scheduled_at").eq("id", profileId).maybeSingle(),
+    // `payment_status` is (pending, success, failed, refunded, chargeback).
+    // The first version of this filtered on "captured" — a value the enum does
+    // not have — so it matched nothing and the 7-day hold could never fire on
+    // any account. Caught by the live check, which forced a hold and found the
+    // delete path wide open.
     d.from("payments")
       .select("captured_at, created_at")
       .eq("profile_id", profileId)
-      .eq("status", "captured")
+      .eq("status", "success")
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle(),

@@ -3,6 +3,8 @@ import { getProfileById } from "@/lib/profile/service";
 import { RoleProvider } from "@/components/nav/RoleContext";
 import { impersonationContext } from "@/lib/admin/impersonation";
 import { ImpersonationBanner } from "@/components/admin/panels/ImpersonationBanner";
+import { MaintenanceGate } from "@/components/system/MaintenanceGate";
+import { TermsGate } from "@/components/legal/TermsGate";
 
 /**
  * (seller) — seller.homzlist.com. Requires a seller session (Owner/Broker/
@@ -36,7 +38,17 @@ export default async function SellerLayout({ children }: { children: React.React
             startedAt={imp.startedAt}
           />
         ) : null}
-        {children}
+        {/* P12 S8 — A20's maintenance switch, enforced. It cannot live in
+            middleware.ts: that runs on the Edge, where Supabase is unreachable.
+            Staff bypass is resolved inside the gate (Doc4 §74). */}
+        <MaintenanceGate>
+          {children}
+          {/* P12 S3e — the re-acceptance interstitial. Mounted once for the
+              whole signed-in tree so a material Terms change is unmissable on
+              ANY screen, rather than only the ones that remembered to include
+              it. Renders nothing when the server says nothing is pending. */}
+          {claims ? <TermsGate /> : null}
+        </MaintenanceGate>
       </div>
     </RoleProvider>
   );

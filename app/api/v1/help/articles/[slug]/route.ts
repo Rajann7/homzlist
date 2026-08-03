@@ -12,6 +12,10 @@ import { clientIp } from "@/lib/auth/rate-limit";
  * setting a tracking cookie on a page a crawler also fetches.
  */
 export const dynamic = "force-dynamic";
+// force-dynamic alone leaves the Supabase reads in Next's persistent DATA cache,
+// which outlives a restart — an admin flipping maintenance on, or republishing a
+// legal page, would never reach this endpoint. (memory: nextjs-data-cache-ssr-staleness)
+export const fetchCache = "force-no-store";
 
 export async function GET(req: NextRequest, { params }: { params: { slug: string } }) {
   const claims = await getCurrentUser();

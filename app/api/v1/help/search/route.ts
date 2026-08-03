@@ -8,6 +8,10 @@ import { searchHelp } from "@/lib/help/service";
  * a statement about the whole library, which only the server can make.
  */
 export const dynamic = "force-dynamic";
+// force-dynamic alone leaves the Supabase reads in Next's persistent DATA cache,
+// which outlives a restart — an admin flipping maintenance on, or republishing a
+// legal page, would never reach this endpoint. (memory: nextjs-data-cache-ssr-staleness)
+export const fetchCache = "force-no-store";
 
 export async function GET(req: NextRequest) {
   const q = req.nextUrl.searchParams.get("q") ?? "";

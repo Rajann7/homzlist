@@ -12,6 +12,10 @@ import { createServiceClient } from "@/lib/supabase/server";
  * filters on the session's own id, so there is nothing to tamper with.
  */
 export const dynamic = "force-dynamic";
+// force-dynamic alone leaves the Supabase reads in Next's persistent DATA cache,
+// which outlives a restart — an admin flipping maintenance on, or republishing a
+// legal page, would never reach this endpoint. (memory: nextjs-data-cache-ssr-staleness)
+export const fetchCache = "force-no-store";
 
 export async function GET() {
   const claims = await getCurrentUser();
@@ -39,6 +43,9 @@ export async function POST(req: NextRequest) {
     reportLink: body.reportLink ? String(body.reportLink) : null,
     attachments: Array.isArray(body.attachments) ? (body.attachments as string[]) : [],
   });
-  if (!res.ok) return fail("VALIDATION_ERROR", res.field ? { field: res.field } : undefined);
+  if (!res.ok) {
+    if (res.reason === "SERVER_ERROR") return fail("SERVER_ERROR");
+    return fail("VALIDATION_ERROR", res.field ? { field: res.field } : undefined);
+  }
   return ok({ id: res.id, number: res.number });
 }

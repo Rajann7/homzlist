@@ -16,9 +16,17 @@ import { MaintenancePage } from "./MaintenancePage";
  * is host-only to account.*, so it is never present here; the bypass is decided
  * by looking the signed-in profile up in `staff`. A guest is never exempt.
  *
- * /legal/* and /help/* are NOT exempted, deliberately — if the platform is down
- * it is down. The one thing that stays answerable is
- * GET /api/v1/system/maintenance, because the page needs it to retry.
+ * /legal/* and /help/* are NOT exempted among the PAGES — if the platform is
+ * down it is down.
+ *
+ * WHAT THIS DOES NOT COVER, stated plainly: /api/v1/**. This gate is a server
+ * component in the page tree, so an already-loaded tab, or anything calling the
+ * API directly, keeps working during a maintenance window. Those endpoints
+ * still enforce their own auth and ownership, so it is not an exposure — but it
+ * is not the write-freeze the word "maintenance" implies either. Freezing the
+ * API needs a shared wrapper on ~120 route files (the Edge middleware cannot do
+ * it: Supabase is unreachable there), which is a change of its own rather than
+ * something to half-do here. Recorded in docs/PENDING-INTEGRATIONS.md.
  */
 export async function MaintenanceGate({ children }: { children: React.ReactNode }) {
   const state = await maintenanceState();

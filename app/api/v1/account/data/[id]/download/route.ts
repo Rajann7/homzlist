@@ -21,7 +21,9 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
   const file = await downloadExport(claims.sub, params.id);
   if (!file) return fail("NOT_FOUND");
 
-  return new NextResponse(file.body, {
+  // `new Uint8Array(buf)` rather than the Buffer itself: Node's Buffer is not a
+  // valid BodyInit under the DOM lib types the app router compiles against.
+  return new NextResponse(new Uint8Array(file.body), {
     headers: {
       "Content-Type": file.contentType,
       "Content-Disposition": `attachment; filename="${file.fileName}"`,

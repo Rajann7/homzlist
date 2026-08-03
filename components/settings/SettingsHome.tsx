@@ -126,7 +126,7 @@ export function SettingsHome({ base = "" }: { base?: string }) {
         <Row icon="list" label="My listings" onClick={() => go("/listings")} />
       </Section>
 
-      <Section title="Plans &amp; billing">
+      <Section title="Plans & billing">
         <Row icon="card" label="My plan" value={data.plan ?? "Free"} onClick={() => go("/plans/my")} />
         <Row icon="receipt" label="Payment history" onClick={() => go("/payments")} />
         <Row icon="rocket" label="Boosts" onClick={() => go("/boost")} />
@@ -140,7 +140,8 @@ export function SettingsHome({ base = "" }: { base?: string }) {
       <Section title="Support">
         <Row icon="help-circle" label="Help centre" onClick={() => go("/help")} />
         <Row icon="headset" label="Contact support" onClick={() => go("/help/contact")} />
-        <Row icon="flag" label="Report a problem" onClick={() => go("/help/contact?topic=problem")} />
+        <Row icon="file" label="My tickets" onClick={() => go("/help/tickets")} />
+        <Row icon="flag" label="Report a problem" onClick={() => go("/help/contact?topic=report")} />
       </Section>
 
       <Section title="About">
@@ -149,14 +150,16 @@ export function SettingsHome({ base = "" }: { base?: string }) {
         <Row icon="file" label="Refund Policy" onClick={() => go("/legal/refund")} />
         <Row icon="user" label="Grievance Officer" onClick={() => go("/legal/grievance")} />
         <Row icon="help-circle" label="About HomzList" onClick={() => go("/legal/about")} />
-        <Row icon="download" label="Download your data" onClick={() => go("/help/contact?topic=data")} />
+        <Row icon="book" label="Blog" onClick={() => go("/blog")} />
+        <Row icon="file" label="All legal pages" onClick={() => go("/legal")} />
+        <Row icon="download" label="Download your data" onClick={() => go("/settings/data")} />
         <Row icon="star" label="Rate us on Google" trail={<Icon name="external" size={18} className="text-ink-tertiary" />} onClick={() => toast.show("Opening Google Play…")} />
       </Section>
 
       <Section title="Danger zone">
         <Row icon="log-out" label="Log out" destructive onClick={() => setLogoutOpen(true)} />
-        <Row icon="shield-off" label="Deactivate account" destructive onClick={() => go("/help/contact?topic=deactivate")} />
-        <Row icon="trash" label="Delete account" destructive onClick={() => go("/help/contact?topic=delete")} />
+        <Row icon="shield-off" label="Deactivate account" destructive onClick={() => go("/settings/account")} />
+        <Row icon="trash" label="Delete account" destructive onClick={() => go("/settings/account")} />
       </Section>
 
       <div className="px-4 pb-[calc(28px+env(safe-area-inset-bottom))] pt-7 text-center">
@@ -194,10 +197,14 @@ export function SettingsHome({ base = "" }: { base?: string }) {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div>
-      <div
-        className="chrome px-4 pb-2 pt-5 text-13 font-semibold uppercase tracking-[0.4px] text-ink-tertiary"
-        dangerouslySetInnerHTML={{ __html: title }}
-      />
+      {/* Plain text, not dangerouslySetInnerHTML. It only ever received string
+          literals so nothing was exploitable — but it was XSS surface sitting on
+          a screen whose section titles could easily become admin-editable, and
+          the one thing it existed for was an HTML-escaped ampersand that JSX
+          renders correctly on its own. */}
+      <div className="chrome px-4 pb-2 pt-5 text-13 font-semibold uppercase tracking-[0.4px] text-ink-tertiary">
+        {title}
+      </div>
       {children}
     </div>
   );

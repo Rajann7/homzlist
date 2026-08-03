@@ -8,6 +8,10 @@ import { getAccountLifecycle } from "@/lib/account/service";
  * counts behind "You have 1 active ₹999 plan and 1 live listing".
  */
 export const dynamic = "force-dynamic";
+// force-dynamic alone leaves the Supabase reads in Next's persistent DATA cache,
+// which outlives a restart — an admin flipping maintenance on, or republishing a
+// legal page, would never reach this endpoint. (memory: nextjs-data-cache-ssr-staleness)
+export const fetchCache = "force-no-store";
 
 export async function GET() {
   const claims = await getCurrentUser();

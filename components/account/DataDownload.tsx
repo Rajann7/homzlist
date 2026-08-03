@@ -195,10 +195,15 @@ function formatSize(bytes: number | null): string {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
+/**
+ * The design prints "This link expires in 48 hours." — which is true at the
+ * moment the file lands and progressively less true afterwards. Kept in HOURS
+ * for the whole 48-hour life, so a fresh export reads exactly as designed and
+ * an older one counts down honestly instead of rounding to "2 days".
+ */
 function expiryLine(iso: string | null): string {
   if (!iso) return "This link expires in 48 hours.";
-  const hrs = Math.round((new Date(iso).getTime() - Date.now()) / 3600_000);
+  const hrs = Math.ceil((new Date(iso).getTime() - Date.now()) / 3600_000);
   if (hrs <= 0) return "This link has expired — request a new one.";
-  if (hrs < 24) return `This link expires in ${hrs} hour${hrs === 1 ? "" : "s"}.`;
-  return `This link expires in ${Math.round(hrs / 24)} day${hrs < 48 ? "" : "s"}.`;
+  return `This link expires in ${hrs} hour${hrs === 1 ? "" : "s"}.`;
 }
