@@ -56,6 +56,43 @@ const checked = secrets.filter((s) => !derived.includes(s));
 secrets.length = 0;
 secrets.push(...checked);
 
+// A value that is ALSO written as a literal fallback in lib/env.ts cannot be
+// told apart from that fallback once it is in a bundle. Next.js replaces
+// non-NEXT_PUBLIC_ `process.env.X` reads with `undefined` on the client, so
+// what a grep finds in a client chunk is the source default
+// (`process.env.REDIS_URL ?? "redis://127.0.0.1:6379"`), not the secret. Left
+// unhandled this gate reported ~49 leaks on every run, and a gate that always
+// fails is a gate nobody reads.
+const envSource = existsSync(join(ROOT, "lib", "env.ts"))
+  ? readFileSync(join(ROOT, "lib", "env.ts"), "utf8")
+  : "";
+const sourceDefaults = new Set(
+  [...envSource.matchAll(/\?\?\s*"([^"]*)"/g)].map((m) => m[1]).filter(Boolean),
+);
+
+// Short values also collide by accident — a 12-character FCM_PROJECT_ID equal
+// to the folder name matched every chunk, because the build path is baked into
+// them. Anything a grep cannot attribute is not evidence.
+const MIN_DISTINCTIVE_LEN = 24;
+const projectPath = ROOT.toLowerCase();
+
+const undecidable = [];
+const checkable = [];
+for (const s of secrets) {
+  if (sourceDefaults.has(s.value)) {
+    undecidable.push([s.name, "identical to its own fallback literal in lib/env.ts"]);
+  } else if (s.value.length < MIN_DISTINCTIVE_LEN && projectPath.includes(s.value.toLowerCase())) {
+    undecidable.push([s.name, `${s.value.length} chars and a substring of the build path`]);
+  } else {
+    checkable.push(s);
+  }
+}
+for (const [name, why] of undecidable) {
+  console.log(`  skip ${name} — ${why}; a match would not prove a leak`);
+}
+secrets.length = 0;
+secrets.push(...checkable);
+
 if (!secrets.length) {
   console.log("No non-public secrets found in .env.local — nothing to check.");
   process.exit(0);

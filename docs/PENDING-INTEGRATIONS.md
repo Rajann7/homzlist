@@ -3993,49 +3993,63 @@ Auditors: `npm run check:module12` is 170 checks, `check:module12-ui` is 57.
 - **`requires_reacceptance` is seeded false** on all 8 legal pages. A decision,
   recorded above, not an omission.
 
-## Found during the Next 15 upgrade (4 Aug 2026) — check-script defects
+## Next 15 upgrade (4 Aug 2026) — verification-script defects, all FIXED
 
-None of these are application bugs and none were caused by the upgrade. They
-are defects in the *verification* scripts, and they matter because they make a
-before/after comparison lie — which is exactly what an upgrade needs to trust.
+None of these were application bugs and none were caused by the upgrade. They
+were defects in the *verification* scripts, and they mattered because a broken
+verifier makes a before/after comparison lie — which is the one thing an
+upgrade cannot afford. All three are fixed and proven; nothing is left open.
 
-- **HIGH — `check:admin-p6` destroys a real legal page on every run.** At
-  `scripts/check-admin-p6.mjs:536` it picks a page to exercise the
-  draft/publish/version machinery, deliberately excluding
-  `terms/privacy/grievance/refund`. But the `??` fallback on the next line is
-  `select id, title, version, kind from cms_pages limit 1` with no exclusion at
-  all, so when the first query returns nothing it grabs a legal page and
-  republishes it with a 28-character throwaway body. It never restores it.
+- **FIXED · HIGH — `check:admin-p6` destroyed a real legal page on every run.**
+  The page-picker read `where kind is null or kind not in ('terms','privacy',
+  'grievance','refund')`, but `kind` holds `'legal'` or `'page'` — never a slug
+  — so the test was always true and the check grabbed a real legal page,
+  republished it with a 28-character throwaway body, and never put it back.
+  (The unpublish guard further down the same file already carried this exact
+  fix, with a comment saying the first version "never fired". Only half the bug
+  had been caught.)
 
-  Proven from the DB: `privacy` went 5798 → 28 chars at 02:58 on 4 Aug (during
-  the Next 14 baseline run) and `refund` went 3317 → 28 at 05:20 (during the
-  Next 15 run). `npm run seed:module12` restores them — its own comment at
-  line 90 already documents this bug — and it reported removing exactly 2
-  throwaway `P6 check` versions, matching the two damaged pages.
+  Proven from the DB: `privacy` went 5798 → 28 chars at 02:58 on 4 Aug during
+  the *Next 14 baseline* run, and `refund` went 3317 → 28 at 05:20 during the
+  Next 15 run. Both restored with `npm run seed:module12`, which reported
+  removing exactly 2 throwaway `P6 check` versions.
 
-  Until the fallback is scoped, `check:module12`'s "no page still carries the
-  P6 placeholder body" assertion fails after any `check:admin-p6` run, and the
-  dev site really is serving a broken legal page in the meantime.
+  Now: excludes by slug, prefers a page whose `kind` is not `'legal'`,
+  snapshots the row it borrows and restores it — body, version, flags, SEO
+  fields — then deletes the version rows it cut. Two new assertions prove the
+  restore. Verified by dumping all 8 `cms_pages` before and after a run: byte
+  identical, and the check passes.
 
-- **MEDIUM — `check:messages` is not idempotent.** At
-  `scripts/check-messages-live.mjs:424` it deletes the proposal row before
-  re-sending, but never restores the quota the send consumed, and it re-picks
-  the builder each run. A builder with no active plan row yields
-  `proposalBalance() = 0`, so the proposal step fails with `NEED_TOPUP` on a
-  later run even though the endpoint is working correctly.
+- **FIXED · MEDIUM — `check:messages` was not idempotent.** The builder for the
+  proposal walk was picked on "has a live project" alone, with no requirement
+  that they could actually afford a proposal, so a builder with no active plan
+  yielded `proposalBalance() = 0` and the walk failed with `NEED_TOPUP` for a
+  reason unrelated to the code under test. `proposal_used` was also never
+  rolled back, so on a finite plan every run burned one proposal for good.
 
-- **LOW — `check:bundle-secrets` reports false positives.** Three `.env.local`
-  values are set to exactly the hardcoded fallback strings in `lib/env.ts`
-  (`REDIS_URL` = the `redis://127.0.0.1:6379` default at line 49, `EMAIL_FROM`
-  = the `noreply@homzlist.com` default at line 70) and `FCM_PROJECT_ID` is a
-  12-character value that appears as a substring of the build path. Next.js
-  replaces non-`NEXT_PUBLIC_` env reads with `undefined` in client bundles, so
-  what the grep finds is the source-code default, not a secret. The real
-  secrets all default to `""` and appear nowhere in the bundle — the
-  `serverEnv()` guard holds. Worth giving the gate a minimum-entropy rule or a
-  known-default skip list, since a gate that always fails gets ignored.
+  Now: selection mirrors the server's own rule in `lib/listings/proposals.ts`
+  (an `active` plan row, either unlimited or with quota left), and the walk
+  returns the quota it spent. Verified by running the check twice back to back
+  — both green, where the second run used to fail.
 
-- **Flaky, not broken.** `check:notifications`, `check:inbox` and
+- **FIXED · LOW — `check:bundle-secrets` reported 49 false positives.** Three
+  `.env.local` values are byte-identical to hardcoded fallbacks in
+  `lib/env.ts` (`REDIS_URL` = the `redis://127.0.0.1:6379` default at line 49,
+  `EMAIL_FROM` = the `noreply@homzlist.com` default at line 70), and
+  `FCM_PROJECT_ID` is a 12-character value that is a substring of the build
+  path baked into every chunk. Next.js replaces non-`NEXT_PUBLIC_` env reads
+  with `undefined` on the client, so what the grep found was the source
+  default, not a secret. The real secrets all default to `""` and appear
+  nowhere in the client bundle — the `serverEnv()` guard held throughout.
+
+  Now: the gate skips values it cannot attribute — ones equal to their own
+  fallback literal in `lib/env.ts`, and short ones that are substrings of the
+  build path — and says why. The skip is by VALUE, not by name: a production
+  `REDIS_URL` carrying real credentials no longer matches the default and is
+  still checked. Result is now `PASS — 11 secret value(s) checked against 441
+  client bundle file(s): 0 leak(s)`.
+
+- **Not defects — network flakes.** `check:notifications`, `check:inbox` and
   `check:admin-p4` each failed once with `ETIMEDOUT :5432`, `Connection
-  terminated unexpectedly` and `ECONNRESET` respectively, and passed on retry.
-  Network to the dev Supabase, not code.
+  terminated unexpectedly` and `ECONNRESET`, and passed on retry. Network to
+  the dev Supabase, not code.
