@@ -1177,6 +1177,27 @@ console.log("\nSecurity — the two walls");
   );
 }
 
+/**
+ * Remove the fixtures this run created.
+ *
+ * The approval walk needs a project sitting in `pending_review`, and when there
+ * isn't one it inserts its own. It then approves it — which puts a project
+ * called "P4 project approval check" LIVE on the public site. Nineteen of them
+ * had accumulated, and because a story segment is recent activity, they had
+ * taken over the story row completely: every circle a visitor saw was a check
+ * fixture with no type and no spec strip.
+ *
+ * Fixtures are identified by their own names, so nothing a human created is
+ * touched.
+ */
+{
+  const names = ["P4 project approval check", "P4 bulk project check"];
+  const { rows: gone } = await sql.query(
+    `delete from projects where name = any($1) returning id`, [names],
+  );
+  if (gone.length) console.log(`\n  cleaned up ${gone.length} P4 fixture project(s)`);
+}
+
 console.log(
   `\n${failures === 0 ? "PASS" : "FAIL"} — ${checks - failures}/${checks} checks green\n`,
 );

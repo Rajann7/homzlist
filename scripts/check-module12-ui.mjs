@@ -19,6 +19,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { connect as dbConnect } from "./lib/dbx.mjs";
 
 const SELLER = (process.argv[2] ?? "http://seller.localhost:3000").replace(/\/$/, "");
 const PUBLIC = (process.argv[3] ?? "http://localhost:3000").replace(/\/$/, "");
@@ -94,11 +95,11 @@ section("Seller host — signed in");
 
 const { rows } = await (async () => {
   const pg = (await import("pg")).default;
-  const c = new pg.Client({
-    host: `db.${E.SUPABASE_PROJECT_REF}.supabase.co`, port: 5432, user: "postgres",
-    password: E.SUPABASE_DB_PASSWORD, database: "postgres", ssl: { rejectUnauthorized: false },
-  });
-  await c.connect();
+  // The DIRECT host drops out often enough — DNS, and an IPv6 route that goes
+// dark — that a one-host client turns a verification run into a false failure.
+// scripts/lib/dbx.mjs walks the same ladder q.mjs and db-proof.mjs already use:
+// direct first, then the regional poolers on 5432 and 6543.
+const c = await dbConnect();
   const r = await c.query(
     `select phone from profiles where state='active' and is_registered and role='owner' and name is not null
       order by last_active_at desc nulls last limit 1`);

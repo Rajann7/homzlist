@@ -20,6 +20,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import pg from "pg";
+import { connect as dbConnect } from "./lib/dbx.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const E = {};
@@ -28,19 +29,15 @@ for (const l of fs.readFileSync(path.join(ROOT, ".env.local"), "utf8").split(/\r
   if (m) E[m[1]] = m[2].replace(/^["']|["']$/g, "");
 }
 
-const c = new pg.Client({
-  host: `db.${E.SUPABASE_PROJECT_REF}.supabase.co`,
-  port: 5432,
-  user: "postgres",
-  password: E.SUPABASE_DB_PASSWORD,
-  database: "postgres",
-  ssl: { rejectUnauthorized: false },
-});
+// The DIRECT host drops out often enough — DNS, and an IPv6 route that goes
+// dark — that a one-host client turns a run into a false failure. dbx.mjs walks
+// the ladder q.mjs and db-proof.mjs already use: direct, then the poolers.
+let c;
 
 const HOURS = (n) => `${n} hours`;
 const DAYS = (n) => `${n} days`;
 
-await c.connect();
+c = await dbConnect();
 
 if (!process.argv.includes("--keep")) {
   const r = await c.query(`delete from notifications where data ? 'seed'`);

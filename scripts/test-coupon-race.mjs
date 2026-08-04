@@ -7,6 +7,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import pg from "pg";
+import { connect as dbConnect } from "./lib/dbx.mjs";
 
 const ROOT = "C:/Users/RAJAN/Music/homzlist-app";
 const E = {};
@@ -14,12 +15,10 @@ for (const l of fs.readFileSync(path.join(ROOT, ".env.local"), "utf8").split(/\r
   const m = /^([A-Z0-9_]+)=(.*)$/.exec(l.trim());
   if (m) E[m[1]] = m[2].replace(/^["']|["']$/g, "");
 }
-const cfg = {
-  host: `db.${E.SUPABASE_PROJECT_REF}.supabase.co`,
-  port: 5432, user: "postgres", password: E.SUPABASE_DB_PASSWORD,
-  database: "postgres", ssl: { rejectUnauthorized: false },
-};
-const conn = async () => { const c = new pg.Client(cfg); await c.connect(); return c; };
+// The DIRECT host drops out often enough — DNS, and an IPv6 route that goes
+// dark — that a one-host client turns a run into a false failure. dbx.mjs walks
+// the ladder q.mjs and db-proof.mjs already use: direct, then the poolers.
+const conn = () => dbConnect();
 
 const admin = await conn();
 const CONCURRENCY = 12;

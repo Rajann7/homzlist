@@ -4,7 +4,7 @@ import { formatShortRupees } from "@/lib/billing/money";
 import { timeAgo } from "@/lib/listings/matching";
 import { projectCardExtras, PROJECT_COLS, type FeedCard } from "@/lib/feed/service";
 import { placementsFor, viewerScope, type ViewerScope } from "@/lib/billing/placement";
-import { parseQuery, pgrstSafe, type ParsedQuery } from "./parse";
+import { parseQuery, pgrstSafe, findPlaces, type ParsedQuery, type PlaceRow } from "./parse";
 import { bucketRange } from "./filters";
 import type {
   AreaResult, AutocompleteResult, BrokerResult,
@@ -658,13 +658,19 @@ export async function autocomplete(q: string, viewerId: string | null, mode: "pr
   }
 
   // ---- area/city suggestions with real counts ----
-  let lq = db().from("locations").select("id,name,slug,level,parent_id,is_launched")
-    .in("level", ["area", "city"]).eq("is_active", true).limit(8);
-  const safeTerm = pgrstSafe(term);
-  if (safeTerm) lq = lq.or(`name.ilike.%${safeTerm}%,name_gu.ilike.%${safeTerm}%`);
-  else lq = lq.eq("level", "area");
-  const { data: locs } = await lq;
-  const locRows = ((locs ?? []) as { id: string; name: string; slug: string; level: string; parent_id: string | null; is_launched: boolean }[]);
+  // Fetch WIDE and rank, then trim. `%term%` matches anywhere in a name, so a
+  // narrow unordered limit let whatever the database returned first decide the
+  // whole dropdown: typing "mav" returned eight arbitrary rows that did not
+  // include Mavdi, and offered "Dharmavaram" as a coming-soon city instead.
+  let locRows: PlaceRow[];
+  if (pgrstSafe(term)) {
+    locRows = (await findPlaces(term, 20)).slice(0, 12);
+  } else {
+    const { data: locs } = await db().from("locations")
+      .select("id,name,name_gu,slug,level,parent_id,is_launched")
+      .eq("level", "area").eq("is_active", true).limit(12);
+    locRows = ((locs ?? []) as PlaceRow[]);
+  }
 
   const parentIds = [...new Set(locRows.map((r) => r.parent_id).filter(Boolean))] as string[];
   const { data: parents } = await db().from("locations").select("id,name,slug").in("id", parentIds.length ? parentIds : [NIL]);
@@ -695,7 +701,13 @@ export async function autocomplete(q: string, viewerId: string | null, mode: "pr
   // ---- unknown / un-launched city ----
   let comingSoonCity: AutocompleteResult["comingSoonCity"] = null;
   if (term.length >= 3) {
-    const unlaunched = locRows.find((r) => r.level === "city" && !r.is_launched);
+    // Only when nothing browsable matched. An unlaunched city sharing its name
+    // with a launched area — there is a city "Mavdi" as well as the launched
+    // Mavdi area — used to put "Mavdi is coming soon" in the dropdown directly
+    // above real Mavdi results.
+    const unlaunched = suggestions.length || pages.length
+      ? null
+      : locRows.find((r) => r.level === "city" && !r.is_launched);
     if (unlaunched) comingSoonCity = { name: unlaunched.name, slug: unlaunched.slug };
     else if (!suggestions.length && !pages.length) {
       // Nothing matched at all — offer the term as an expansion signal rather

@@ -25,6 +25,7 @@ import { randomUUID } from "node:crypto";
 import zlib from "node:zlib";
 import pg from "pg";
 import { parseDump, buildTree, countTree } from "./lib/india-locations.mjs";
+import { connect as dbConnect } from "./lib/dbx.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const DUMP_URL = "https://download.geonames.org/export/zip/IN.zip";
@@ -148,22 +149,18 @@ function flatten(tree, existing, citySlugs, scopeSlugs) {
 }
 
 // ---- 3. run ----------------------------------------------------------------
-const client = new pg.Client({
-  host: `db.${env.SUPABASE_PROJECT_REF}.supabase.co`,
-  port: 5432,
-  user: "postgres",
-  password: env.SUPABASE_DB_PASSWORD,
-  database: "postgres",
-  ssl: { rejectUnauthorized: false },
-  statement_timeout: 0,
-});
+// The DIRECT host drops out often enough — DNS, and an IPv6 route that goes
+// dark — that a one-host client turns a run into a false failure. dbx.mjs walks
+// the ladder q.mjs and db-proof.mjs already use: direct, then the poolers.
+const client = await dbConnect();
+// This dump is large; the per-statement timeout has to come off for it.
+await client.query("set statement_timeout = 0");
 
 const text = await loadDump();
 const rows = parseDump(text);
 const tree = buildTree(rows);
 console.log("parsed:", rows.length, "offices →", countTree(tree));
 
-await client.connect();
 try {
   // Existing rows keep their ids — listings point at them.
   const { rows: current } = await client.query("select id, parent_id, level, name, slug from locations");

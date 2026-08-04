@@ -13,6 +13,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import pg from "pg";
+import { connect as dbConnect } from "./lib/dbx.mjs";
 
 const BASE = (process.argv[2] ?? "http://seller.localhost:3000").replace(/\/$/, "");
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -22,12 +23,11 @@ for (const l of fs.readFileSync(path.join(ROOT, ".env.local"), "utf8").split(/\r
   if (m) E[m[1]] = m[2].replace(/^["']|["']$/g, "");
 }
 
-const db = new pg.Client({
-  host: `db.${E.SUPABASE_PROJECT_REF}.supabase.co`,
-  port: 5432, user: "postgres", password: E.SUPABASE_DB_PASSWORD,
-  database: "postgres", ssl: { rejectUnauthorized: false },
-});
-await db.connect();
+// The DIRECT host drops out often enough — DNS, and an IPv6 route that goes
+// dark — that a one-host client turns a verification run into a false failure.
+// scripts/lib/dbx.mjs walks the same ladder q.mjs and db-proof.mjs already use:
+// direct first, then the regional poolers on 5432 and 6543.
+const db = await dbConnect();
 
 const results = [];
 const check = (name, pass, detail = "") => {
