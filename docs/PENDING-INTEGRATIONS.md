@@ -4053,3 +4053,44 @@ upgrade cannot afford. All three are fixed and proven; nothing is left open.
   `check:admin-p4` each failed once with `ETIMEDOUT :5432`, `Connection
   terminated unexpectedly` and `ECONNRESET`, and passed on retry. Network to
   the dev Supabase, not code.
+
+## Still open after the Next 16 upgrade (4 Aug 2026) — `check:boost`
+
+`check:boost` is the one verification script that does not end green, and it
+did not end green before the upgrade either — it could not run at all, because
+`seed-module9` threw on a precondition that cannot exist.
+
+**Fixed, and it now gets most of the way through:**
+- it opened a single hard-coded DB host, so it died with `ETIMEDOUT` whenever
+  that host's IPv6 route dropped;
+- `seed-module9` demanded "a builder with a live listing", which contradicts the
+  product — builders post projects. Builders are matched on projects now and
+  their boosts carry `subject_kind = project`, a subject the schema has always
+  permitted and nothing had ever created (the table held 0 of them);
+- `seed-module9` ranked sellers by total listings while the fixtures need
+  live+available ones, and indexed `brokerListings[4]` where no broker in the
+  demo data has five;
+- the seed restores its own sellers' inventory before running.
+
+**What is still wrong: the check pollutes the state it depends on.**
+
+`check-boost-live.mjs` drives real flows — it marks a listing sold mid-approval,
+it approves, rejects, pauses and resumes boosts — and it never puts any of it
+back. Run it twice and the second run fails differently from the first:
+
+    run 1   2 failures
+    run 2   4 failures   (`alreadyDecided: true` — the boost was decided last run)
+
+So its result depends on how many times it has been run since the last seed,
+which makes it useless as a gate. The remaining failures are all downstream of
+that: `staff APPROVE puts the boost live` gets `LISTING_STATE_LOCKED /
+alreadyDecided`, and everything asserting on the resulting window, audit row,
+pause and resume fails with it.
+
+The fix is to make each flow restore what it touched — the same treatment
+`check-admin-p6` got in this pass — but that is a rewrite of a verification
+script, not upgrade work, so it is recorded rather than rushed.
+
+**This does not describe a fault in the boost feature.** The application paths
+it exercises answer correctly; it is the script's own leftovers that make the
+second run disagree with the first.
