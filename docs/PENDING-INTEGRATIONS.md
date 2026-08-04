@@ -1299,7 +1299,7 @@ than rediscovered.
 | P9 Profile suite | ownProfile, editProfile, verification, listings, listingStats, accountStatus, otp* | ✅ |
 | P10 Saved/Activity/Settings | S1–S10 (12 screens) | ❌ none built — **Module 6B** owns it (added 23 Jul 2026, A0-M6.7); `/saved` = placeholder shell, not a 404 |
 | P11 Plans/Payments/Boost/Notifications | plans, myplan, payments, boost, boostbuy, **notif** | ⚠️ five built; the **Notifications screen is missing** |
-| P12 Help/Legal/Blog/System | help, legal, blog, system pages | ❌ not built |
+| P12 Help/Legal/Blog/System | help, legal, blog, system pages | ✅ built 3 Aug 2026 (Module 12) — all screens; see A0-M12 |
 
 ## D0. ✅ Module 4 completion pass — 22 Jul 2026 (migration 0019)
 
@@ -3815,3 +3815,180 @@ The four gaps the first pass recorded here were closed rather than tracked.
    shape at 50,000). Migration 0100 rebuilds it with LATERAL over the indexes
    0098 added: **8.6 ms** for a page of 50, asserted by the check so it cannot
    quietly regress.
+
+---
+
+# A0-M12. Module 12 (P12 — Help · Legal/CMS · Blog · Data rights · System) — built 3 Aug 2026
+
+Shipped: 8 migrations (0113–0120), 6 services, 20 API routes, 17 screens across
+the public and seller hosts, 52 help articles, 8 legal pages transcribed from
+Doc10, and 8 blog posts (~6,300 words). Two auditors: `npm run check:module12`
+(141 live checks) and `npm run check:module12-ui` (57 render/copy checks).
+
+## What the hidden-issue hunt found (all fixed unless marked)
+
+**1. The legal pages were serving junk.** `cms_pages.body_md` for all eight
+pages read `"Published body 1785656601391"` — `scripts/check-admin-p6.mjs`
+republishes each page with a throwaway body to prove the version machinery
+works and never cleans up, and it had overwritten the real content. The genuine
+Doc10 text was only in `cms_page_versions` v1.0. The seed now restores the full
+Doc10 content and deletes the 11 `note = 'P6 check'` version rows.
+
+**2. Eight columns and a whole feature existed only on the dev database.**
+`cms_pages.kind/icon/sort_order/effective_date/reader`,
+`cms_page_versions.effective_date/is_material`, `blog_posts.is_featured/badge`
+and seven columns on `faqs` were added out of band during P6. Migration 0106's
+own `admin_cms_list` view SELECTs `p.kind` and `p.effective_date` — so a fresh
+`npm run migrate` built a database where a Module 11 view failed to compile.
+All of it is written down in 0113, idempotently.
+
+**3. `POST /support/tickets` was broken for every user.** The ticket number was
+`2800 + count(*) + 1`. The numbers already in the table were not allocated
+contiguously, so it landed on one that existed, the unique index rejected the
+insert — and the insert error was returned as `VALIDATION_ERROR`, so "Submit
+ticket" looked like a form problem and did nothing, forever. Now a Postgres
+sequence (0119), and an insert failure returns `SERVER_ERROR`.
+
+**4. Re-acceptance could never be recorded.** `auth_consents.kind` was
+CHECK-constrained to `('age18','dpdp','tc')` since 0001; P12 keys consent by
+page slug, so every insert was rejected — and `acceptLegal()` ignored the insert
+error, so the endpoint answered 200 while writing nothing and the interstitial
+would have come back on the next page load for ever. Constraint widened (0120),
+error now read.
+
+**5. The 7-day payment hold could never fire.** `getAccountLifecycle` filtered
+payments on `status = 'captured'`, which is not a value in the `payment_status`
+enum (`pending, success, failed, refunded, chargeback`). It matched nothing, so
+deletion was available immediately after any payment. Found by the live check
+forcing a hold and watching the delete path stay open.
+
+**6. Two jump controls were dead.** `behavior: "smooth"` is a silent no-op
+wherever smooth scrolling is disabled (headless Chrome, some webviews,
+OS-level reduce-motion) — it killed all 19 entries in the legal Table of
+contents. Separately, `AppShell` scrolls inside `<main>`, not the window, so
+`window.scrollTo` moved nothing on the components gallery, killing all 15
+section chips. `scrollToId()` in lib/utils.ts finds the real scroll container
+and falls back to an instant jump when smooth does nothing.
+
+**7. The data export had no abuse floor.** The in-flight guard looked like a
+throttle and was not — the build runs inline and finishes in well under a
+second, so every press of "Request data" ran an eight-table scan, wrote another
+object, and fired another notification. A ready export in the same format is
+now returned as-is, plus a 60-second floor between builds.
+
+**8. `SettingsHome` rendered its section titles through
+`dangerouslySetInnerHTML`** for the sake of one `&amp;`. Not exploitable — every
+caller passed a literal — but it was XSS surface on a screen whose labels could
+easily become admin-editable. Replaced with a text node.
+
+## Decisions taken, that are Rajan's to reverse
+
+- **`requires_reacceptance` is seeded FALSE on all 8 pages.** Turning it on
+  walls every existing account behind the interstitial on their next page load.
+  The flag is for a MATERIAL CHANGE, and v1.0 is the first version rather than a
+  change to one. A20's toggle is the switch; the gate itself is proven working
+  by `check:module12` §9, which publishes a version nobody has accepted and
+  walks the whole flow.
+- **Doc10's `[SQUARE BRACKET]` placeholders are carried through verbatim** —
+  entity name, CIN, registered address, support email, grievance officer phone
+  and hours. Doc10 says they are Rajan's to fill and that an advocate must
+  review before go-live; inventing a legal entity name would be fabricating a
+  legal record. The grievance officer's NAME and EMAIL do resolve, because A20
+  already holds real values for them (`branding_settings.grievance_officer` =
+  "Priya Shah"). Fill the rest in A20 → Branding; the public page follows
+  immediately.
+- **Help and Support are seller-only, not public.** P12 marks only the legal and
+  blog screens `g-ok` (guest-readable); the help screens are not marked. Doc10's
+  "Guest-accessible + SEO" line is about the legal/blog surfaces, and that is
+  what was built. A public help centre would be a real SEO asset — say the word
+  and it is a routing change, since the service layer is already guest-safe.
+- **The design's demo hub (`s-home`) was not built.** It is the prototype's own
+  navigation harness ("Other modules are placeholders"), not a product screen.
+  Its real entry points are the Settings rows, which now all point at live
+  routes instead of `/help/contact?topic=…` stubs.
+
+## Production pass — 3 Aug 2026 (the three items above are now closed)
+
+Closing them surfaced five more bugs, four of which would have destroyed the
+content this module just shipped.
+
+**Maintenance now freezes WRITES, not just pages.** MaintenanceGate stops a
+visitor loading a screen; it never stopped an already-open tab from posting.
+The freeze lives in `middleware.ts`, the one chokepoint every API request
+passes. Middleware runs on the Edge, where supabase-js and ioredis are both
+unreachable — so the flag is read over PostgREST with plain fetch (migration
+0121 exposes a SECURITY DEFINER function returning ONLY what the public
+maintenance endpoint already publishes; never `bypass_roles`). Cached 10s per
+isolate, checked only on non-GET, fails open. `/admin`, `/auth`, `/cron` and
+`/system/maintenance` stay open, or the window would lock out the people who
+have to end it. Propagation is ~10s by design, and that is written down rather
+than pretended away.
+
+**Ticket attachments are real.** The design's three "Add screenshot" tiles are
+on the same presign → PUT → commit pipeline as every other upload, into the
+PRIVATE bucket (a failed-payment screenshot routinely carries a bank
+reference), read back through an authenticated route rather than a signed URL.
+
+**Blog covers were never an asset problem — they were a missing control.** The
+admin blog editor had no cover field at all, so `cover_url` was unreachable by
+anyone. It now has one, plus excerpt and both SEO fields.
+
+### Found while closing them
+
+1. **The CMS could delete a blog post by saving its title.** `saveBlogPost`
+   nulled every field the form did not send, and the edit panel never LOADED
+   the body — so a title change wrote an empty string over a 5,000-word article
+   and reset "7 min read" to 1. It cleared the cover, excerpt and both SEO
+   fields the same way. Absent now means unchanged, and the panel loads the
+   real post before letting anyone edit it.
+2. **A title save also silently rewrote the SLUG**, turning
+   `/blog/mavdi-vs-university-road` into
+   `/blog/mavdi-vs-university-road-which-area-fits-you` — 404-ing every shared
+   link, every inbound link and the sitemap entry, with the post still sitting
+   there under a different address. The slug is derived on create, or when an
+   editor types one, and never re-derived.
+3. **`published_at` was stamped with `now()` on every save**, so fixing a typo
+   in a January post reprinted it as today's and jumped it to the top.
+4. **The blog category dropdown was a hardcoded array** ("Buying Guide", "Area
+   Guide", "Product", "Market") matching no chip on the live blog — a post saved
+   from the admin landed in a category no filter could show. It reads
+   `blog_categories` now, the same rows the public site does.
+5. **A staff reply notified with `report_outcome`**, whose href points at a
+   REPORT — the user got a notification about their ticket that deep-linked
+   them somewhere unrelated. Now `support_ticket_replied`.
+
+### Found by the follow-up security audit, and fixed
+
+- **HIGH — a ticket could launder a read of any private-bucket object.**
+  `ticketAttachmentBytes` checked that a key appears in the attachments on the
+  caller's own ticket, which sounds like ownership and is not: the caller wrote
+  that list. Attaching `docs/<someone>/<key>` to your own ticket and reading it
+  back would have served another user's VERIFICATION DOCUMENT, since support
+  screenshots and ID scans share the private bucket. Keys are now filtered
+  against `support/<caller>/` on the WRITE — the wall that was missing. The
+  auditor's own first version of this test passed for the wrong reason (the
+  object did not exist); it now uploads a real doc and tries to launder it.
+- **MEDIUM — the freeze exemption trusted the Host header.** It keyed off
+  `zone !== "admin"`, and `zone` is derived from a header the client sets, so
+  `Host: account.…` skipped the freeze with no admin session anywhere. The
+  exemption is by PATH now. Host is fine for routing (those routes are gated
+  again by `requireAdmin`); it is not something to hang a guard on.
+- **LOW — the attachment response** now carries `X-Content-Type-Options:
+  nosniff` and a `default-src 'none'; sandbox` CSP.
+
+Auditors: `npm run check:module12` is 170 checks, `check:module12-ui` is 57.
+
+## Still open — genuinely, and not ours to close
+
+- **Doc10's `[SQUARE BRACKET]` placeholders.** Entity name, CIN, registered
+  address, support email, grievance phone and hours. Doc10 says they are Rajan's
+  to fill and that an advocate must review before go-live; inventing a legal
+  entity name would be fabricating a legal record. Fill them in A20 → Branding
+  and the public pages follow immediately — the officer's name and email already
+  resolve from real values there.
+- **Blog cover ART.** The pipeline is complete — an admin can set a cover and the
+  post renders it — but no photographs exist yet, so all 8 posts fall back to the
+  design's own tinted placeholder. Sourcing them is a content task; nothing here
+  fabricates a property photo.
+- **`requires_reacceptance` is seeded false** on all 8 legal pages. A decision,
+  recorded above, not an omission.

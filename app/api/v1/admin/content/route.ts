@@ -8,6 +8,8 @@ import {
   cancelBroadcast,
   deleteBlogPost,
   deleteFaq,
+  blogCategories,
+  blogDetail,
   faqCategories,
   pageDetail,
   saveBanner,
@@ -42,6 +44,13 @@ export async function GET(req: NextRequest) {
       const page = await pageDetail(url.searchParams.get("id") ?? "");
       return page ? ok(page) : fail("NOT_FOUND");
     }
+    if (what === "blog") {
+      // The full post, so the edit panel opens on the real body instead of an
+      // empty box it would then save over the article.
+      const post = await blogDetail(url.searchParams.get("id") ?? "");
+      return post ? ok(post) : fail("NOT_FOUND");
+    }
+    if (what === "blog-categories") return ok({ categories: await blogCategories() });
     if (what === "faq-categories") return ok({ categories: await faqCategories() });
     if (what === "broadcast-report") {
       const report = await broadcastReport(url.searchParams.get("id") ?? "");

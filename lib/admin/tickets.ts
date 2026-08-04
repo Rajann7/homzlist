@@ -197,12 +197,20 @@ export async function replyToTicket(
   await db().from("support_tickets").update(patch).eq("id", id);
 
   if (!isInternal) {
+    // `support_ticket_replied`, not `report_outcome`. The old type's href
+    // template points at a REPORT, so the notification for a staff reply landed
+    // in the user's list and then deep-linked them somewhere unrelated —
+    // technically delivered, practically a dead end. Migration 0117 added the
+    // right type with `/help/tickets/{ticketId}`.
     await notify({
       profileId: t.profile_id,
-      type: "report_outcome",
+      type: "support_ticket_replied",
       title: `Reply on ${t.number}`,
       body: text.slice(0, 200),
       actorId: me.id,
+      href: `/help/tickets/${t.id}`,
+      entityKind: "ticket",
+      entityId: t.id,
     }).catch(() => {});
   }
 

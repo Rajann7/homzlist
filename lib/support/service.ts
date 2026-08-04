@@ -1,6 +1,7 @@
 import "server-only";
 import { createServiceClient } from "@/lib/supabase/server";
 import { notify } from "@/lib/notifications/service";
+import { readObject, BUCKET } from "@/lib/storage";
 
 /**
  * P12 S2 — Support tickets (Doc4 §68, Doc7 §192).
@@ -195,6 +196,25 @@ export async function getTicketThread(profileId: string, id: string): Promise<Ti
   };
 }
 
+/**
+ * Attachment keys are NOT trusted from the client.
+ *
+ * `ticketAttachmentBytes` checks that a key appears in the attachments on the
+ * caller's own ticket — which sounds like ownership and is not, because the
+ * caller wrote that list. Posting a ticket with
+ * `attachments: ["docs/<someone>/<key>"]` and then reading it back would have
+ * served another user's VERIFICATION DOCUMENT: support screenshots and ID scans
+ * share the private bucket, so the prefix is the only thing separating them.
+ *
+ * The upload path already pins every key under `support/<uploader>/`
+ * (uploads/commit). This is the same check on the write that stores it — the
+ * second wall, on the side that was missing one.
+ */
+function ownAttachments(profileId: string, keys: string[] | undefined): string[] {
+  const prefix = `support/${profileId}/`;
+  return (keys ?? []).filter((k) => typeof k === "string" && k.startsWith(prefix)).slice(0, 3);
+}
+
 export interface CreateTicketInput {
   category: string;
   subject: string;
@@ -318,7 +338,7 @@ export async function createTicket(
     author_id: profileId,
     author_name: authorName,
     body: description,
-    attachments: (input.attachments ?? []).slice(0, 3),
+    attachments: ownAttachments(profileId, input.attachments),
   });
 
   // The system line the thread opens with — the same auto-ack the design draws.
@@ -376,7 +396,7 @@ export async function replyToTicket(
       author_id: profileId,
       author_name: authorName,
       body: text,
-      attachments: attachments.slice(0, 3),
+      attachments: ownAttachments(profileId, attachments),
     })
     .select("id, author_kind, author_name, body, attachments, created_at")
     .single();
@@ -435,4 +455,49 @@ export async function reopenTicket(profileId: string, ticketId: string): Promise
   });
 
   return { ok: true };
+}
+
+/**
+ * The bytes behind one attachment on one ticket.
+ *
+ * Two checks, and the second is the one that matters: the ticket must be the
+ * caller's, AND the key must appear in the attachments recorded on a message of
+ * that ticket. Without the second, a caller could pass any key under their own
+ * `support/<id>/` prefix — or, worse, one under `docs/<id>/`, since verification
+ * documents share the private bucket — and this route would happily serve it.
+ */
+export async function ticketAttachmentBytes(
+  profileId: string,
+  ticketId: string,
+  key: string,
+): Promise<{ body: Buffer; contentType: string } | null> {
+  const { data: ticket } = await db()
+    .from("support_tickets")
+    .select("id")
+    .eq("id", ticketId)
+    .eq("profile_id", profileId)
+    .maybeSingle();
+  if (!ticket) return null;
+
+  const { data: msgs } = await db()
+    .from("ticket_messages")
+    .select("attachments")
+    .eq("ticket_id", ticketId);
+  const known = new Set(
+    ((msgs ?? []) as { attachments: string[] | null }[]).flatMap((m) => m.attachments ?? []),
+  );
+  if (!known.has(key)) return null;
+
+  const bytes = await readObject(key, BUCKET.private);
+  if (!bytes) return null;
+
+  // Sniffed from the magic bytes rather than trusted from the key's extension.
+  const head = bytes.subarray(0, 12);
+  const contentType =
+    head[0] === 0xff && head[1] === 0xd8 ? "image/jpeg"
+    : head.subarray(0, 8).toString("latin1") === "\x89PNG\r\n\x1a\n" ? "image/png"
+    : head.subarray(0, 4).toString("latin1") === "RIFF" && head.subarray(8, 12).toString("latin1") === "WEBP" ? "image/webp"
+    : "application/octet-stream";
+
+  return { body: bytes, contentType };
 }

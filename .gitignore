@@ -8,6 +8,9 @@
 # Secondary dev-server build dir (NEXT_DIST_DIR) — keeps two servers on one
 # checkout from corrupting each other's webpack cache.
 /.next-claude/
+# Pre-upgrade baseline build (NEXT_DIST_DIR) — kept so the Next 15/16 upgrade
+# can be diffed against a known-good Next 14 build.
+/.next-baseline/
 /out/
 next-env.d.ts
 

@@ -49,6 +49,32 @@ export async function pageDetail(id: string) {
   return { ...data, versions: versions ?? [] };
 }
 
+/**
+ * The full row behind a blog post, for the edit panel.
+ *
+ * The panel used to open with an EMPTY body box because the list view it was
+ * handed does not carry body_md — and then saved that empty string over the
+ * article. Editing the title of a 5,000-word post deleted the post. It also
+ * blanked cover_url, the excerpt and both SEO fields the same way, and reset
+ * read_minutes to 1. Nothing warned anyone, because from the panel's point of
+ * view it had saved exactly what it was showing.
+ */
+export async function blogDetail(id: string) {
+  if (!isUuid(id)) return null;
+  const { data } = await db().from('blog_posts').select('*').eq('id', id).maybeSingle();
+  return data ?? null;
+}
+
+/** The blog category chips, from the table the public site reads. */
+export async function blogCategories() {
+  const { data } = await db()
+    .from('blog_categories')
+    .select('slug, label')
+    .eq('is_active', true)
+    .order('sort_order');
+  return (data ?? []) as { slug: string; label: string }[];
+}
+
 export async function savePage(
   id: string,
   body: Record<string, unknown>,
@@ -192,10 +218,29 @@ export async function saveBlogPost(
   if (status === "scheduled" && new Date(scheduledAt!).getTime() < Date.now())
     return { ok: false, message: "That date is in the past — publish it instead" };
 
-  const slug =
+  /**
+   * The slug is derived from the title ONLY when creating, or when an editor
+   * deliberately types one.
+   *
+   * Re-deriving it on every save meant a title tweak silently changed the URL:
+   * "Mavdi vs University Road: which area fits you?" turned
+   * /blog/mavdi-vs-university-road into
+   * /blog/mavdi-vs-university-road-which-area-fits-you, 404-ing every shared
+   * link, every inbound link and the sitemap entry — with no warning, because
+   * the post was still right there under a different address. A published URL
+   * is a promise; it changes when someone means it to.
+   */
+  const explicitSlug =
     typeof body.slug === "string" && body.slug.trim()
       ? body.slug.trim().toLowerCase().replace(/[^a-z0-9-]/g, "-").slice(0, 120)
-      : title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 120);
+      : null;
+  const derived = title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 120);
+
+  let slug = explicitSlug ?? derived;
+  if (id && !explicitSlug) {
+    const { data: existing } = await db().from("blog_posts").select("slug").eq("id", id).maybeSingle();
+    slug = (existing as { slug: string } | null)?.slug ?? derived;
+  }
 
   const { data: clash } = await db()
     .from("blog_posts")
@@ -204,28 +249,61 @@ export async function saveBlogPost(
     .maybeSingle();
   if (clash && clash.id !== id) return { ok: false, message: `The slug "${slug}" is taken` };
 
-  const bodyMd = typeof body.body_md === "string" ? body.body_md : "";
-  const patch = {
+  /**
+   * A field the panel did NOT send is LEFT ALONE, rather than nulled.
+   *
+   * The previous shape — `typeof body.x === "string" ? body.x : null` — wrote
+   * null over anything the form did not carry. The edit panel never loaded the
+   * body, the cover, the excerpt or the SEO fields, so saving a TITLE CHANGE
+   * deleted a five-thousand-word article and reset "8 min read" to 1. Nothing
+   * warned anyone: from the panel's point of view it saved what it was showing.
+   *
+   * `undefined` is omitted from the PATCH by supabase-js, which is exactly the
+   * semantics wanted: absent means unchanged, empty string means cleared.
+   */
+  const sent = (k: string, max: number) =>
+    typeof body[k] === "string" ? String(body[k]).slice(0, max) : undefined;
+
+  const bodyMd = sent("body_md", 200_000);
+  const patch: Record<string, unknown> = {
     slug,
     title,
-    excerpt: typeof body.excerpt === "string" ? body.excerpt.slice(0, 400) : null,
+    excerpt: sent("excerpt", 400),
     body_md: bodyMd,
-    cover_url: typeof body.cover_url === "string" ? body.cover_url : null,
-    category: typeof body.category === "string" ? body.category : "General",
+    cover_url: sent("cover_url", 500),
+    category: sent("category", 60),
     status,
-    seo_title: typeof body.seo_title === "string" ? body.seo_title.slice(0, 160) : null,
-    seo_description:
-      typeof body.seo_description === "string" ? body.seo_description.slice(0, 300) : null,
-    // "6 min read" is a fact about the body, so it is computed rather than typed
-    // — a hand-entered number goes stale the first time someone edits a
-    // paragraph. 200 wpm is the usual convention.
-    read_minutes: Math.max(1, Math.round(bodyMd.split(/\s+/).filter(Boolean).length / 200)),
+    seo_title: sent("seo_title", 160),
+    seo_description: sent("seo_description", 300),
+    // "6 min read" is a fact about the body, so it is computed rather than
+    // typed — a hand-entered number goes stale the first time someone edits a
+    // paragraph. 200 wpm is the usual convention. Only recomputed when the body
+    // was actually sent, or a title-only edit would drop every post to 1 min.
+    read_minutes:
+      bodyMd === undefined
+        ? undefined
+        : Math.max(1, Math.round(bodyMd.split(/\s+/).filter(Boolean).length / 200)),
     author_id: me.id,
     author_name: me.name,
     scheduled_at: scheduledAt,
-    published_at: status === "published" ? new Date().toISOString() : null,
     updated_at: new Date().toISOString(),
   };
+
+  /**
+   * `published_at` is the date the post CLAIMS, and the blog sorts on it.
+   * Stamping `now()` on every save meant fixing a typo in a January post
+   * reprinted it as today's and jumped it to the top of the list. It is set
+   * once, when the post first goes live, and cleared only if it is unpublished.
+   */
+  if (status === "published") {
+    const already = id
+      ? ((await db().from("blog_posts").select("published_at").eq("id", id).maybeSingle()).data as
+          { published_at: string | null } | null)?.published_at
+      : null;
+    patch.published_at = already ?? new Date().toISOString();
+  } else {
+    patch.published_at = null;
+  }
 
   const { data, error } = id
     ? await db().from("blog_posts").update(patch).eq("id", id).select("id").single()

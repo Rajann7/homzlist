@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AppShell, Header, Icon, Button, BottomSheet, Skeleton, useToast } from "@/components";
+import { AppShell, Header, Icon, Button, BottomSheet, Skeleton, Spinner, useToast } from "@/components";
 import { BackButton } from "@/components/billing/primitives";
 import { supportApi, type TicketCategory } from "@/lib/content/client";
+import { apiFetch } from "@/lib/auth/api-fetch";
 
 /**
  * P12 S2b — Contact support.
@@ -34,6 +35,51 @@ export function NewTicket({ base = "", topic }: { base?: string; topic?: string 
   const [reportLink, setReportLink] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  /**
+   * The design's three "Add screenshot" tiles, on the real
+   * presign → PUT → commit pipeline the rest of the app uses.
+   *
+   * `preview` is a local object URL purely so the tile shows the thumbnail the
+   * design draws; `key` is the only thing that travels with the ticket. Support
+   * screenshots go to the PRIVATE bucket (a failed-payment screenshot routinely
+   * has a bank reference in it), so there is no public URL to show even after
+   * the upload succeeds — which is why the preview is local.
+   */
+  const [shots, setShots] = useState<(Shot | null)[]>([null, null, null]);
+  const [shotError, setShotError] = useState<string | null>(null);
+  const pickerRefs = useRef<(HTMLInputElement | null)[]>([]);
+
+  async function upload(slot: number, file: File) {
+    setShotError(null);
+    if (file.size > 10 * 1024 * 1024) { setShotError("That image is over 10 MB — try a smaller screenshot."); return; }
+    setShots((s) => s.map((v, i) => (i === slot ? { state: "uploading", preview: URL.createObjectURL(file) } : v)));
+    try {
+      const pre = await apiFetch("/api/v1/uploads/presign", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ kind: "support", contentType: file.type, size: file.size }),
+      }).then((r) => r.json());
+      if (!pre.ok) throw new Error(pre.error?.code ?? "presign");
+
+      const put = await fetch(pre.data.grant.url, { method: "PUT", headers: pre.data.grant.headers, body: file });
+      if (!put.ok) throw new Error("put");
+
+      const commit = await apiFetch("/api/v1/uploads/commit", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ kind: "support", key: pre.data.grant.key }),
+      }).then((r) => r.json());
+      if (!commit.ok) throw new Error(commit.error?.code ?? "commit");
+
+      setShots((s) => s.map((v, i) => (i === slot ? { ...v!, state: "done", key: commit.data.key } : v)));
+    } catch (err) {
+      setShots((s) => s.map((v, i) => (i === slot ? null : v)));
+      setShotError(
+        String(err).includes("FILE_TYPE_BLOCKED") ? "That file isn't an image we can accept."
+          : String(err).includes("FILE_TOO_LARGE") ? "That image is too large."
+          : "Couldn't upload that screenshot — you can still submit without it.",
+      );
+    }
+  }
 
   const load = useCallback(async () => {
     const r = await supportApi.categories();
@@ -83,6 +129,7 @@ export function NewTicket({ base = "", topic }: { base?: string; topic?: string 
       paymentRef: paymentRef.trim() || null,
       altContact: altContact.trim() || null,
       reportLink: reportLink.trim() || null,
+      attachments: shots.filter((s) => s?.state === "done").map((s) => s!.key!),
     });
     setSubmitting(false);
     if (!r.ok) {
@@ -196,6 +243,32 @@ export function NewTicket({ base = "", topic }: { base?: string; topic?: string 
           <p className="mt-1 text-right text-11 text-ink-tertiary">{description.length} / 1000</p>
         </div>
 
+        {/* Attachments — the design's three 72×72 dashed tiles. */}
+        <div>
+          <span className="mb-1.5 block text-13 font-semibold text-ink-primary">Attachments</span>
+          <div className="flex gap-3">
+            {[0, 1, 2].map((i) => (
+              <AttachmentTile
+                key={i}
+                slot={shots[i]}
+                onPick={() => pickerRefs.current[i]?.click()}
+                onRemove={() => setShots((s) => s.map((v, k) => (k === i ? null : v)))}
+              />
+            ))}
+          </div>
+          {[0, 1, 2].map((i) => (
+            <input
+              key={i}
+              ref={(el) => { pickerRefs.current[i] = el; }}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              className="hidden"
+              onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) void upload(i, f); }}
+            />
+          ))}
+          {shotError && <p className="mt-1.5 text-11 text-error">{shotError}</p>}
+        </div>
+
         <p className="rounded-8 bg-surface-2 p-3 text-11 leading-[1.5] text-ink-tertiary">
           You&apos;ll get a ticket number instantly. We reply within 24 hours (grievance complaints: acknowledged in
           24 hours, resolved within 15 days).
@@ -241,3 +314,55 @@ export function NewTicket({ base = "", topic }: { base?: string; topic?: string 
 const INPUT =
   "h-11 w-full rounded-8 border border-border bg-surface-1 px-3 text-15 text-ink-primary outline-none " +
   "focus:border-accent focus:shadow-[0_0_0_1px_var(--accent)] placeholder:text-ink-tertiary";
+
+interface Shot {
+  state: "uploading" | "done";
+  preview: string;
+  key?: string;
+}
+
+/**
+ * One 72×72 attachment tile: dashed + "Add screenshot" when empty, the
+ * thumbnail with a ✕ badge when filled — the design's `.upl` / `.upl.up`.
+ */
+function AttachmentTile({
+  slot,
+  onPick,
+  onRemove,
+}: {
+  slot: Shot | null;
+  onPick: () => void;
+  onRemove: () => void;
+}) {
+  if (!slot) {
+    return (
+      <button
+        type="button"
+        onClick={onPick}
+        className="chrome flex h-[72px] w-[72px] flex-col items-center justify-center gap-1 rounded-8 border-[1.5px] border-dashed border-border text-10 text-ink-tertiary active:bg-surface-2"
+      >
+        <Icon name="image" size={20} />
+        <span className="text-[10px] leading-none">Add screenshot</span>
+      </button>
+    );
+  }
+  return (
+    <span className="relative inline-flex h-[72px] w-[72px]">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={slot.preview} alt="" className="h-[72px] w-[72px] rounded-8 border border-border object-cover" />
+      {slot.state === "uploading" && (
+        <span className="absolute inset-0 grid place-items-center rounded-8 bg-black/40 text-white">
+          <Spinner size={20} />
+        </span>
+      )}
+      <button
+        type="button"
+        aria-label="Remove screenshot"
+        onClick={onRemove}
+        className="chrome absolute -right-1.5 -top-1.5 grid h-5 w-5 place-items-center rounded-full bg-ink-primary text-[11px] text-ink-inverse"
+      >
+        ✕
+      </button>
+    </span>
+  );
+}

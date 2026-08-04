@@ -23,6 +23,12 @@ const KINDS = {
   chat: { prefix: "chat", private: false, mimes: ALLOWED_IMAGE_MIME as readonly string[] },
   // Verification docs are PRIVATE: owner + admin only, via signed URL.
   doc: { prefix: "docs", private: true, mimes: [...ALLOWED_IMAGE_MIME, "application/pdf"] },
+  // Support-ticket screenshots (P12 S2). PRIVATE, because a screenshot of a
+  // failed payment routinely contains a bank reference or a phone number, and
+  // it is read by exactly two parties: the person who attached it and the staff
+  // member on the ticket. Images only — no PDF, so this adds nothing to the
+  // private bucket's existing mime surface.
+  support: { prefix: "support", private: true, mimes: ALLOWED_IMAGE_MIME as readonly string[] },
 } as const;
 
 export async function POST(req: NextRequest) {

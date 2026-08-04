@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { verifyAccessEdge } from "@/lib/auth/edge";
 import { verifyAdminAccessEdge } from "@/lib/admin/edge";
+import { edgeMaintenanceState } from "@/lib/system/maintenance-edge";
 
 /**
  * Subdomain routing + session isolation + login-bypass sealing (Doc6 §4, Doc9 §28).
@@ -51,11 +52,63 @@ export async function middleware(request: NextRequest) {
     // is how an admin gets OUT of read-only mode. Refusing it would leave the
     // tab live until the 30-minute expiry with no way to close it.
     const isExit = pathname === "/api/v1/impersonate/exit";
-    if (user?.imp && !isExit && !["GET", "HEAD", "OPTIONS"].includes(request.method)) {
+    const isRead = ["GET", "HEAD", "OPTIONS"].includes(request.method);
+    if (user?.imp && !isExit && !isRead) {
       return NextResponse.json(
         { ok: false, error: { code: "IMPERSONATION_READ_ONLY", message: "This is a read-only admin view — sends, payments and messages are disabled." } },
         { status: 403 },
       );
+    }
+
+    /**
+     * P12 S8 — the maintenance WRITE FREEZE.
+     *
+     * MaintenanceGate stops a visitor loading a screen. It does not stop an
+     * already-open tab, or anything calling the API directly, from writing
+     * straight through the window — which is precisely the case maintenance
+     * exists for. This is the other half.
+     *
+     * Only WRITES are frozen: reads cost nothing to serve and the pages are
+     * gated anyway, so a read-heavy site pays nothing for this check.
+     *
+     * Four things stay open, and each would otherwise be a trap:
+     *   · /admin/*, which is where maintenance gets switched back OFF;
+     *   · /auth/*, so a staff member can still sign in to go and do that;
+     *   · /cron/*, which is shared-secret guarded and is often the reason the
+     *     window is open at all;
+     *   · /system/maintenance, which the maintenance page polls to know when
+     *     to let go.
+     *
+     * The exemption is by PATH, never by `zone`. `zone` comes from the Host
+     * header, which the client sets — so `Host: account.…` on any request would
+     * have skipped the freeze with no admin session anywhere in sight. Host is
+     * fine for ROUTING (the admin routes it reaches are gated again by
+     * requireAdmin server-side); it is not something to hang a guard on.
+     */
+    if (!isRead) {
+      const exempt =
+        pathname.startsWith("/api/v1/auth/") ||
+        pathname.startsWith("/api/v1/admin/") ||
+        pathname.startsWith("/api/v1/cron/") ||
+        pathname === "/api/v1/system/maintenance" ||
+        isExit;
+      if (!exempt) {
+        const m = await edgeMaintenanceState();
+        if (m.enabled) {
+          return NextResponse.json(
+            {
+              ok: false,
+              error: {
+                code: "MAINTENANCE",
+                message_key: "error.maintenance",
+                message: m.message ?? "HomzList is under maintenance. We'll be right back.",
+                eta: m.eta,
+              },
+            },
+            { status: 503, headers: { "retry-after": "300" } },
+          );
+        }
+      }
     }
     return NextResponse.next();
   }

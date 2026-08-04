@@ -27,17 +27,17 @@ export async function POST(req: NextRequest) {
   }
 
   const key = typeof body.key === "string" ? body.key : "";
-  const kind = body.kind as "avatar" | "logo" | "doc" | "chat";
-  if (!key || !["avatar", "logo", "doc", "chat"].includes(kind)) return fail("VALIDATION_ERROR");
+  const kind = body.kind as "avatar" | "logo" | "doc" | "chat" | "support";
+  if (!key || !["avatar", "logo", "doc", "chat", "support"].includes(kind)) return fail("VALIDATION_ERROR");
   // Registration window: profile photo only, never logos/docs/chat.
   if (!registerScopeAllows(uploader, kind)) return fail("UNAUTHORIZED");
 
   // The key must sit under THIS user's prefix — a crafted key pointing at
   // someone else's object can't be claimed.
-  const expected = `${kind === "doc" ? "docs" : kind === "logo" ? "logos" : kind === "chat" ? "chat" : "avatars"}/${uploader.id}/`;
+  const expected = `${kind === "doc" ? "docs" : kind === "logo" ? "logos" : kind === "chat" ? "chat" : kind === "support" ? "support" : "avatars"}/${uploader.id}/`;
   if (!key.startsWith(expected)) return fail("VALIDATION_ERROR", { field: "key" });
 
-  const bucket = kind === "doc" ? BUCKET.private : BUCKET.public;
+  const bucket = kind === "doc" || kind === "support" ? BUCKET.private : BUCKET.public;
   const bytes = await readObject(key, bucket);
   if (!bytes) return fail("VALIDATION_ERROR", { field: "key" });
 
@@ -49,9 +49,16 @@ export async function POST(req: NextRequest) {
       await deleteObject(key, bucket).catch(() => undefined);
       return fail(check.reason === "FILE_TOO_LARGE" ? "FILE_TOO_LARGE" : "FILE_TYPE_BLOCKED");
     }
-  } else if (kind !== "doc") {
+  } else if (kind !== "doc") {  // a PDF is only ever a verification document
     await deleteObject(key, bucket).catch(() => undefined);
     return fail("FILE_TYPE_BLOCKED");
+  }
+
+  // A support screenshot stays private and attaches to nothing yet — the KEY
+  // goes back to the form, which sends it with the ticket. It becomes readable
+  // only through the ticket it lands on (GET …/attachment), never by URL.
+  if (kind === "support") {
+    return ok({ key });
   }
 
   // Chat photos are public and returned to the composer to send as a bubble;

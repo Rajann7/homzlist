@@ -135,6 +135,11 @@ section("2 · Help centre — counts, search, article, feedback");
                    "chat-inquiries": 7, "payments-invoices": 5, verification: 4, "account-privacy": 6 };
   check("counts match the P12 design (6/8/10/6/7/5/4/6)",
     d.categories.every((c) => design[c.slug] === c.articleCount));
+
+  // An article with no category is unreachable from the Help centre but still
+  // fills the admin FAQ list — the public and admin views must be the same list.
+  const orphan = (await db.query(`select count(*)::int c from faqs where is_active and category_id is null`)).rows[0].c;
+  check("no active help article is orphaned from its category", orphan === 0, `${orphan} orphan(s)`);
 }
 
 {
@@ -316,6 +321,100 @@ if (created.length >= 1) {
     const probeReply = await other.req(`/api/v1/support/tickets/${id}/messages`, "POST", { body: "hijack" });
     check("IDOR: cannot post into another user's ticket", probeReply.status === 404, `got ${probeReply.status}`);
   }
+}
+
+/* ═══════════════════════════════ 5b · Ticket attachments ═══ */
+section("5b · Attachments — private bucket, ownership-checked read");
+
+if (created.length) {
+  const a = created[0].actor;
+  // A 1×1 PNG: enough to prove the magic-byte gate on commit accepts a real
+  // image and that the bytes come back out through the authenticated route.
+  const png = Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+    "base64",
+  );
+
+  const pre = await a.req("/api/v1/uploads/presign", "POST",
+    { kind: "support", contentType: "image/png", size: png.length });
+  check("support upload is granted", pre.status === 200 && Boolean(pre.json?.data?.grant?.key), `got ${pre.status}`);
+  check("…into the PRIVATE bucket, not the public one",
+    pre.json?.data?.grant?.bucket === "private-docs", pre.json?.data?.grant?.bucket);
+  check("…and returns no public URL", pre.json?.data?.grant?.publicUrl === null);
+
+  const key = pre.json?.data?.grant?.key;
+  const put = await fetch(pre.json.data.grant.url, { method: "PUT", headers: pre.json.data.grant.headers, body: png });
+  check("the browser can PUT the bytes", put.ok, `got ${put.status}`);
+
+  const commit = await a.req("/api/v1/uploads/commit", "POST", { kind: "support", key });
+  check("commit validates the image and returns the key", commit.json?.data?.key === key);
+
+  // A key under someone else's prefix must not be claimable.
+  const stolen = await a.req("/api/v1/uploads/commit", "POST",
+    { kind: "support", key: `support/${crypto.randomUUID()}/abcdef` });
+  check("a key under another user's prefix is refused", stolen.status === 422, `got ${stolen.status}`);
+
+  const t = await a.req("/api/v1/support/tickets", "POST", {
+    category: "bug", subject: "M12 attachment probe", description: "with a screenshot", attachments: [key],
+  });
+  const ticketId = t.json?.data?.id;
+  check("a ticket carries the attachment", t.status === 200 && Boolean(ticketId));
+
+  const stored = (await db.query(
+    `select attachments from ticket_messages where ticket_id = $1 and author_kind = 'user'`, [ticketId])).rows[0];
+  check("the key is stored on the message row", (stored?.attachments ?? []).includes(key),
+    JSON.stringify(stored?.attachments));
+
+  const dl = await a.req(`/api/v1/support/tickets/${ticketId}/attachment?key=${encodeURIComponent(key)}`);
+  check("the owner can read the attachment back", dl.status === 200, `got ${dl.status}`);
+
+  // The important one, and the reason it is written this way:
+  //
+  // A first version of this test asked for `docs/anything/evil.png` and got a
+  // 404 — but only because that OBJECT did not exist, not because the key was
+  // rejected. The real attack is to ATTACH a foreign key to your own ticket
+  // (which you control) and then read it back through the ownership check
+  // (which then passes). Verification documents live in the same private
+  // bucket, so that read would have served somebody's ID scan.
+  //
+  // So this uploads a real object under the caller's OWN `docs/` prefix — a
+  // stand-in for a victim's verification document — and then tries to launder
+  // it through a ticket.
+  const docPre = await a.req("/api/v1/uploads/presign", "POST",
+    { kind: "doc", contentType: "image/png", size: png.length });
+  const docKey = docPre.json?.data?.grant?.key;
+  await fetch(docPre.json.data.grant.url, { method: "PUT", headers: docPre.json.data.grant.headers, body: png });
+  await a.req("/api/v1/uploads/commit", "POST", { kind: "doc", key: docKey });
+
+  const laundered = await a.req("/api/v1/support/tickets", "POST", {
+    category: "bug", subject: "M12 attachment probe 2", description: "laundering probe",
+    attachments: [docKey],
+  });
+  const lid = laundered.json?.data?.id;
+  const storedBad = (await db.query(
+    `select attachments from ticket_messages where ticket_id = $1 and author_kind = 'a'
+      union all select attachments from ticket_messages where ticket_id = $1 and author_kind = 'user'`,
+    [lid])).rows[0];
+  check("a NON-support key is stripped before it is ever stored",
+    !((storedBad?.attachments ?? []).includes(docKey)), JSON.stringify(storedBad?.attachments));
+
+  const stolen2 = await a.req(
+    `/api/v1/support/tickets/${lid}/attachment?key=${encodeURIComponent(docKey)}`);
+  check("…so a verification document cannot be read through a ticket", stolen2.status === 404,
+    `got ${stolen2.status}`);
+  if (lid) await db.query(`delete from support_tickets where id = $1`, [lid]);
+
+  const foreign = await a.req(
+    `/api/v1/support/tickets/${ticketId}/attachment?key=${encodeURIComponent("docs/anything/evil.png")}`);
+  check("a key that is not on this ticket is refused", foreign.status === 404, `got ${foreign.status}`);
+
+  if (created.length >= 2) {
+    const other = created[1].actor;
+    const probe = await other.req(`/api/v1/support/tickets/${ticketId}/attachment?key=${encodeURIComponent(key)}`);
+    check("IDOR: another user cannot read this attachment", probe.status === 404, `got ${probe.status}`);
+  }
+
+  if (ticketId) await db.query(`delete from support_tickets where id = $1`, [ticketId]);
 }
 
 /* ═══════════════════════════════ 6 · Grievance route + SLA ═══ */
@@ -529,6 +628,30 @@ section("10 · Maintenance — the switch reaches the surface");
   check("the ETA is a computed label, not a stored phrase",
     /Estimated: 2[45] minutes/.test(on.json?.data?.etaLabel ?? ""), on.json?.data?.etaLabel);
 
+  // The WRITE FREEZE. A page gate stops someone LOADING a screen; it does not
+  // stop an already-open tab from posting. This is the half that does.
+  //
+  // The Edge caches the flag for 10s (lib/system/maintenance-edge.ts), so the
+  // freeze lands within ~10 seconds of the switch rather than instantly. That
+  // is the documented trade — a database round trip on every write would be the
+  // alternative — so the check waits for it instead of pretending otherwise.
+  if (created.length) {
+    let w = { status: 0, json: null };
+    for (let i = 0; i < 16 && w.status !== 503; i++) {
+      if (i) await new Promise((r) => setTimeout(r, 1000));
+      w = await created[0].actor.req("/api/v1/support/tickets", "POST",
+        { category: "bug", subject: "during maintenance", description: "should be refused" });
+      // A ticket that slipped through before the cache turned over is cleaned up.
+      if (w.status === 200) await db.query(`delete from support_tickets where id = $1`, [w.json?.data?.id]);
+    }
+    check("a WRITE is frozen during maintenance (503)", w.status === 503, `got ${w.status}`);
+    check("…carrying the MAINTENANCE code", w.json?.error?.code === "MAINTENANCE", w.json?.error?.code);
+    const r = await created[0].actor.req("/api/v1/support/tickets");
+    check("…while READS keep working", r.status === 200, `got ${r.status}`);
+    const a = await created[0].actor.req("/api/v1/auth/me");
+    check("…and /auth stays open, so staff can still sign in to turn it off", a.status !== 503, `got ${a.status}`);
+  }
+
   const page = await fetch(`${PUBLIC}/blog`);
   const html = await page.text();
   check("a guest page renders the maintenance screen while it is on",
@@ -540,6 +663,91 @@ section("10 · Maintenance — the switch reaches the surface");
   check("maintenance switched back off", off.json?.data?.enabled === Boolean(wasOn));
   const back = await fetch(`${PUBLIC}/blog`);
   check("the real page returns once maintenance is off", (await back.text()).includes("HomzList Blog") || back.status === 200);
+}
+
+/* ═══════════════════ 10b · the CMS must not be able to eat the content ═══ */
+section("10b · Admin blog save is non-destructive");
+
+/**
+ * `saveBlogPost` nulled every field the form did not send, and the edit panel
+ * never loaded the body — so saving a TITLE CHANGE through A20 deleted the
+ * article, cleared its cover and reset "7 min read" to 1. This drives the REAL
+ * admin endpoint, exactly the way the panel does.
+ */
+{
+  const adminJar = new Map();
+  const ADMIN = `http://account.localhost:${new URL(SELLER).port || 3000}/api/v1/admin`;
+  const absorb = (r) => {
+    for (const c of r.headers.getSetCookie?.() ?? []) {
+      const [pair] = c.split(";"); const i = pair.indexOf("=");
+      adminJar.set(pair.slice(0, i).trim(), pair.slice(i + 1).trim());
+    }
+  };
+  const adminCall = async (path, init = {}) => {
+    const r = await fetch(ADMIN + path, {
+      ...init,
+      headers: {
+        "content-type": "application/json",
+        cookie: [...adminJar].map(([k, v]) => `${k}=${v}`).join("; "),
+        ...(init.headers ?? {}),
+      },
+    });
+    absorb(r);
+    return { status: r.status, json: await r.json().catch(() => null) };
+  };
+
+  const email = process.env.ADMIN_DEV_EMAIL ?? E.ADMIN_DEV_EMAIL;
+  const signIn = await fetch(`${ADMIN}/auth/dev`, {
+    method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email }),
+  });
+  absorb(signIn);
+  const signedIn = (await signIn.json().catch(() => null))?.data?.outcome === "ok";
+  check("admin dev sign-in for the CMS check", signedIn, email ? "" : "ADMIN_DEV_EMAIL not set");
+
+  if (signedIn) {
+    const { rows: [before] } = await db.query(
+      `select id, title, length(body_md) len, read_minutes, cover_url, excerpt, seo_title,
+              published_at, category, status
+         from blog_posts where slug = 'mavdi-vs-university-road'`);
+    await db.query(`update blog_posts set cover_url = 'https://example.test/cover.jpg' where id = $1`, [before.id]);
+
+    // The edit panel must be able to LOAD the post — without this it opens on an
+    // empty body box, which is what made the save destructive.
+    const detail = await adminCall(`/content?what=blog&id=${before.id}`);
+    check("A20 can load a post's full body", (detail.json?.data?.body_md?.length ?? 0) > 1000,
+      `${detail.json?.data?.body_md?.length} chars`);
+    const cats = await adminCall("/content?what=blog-categories");
+    check("A20's category list comes from blog_categories",
+      (cats.json?.data?.categories ?? []).some((c) => c.slug === "rajkot-market"),
+      (cats.json?.data?.categories ?? []).map((c) => c.slug).join(","));
+
+    // A TITLE-ONLY save, exactly as the panel sends it when nothing else changed.
+    const saved = await adminCall("/content", {
+      method: "POST",
+      body: JSON.stringify({ action: "blog_save", id: before.id, title: before.title,
+                             category: before.category, status: before.status }),
+    });
+    check("a title-only save succeeds", saved.status === 200 && saved.json?.ok, `got ${saved.status}`);
+
+    const after = (await db.query(
+      `select slug, length(body_md) len, read_minutes, cover_url, excerpt, seo_title, published_at
+         from blog_posts where id = $1`, [before.id])).rows[0];
+    // A published URL is a promise. Re-deriving the slug from the title on
+    // every save silently 404'd every shared link to the post.
+    check("…and the SLUG is not rewritten by a title save",
+      after.slug === "mavdi-vs-university-road", after.slug);
+    check("…and the article body survives it", after.len === before.len, `${before.len} → ${after.len}`);
+    check("…and read_minutes survives it", after.read_minutes === before.read_minutes,
+      `${before.read_minutes} → ${after.read_minutes}`);
+    check("…and the cover survives it", after.cover_url === "https://example.test/cover.jpg", String(after.cover_url));
+    check("…and the excerpt survives it", after.excerpt === before.excerpt);
+    check("…and the SEO title survives it", after.seo_title === before.seo_title);
+    check("…and published_at is NOT bumped to today",
+      new Date(after.published_at).getTime() === new Date(before.published_at).getTime(),
+      `${before.published_at} → ${after.published_at}`);
+
+    await db.query(`update blog_posts set cover_url = $2 where id = $1`, [before.id, before.cover_url]);
+  }
 }
 
 /* ══════════════════════════════════ 11 · SEO surface ═══ */

@@ -96,13 +96,12 @@ export function HelpCategory({ slug, base = "" }: { slug: string; base?: string 
                 className="overflow-hidden transition-[max-height] duration-200 ease-out-quart"
                 style={{ maxHeight: isOpen ? 400 : 0 }}
               >
+                {/* The design's accordion body is the answer paragraph and
+                    nothing else — no "read more" affordance. A link was added
+                    here and then removed: the design lock forbids additions, and
+                    the full articles are still reachable from the popular list
+                    and from search, which is how P12 reaches the article screen. */}
                 <p className="px-4 pb-4 text-13 leading-[1.5] text-ink-secondary">{a.answer}</p>
-                <button
-                  onClick={() => router.push(`${base}/help/article/${a.slug}`)}
-                  className="chrome mb-4 px-4 text-13 font-semibold text-accent"
-                >
-                  Read the full article →
-                </button>
               </div>
             </div>
           );

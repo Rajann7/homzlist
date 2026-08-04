@@ -180,6 +180,20 @@ async function main() {
   }
   say(`${HELP_ARTICLES.length} articles (${POPULAR_ORDER.length} marked popular)`);
 
+  // Anything still orphaned cannot be reached.
+  //
+  // The same out-of-band P6 setup left 27 more draft articles with slugs and a
+  // category NAME but no category_id — so they were invisible on the Help
+  // centre (every query joins through the category) while still filling the
+  // admin FAQ list, which is the "admin and public disagree" problem again.
+  // They also duplicate the authored set (`block-a-user` vs `block-someone`,
+  // `no-replies` vs `no-reply-from-owner`, …).
+  //
+  // The rule is deliberately narrow: only rows with NO category are removed. An
+  // article an admin writes in the CMS has one, and is never touched by this.
+  const orphans = await q(`delete from faqs where category_id is null returning slug`);
+  if (orphans.rowCount) say(`removed ${orphans.rowCount} unreachable article(s) with no category`);
+
   /* ══════════════════════════════════════════════════════════ 3 · blog ═══ */
   console.log("\nBLOG");
 

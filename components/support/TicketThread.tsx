@@ -170,6 +170,22 @@ export function TicketThread({ id, base = "" }: { id: string; base?: string }) {
           {thread.messages.map((m) =>
             m.authorKind === "user" ? (
               <div key={m.id} className="max-w-[78%] self-end rounded-12 rounded-br-[4px] bg-accent-soft px-3 py-2.5 text-15 leading-[1.45] text-ink-primary">
+                {m.attachments.length > 0 && (
+                  <span className="mb-1.5 flex flex-wrap gap-1.5">
+                    {m.attachments.map((key) => (
+                      // Streamed through the authenticated route, never a signed
+                      // storage URL — the ownership check runs on each read.
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        key={key}
+                        src={`/api/v1/support/tickets/${thread.id}/attachment?key=${encodeURIComponent(key)}`}
+                        alt="Attached screenshot"
+                        className="h-20 w-[120px] rounded-8 object-cover"
+                        loading="lazy"
+                      />
+                    ))}
+                  </span>
+                )}
                 {m.body}
               </div>
             ) : (

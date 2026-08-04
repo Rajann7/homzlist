@@ -198,12 +198,55 @@ export function BlogEditPanelBody({ panel }: { panel: PanelEntry }) {
   const { popPanel, notifyChanged } = usePanels();
   const row = panel.data?.id ? (panel.data as unknown as BlogRow) : null;
   const [title, setTitle] = useState(row?.title ?? "");
-  const [category, setCategory] = useState(row?.category ?? "Buying Guide");
+  const [category, setCategory] = useState(row?.category ?? "");
   const [status, setStatus] = useState(row?.status_key ?? "draft");
   const [scheduledAt, setScheduledAt] = useState("");
   const [body, setBody] = useState("");
+  const [excerpt, setExcerpt] = useState("");
+  const [coverUrl, setCoverUrl] = useState("");
+  const [seoTitle, setSeoTitle] = useState("");
+  const [seoDescription, setSeoDescription] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(Boolean(row?.id));
+  const [cats, setCats] = useState<{ slug: string; label: string }[]>([]);
+
+  /**
+   * Load the REAL post before letting anyone edit it.
+   *
+   * The panel used to open on an empty body box, because the list row it is
+   * handed carries no body_md — and then saved that empty string over the
+   * article. Editing a title deleted the post. The save side now leaves absent
+   * fields alone (lib/admin/content.ts), and this side actually loads them, so
+   * the box shows what is really there.
+   */
+  useEffect(() => {
+    let dead = false;
+    void (async () => {
+      const [detail, categories] = await Promise.all([
+        row?.id
+          ? fetch(`/api/v1/admin/content?what=blog&id=${row.id}`, { credentials: "same-origin", cache: "no-store" })
+              .then((r) => r.json()).catch(() => null)
+          : Promise.resolve(null),
+        fetch("/api/v1/admin/content?what=blog-categories", { credentials: "same-origin", cache: "no-store" })
+          .then((r) => r.json()).catch(() => null),
+      ]);
+      if (dead) return;
+      if (categories?.ok) setCats(categories.data.categories);
+      if (detail?.ok) {
+        const p = detail.data as Record<string, string | null>;
+        setBody(p.body_md ?? "");
+        setExcerpt(p.excerpt ?? "");
+        setCoverUrl(p.cover_url ?? "");
+        setSeoTitle(p.seo_title ?? "");
+        setSeoDescription(p.seo_description ?? "");
+        setCategory(p.category ?? "");
+        setScheduledAt(p.scheduled_at ? String(p.scheduled_at).slice(0, 16) : "");
+      }
+      setLoading(false);
+    })();
+    return () => { dead = true; };
+  }, [row?.id]);
 
     const footer = (
     <div
@@ -217,8 +260,9 @@ export function BlogEditPanelBody({ panel }: { panel: PanelEntry }) {
     >
           <Btn label="Cancel" kind="outline" onClick={popPanel} style={{ flex: 1 }} />
           <Btn
-            label={busy ? "Saving…" : "Save"}
+            label={busy ? "Saving…" : loading ? "Loading…" : "Save"}
             kind="primary"
+            disabled={loading}
             style={{ flex: 1 }}
             onClick={async () => {
               setBusy(true);
@@ -231,6 +275,10 @@ export function BlogEditPanelBody({ panel }: { panel: PanelEntry }) {
                 status,
                 scheduled_at: scheduledAt || null,
                 body_md: body,
+                excerpt,
+                cover_url: coverUrl,
+                seo_title: seoTitle,
+                seo_description: seoDescription,
               });
               setBusy(false);
               if (json?.ok) {
@@ -249,14 +297,25 @@ export function BlogEditPanelBody({ panel }: { panel: PanelEntry }) {
       <FField label="Title">
         <input value={title} onChange={(e) => setTitle(e.target.value)} style={F_INPUT_STYLE} />
       </FField>
+      {/* The categories are the rows the PUBLIC blog reads (blog_categories),
+          not a hardcoded list. The old array held "Buying Guide", "Area Guide",
+          "Product", "Market" — none of which match a chip on the live blog, so
+          a post saved here landed in a category no filter could ever show. */}
       <FField label="Category">
         <select value={category} onChange={(e) => setCategory(e.target.value)} style={F_INPUT_STYLE}>
-          {["Buying Guide", "Legal", "Area Guide", "Product", "Market"].map((c) => (
-            <option key={c} value={c}>
-              {c}
+          <option value="">Choose a category…</option>
+          {cats.map((c) => (
+            <option key={c.slug} value={c.slug}>
+              {c.label}
             </option>
           ))}
         </select>
+      </FField>
+      <FField label="Cover image URL" helper="Shown on the blog card and the post header. Left empty, the branded placeholder is used.">
+        <input value={coverUrl} onChange={(e) => setCoverUrl(e.target.value)} placeholder="https://…" style={F_INPUT_STYLE} />
+      </FField>
+      <FField label="Excerpt" helper="One line under the title on the card, and the share description.">
+        <input value={excerpt} onChange={(e) => setExcerpt(e.target.value)} style={F_INPUT_STYLE} />
       </FField>
       <FField label="Body" helper="Markdown. The read time is computed from this, not typed.">
         <textarea
@@ -282,6 +341,12 @@ export function BlogEditPanelBody({ panel }: { panel: PanelEntry }) {
           />
         </FField>
       ) : null}
+      <FField label="SEO title" helper="≤ 60 characters. Falls back to the post title.">
+        <input value={seoTitle} onChange={(e) => setSeoTitle(e.target.value)} style={F_INPUT_STYLE} />
+      </FField>
+      <FField label="SEO description" helper="≤ 160 characters. Falls back to the excerpt.">
+        <textarea value={seoDescription} onChange={(e) => setSeoDescription(e.target.value)} style={{ ...F_TEXTAREA_STYLE, height: 70 }} />
+      </FField>
       {error ? <NoteStrip tone="warn">{error}</NoteStrip> : null}
       </div>
       {footer}

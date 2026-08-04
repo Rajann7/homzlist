@@ -7,6 +7,7 @@ import {
 } from "@/components";
 import { BackButton } from "@/components/billing/primitives";
 import { useTheme } from "@/components/theme/ThemeProvider";
+import { scrollToId } from "@/lib/utils";
 
 /**
  * P12 S9 — the Components gallery.
@@ -50,11 +51,12 @@ export function ComponentsGallery({ base = "" }: { base?: string }) {
   const [checked, setChecked] = useState(true);
   const [radio, setRadio] = useState("a");
 
+  // Same guaranteed-landing jump as the legal reader: scrollIntoView with
+  // behavior:"smooth" is a silent no-op wherever smooth scrolling is disabled,
+  // which would leave all 15 section chips dead.
   const goto = (id: string) => {
+    scrollToId(id, 108);
     setJump(false);
-    const el = document.getElementById(id);
-    if (!el) return;
-    el.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
   return (

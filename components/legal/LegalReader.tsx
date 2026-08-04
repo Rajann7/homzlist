@@ -9,6 +9,7 @@ import { BackButton } from "@/components/billing/primitives";
 import { Longform, tocOf } from "@/components/content/Longform";
 import { ShareSheet } from "@/components/content/ShareSheet";
 import { legalApi, type LegalVersion } from "@/lib/content/client";
+import { scrollToId } from "@/lib/utils";
 
 /**
  * P12 S3 — the legal reader.
@@ -69,14 +70,15 @@ export function LegalReader({ page, officer, guest = false, base = "" }: LegalPa
 
   useEffect(() => { if (versionsOpen && !versions) void loadVersions(); }, [versionsOpen, versions, loadVersions]);
 
-  const jump = (id: string) => {
-    setTocOpen(false);
-    // The header is sticky at 56px; the design lands the heading just below it.
-    const el = document.getElementById(id);
-    if (!el) return;
-    const y = el.getBoundingClientRect().top + window.scrollY - 76;
-    window.scrollTo({ top: y, behavior: "smooth" });
-  };
+  /**
+   * The header is sticky at 56px; the design lands the heading just below it.
+   *
+   * The accordion deliberately STAYS OPEN, which is what P12's own handler does
+   * — it closes the jump SHEET but never the inline contents list. Collapsing it
+   * also re-lays out ~90px above the target mid-scroll, so the heading ends up
+   * well below where it was aimed.
+   */
+  const jump = (id: string) => scrollToId(id, 76);
 
   const effective = page.effectiveDate
     ? new Date(page.effectiveDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
