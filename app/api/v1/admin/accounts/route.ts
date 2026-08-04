@@ -24,7 +24,7 @@ export async function GET() {
     const me = await requireAdmin("staff");
     const db = createServiceClient();
 
-    const pool = readAdminPool();
+    const pool = await readAdminPool();
     const alive: AdminPoolEntry[] = [];
     const accounts = [
       { id: me.id, name: me.name, email: me.email, initials: initialsOf(me.name), current: true },
@@ -50,7 +50,7 @@ export async function GET() {
     }
 
     // Self-healing: anything that no longer resolves is dropped for good.
-    if (alive.length !== pool.length) writeAdminPool(alive);
+    if (alive.length !== pool.length) await writeAdminPool(alive);
 
     return ok({ accounts });
   } catch (e) {

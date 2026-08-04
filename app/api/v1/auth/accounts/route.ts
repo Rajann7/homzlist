@@ -37,7 +37,7 @@ export async function GET() {
   const active = await getProfileById(claims.sub);
   if (!active) return fail("UNAUTHORIZED");
 
-  const pool = readPool();
+  const pool = await readPool();
   const alive: PoolEntry[] = [];
   const accounts = [await row(active, true)];
 
@@ -51,7 +51,7 @@ export async function GET() {
   }
 
   // Self-healing: prune anything that no longer resolves.
-  if (alive.length !== pool.length) writePool(alive);
+  if (alive.length !== pool.length) await writePool(alive);
 
   return ok({ accounts });
 }

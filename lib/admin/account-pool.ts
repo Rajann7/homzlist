@@ -1,5 +1,5 @@
 import "server-only";
-import { cookies, type UnsafeUnwrappedCookies } from "next/headers";
+import { cookies } from "next/headers";
 import { peekAdminRefresh, revokeAdminRefresh } from "./session";
 
 /**
@@ -53,12 +53,12 @@ function parse(raw: string | undefined): AdminPoolEntry[] {
     .filter((e) => e.staffId && e.token);
 }
 
-export function readAdminPool(): AdminPoolEntry[] {
-  return parse((cookies() as unknown as UnsafeUnwrappedCookies).get(ADMIN_POOL_COOKIE)?.value);
+export async function readAdminPool(): Promise<AdminPoolEntry[]> {
+  return parse((await cookies()).get(ADMIN_POOL_COOKIE)?.value);
 }
 
-export function writeAdminPool(entries: AdminPoolEntry[]): void {
-  const jar = (cookies() as unknown as UnsafeUnwrappedCookies);
+export async function writeAdminPool(entries: AdminPoolEntry[]): Promise<void> {
+  const jar = await cookies();
   if (!entries.length) {
     jar.set(ADMIN_POOL_COOKIE, "", opts(0));
     return;
@@ -79,22 +79,22 @@ export async function parkOutgoingAdmin(
   incomingStaffId: string,
   outgoingToken: string | undefined,
 ): Promise<void> {
-  const rest = readAdminPool().filter((e) => e.staffId !== incomingStaffId);
+  const rest = (await readAdminPool()).filter((e) => e.staffId !== incomingStaffId);
   if (outgoingToken) {
     const live = await peekAdminRefresh(outgoingToken);
     if (live && live.staffId !== incomingStaffId) {
-      writeAdminPool([{ staffId: live.staffId, token: outgoingToken }, ...rest]);
+      await writeAdminPool([{ staffId: live.staffId, token: outgoingToken }, ...rest]);
       return;
     }
   }
-  writeAdminPool(rest);
+  await writeAdminPool(rest);
 }
 
-export function takeFromAdminPool(staffId: string): {
+export async function takeFromAdminPool(staffId: string): Promise<{
   entry: AdminPoolEntry | null;
   rest: AdminPoolEntry[];
-} {
-  const pool = readAdminPool();
+}> {
+  const pool = await readAdminPool();
   return {
     entry: pool.find((e) => e.staffId === staffId) ?? null,
     rest: pool.filter((e) => e.staffId !== staffId),
@@ -102,12 +102,12 @@ export function takeFromAdminPool(staffId: string): {
 }
 
 /** Log out clears the parked accounts too — see the logout route for why. */
-export function clearAdminPool(): void {
-  writeAdminPool([]);
+export async function clearAdminPool(): Promise<void> {
+  await writeAdminPool([]);
 }
 
 /** Sign every parked admin out server-side as well, then drop the cookie. */
 export async function revokeAndClearAdminPool(): Promise<void> {
-  for (const e of readAdminPool()) await revokeAdminRefresh(e.token);
-  clearAdminPool();
+  for (const e of await readAdminPool()) await revokeAdminRefresh(e.token);
+  await clearAdminPool();
 }

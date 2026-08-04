@@ -85,7 +85,7 @@ async function alertOnRepeatedFailures(email: string): Promise<void> {
 
 export async function signInAdmin(identity: ProviderIdentity): Promise<SignInResult> {
   const db = createServiceClient();
-  const { ip, device } = requestContext();
+  const { ip, device } = await requestContext();
   const email = identity.email.toLowerCase();
 
   const log = async (success: boolean, reason: string) => {

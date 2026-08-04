@@ -1,5 +1,5 @@
 import "server-only";
-import { cookies, type UnsafeUnwrappedCookies } from "next/headers";
+import { cookies } from "next/headers";
 
 /**
  * How a failed sign-in reaches the login SCREEN.
@@ -32,9 +32,9 @@ function opts(maxAge: number) {
   };
 }
 
-export function setLoginOutcome(outcome: LoginOutcome): void {
+export async function setLoginOutcome(outcome: LoginOutcome): Promise<void> {
   const value = JSON.stringify(outcome);
-  (cookies() as unknown as UnsafeUnwrappedCookies).set(COOKIE, Buffer.from(value).toString("base64url"), opts(TTL_SEC));
+  (await cookies()).set(COOKIE, Buffer.from(value).toString("base64url"), opts(TTL_SEC));
 }
 
 /**
@@ -42,8 +42,8 @@ export function setLoginOutcome(outcome: LoginOutcome): void {
  * cookies, so `clearLoginOutcome()` is called by the route that acts next
  * (starting another sign-in, or dismissing with "Use a different account").
  */
-export function readLoginOutcome(): LoginOutcome | null {
-  const raw = (cookies() as unknown as UnsafeUnwrappedCookies).get(COOKIE)?.value;
+export async function readLoginOutcome(): Promise<LoginOutcome | null> {
+  const raw = (await cookies()).get(COOKIE)?.value;
   if (!raw) return null;
   try {
     const parsed = JSON.parse(Buffer.from(raw, "base64url").toString("utf8")) as LoginOutcome;
@@ -53,6 +53,6 @@ export function readLoginOutcome(): LoginOutcome | null {
   }
 }
 
-export function clearLoginOutcome(): void {
-  (cookies() as unknown as UnsafeUnwrappedCookies).set(COOKIE, "", opts(0));
+export async function clearLoginOutcome(): Promise<void> {
+  (await cookies()).set(COOKIE, "", opts(0));
 }

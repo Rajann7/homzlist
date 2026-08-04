@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
       path: "/",
       maxAge: 600,
     });
-    return ok({ redirect: googleAuthorizeUrl(adminCallbackUrl(), state) });
+    return ok({ redirect: googleAuthorizeUrl(await adminCallbackUrl(), state) });
   }
 
   const email = process.env.ADMIN_DEV_EMAIL;

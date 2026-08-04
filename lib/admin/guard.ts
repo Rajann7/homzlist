@@ -1,5 +1,5 @@
 import "server-only";
-import { headers, type UnsafeUnwrappedHeaders } from "next/headers";
+import { headers } from "next/headers";
 import { createServiceClient } from "@/lib/supabase/server";
 import { readAdminClaims, type AdminRole } from "./session";
 
@@ -102,8 +102,8 @@ export async function requireAdmin(min: AdminRole): Promise<AdminIdentity> {
 }
 
 /** Request metadata every audit row carries. */
-export function requestContext(): { ip: string | null; device: string | null } {
-  const h = (headers() as unknown as UnsafeUnwrappedHeaders);
+export async function requestContext(): Promise<{ ip: string | null; device: string | null }> {
+  const h = await headers();
   const fwd = h.get("x-forwarded-for");
   return {
     ip: fwd ? fwd.split(",")[0].trim() : (h.get("x-real-ip") ?? null),

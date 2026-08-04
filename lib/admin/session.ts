@@ -1,7 +1,7 @@
 import "server-only";
 import { SignJWT, jwtVerify } from "jose";
 import { createHash, randomBytes } from "node:crypto";
-import { cookies, type UnsafeUnwrappedCookies } from "next/headers";
+import { cookies } from "next/headers";
 import { kv } from "@/lib/kv";
 import { serverEnv } from "@/lib/env";
 
@@ -149,8 +149,8 @@ export async function setAdminCookies(access: string, refresh: string): Promise<
   jar.set(ADMIN_COOKIE.REFRESH, refresh, { ...cookieOptions(), maxAge: REFRESH_TTL_SEC });
 }
 
-export function clearAdminCookies(): void {
-  const jar = (cookies() as unknown as UnsafeUnwrappedCookies);
+export async function clearAdminCookies(): Promise<void> {
+  const jar = await cookies();
   jar.set(ADMIN_COOKIE.ACCESS, "", { ...cookieOptions(), maxAge: 0 });
   jar.set(ADMIN_COOKIE.REFRESH, "", { ...cookieOptions(), maxAge: 0 });
 }

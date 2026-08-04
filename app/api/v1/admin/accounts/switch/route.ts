@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
     if (!body?.staffId) return fail("VALIDATION_ERROR");
     if (body.staffId === me.id) return ok({ switched: true });
 
-    const { entry, rest } = takeFromAdminPool(body.staffId);
+    const { entry, rest } = await takeFromAdminPool(body.staffId);
     if (!entry) return fail("NOT_FOUND");
 
     // Capture the outgoing token BEFORE the switch overwrites the cookie.
@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
 
     // Drop the entry from the pool first: whether the switch succeeds or the
     // token turns out to be dead, that parked account is spent either way.
-    writeAdminPool(rest);
+    await writeAdminPool(rest);
 
     const switched = await switchToParkedAdmin(entry.token, outgoing);
     if (!switched) return fail("NOT_FOUND");

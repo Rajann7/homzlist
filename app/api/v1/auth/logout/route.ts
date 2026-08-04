@@ -25,7 +25,7 @@ export async function POST() {
 
   // Promote the most-recently-used background account, skipping any that died
   // (revoked elsewhere, suspended, deleted) — those are dropped, not entered.
-  let pool = readPool();
+  let pool = await readPool();
   while (pool.length) {
     const [next, ...rest] = pool;
     const rotated = await rotateRefreshSession(next.token);
@@ -33,7 +33,7 @@ export async function POST() {
     if (rotated && profile && profile.is_registered && profile.state !== "deleted" && profile.state !== "suspended") {
       const access = await signAccess({ sub: profile.id, role: profile.role, registered: true });
       await setSessionCookies(access, rotated.newCookie);
-      writePool(rest);
+      await writePool(rest);
       await touchLastActive(profile.id);
       return ok({ loggedOut: true, switchedTo: profile.id });
     }
@@ -41,6 +41,6 @@ export async function POST() {
   }
 
   await clearAuthCookies();
-  writePool([]);
+  await writePool([]);
   return ok({ loggedOut: true, switchedTo: null });
 }

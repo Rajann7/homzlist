@@ -26,7 +26,7 @@ export type AuditEntry = {
 };
 
 export async function writeAudit(me: AdminIdentity, entry: AuditEntry): Promise<void> {
-  const { ip, device } = requestContext();
+  const { ip, device } = await requestContext();
   const db = createServiceClient();
   const { error } = await db.from("admin_audit_log").insert({
     actor_id: me.id,

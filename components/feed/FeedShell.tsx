@@ -27,7 +27,7 @@ export function FeedShell({
   onRefresh?: () => void | Promise<void>;
   children: React.ReactNode;
   /** Optional external ref to the scroll container (feed uses it for pull-to-refresh). */
-  scrollRef?: React.RefObject<HTMLDivElement>;
+  scrollRef?: React.RefObject<HTMLDivElement | null>;
 }) {
   const router = useRouter();
   const innerRef = useRef<HTMLDivElement>(null);

@@ -42,7 +42,7 @@ export async function GET(req: NextRequest) {
 
   let result;
   try {
-    const identity = await googleIdentityFromCode(code, adminCallbackUrl());
+    const identity = await googleIdentityFromCode(code, await adminCallbackUrl());
     result = await signInAdmin(identity);
   } catch (e) {
     console.error("[admin] google sign-in failed", e);

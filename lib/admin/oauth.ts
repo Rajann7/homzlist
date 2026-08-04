@@ -1,5 +1,5 @@
 import "server-only";
-import { headers, type UnsafeUnwrappedHeaders } from "next/headers";
+import { headers } from "next/headers";
 
 /**
  * The two things the OAuth start and its callback must agree on, kept out of
@@ -23,8 +23,8 @@ export const OAUTH_STATE_COOKIE = "hz_admin_oauth";
  * source here; a spoofed one only ever produces a redirect_uri Google does not
  * recognise, for the request that spoofed it.
  */
-export function adminCallbackUrl(): string {
-  const h = (headers() as unknown as UnsafeUnwrappedHeaders);
+export async function adminCallbackUrl(): Promise<string> {
+  const h = await headers();
   const host = h.get("x-forwarded-host") ?? h.get("host") ?? "";
   const proto = h.get("x-forwarded-proto") ?? (host.includes("localhost") ? "http" : "https");
   return `${proto}://${host}/api/v1/admin/auth/google/callback`;
