@@ -3992,3 +3992,50 @@ Auditors: `npm run check:module12` is 170 checks, `check:module12-ui` is 57.
   fabricates a property photo.
 - **`requires_reacceptance` is seeded false** on all 8 legal pages. A decision,
   recorded above, not an omission.
+
+## Found during the Next 15 upgrade (4 Aug 2026) — check-script defects
+
+None of these are application bugs and none were caused by the upgrade. They
+are defects in the *verification* scripts, and they matter because they make a
+before/after comparison lie — which is exactly what an upgrade needs to trust.
+
+- **HIGH — `check:admin-p6` destroys a real legal page on every run.** At
+  `scripts/check-admin-p6.mjs:536` it picks a page to exercise the
+  draft/publish/version machinery, deliberately excluding
+  `terms/privacy/grievance/refund`. But the `??` fallback on the next line is
+  `select id, title, version, kind from cms_pages limit 1` with no exclusion at
+  all, so when the first query returns nothing it grabs a legal page and
+  republishes it with a 28-character throwaway body. It never restores it.
+
+  Proven from the DB: `privacy` went 5798 → 28 chars at 02:58 on 4 Aug (during
+  the Next 14 baseline run) and `refund` went 3317 → 28 at 05:20 (during the
+  Next 15 run). `npm run seed:module12` restores them — its own comment at
+  line 90 already documents this bug — and it reported removing exactly 2
+  throwaway `P6 check` versions, matching the two damaged pages.
+
+  Until the fallback is scoped, `check:module12`'s "no page still carries the
+  P6 placeholder body" assertion fails after any `check:admin-p6` run, and the
+  dev site really is serving a broken legal page in the meantime.
+
+- **MEDIUM — `check:messages` is not idempotent.** At
+  `scripts/check-messages-live.mjs:424` it deletes the proposal row before
+  re-sending, but never restores the quota the send consumed, and it re-picks
+  the builder each run. A builder with no active plan row yields
+  `proposalBalance() = 0`, so the proposal step fails with `NEED_TOPUP` on a
+  later run even though the endpoint is working correctly.
+
+- **LOW — `check:bundle-secrets` reports false positives.** Three `.env.local`
+  values are set to exactly the hardcoded fallback strings in `lib/env.ts`
+  (`REDIS_URL` = the `redis://127.0.0.1:6379` default at line 49, `EMAIL_FROM`
+  = the `noreply@homzlist.com` default at line 70) and `FCM_PROJECT_ID` is a
+  12-character value that appears as a substring of the build path. Next.js
+  replaces non-`NEXT_PUBLIC_` env reads with `undefined` in client bundles, so
+  what the grep finds is the source-code default, not a secret. The real
+  secrets all default to `""` and appear nowhere in the bundle — the
+  `serverEnv()` guard holds. Worth giving the gate a minimum-entropy rule or a
+  known-default skip list, since a gate that always fails gets ignored.
+
+- **Flaky, not broken.** `check:notifications`, `check:inbox` and
+  `check:admin-p4` each failed once with `ETIMEDOUT :5432`, `Connection
+  terminated unexpectedly` and `ECONNRESET` respectively, and passed on retry.
+  Network to the dev Supabase, not code.
