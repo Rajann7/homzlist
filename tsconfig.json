@@ -36,7 +36,8 @@
     ".next-claude/types/**/*.ts",
     ".next-build/types/**/*.ts",
     ".next-baseline/types/**/*.ts",
-    ".next/dev/types/**/*.ts"
+    ".next/dev/types/**/*.ts",
+    ".next-claude/dev/types/**/*.ts"
   ],
   "exclude": [
     "node_modules"

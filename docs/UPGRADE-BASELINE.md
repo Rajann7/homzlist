@@ -243,3 +243,75 @@ because the same traps apply to any future upgrade:
     same screen scored 62% on one run and 0% on the next.
 11. The disk filled to 100% mid-capture; `ENOSPC` does not throw on write, it
     silently truncates, so the capture kept "succeeding".
+
+---
+
+# Next 16 verification result (4 Aug 2026)
+
+Next 14.2.35 production build vs Next 16.3.0 production build, same machine,
+same database, routes pre-warmed on both.
+
+## What is proven
+
+| Gate | Next 14 baseline | Next 16.3.0 |
+|---|---|---|
+| `tsc --noEmit` | clean | clean — **no source changes were needed at all** |
+| `next build` | clean | clean under **Turbopack**, zero errors, zero warnings |
+| `npm run lint` | exit 0, warnings only | exit 0, warnings only |
+| App route manifest | 372 | 373 — none missing, the one addition is Next's own `/_global-error` |
+| **Guest screens, production vs production** | — | **16 / 16 pixel-identical** |
+| `check:bundle-secrets` on the Turbopack bundle | — | **PASS — 11 secrets vs 100 client files, 0 leaks** |
+| `middleware.ts` runtime | edge | **edge** (`.next/server/middleware-manifest.json`) |
+| `db:proof` | pass | pass |
+| 15 of 17 `check:*` scripts | pass | pass |
+| `check:search` | 9 failures | **the same 9 failures, verbatim** |
+| `check:story` | crashes at `check-story-live.mjs:111` | **the same crash, same line** |
+| Dev server boot | ~24s | 2.4s |
+
+Nothing that passed on Next 14 fails on Next 16. The two failures are the two
+that were already failing, unchanged down to the assertion text — both are
+stories having expired, which also explains `check:search`'s empty index.
+
+`pub-property` first measured 31.9% against Next 14; a fresh head-to-head is
+0.000%, and each server is stable against itself, so that was a hero-image load
+landing on one side and not the other. `pub-property-desktop` carries a ~1.9%
+noise floor that reproduces on the SAME server, from the same cause.
+
+## Turbopack
+
+Turbopack is the default builder in 16, and the common upgrade failure — a
+custom `webpack` config making `next build` refuse to run — does not apply:
+this project never had one. It built clean against `sharp`, `bullmq`,
+`ioredis`, `firebase-admin`, `@aws-sdk/*` and `exceljs`, so
+`serverExternalPackages` was not needed and the `--webpack` escape hatch was
+never used.
+
+## Decisions carried into 16
+
+1. **`middleware.ts` was NOT migrated to `proxy`.** `next dev` prints a
+   deprecation notice for it on every boot, and that is accepted: the v16 guide
+   states that `proxy` runs on `nodejs`, cannot be configured, and that edge
+   callers should keep using `middleware`. This middleware verifies both the
+   user and admin sessions on the edge with jose and its matcher catches nearly
+   every request. Revisit when the Next team ships the promised edge story for
+   `proxy`.
+
+2. **The 155 new lint errors are warnings, not fixes.** `eslint-config-next` 16
+   brings eslint-plugin-react-hooks v6 (the React Compiler rules) and two new
+   `@next/next` rules. 110 of the findings are `set-state-in-effect`; the rest
+   include `<a>`-instead-of-`<Link>` and `window.location.href` navigations.
+   Clearing them means rewriting component logic and changing navigation from a
+   full load to a client transition — behaviour this upgrade exists to preserve.
+   They are visible as warnings and tracked as separate work in
+   `docs/PENDING-INTEGRATIONS.md`.
+
+3. **`@supabase/ssr` stays at 0.5.2.** It is used in exactly two places —
+   `createBrowserClient` (no cookies involved) and a `createServerClient` that
+   nothing imports. Upgrading it would be change without a reason.
+
+## Still open, and unchanged by this upgrade
+
+`check:search` (9) and `check:story` (crash) fail because stories expire after
+24h and the search index is empty. They failed identically before the upgrade
+started. Re-seeding is a separate task; it was deliberately not mixed in, so
+that no green could be mistaken for something the upgrade fixed.
