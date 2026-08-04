@@ -6,7 +6,8 @@ export const metadata = { title: "Ticket" };
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
 
-export default function SellerTicketPage({ params }: { params: { id: string } }) {
+export default async function SellerTicketPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   // useSearchParams needs a Suspense boundary in the app router.
   return (
     <Suspense fallback={null}>

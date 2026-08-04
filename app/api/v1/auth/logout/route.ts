@@ -17,7 +17,7 @@ import { getProfileById, touchLastActive } from "@/lib/auth/service";
 export const dynamic = "force-dynamic";
 
 export async function POST() {
-  const rt = cookies().get(COOKIE.REFRESH)?.value;
+  const rt = (await cookies()).get(COOKIE.REFRESH)?.value;
   if (rt) {
     const [profileId, sid] = rt.split(".");
     if (profileId && sid) await revokeSession(profileId, sid);

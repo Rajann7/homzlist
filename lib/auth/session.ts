@@ -232,18 +232,18 @@ export function cookieOpts(maxAge: number) {
 }
 
 export async function setSessionCookies(access: string, refresh: string) {
-  const jar = cookies();
+  const jar = await cookies();
   jar.set(COOKIE.ACCESS, access, cookieOpts(ACCESS_TTL_SEC));
   jar.set(COOKIE.REFRESH, refresh, cookieOpts(REFRESH_TTL_SEC));
   jar.delete(COOKIE.REGISTER);
 }
 
 export async function setRegisterCookie(token: string) {
-  cookies().set(COOKIE.REGISTER, token, cookieOpts(REGISTER_TTL_SEC));
+  (await cookies()).set(COOKIE.REGISTER, token, cookieOpts(REGISTER_TTL_SEC));
 }
 
 export async function clearAuthCookies() {
-  const jar = cookies();
+  const jar = await cookies();
   jar.delete(COOKIE.ACCESS);
   jar.delete(COOKIE.REFRESH);
   jar.delete(COOKIE.REGISTER);

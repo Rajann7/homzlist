@@ -7,7 +7,7 @@ import { COOKIE, verifyAccess, type AccessClaims } from "./session";
  * Server Components). The API's source of truth for gating — never a client flag.
  */
 export async function getCurrentUser(): Promise<AccessClaims | null> {
-  const token = cookies().get(COOKIE.ACCESS)?.value;
+  const token = (await cookies()).get(COOKIE.ACCESS)?.value;
   if (!token) return null;
   return verifyAccess(token);
 }

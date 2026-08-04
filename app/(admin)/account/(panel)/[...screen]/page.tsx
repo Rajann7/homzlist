@@ -24,7 +24,8 @@ import { requireAdmin } from "@/lib/admin/guard";
  */
 export const dynamic = "force-dynamic";
 
-export default async function PanelPlaceholder({ params }: { params: { screen: string[] } }) {
+export default async function PanelPlaceholder(props: { params: Promise<{ screen: string[] }> }) {
+  const params = await props.params;
   const me = await requireAdmin("staff");
 
   // The segments below /account are the BROWSER's path, which is what

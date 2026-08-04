@@ -9,6 +9,7 @@ export const metadata = { title: "Contact support" };
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
 
-export default function SellerContactPage({ searchParams }: { searchParams: { topic?: string } }) {
-  return <NewTicket topic={searchParams.topic ?? null} />;
+export default async function SellerContactPage(props: { searchParams: Promise<{ topic?: string }> }) {
+ const searchParams = await props.searchParams;
+ return <NewTicket topic={searchParams.topic ?? null} />;
 }

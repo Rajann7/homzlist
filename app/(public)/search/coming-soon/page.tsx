@@ -18,11 +18,12 @@ export const metadata = {
   robots: { index: false, follow: true },
 };
 
-export default async function ComingSoonPage({
-  searchParams,
-}: {
-  searchParams: { city?: string };
-}) {
+export default async function ComingSoonPage(
+  props: {
+    searchParams: Promise<{ city?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const city = (searchParams.city ?? "").trim().slice(0, 80) || "your city";
   const db = createServiceClient();
 

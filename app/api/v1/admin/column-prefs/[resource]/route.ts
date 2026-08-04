@@ -18,7 +18,8 @@ import { columnKeys } from "@/lib/admin/list-query";
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
 
-export async function GET(_req: NextRequest, { params }: { params: { resource: string } }) {
+export async function GET(_req: NextRequest, props: { params: Promise<{ resource: string }> }) {
+  const params = await props.params;
   const resource = resourceByName(params.resource);
   if (!resource) return fail("NOT_FOUND");
   try {
@@ -37,7 +38,8 @@ export async function GET(_req: NextRequest, { params }: { params: { resource: s
   }
 }
 
-export async function PUT(req: NextRequest, { params }: { params: { resource: string } }) {
+export async function PUT(req: NextRequest, props: { params: Promise<{ resource: string }> }) {
+  const params = await props.params;
   const resource = resourceByName(params.resource);
   if (!resource) return fail("NOT_FOUND");
   try {

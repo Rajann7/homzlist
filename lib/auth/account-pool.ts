@@ -1,5 +1,5 @@
 import "server-only";
-import { cookies } from "next/headers";
+import { cookies, type UnsafeUnwrappedCookies } from "next/headers";
 import { cookieOpts, REFRESH_MAX_AGE_SEC, revokeSession, peekRefreshSession } from "./session";
 
 /**
@@ -46,11 +46,11 @@ function serialize(entries: PoolEntry[]): string {
 
 /** Background accounts, most-recently-used first. */
 export function readPool(): PoolEntry[] {
-  return parse(cookies().get(COOKIE_POOL)?.value);
+  return parse((cookies() as unknown as UnsafeUnwrappedCookies).get(COOKIE_POOL)?.value);
 }
 
 export function writePool(entries: PoolEntry[]): void {
-  const jar = cookies();
+  const jar = (cookies() as unknown as UnsafeUnwrappedCookies);
   if (!entries.length) {
     jar.delete(COOKIE_POOL);
     return;
@@ -98,5 +98,5 @@ export async function revokeAndClearPool(): Promise<void> {
     const [profileId, sid] = e.token.split(".");
     if (profileId && sid) await revokeSession(profileId, sid);
   }
-  cookies().delete(COOKIE_POOL);
+  (await cookies()).delete(COOKIE_POOL);
 }

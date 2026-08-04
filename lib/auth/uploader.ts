@@ -17,7 +17,7 @@ export interface Uploader {
 }
 
 export async function getUploader(): Promise<Uploader | null> {
-  const jar = cookies();
+  const jar = await cookies();
 
   const access = await verifyAccess(jar.get(COOKIE.ACCESS)?.value ?? "");
   if (access) return { id: access.sub, scope: "session" };

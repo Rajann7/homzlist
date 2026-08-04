@@ -14,9 +14,9 @@ import { publicEnv } from "@/lib/env";
  */
 export const dynamic = "force-dynamic";
 
-export default function PublicCreateRedirect() {
-  const host = headers().get("host");
-  const proto = headers().get("x-forwarded-proto") ?? (host?.includes("localhost") ? "http" : "https");
+export default async function PublicCreateRedirect() {
+  const host = (await headers()).get("host");
+  const proto = (await headers()).get("x-forwarded-proto") ?? (host?.includes("localhost") ? "http" : "https");
   const target = host ? `${proto}://${host.startsWith("seller.") ? host : `seller.${host}`}/create` : `${publicEnv.sellerUrl}/create`;
   redirect(target);
 }

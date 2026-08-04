@@ -52,7 +52,8 @@ const GATE: Record<string, { role: AdminRole; audit: string }> = {
   reject: { role: "admin", audit: "reject" },
 };
 
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const me = await requireAdmin("admin");
     if (!UUID_RE.test(params.id)) return fail("NOT_FOUND");

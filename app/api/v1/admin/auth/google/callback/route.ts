@@ -27,7 +27,7 @@ export const dynamic = "force-dynamic";
 export async function GET(req: NextRequest) {
   if (adminAuthProviderKind() !== "google") return redirectToPath("/login");
 
-  const jar = cookies();
+  const jar = await cookies();
   const expected = jar.get(OAUTH_STATE_COOKIE)?.value;
   jar.set(OAUTH_STATE_COOKIE, "", { path: "/", maxAge: 0 });
 

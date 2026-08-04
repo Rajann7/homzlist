@@ -40,7 +40,8 @@ async function ownProject(id: string, profileId: string) {
   return (data as { id: string; profile_id: string; brochure_key: string | null; brochure_scanned: boolean } | null) ?? null;
 }
 
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const claims = await getCurrentUser();
   if (!claims) return fail("UNAUTHORIZED");
   if (!UUID_RE.test(params.id)) return fail("NOT_FOUND");
@@ -119,7 +120,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
  * to anyone; anything not yet live stays owner-only, and either way the bucket
  * path itself is never handed out — only a 5-minute signed URL.
  */
-export async function GET(_req: Request, { params }: { params: { id: string } }) {
+export async function GET(_req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   if (!UUID_RE.test(params.id)) return fail("NOT_FOUND");
   const claims = await getCurrentUser();
 
@@ -144,7 +146,8 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
   return ok({ brochure: { url, scanned: project.brochure_scanned } });
 }
 
-export async function DELETE(_req: Request, { params }: { params: { id: string } }) {
+export async function DELETE(_req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const claims = await getCurrentUser();
   if (!claims) return fail("UNAUTHORIZED");
   if (!UUID_RE.test(params.id)) return fail("NOT_FOUND");

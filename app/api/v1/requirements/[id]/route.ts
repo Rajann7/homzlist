@@ -42,7 +42,8 @@ function bhkOrNull(v: unknown): number | null {
   return Number.isInteger(n) && n >= 1 && n <= 10 ? n : null;
 }
 
-export async function GET(_req: Request, { params }: { params: { id: string } }) {
+export async function GET(_req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   if (!UUID_RE.test(params.id)) return fail("NOT_FOUND");
 
   // Guests may see the locked preview — that's the paywall's whole point.
@@ -54,7 +55,8 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
   return ok({ requirement: requirementDetailDTO(res.row, res.access, proposals, (await getPropertyType(res.row.type_code))?.label ?? null) });
 }
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const claims = await getCurrentUser();
   if (!claims) return fail("UNAUTHORIZED");
   if (!UUID_RE.test(params.id)) return fail("NOT_FOUND");
@@ -123,7 +125,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   return ok({ requirement: requirementDetailDTO(res.row, res.access, proposals, (await getPropertyType(res.row.type_code))?.label ?? null) });
 }
 
-export async function DELETE(_req: Request, { params }: { params: { id: string } }) {
+export async function DELETE(_req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const claims = await getCurrentUser();
   if (!claims) return fail("UNAUTHORIZED");
   if (!UUID_RE.test(params.id)) return fail("NOT_FOUND");

@@ -1,5 +1,5 @@
 import "server-only";
-import { cookies } from "next/headers";
+import { cookies, type UnsafeUnwrappedCookies } from "next/headers";
 
 /**
  * How a failed sign-in reaches the login SCREEN.
@@ -34,7 +34,7 @@ function opts(maxAge: number) {
 
 export function setLoginOutcome(outcome: LoginOutcome): void {
   const value = JSON.stringify(outcome);
-  cookies().set(COOKIE, Buffer.from(value).toString("base64url"), opts(TTL_SEC));
+  (cookies() as unknown as UnsafeUnwrappedCookies).set(COOKIE, Buffer.from(value).toString("base64url"), opts(TTL_SEC));
 }
 
 /**
@@ -43,7 +43,7 @@ export function setLoginOutcome(outcome: LoginOutcome): void {
  * (starting another sign-in, or dismissing with "Use a different account").
  */
 export function readLoginOutcome(): LoginOutcome | null {
-  const raw = cookies().get(COOKIE)?.value;
+  const raw = (cookies() as unknown as UnsafeUnwrappedCookies).get(COOKIE)?.value;
   if (!raw) return null;
   try {
     const parsed = JSON.parse(Buffer.from(raw, "base64url").toString("utf8")) as LoginOutcome;
@@ -54,5 +54,5 @@ export function readLoginOutcome(): LoginOutcome | null {
 }
 
 export function clearLoginOutcome(): void {
-  cookies().set(COOKIE, "", opts(0));
+  (cookies() as unknown as UnsafeUnwrappedCookies).set(COOKIE, "", opts(0));
 }

@@ -6,7 +6,8 @@ import { revokeSession } from "@/lib/auth/session";
 /** POST /api/v1/auth/sessions/:id/revoke (Doc7 §1.8) — log out a device (ownership-scoped, IDOR-safe). */
 export const dynamic = "force-dynamic";
 
-export async function POST(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(_req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const claims = await getCurrentUser();
   if (!claims) return fail("UNAUTHORIZED");
   if (!params.id) return fail("VALIDATION_ERROR");

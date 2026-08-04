@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
     if (!entry) return fail("NOT_FOUND");
 
     // Capture the outgoing token BEFORE the switch overwrites the cookie.
-    const outgoing = cookies().get(ADMIN_COOKIE.REFRESH)?.value;
+    const outgoing = (await cookies()).get(ADMIN_COOKIE.REFRESH)?.value;
 
     // Drop the entry from the pool first: whether the switch succeeds or the
     // token turns out to be dead, that parked account is spent either way.

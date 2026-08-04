@@ -16,7 +16,8 @@ export async function generateStaticParams() {
   return (await allBlogSlugs()).map((p) => ({ slug: p.slug }));
 }
 
-export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
+export async function generateMetadata(props: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+  const params = await props.params;
   const post = await getBlogPost(params.slug);
   if (!post) return { title: "Not found", robots: { index: false, follow: false } };
   const url = `${siteUrl()}/blog/${post.slug}`;
@@ -45,7 +46,8 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   };
 }
 
-export default async function PublicBlogPostPage({ params }: { params: { slug: string } }) {
+export default async function PublicBlogPostPage(props: { params: Promise<{ slug: string }> }) {
+  const params = await props.params;
   const post = await getBlogPost(params.slug);
   if (!post) notFound();
 

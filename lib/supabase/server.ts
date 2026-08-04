@@ -1,5 +1,5 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
-import { cookies } from "next/headers";
+import { cookies, type UnsafeUnwrappedCookies } from "next/headers";
 import { publicEnv, serverEnv } from "@/lib/env";
 
 type CookieToSet = { name: string; value: string; options?: CookieOptions };
@@ -11,7 +11,7 @@ type CookieToSet = { name: string; value: string; options?: CookieOptions };
  * (Doc6 §4 / Doc9 §2).
  */
 export function createClient() {
-  const cookieStore = cookies();
+  const cookieStore = (cookies() as unknown as UnsafeUnwrappedCookies);
   const { cookieDomain } = serverEnv();
   const isProd = process.env.NODE_ENV === "production";
 

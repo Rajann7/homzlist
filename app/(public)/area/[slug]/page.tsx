@@ -16,7 +16,8 @@ export const dynamic = "force-dynamic";
 // appear (Doc3 §4). Opt every fetch in this route out.
 export const fetchCache = "force-no-store";
 
-export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
+export async function generateMetadata(props: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+  const params = await props.params;
   const spec = await parseAreaSlug(params.slug);
   if (!spec) return { title: "Not found", robots: { index: false, follow: false } };
 
@@ -51,7 +52,8 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   };
 }
 
-export default async function AreaPage({ params }: { params: { slug: string } }) {
+export default async function AreaPage(props: { params: Promise<{ slug: string }> }) {
+  const params = await props.params;
   const spec = await parseAreaSlug(params.slug);
   if (!spec) notFound();
 

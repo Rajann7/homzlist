@@ -12,15 +12,16 @@ import { getThread } from "@/lib/chat/thread";
  */
 export const dynamic = "force-dynamic";
 
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
-  const auth = await requireActive();
-  if ("error" in auth) return fail(auth.error);
-  if (!UUID_RE.test(params.id)) return fail("NOT_FOUND");
-  const limited = await rateLimit(`chat-thread:${auth.id}`, 300, 60);
-  if (!limited.allowed) return fail("RATE_LIMITED");
+export async function GET(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+ const params = await props.params;
+ const auth = await requireActive();
+ if ("error" in auth) return fail(auth.error);
+ if (!UUID_RE.test(params.id)) return fail("NOT_FOUND");
+ const limited = await rateLimit(`chat-thread:${auth.id}`, 300, 60);
+ if (!limited.allowed) return fail("RATE_LIMITED");
 
-  const before = new URL(req.url).searchParams.get("before") ?? undefined;
-  const view = await getThread(params.id, auth.id, { before });
-  if (!view) return fail("NOT_FOUND");
-  return ok(view);
+ const before = new URL(req.url).searchParams.get("before") ?? undefined;
+ const view = await getThread(params.id, auth.id, { before });
+ if (!view) return fail("NOT_FOUND");
+ return ok(view);
 }

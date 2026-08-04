@@ -30,7 +30,8 @@ const TABS = new Set<UserTab>([
   "timeline",
 ]);
 
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const me = await requireAdmin("admin");
     if (!UUID_RE.test(params.id)) return fail("NOT_FOUND");

@@ -4,6 +4,7 @@ import { Thread } from "@/components";
 export const metadata = { title: "Chat" };
 export const dynamic = "force-dynamic";
 
-export default function ThreadPage({ params }: { params: { threadId: string } }) {
+export default async function ThreadPage(props: { params: Promise<{ threadId: string }> }) {
+  const params = await props.params;
   return <Thread threadId={params.threadId} base="/messages" />;
 }

@@ -11,6 +11,7 @@ import { ProjectDetail } from "@/components/listings/ProjectDetail";
  */
 export const dynamic = "force-dynamic";
 
-export default function Page({ params }: { params: { id: string } }) {
-  return <ProjectDetail id={params.id} isGuest />;
+export default async function Page(props: { params: Promise<{ id: string }> }) {
+ const params = await props.params;
+ return <ProjectDetail id={params.id} isGuest />;
 }

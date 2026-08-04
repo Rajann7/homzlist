@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
   }
 
   // Park the outgoing account BEFORE its cookie is overwritten.
-  const outgoing = cookies().get(COOKIE.REFRESH)?.value;
+  const outgoing = (await cookies()).get(COOKIE.REFRESH)?.value;
 
   const access = await signAccess({ sub: profile.id, role: profile.role, registered: true });
   await setSessionCookies(access, rotated.newCookie);

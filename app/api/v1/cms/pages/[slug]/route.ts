@@ -13,7 +13,8 @@ export const dynamic = "force-dynamic";
 // legal page, would never reach this endpoint. (memory: nextjs-data-cache-ssr-staleness)
 export const fetchCache = "force-no-store";
 
-export async function GET(req: NextRequest, { params }: { params: { slug: string } }) {
+export async function GET(req: NextRequest, props: { params: Promise<{ slug: string }> }) {
+  const params = await props.params;
   const version = req.nextUrl.searchParams.get("version");
   const page = await getLegalPage(params.slug, version);
   if (!page) return fail("NOT_FOUND");

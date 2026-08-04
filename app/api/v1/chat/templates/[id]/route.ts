@@ -7,7 +7,8 @@ import { updateTemplate, deleteTemplate } from "@/lib/chat/thread";
 /** PATCH / DELETE /api/v1/chat/templates/:id — edit / delete my own template. */
 export const dynamic = "force-dynamic";
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const auth = await requireActive();
   if ("error" in auth) return fail(auth.error);
   const limited = await rateLimit(`chat-template:${auth.id}`, 60, 60);
@@ -19,7 +20,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   return res.ok ? ok({ updated: true }) : fail("NOT_FOUND");
 }
 
-export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(_req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const auth = await requireActive();
   if ("error" in auth) return fail(auth.error);
   const limited = await rateLimit(`chat-template:${auth.id}`, 60, 60);

@@ -11,14 +11,15 @@ export const dynamic = "force-dynamic";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export async function GET(_req: Request, { params }: { params: { id: string } }) {
-  const claims = await getCurrentUser();
-  if (!claims) return fail("UNAUTHORIZED");
-  if (!UUID_RE.test(params.id)) return fail("NOT_FOUND");
+export async function GET(_req: Request, props: { params: Promise<{ id: string }> }) {
+ const params = await props.params;
+ const claims = await getCurrentUser();
+ if (!claims) return fail("UNAUTHORIZED");
+ if (!UUID_RE.test(params.id)) return fail("NOT_FOUND");
 
-  const invoice = await getInvoice(params.id, claims.sub);
-  if (!invoice) return fail("NOT_FOUND");
+ const invoice = await getInvoice(params.id, claims.sub);
+ if (!invoice) return fail("NOT_FOUND");
 
-  const payment = Array.isArray(invoice.payments) ? invoice.payments[0] : invoice.payments;
-  return ok({ invoice: invoiceDTO(invoice, payment ?? null) });
+ const payment = Array.isArray(invoice.payments) ? invoice.payments[0] : invoice.payments;
+ return ok({ invoice: invoiceDTO(invoice, payment ?? null) });
 }

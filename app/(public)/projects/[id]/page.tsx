@@ -13,6 +13,7 @@ import { redirect } from "next/navigation";
  */
 export const dynamic = "force-dynamic";
 
-export default function Page({ params }: { params: { id: string } }) {
-  redirect(`/project/${params.id}`);
+export default async function Page(props: { params: Promise<{ id: string }> }) {
+ const params = await props.params;
+ redirect(`/project/${params.id}`);
 }

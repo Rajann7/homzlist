@@ -15,16 +15,17 @@ export const dynamic = "force-dynamic";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export async function POST(_req: Request, { params }: { params: { id: string } }) {
-  const claims = await getCurrentUser();
-  if (!claims) return fail("UNAUTHORIZED");
-  if (!UUID_RE.test(params.id)) return fail("NOT_FOUND");
+export async function POST(_req: Request, props: { params: Promise<{ id: string }> }) {
+ const params = await props.params;
+ const claims = await getCurrentUser();
+ if (!claims) return fail("UNAUTHORIZED");
+ if (!UUID_RE.test(params.id)) return fail("NOT_FOUND");
 
-  // Irreversible — capped well below anything that could be used to walk ids.
-  const limited = await rateLimit(`project-purge:${claims.sub}`, 30, 3600);
-  if (!limited.allowed) return fail("RATE_LIMITED");
+ // Irreversible — capped well below anything that could be used to walk ids.
+ const limited = await rateLimit(`project-purge:${claims.sub}`, 30, 3600);
+ if (!limited.allowed) return fail("RATE_LIMITED");
 
-  const purged = await purgeProject(params.id, claims.sub);
-  if (!purged) return fail("NOT_FOUND");
-  return ok({ purged: true });
+ const purged = await purgeProject(params.id, claims.sub);
+ if (!purged) return fail("NOT_FOUND");
+ return ok({ purged: true });
 }

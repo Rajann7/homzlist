@@ -4,6 +4,7 @@ import { ListingInsights } from "@/components/listings/ListingInsights";
 export const metadata = { title: "Listing insights" };
 export const dynamic = "force-dynamic";
 
-export default function Page({ params }: { params: { id: string } }) {
+export default async function Page(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   return <ListingInsights id={params.id} />;
 }

@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
   // "Add account" (P9 S1): whoever was signed in on this device keeps their real
   // server-side session, parked in the httpOnly pool, so both accounts show in
   // the switch sheet. Captured before the cookies are overwritten.
-  const outgoing = cookies().get(COOKIE.REFRESH)?.value;
+  const outgoing = (await cookies()).get(COOKIE.REFRESH)?.value;
 
   const access = await signAccess({ sub: profile.id, role: profile.role, registered: true });
   const refresh = await createRefreshSession(profile.id, {

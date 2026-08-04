@@ -1,7 +1,7 @@
 import "server-only";
 import { SignJWT, jwtVerify } from "jose";
 import { createHash, randomBytes } from "node:crypto";
-import { cookies } from "next/headers";
+import { cookies, type UnsafeUnwrappedCookies } from "next/headers";
 import { kv } from "@/lib/kv";
 import { serverEnv } from "@/lib/env";
 
@@ -144,20 +144,20 @@ function cookieOptions() {
 }
 
 export async function setAdminCookies(access: string, refresh: string): Promise<void> {
-  const jar = cookies();
+  const jar = await cookies();
   jar.set(ADMIN_COOKIE.ACCESS, access, { ...cookieOptions(), maxAge: ACCESS_TTL_SEC });
   jar.set(ADMIN_COOKIE.REFRESH, refresh, { ...cookieOptions(), maxAge: REFRESH_TTL_SEC });
 }
 
 export function clearAdminCookies(): void {
-  const jar = cookies();
+  const jar = (cookies() as unknown as UnsafeUnwrappedCookies);
   jar.set(ADMIN_COOKIE.ACCESS, "", { ...cookieOptions(), maxAge: 0 });
   jar.set(ADMIN_COOKIE.REFRESH, "", { ...cookieOptions(), maxAge: 0 });
 }
 
 /** The raw claims in the current request's admin cookie, or null. */
 export async function readAdminClaims(): Promise<AdminClaims | null> {
-  const token = cookies().get(ADMIN_COOKIE.ACCESS)?.value;
+  const token = (await cookies()).get(ADMIN_COOKIE.ACCESS)?.value;
   if (!token) return null;
   return verifyAdminAccess(token);
 }

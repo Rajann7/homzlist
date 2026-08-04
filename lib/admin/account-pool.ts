@@ -1,5 +1,5 @@
 import "server-only";
-import { cookies } from "next/headers";
+import { cookies, type UnsafeUnwrappedCookies } from "next/headers";
 import { peekAdminRefresh, revokeAdminRefresh } from "./session";
 
 /**
@@ -54,11 +54,11 @@ function parse(raw: string | undefined): AdminPoolEntry[] {
 }
 
 export function readAdminPool(): AdminPoolEntry[] {
-  return parse(cookies().get(ADMIN_POOL_COOKIE)?.value);
+  return parse((cookies() as unknown as UnsafeUnwrappedCookies).get(ADMIN_POOL_COOKIE)?.value);
 }
 
 export function writeAdminPool(entries: AdminPoolEntry[]): void {
-  const jar = cookies();
+  const jar = (cookies() as unknown as UnsafeUnwrappedCookies);
   if (!entries.length) {
     jar.set(ADMIN_POOL_COOKIE, "", opts(0));
     return;
