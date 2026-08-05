@@ -1,15 +1,21 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { Icon } from "@/components/ui/Icon";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { fetchCities } from "@/lib/auth/client";
 import { cn } from "@/lib/utils";
 
 /**
- * P2 City sheet — search + RECENT + ALL CITIES from the server (Doc7 §11, cached).
- * Selecting a city swaps the feed in place (the parent re-fetches) + toast. The
- * list is never hardcoded; it reads `/locations/cities`.
+ * P2 City sheet — search + ALL CITIES from the server (Doc7 §11, cached).
+ * Selecting a city swaps the feed in place (the parent re-fetches) + toast.
+ *
+ * Search is resolved server-side by `/locations/cities` (via `fetchCities`, the
+ * same helper the auth sheet uses): the default list is the launched cities and
+ * typing reaches the whole India master (104k+ cities), so every city + its
+ * state is findable — not just the handful we filtered in the browser before.
+ * The list is never hardcoded.
  */
 export interface CityRow { id: string; name: string; state: string; propertyCount: number; }
 
@@ -19,18 +25,19 @@ export function CitySheet({
   const [cities, setCities] = useState<CityRow[] | null>(null);
   const [q, setQ] = useState("");
 
-  const load = useCallback(async () => {
-    try {
-      const res = await fetch("/api/v1/locations/cities", { credentials: "same-origin" });
-      const json = await res.json();
-      if (json.ok) setCities(json.data.cities ?? json.data.items ?? []);
-      else setCities([]);
-    } catch { setCities([]); }
-  }, []);
+  // Server-side search: default (no q) = launched cities from cache; typing
+  // (debounced) queries the full master. Never filters a client array.
+  useEffect(() => {
+    if (!open) return;
+    let active = true;
+    setCities(null);
+    const t = setTimeout(() => {
+      fetchCities(q.trim()).then((c) => active && setCities(c));
+    }, q.trim() ? 250 : 0);
+    return () => { active = false; clearTimeout(t); };
+  }, [q, open]);
 
-  useEffect(() => { if (open) void load(); }, [open, load]);
-
-  const shown = (cities ?? []).filter((c) => c.name.toLowerCase().includes(q.trim().toLowerCase()));
+  const shown = cities ?? [];
 
   return (
     <BottomSheet open={open} onClose={onClose} title="Select city">
@@ -61,8 +68,11 @@ export function CitySheet({
                   className={cn("flex h-12 items-center gap-3 rounded-8 px-2 text-left", sel && "bg-accent-soft")}
                 >
                   <Icon name="pin" size={18} className={sel ? "text-accent" : "text-ink-tertiary"} />
-                  <span className={cn("flex-1 text-15", sel ? "font-semibold text-accent" : "text-ink-primary")}>{c.name}</span>
-                  <span className="text-13 text-ink-tertiary">{c.propertyCount.toLocaleString("en-IN")}</span>
+                  <span className="flex min-w-0 flex-1 flex-col justify-center">
+                    <span className={cn("truncate text-15 leading-tight", sel ? "font-semibold text-accent" : "text-ink-primary")}>{c.name}</span>
+                    {c.state && <span className="truncate text-11 leading-tight text-ink-tertiary">{c.state}</span>}
+                  </span>
+                  <span className="shrink-0 text-13 text-ink-tertiary">{c.propertyCount.toLocaleString("en-IN")}</span>
                   {sel && <Icon name="check" size={18} className="text-accent" />}
                 </button>
               );

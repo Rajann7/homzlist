@@ -38,16 +38,30 @@ export async function GET(req: Request) {
   // haven't launched still has to be able to name it, and the coming-soon
   // screen is what handles the rest (Doc2 §12).
   const safe = q.replace(/[%_,]/g, " ").slice(0, 60);
-  const { data } = await db
+
+  // The candidate set is built from THREE queries, not one, because a single
+  // `%term%` ordered by name and capped would slice the master alphabetically
+  // BEFORE ranking — "raj" would fill up on "Abbarajupalem…" and never fetch
+  // launched "Rajkot" (starts R) at all. So we guarantee the two buckets the
+  // ranking cares about are always present: every launched match, and every
+  // prefix match, then fill the rest with substring matches.
+  const base = () => db
     .from("locations")
     .select("id,name,slug,parent_id,is_launched")
     .eq("level", "city")
-    .eq("is_active", true)
-    .ilike("name", `%${safe}%`)
-    .order("name")
-    .limit(LIMIT * 4);
+    .eq("is_active", true);
+  const [launched, prefix, substr] = await Promise.all([
+    base().eq("is_launched", true).ilike("name", `%${safe}%`).order("name").limit(LIMIT),
+    base().ilike("name", `${safe}%`).order("name").limit(LIMIT * 4),
+    base().ilike("name", `%${safe}%`).order("name").limit(LIMIT * 4),
+  ]);
 
-  const rows = (data ?? []) as CityRow[];
+  // Union by id — a launched prefix match must appear once, not three times.
+  const byId = new Map<string, CityRow>();
+  for (const r of [...(launched.data ?? []), ...(prefix.data ?? []), ...(substr.data ?? [])] as CityRow[]) {
+    if (!byId.has(r.id)) byId.set(r.id, r);
+  }
+  const rows = [...byId.values()];
   const term = safe.toLowerCase();
   // Launched first, then exact/prefix matches — typing "raj" should surface
   // Rajkot before a hamlet called Rajapur.
