@@ -14,7 +14,8 @@ import { clientIp } from "@/lib/auth/rate-limit";
  */
 export const dynamic = "force-dynamic";
 
-export async function POST(req: NextRequest, { params }: { params: { slug: string } }) {
+export async function POST(req: NextRequest, props: { params: Promise<{ slug: string }> }) {
+  const params = await props.params;
   let body: { helpful?: boolean; comment?: string };
   try { body = await req.json(); } catch { return fail("VALIDATION_ERROR"); }
   if (typeof body.helpful !== "boolean") return fail("VALIDATION_ERROR");

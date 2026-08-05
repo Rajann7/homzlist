@@ -533,8 +533,24 @@ console.log("\nA20 Content — a publish cuts a version, and a legal page cannot
   const dbPages = Number((await one(`select count(*) n from cms_pages`)).n);
   check("page count is real", pages.json.data.total, dbPages);
 
-  const page = await one(`select id, title, version, kind from cms_pages where kind is null or kind not in ('terms','privacy','grievance','refund') limit 1`)
-    ?? await one(`select id, title, version, kind from cms_pages limit 1`);
+  // Pick a page to exercise the draft/publish/version machinery on.
+  //
+  // This guard used to read `kind not in ('terms','privacy','grievance',
+  // 'refund')` — but `kind` holds 'legal' or 'page', never a slug, so the test
+  // was always true and this check happily grabbed a real legal page,
+  // republished it with a throwaway body, and never put it back. It destroyed
+  // `privacy` on one run and `refund` on the next, each time leaving the live
+  // site serving a 28-character legal page. (The unpublish guard further down
+  // already carries the same fix, with the same comment — only half the bug
+  // was caught the first time.)
+  //
+  // Exclude by SLUG, prefer a page that is not legally required, and — since
+  // every cms_page is real content — snapshot whatever we land on and restore
+  // it at the end so the check is idempotent.
+  const PAGE_COLS = `id, title, version, kind, body_md, requires_reacceptance, is_published,
+                     seo_title, seo_description, effective_date`;
+  const page = await one(`select ${PAGE_COLS} from cms_pages where kind is distinct from 'legal' limit 1`)
+    ?? await one(`select ${PAGE_COLS} from cms_pages limit 1`);
   const versionsBefore = Number(
     (await one(`select count(*) n from cms_page_versions where page_id=$1`, page.id)).n,
   );
@@ -575,6 +591,22 @@ console.log("\nA20 Content — a publish cuts a version, and a legal page cannot
   );
   check("…and it records that the change was material", v.is_material, true);
   gte("audit row", await audited("cms_publish"), 1);
+
+  // Put the page back exactly as it was and drop the version rows this check
+  // cut. Without this the check is destructive: the page keeps whatever
+  // throwaway body the last run published, and `check:module12`'s "no page
+  // still carries the P6 placeholder body" assertion fails from then on.
+  await one(
+    `update cms_pages set title=$2, body_md=$3, version=$4, requires_reacceptance=$5,
+            is_published=$6, seo_title=$7, seo_description=$8, effective_date=$9, updated_at=now()
+       where id=$1 returning id`,
+    page.id, page.title, page.body_md, page.version, page.requires_reacceptance,
+    page.is_published, page.seo_title, page.seo_description, page.effective_date,
+  );
+  await one(`delete from cms_page_versions where page_id=$1 and note='P6 check' returning id`, page.id);
+  const restored = await one(`select version, length(body_md) as len from cms_pages where id=$1`, page.id);
+  check("the check restored the version it borrowed", Number(restored.version), Number(page.version));
+  check("…and the original body", Number(restored.len), (page.body_md ?? "").length, `slug-kind=${page.kind}`);
 
   // by SLUG — 'kind' is 'legal' for the cookie policy too, and the first
   // version of this guard tested that and therefore never fired.

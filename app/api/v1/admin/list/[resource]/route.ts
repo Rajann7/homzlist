@@ -19,7 +19,8 @@ import { parseListParams, runList } from "@/lib/admin/list-query";
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
 
-export async function GET(req: NextRequest, { params }: { params: { resource: string } }) {
+export async function GET(req: NextRequest, props: { params: Promise<{ resource: string }> }) {
+  const params = await props.params;
   const resource = resourceByName(params.resource);
   if (!resource) return fail("NOT_FOUND");
 

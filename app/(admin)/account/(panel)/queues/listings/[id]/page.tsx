@@ -17,13 +17,14 @@ import { claimReviewLock } from "@/lib/admin/review-lock";
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
 
-export default async function ReviewPage({
-  params,
-  searchParams,
-}: {
-  params: { id: string };
-  searchParams: { tab?: string };
-}) {
+export default async function ReviewPage(
+  props: {
+    params: Promise<{ id: string }>;
+    searchParams: Promise<{ tab?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const me = await requireAdmin("staff");
   const tab = searchParams.tab ?? "pending";
 

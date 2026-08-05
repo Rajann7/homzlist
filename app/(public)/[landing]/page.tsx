@@ -40,7 +40,8 @@ export const dynamic = "force-dynamic";
  */
 export const fetchCache = "force-no-store";
 
-export async function generateMetadata({ params }: { params: { landing: string } }): Promise<Metadata> {
+export async function generateMetadata(props: { params: Promise<{ landing: string }> }): Promise<Metadata> {
+  const params = await props.params;
   const spec = await parseLandingSlug(params.landing);
   if (!spec) return { title: "Not found", robots: { index: false, follow: false } };
 
@@ -72,7 +73,8 @@ export async function generateMetadata({ params }: { params: { landing: string }
   };
 }
 
-export default async function LandingPage({ params }: { params: { landing: string } }) {
+export default async function LandingPage(props: { params: Promise<{ landing: string }> }) {
+  const params = await props.params;
   const spec = await parseLandingSlug(params.landing);
   if (!spec) notFound();
   const page = await buildLandingPage(spec, null);

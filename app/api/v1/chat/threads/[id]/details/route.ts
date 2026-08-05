@@ -6,7 +6,8 @@ import { chatDetails } from "@/lib/chat/thread";
 /** GET /api/v1/chat/threads/:id/details (S4) — participant, shared media, state. */
 export const dynamic = "force-dynamic";
 
-export async function GET(_req: Request, { params }: { params: { id: string } }) {
+export async function GET(_req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const auth = await requireActive();
   if ("error" in auth) return fail(auth.error);
   const limited = await rateLimit(`chat-details:${auth.id}`, 240, 60);

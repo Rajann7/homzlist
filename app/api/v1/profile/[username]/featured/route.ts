@@ -14,13 +14,14 @@ import { listCollections } from "@/lib/profile/featured";
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
 
-export async function GET(_req: Request, { params }: { params: { username: string } }) {
-  const profile = await getProfileByUsername(params.username);
-  if (!profile || !profile.is_registered) return fail("NOT_FOUND");
-  if (profile.state === "deleted" || profile.state === "suspended") return ok({ items: [] });
+export async function GET(_req: Request, props: { params: Promise<{ username: string }> }) {
+ const params = await props.params;
+ const profile = await getProfileByUsername(params.username);
+ if (!profile || !profile.is_registered) return fail("NOT_FOUND");
+ if (profile.state === "deleted" || profile.state === "suspended") return ok({ items: [] });
 
-  const items = await listCollections(profile.id);
-  // A visitor has no reason to see an empty shelf: only collections with
-  // something live in them are drawn.
-  return ok({ items: items.filter((c) => c.count > 0) });
+ const items = await listCollections(profile.id);
+ // A visitor has no reason to see an empty shelf: only collections with
+ // something live in them are drawn.
+ return ok({ items: items.filter((c) => c.count > 0) });
 }

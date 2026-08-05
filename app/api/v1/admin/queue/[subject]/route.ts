@@ -16,7 +16,8 @@ import { boostQueue } from "@/lib/billing/boost";
 export const dynamic = "force-dynamic";
 const SUBJECTS = ["listing", "requirement", "project", "boost"];
 
-export async function GET(_req: NextRequest, { params }: { params: { subject: string } }) {
+export async function GET(_req: NextRequest, props: { params: Promise<{ subject: string }> }) {
+  const params = await props.params;
   const claims = await getCurrentUser();
   if (!claims || !SUBJECTS.includes(params.subject)) return fail("NOT_FOUND");
   if (!(await isStaff(claims.sub))) return fail("NOT_FOUND");

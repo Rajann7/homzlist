@@ -27,7 +27,7 @@ export const dynamic = "force-dynamic";
 export async function GET(req: NextRequest) {
   if (adminAuthProviderKind() !== "google") return redirectToPath("/login");
 
-  const jar = cookies();
+  const jar = await cookies();
   const expected = jar.get(OAUTH_STATE_COOKIE)?.value;
   jar.set(OAUTH_STATE_COOKIE, "", { path: "/", maxAge: 0 });
 
@@ -42,7 +42,7 @@ export async function GET(req: NextRequest) {
 
   let result;
   try {
-    const identity = await googleIdentityFromCode(code, adminCallbackUrl());
+    const identity = await googleIdentityFromCode(code, await adminCallbackUrl());
     result = await signInAdmin(identity);
   } catch (e) {
     console.error("[admin] google sign-in failed", e);

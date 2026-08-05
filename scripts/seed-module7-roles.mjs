@@ -20,6 +20,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import pg from "pg";
+import { connect as dbConnect } from "./lib/dbx.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const E = {};
@@ -27,8 +28,10 @@ for (const l of fs.readFileSync(path.join(ROOT, ".env.local"), "utf8").split(/\r
   const m = /^([A-Z0-9_]+)=(.*)$/.exec(l.trim());
   if (m) E[m[1]] = m[2].replace(/^["']|["']$/g, "");
 }
-const c = new pg.Client({ host: `db.${E.SUPABASE_PROJECT_REF}.supabase.co`, port: 5432, user: "postgres", password: E.SUPABASE_DB_PASSWORD, database: "postgres", ssl: { rejectUnauthorized: false } });
-await c.connect();
+// The DIRECT host drops out often enough — DNS, and an IPv6 route that goes
+// dark — that a one-host client turns a run into a false failure. dbx.mjs walks
+// the ladder q.mjs and db-proof.mjs already use: direct, then the poolers.
+const c = await dbConnect();
 const q = (s, p) => c.query(s, p);
 const one = async (s, p) => (await q(s, p)).rows[0];
 const rows = async (s, p) => (await q(s, p)).rows;

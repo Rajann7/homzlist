@@ -15,10 +15,11 @@ export const dynamic = "force-dynamic";
 // legal page, would never reach this endpoint. (memory: nextjs-data-cache-ssr-staleness)
 export const fetchCache = "force-no-store";
 
-export async function GET(_req: Request, { params }: { params: { id: string } }) {
-  const claims = await getCurrentUser();
-  if (!claims) return fail("UNAUTHORIZED");
-  const thread = await getTicketThread(claims.sub, params.id);
-  if (!thread) return fail("NOT_FOUND");
-  return ok(thread);
+export async function GET(_req: Request, props: { params: Promise<{ id: string }> }) {
+ const params = await props.params;
+ const claims = await getCurrentUser();
+ if (!claims) return fail("UNAUTHORIZED");
+ const thread = await getTicketThread(claims.sub, params.id);
+ if (!thread) return fail("NOT_FOUND");
+ return ok(thread);
 }

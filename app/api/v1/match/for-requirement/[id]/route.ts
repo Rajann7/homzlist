@@ -21,7 +21,8 @@ function priceLabel(paise: number | null): string {
   return `₹${Math.round(r)}`;
 }
 
-export async function GET(_req: Request, { params }: { params: { id: string } }) {
+export async function GET(_req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const claims = await getCurrentUser();
   if (!claims) return fail("UNAUTHORIZED");
   if (!UUID_RE.test(params.id)) return fail("NOT_FOUND");

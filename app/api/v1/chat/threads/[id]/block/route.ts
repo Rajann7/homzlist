@@ -11,7 +11,8 @@ import { blockUser, unblockUser, reportChat } from "@/lib/chat/thread";
  */
 export const dynamic = "force-dynamic";
 
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const auth = await requireActive();
   if ("error" in auth) return fail(auth.error);
   const limited = await rateLimit(`chat-block:${auth.id}`, 60, 60);

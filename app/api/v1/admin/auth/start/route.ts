@@ -40,14 +40,14 @@ export async function POST(req: NextRequest) {
 
   if (adminAuthProviderKind() === "google") {
     const state = newOauthState();
-    cookies().set(OAUTH_STATE_COOKIE, state, {
+    (await cookies()).set(OAUTH_STATE_COOKIE, state, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
       path: "/",
       maxAge: 600,
     });
-    return ok({ redirect: googleAuthorizeUrl(adminCallbackUrl(), state) });
+    return ok({ redirect: googleAuthorizeUrl(await adminCallbackUrl(), state) });
   }
 
   const email = process.env.ADMIN_DEV_EMAIL;

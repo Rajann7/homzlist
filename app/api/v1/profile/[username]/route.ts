@@ -11,7 +11,8 @@ import { publicProfileDTO } from "@/lib/profile/dto";
  */
 export const dynamic = "force-dynamic";
 
-export async function GET(_req: NextRequest, { params }: { params: { username: string } }) {
+export async function GET(_req: NextRequest, props: { params: Promise<{ username: string }> }) {
+  const params = await props.params;
   const profile = await getProfileByUsername(params.username);
   if (!profile || !profile.is_registered) return fail("NOT_FOUND");
 

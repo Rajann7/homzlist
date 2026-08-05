@@ -36,12 +36,12 @@ export async function POST(req: NextRequest) {
   if (!profileId) return fail("VALIDATION_ERROR");
   if (profileId === claims.sub) return ok({ switched: false, profileId }); // already active
 
-  const { entry, rest } = takeFromPool(profileId);
+  const { entry, rest } = await takeFromPool(profileId);
   if (!entry) return fail("NOT_FOUND");
 
   const rotated = await rotateRefreshSession(entry.token);
   if (!rotated) {
-    writePool(rest); // dead session — it leaves the sheet instead of dead-ending
+    await writePool(rest); // dead session — it leaves the sheet instead of dead-ending
     return fail("UNAUTHORIZED");
   }
 
@@ -49,16 +49,16 @@ export async function POST(req: NextRequest) {
   if (!profile || !profile.is_registered || profile.state === "deleted" || profile.state === "suspended") {
     const [pid, sid] = entry.token.split(".");
     if (pid && sid) await revokeSession(pid, sid);
-    writePool(rest);
+    await writePool(rest);
     return fail("FORBIDDEN");
   }
 
   // Park the outgoing account BEFORE its cookie is overwritten.
-  const outgoing = cookies().get(COOKIE.REFRESH)?.value;
+  const outgoing = (await cookies()).get(COOKIE.REFRESH)?.value;
 
   const access = await signAccess({ sub: profile.id, role: profile.role, registered: true });
   await setSessionCookies(access, rotated.newCookie);
-  writePool(outgoing ? [{ profileId: claims.sub, token: outgoing }, ...rest] : rest);
+  await writePool(outgoing ? [{ profileId: claims.sub, token: outgoing }, ...rest] : rest);
   await touchLastActive(profile.id);
 
   return ok({ switched: true, profileId: profile.id });

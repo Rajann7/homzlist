@@ -195,7 +195,7 @@ export async function impersonationContext(): Promise<{
   staffName: string;
   startedAt: string;
 } | null> {
-  const value = cookies().get(IMP_COOKIE)?.value;
+  const value = (await cookies()).get(IMP_COOKIE)?.value;
   if (!value) return null;
   const { data } = await db()
     .from("impersonation_sessions")

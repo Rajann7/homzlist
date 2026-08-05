@@ -6,12 +6,14 @@ import { AppShell, BottomSheet, EmptyState, Header, Icon, Skeleton, useToast } f
 import { BackButton } from "@/components/billing/primitives";
 import { listingsApi } from "@/lib/listings/client";
 import { cn } from "@/lib/utils";
+import { useNow } from "@/lib/hooks/useNow";
 
 /**
  * P6 S5 — Drafts (Doc2 §5.3): max 3, 90-day expiry, resume or delete.
  * The countdown is derived from the server's `expiresAt`, not a local clock.
  */
 export function Drafts() {
+  const now = useNow();
   const router = useRouter();
   const toast = useToast();
   const [data, setData] = useState<{ items: any[]; max: number } | null>(null);
@@ -50,7 +52,7 @@ export function Drafts() {
     <Shell counter={`${data.items.length} / ${data.max}`}>
       <div className="p-4">
         {data.items.map((d) => {
-          const daysLeft = Math.max(0, Math.ceil((new Date(d.expiresAt).getTime() - Date.now()) / 86_400_000));
+          const daysLeft = Math.max(0, Math.ceil((new Date(d.expiresAt).getTime() - now) / 86_400_000));
           const p = d.payload ?? {};
           const open = () =>
             router.push(`/create/form?type=${p.typeCode ?? ""}&kind=${p.kind ?? "sell"}&draft=${d.id}`);

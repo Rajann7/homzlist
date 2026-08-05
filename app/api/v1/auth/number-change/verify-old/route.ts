@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
     return fail("OTP_INVALID", { attemptsLeft: result.attemptsLeft });
   }
 
-  cookies().set(COOKIE_NUMBER_CHANGE, await signNumberChangeToken(claims.sub), {
+  (await cookies()).set(COOKIE_NUMBER_CHANGE, await signNumberChangeToken(claims.sub), {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",

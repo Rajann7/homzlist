@@ -7,7 +7,8 @@ import { createServiceClient } from "@/lib/supabase/server";
 /** POST /api/v1/support/tickets/:id/messages — reply in the thread. */
 export const dynamic = "force-dynamic";
 
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const claims = await getCurrentUser();
   if (!claims) return fail("UNAUTHORIZED");
 

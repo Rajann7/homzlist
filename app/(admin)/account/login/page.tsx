@@ -21,7 +21,7 @@ export default async function AdminLoginPage() {
 
   return (
     <AdminLoginScreen
-      outcome={readLoginOutcome()}
+      outcome={await readLoginOutcome()}
       staging={isStagingEnv()}
       supportEmail={await supportEmail()}
     />

@@ -151,7 +151,16 @@ export function BlogPost({ post, guest = false, base = "" }: { post: PostView; g
       )}
 
       <div className="px-4 pb-10 pt-6">
-        <Button variant="outline" fullWidth onClick={() => (window.location.href = `${guest ? "" : base}/blog`)}>
+        {/* Cross-subdomain when signed in — `base` is another host, which the
+            App Router cannot navigate to. */}
+        <Button
+          variant="outline"
+          fullWidth
+          onClick={() => {
+            // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- see above
+            window.location.href = `${guest ? "" : base}/blog`;
+          }}
+        >
           More from the HomzList blog
         </Button>
         <p className="mt-6 text-11 text-ink-tertiary">

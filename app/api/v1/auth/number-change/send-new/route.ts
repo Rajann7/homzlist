@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
 export async function POST(req: NextRequest) {
   const claims = await getCurrentUser();
   if (!claims) return fail("UNAUTHORIZED");
-  const ncSub = await verifyNumberChangeToken(cookies().get(COOKIE_NUMBER_CHANGE)?.value ?? "");
+  const ncSub = await verifyNumberChangeToken((await cookies()).get(COOKIE_NUMBER_CHANGE)?.value ?? "");
   if (ncSub !== claims.sub) return fail("FORBIDDEN"); // old number not verified
 
   let body: { newPhone?: string };

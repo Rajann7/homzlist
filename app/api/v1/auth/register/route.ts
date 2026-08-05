@@ -17,7 +17,7 @@ export const dynamic = "force-dynamic";
 const ROLES = ["owner", "broker", "builder"] as const;
 
 export async function POST(req: NextRequest) {
-  const profileId = await verifyRegisterToken(cookies().get(COOKIE.REGISTER)?.value ?? "");
+  const profileId = await verifyRegisterToken((await cookies()).get(COOKIE.REGISTER)?.value ?? "");
   if (!profileId) return fail("UNAUTHORIZED");
 
   let body: { role?: string; name?: string; cityId?: string; email?: string | null; consent18?: boolean; consentDpdp?: boolean; hp?: string };
@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
 
   // Same "Add account" rule as OTP verify — registering a brand-new account on a
   // device that already has one parks the old session instead of dropping it.
-  const outgoing = cookies().get(COOKIE.REFRESH)?.value;
+  const outgoing = (await cookies()).get(COOKIE.REFRESH)?.value;
 
   const access = await signAccess({ sub: profile.id, role: profile.role, registered: true });
   const refresh = await createRefreshSession(profile.id, {

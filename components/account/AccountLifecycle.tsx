@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { AppShell, Header, Icon, Button, Skeleton, useToast } from "@/components";
 import { BackButton } from "@/components/billing/primitives";
 import { accountApi, type AccountLifecycle as Lifecycle } from "@/lib/content/client";
+import { useNow } from "@/lib/hooks/useNow";
 
 /**
  * P12 S6 — Deactivate or delete, and the two end states.
@@ -32,6 +33,7 @@ const REASONS = ["Found a property", "Too many messages", "Not useful", "Privacy
 type Step = "loading" | "choose" | "otp" | "deactivated" | "grace";
 
 export function AccountLifecycle({ base = "" }: { base?: string }) {
+  const now = useNow();
   const router = useRouter();
   const toast = useToast();
 
@@ -160,6 +162,7 @@ export function AccountLifecycle({ base = "" }: { base?: string }) {
             className="mt-4 min-w-[180px]"
             onClick={async () => {
               await fetch("/api/v1/auth/logout", { method: "POST", credentials: "same-origin" });
+              // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- The session identity changes here, so this has to be a real page load — router.push() would keep the previous user's client cache and rendered tree.
               window.location.href = "/login";
             }}
           >
@@ -177,7 +180,7 @@ export function AccountLifecycle({ base = "" }: { base?: string }) {
       ? new Date(scheduled).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
       : "";
     const daysLeft = scheduled
-      ? Math.max(0, Math.ceil((new Date(scheduled).getTime() - Date.now()) / 86_400_000))
+      ? Math.max(0, Math.ceil((new Date(scheduled).getTime() - now) / 86_400_000))
       : 0;
     return (
       <AppShell header={header} showNav={false}>
@@ -197,6 +200,7 @@ export function AccountLifecycle({ base = "" }: { base?: string }) {
             variant="text"
             onClick={async () => {
               await fetch("/api/v1/auth/logout", { method: "POST", credentials: "same-origin" });
+              // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- The session identity changes here, so this has to be a real page load — router.push() would keep the previous user's client cache and rendered tree.
               window.location.href = "/login";
             }}
           >
@@ -271,7 +275,7 @@ export function AccountLifecycle({ base = "" }: { base?: string }) {
     ? new Date(hold.availableFrom).toLocaleDateString("en-IN", { day: "numeric", month: "short" })
     : null;
   const daysSincePayment = hold?.lastPaymentAt
-    ? Math.max(0, Math.floor((Date.now() - new Date(hold.lastPaymentAt).getTime()) / 86_400_000))
+    ? Math.max(0, Math.floor((now - new Date(hold.lastPaymentAt).getTime()) / 86_400_000))
     : null;
 
   return (

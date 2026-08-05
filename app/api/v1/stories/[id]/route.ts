@@ -15,14 +15,15 @@ import { storySegment } from "@/lib/feed/stories";
 export const dynamic = "force-dynamic";
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
-  if (!UUID_RE.test(params.id)) return fail("NOT_FOUND");
-  const limited = await rateLimit(`story-seg:${clientIp(req.headers)}`, 120, 60);
-  if (!limited.allowed) return fail("RATE_LIMITED");
-  // The viewer is only used for the segment's `saved` flag — everything else it
-  // returns is public. A guest gets the same payload with `saved:false`.
-  const claims = await getCurrentUser();
-  const seg = await storySegment(params.id, claims?.sub ?? null);
-  if (!seg) return fail("NOT_FOUND");
-  return ok({ segment: seg });
+export async function GET(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+ const params = await props.params;
+ if (!UUID_RE.test(params.id)) return fail("NOT_FOUND");
+ const limited = await rateLimit(`story-seg:${clientIp(req.headers)}`, 120, 60);
+ if (!limited.allowed) return fail("RATE_LIMITED");
+ // The viewer is only used for the segment's `saved` flag — everything else it
+ // returns is public. A guest gets the same payload with `saved:false`.
+ const claims = await getCurrentUser();
+ const seg = await storySegment(params.id, claims?.sub ?? null);
+ if (!seg) return fail("NOT_FOUND");
+ return ok({ segment: seg });
 }

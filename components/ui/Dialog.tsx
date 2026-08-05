@@ -45,9 +45,15 @@ export function ConfirmDialog({
 }: ConfirmDialogProps) {
   const [typed, setTyped] = useState("");
 
-  useEffect(() => {
-    if (!open) setTyped("");
-  }, [open]);
+  // Clearing the confirmation text used to be an effect keyed on `open`, which
+  // costs an extra render pass every time the dialog closes. React's own
+  // "adjusting state when a prop changes" pattern does it during render, so the
+  // cleared value is part of the same commit.
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    setTyped("");
+  }
 
   useEffect(() => {
     if (!open) return;

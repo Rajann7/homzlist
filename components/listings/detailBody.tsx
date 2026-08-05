@@ -577,7 +577,9 @@ export function PropertyDetailBody({
 }) {
   const specs = (listing.keySpecs ?? []) as KeySpec[];
   const highlights = (listing.highlights ?? []) as string[];
-  const groups = (listing.attributeGroups ?? []) as AttrGroup[];
+  // Memoised: `sections` below depends on it, and a fresh array each render
+  // would rebuild that list every time.
+  const groups = useMemo(() => (listing.attributeGroups ?? []) as AttrGroup[], [listing.attributeGroups]);
   const amenities = amenityList(listing);
 
   const sections = useMemo(() => {
@@ -751,7 +753,8 @@ export function ProjectDetailBody({
    * tiles on every scheme that has no towers and no floors.
    */
   const specs = (p.keySpecs ?? []) as KeySpec[];
-  const groups = (p.attributeGroups ?? []) as AttrGroup[];
+  // Memoised for the same reason as the listing view above.
+  const groups = useMemo(() => (p.attributeGroups ?? []) as AttrGroup[], [p.attributeGroups]);
   const amenities = amenityList(p);
   const banks = (p.bankApprovals ?? []) as string[];
 

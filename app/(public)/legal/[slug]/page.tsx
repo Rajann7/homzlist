@@ -18,8 +18,10 @@ export async function generateStaticParams() {
 }
 
 export async function generateMetadata(
-  { params, searchParams }: { params: { slug: string }; searchParams: { version?: string } },
+  props: { params: Promise<{ slug: string }>; searchParams: Promise<{ version?: string }> }
 ): Promise<Metadata> {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const page = await getLegalPage(params.slug, searchParams.version ?? null);
   if (!page) return { title: "Not found", robots: { index: false, follow: false } };
   const url = `${siteUrl()}/legal/${page.slug}`;
@@ -34,8 +36,10 @@ export async function generateMetadata(
 }
 
 export default async function PublicLegalPage(
-  { params, searchParams }: { params: { slug: string }; searchParams: { version?: string } },
+  props: { params: Promise<{ slug: string }>; searchParams: Promise<{ version?: string }> }
 ) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const page = await getLegalPage(params.slug, searchParams.version ?? null);
   if (!page) notFound();
   const officer = page.reader === "grievance" ? await getGrievanceOfficer() : null;

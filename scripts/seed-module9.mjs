@@ -27,6 +27,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import pg from "pg";
+import { connect as dbConnect } from "./lib/dbx.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const E = {};
@@ -34,11 +35,10 @@ for (const l of fs.readFileSync(path.join(ROOT, ".env.local"), "utf8").split(/\r
   const m = /^([A-Z0-9_]+)=(.*)$/.exec(l.trim());
   if (m) E[m[1]] = m[2].replace(/^["']|["']$/g, "");
 }
-const c = new pg.Client({
-  host: `db.${E.SUPABASE_PROJECT_REF}.supabase.co`, port: 5432, user: "postgres",
-  password: E.SUPABASE_DB_PASSWORD, database: "postgres", ssl: { rejectUnauthorized: false },
-});
-await c.connect();
+// The DIRECT host drops out often enough — DNS, and an IPv6 route that goes
+// dark — that a one-host client turns a run into a false failure. dbx.mjs walks
+// the ladder q.mjs and db-proof.mjs already use: direct, then the poolers.
+const c = await dbConnect();
 const q = (s, p) => c.query(s, p);
 const one = async (s, p) => (await q(s, p)).rows[0];
 const TAG = "m9-seed";
@@ -89,37 +89,113 @@ const rates = Object.fromEntries(
 );
 if (!rates.boost7 || !rates.boost30) throw new Error("boost catalog rows missing — run migrations first");
 
-/** A seller of each role who actually has live inventory to boost. */
-async function sellerWithLiveListing(role) {
+/**
+ * A seller of each role who actually has live inventory to boost.
+ *
+ * Builders are matched on PROJECTS. They do not post listings — the product
+ * routes them to projects (and to requirements through a project), so demanding
+ * "a builder with a live listing" asked for something that cannot exist, and
+ * this seed threw before writing a single row. The boosts schema has allowed
+ * subject_kind = project all along; until now nothing had ever created one.
+ */
+async function sellerWithLiveListing(role, need = 1) {
+  if (role === "builder") {
+    return one(
+      `select p.id, p.name, p.role, p.city_id
+         from profiles p
+        where p.role = $1
+          and (select count(*) from projects pr
+                where pr.profile_id = p.id and pr.status = 'live' and pr.deleted_at is null) >= $2
+        order by (select count(*) from projects pr2
+                   where pr2.profile_id = p.id and pr2.status = 'live' and pr2.deleted_at is null) desc
+        limit 1`,
+      [role, need],
+    );
+  }
+  // Rank by the count of listings this seed can actually USE. Ordering by the
+  // profile's total listing count picked someone with plenty of drafts and
+  // sold rows but only one live one, and the fixtures below index into
+  // ownerListings[1] / brokerListings[4] — so the seed died on an undefined.
   return one(
     `select p.id, p.name, p.role, p.city_id
        from profiles p
       where p.role = $1
-        and exists (select 1 from listings l
-                     where l.profile_id = p.id and l.status='live' and l.availability='available')
-      order by (select count(*) from listings l2 where l2.profile_id = p.id) desc
+        and (select count(*) from listings l
+              where l.profile_id = p.id and l.status='live' and l.availability='available') >= $2
+      order by (select count(*) from listings l2
+                 where l2.profile_id = p.id and l2.status='live' and l2.availability='available') desc
       limit 1`,
-    [role],
+    [role, need],
   );
 }
+/**
+ * Put a seller's own listings back into a boostable state.
+ *
+ * check-boost-live.mjs exercises "owner marks a listing sold while its boost is
+ * pending approval" and the moderation paths, and it does not put those
+ * listings back. So every run left fewer live listings than the one before, and
+ * by the third run the seed's own fixtures were pointing at sold and
+ * changes_requested rows — the boost queue then refused to approve them
+ * (LISTING_STATE_LOCKED) and the check failed on state it had itself created.
+ *
+ * Only this seller's own rows are touched, and only into the state the fixtures
+ * need. Other sellers keep their draft / changes_requested / sold listings, so
+ * those screens still have something to show.
+ */
+async function ensureBoostableInventory(profileId, want) {
+  const live = async () => Number((await one(
+    `select count(*) n from listings
+      where profile_id=$1 and status='live' and availability='available'`, [profileId])).n);
+  if (await live() >= want) return;
+  const spare = (await q(
+    `select id from listings
+      where profile_id=$1 and deleted_at is null
+        and (status <> 'live' or availability <> 'available')
+      order by (status = 'changes_requested') desc, (status = 'draft') desc, updated_at desc
+      limit $2`, [profileId, want])).rows;
+  for (const r of spare) {
+    if (await live() >= want) break;
+    await q(
+      `update listings
+          set status='live', availability='available',
+              live_at = coalesce(live_at, now()), approved_at = coalesce(approved_at, now()),
+              sold_at = null, updated_at = now()
+        where id=$1`, [r.id]);
+  }
+}
+
 const sellers = {
-  owner: await sellerWithLiveListing("owner"),
-  broker: await sellerWithLiveListing("broker"),
-  builder: await sellerWithLiveListing("builder"),
+  // One usable subject is enough — liveListings() cycles to fill the fixtures.
+  owner: await sellerWithLiveListing("owner", 1),
+  broker: await sellerWithLiveListing("broker", 1),
+  builder: await sellerWithLiveListing("builder", 1),
 };
+// The counts the fixture list below indexes into.
+if (sellers.owner) await ensureBoostableInventory(sellers.owner.id, 4);
+if (sellers.broker) await ensureBoostableInventory(sellers.broker.id, 5);
 for (const [role, s] of Object.entries(sellers)) {
   if (!s) throw new Error(`no ${role} with a live listing — run the earlier module seeds first`);
   console.log(`${role.padEnd(8)} ${s.name}`);
 }
 
-/** N live listings for a seller, newest first. */
+/**
+ * n subjects to hang fixtures on, CYCLING when the seller has fewer.
+ *
+ * The fixture list below indexes brokerListings[4], but no broker in the demo
+ * data has five live+available listings — the best has three — so a plain
+ * LIMIT returned a short array and the seed died on an undefined id. A boost is
+ * a row per purchase, not a property of the listing, so pointing two fixtures
+ * at the same subject is a fair demo; failing to seed anything is not.
+ */
 async function liveListings(profileId, n) {
-  return (await q(
+  const rows = (await q(
     `select id, title, area_id, city_id, state_id from listings
       where profile_id=$1 and status='live' and availability='available'
-      order by live_at desc nulls last limit $2`,
-    [profileId, n],
+      order by live_at desc nulls last`,
+    [profileId],
   )).rows;
+  if (!rows.length) return [];
+  return Array.from({ length: n }, (_, i) => rows[i % rows.length]);
 }
 
 // A live project (builder) and a live requirement (any role) so all three
@@ -238,7 +314,15 @@ const gujarat = states.Gujarat;
 
 const ownerListings = await liveListings(sellers.owner.id, 4);
 const brokerListings = await liveListings(sellers.broker.id, 5);
-const builderListings = await liveListings(sellers.builder.id, 2);
+const builderProjectRows = (await q(
+  `select id, name, area_id, city_id, state_id from projects
+    where profile_id=$1 and status='live' and deleted_at is null
+    order by live_at desc nulls last`,
+  [sellers.builder.id],
+)).rows;
+const builderProjects = builderProjectRows.length
+  ? Array.from({ length: 2 }, (_, i) => builderProjectRows[i % builderProjectRows.length])
+  : [];
 
 const geoOf = (l) => ({ areaId: l.area_id, cityId: l.city_id, stateId: l.state_id ?? gujarat });
 
@@ -316,8 +400,8 @@ await boost({
   status: "pending_approval",
 });
 await boost({
-  profileId: sellers.builder.id, subjectKind: "listing", subjectId: builderListings[0].id,
-  code: "boost7", targeting: "state", geo: geoOf(builderListings[0]),
+  profileId: sellers.builder.id, subjectKind: "project", subjectId: builderProjects[0].id,
+  code: "boost7", targeting: "state", geo: geoOf(builderProjects[0]),
   status: "pending_approval",
 });
 
@@ -338,10 +422,10 @@ if (brokerListings[4]) {
     status: "pending_approval",
   });
 }
-if (builderListings[1]) {
+if (builderProjects[1]) {
   await boost({
-    profileId: sellers.builder.id, subjectKind: "listing", subjectId: builderListings[1].id,
-    code: "boost7", targeting: "area", geo: geoOf(builderListings[1]),
+    profileId: sellers.builder.id, subjectKind: "project", subjectId: builderProjects[1].id,
+    code: "boost7", targeting: "area", geo: geoOf(builderProjects[1]),
     status: "pending_approval",
   });
 }
@@ -384,8 +468,8 @@ await boost({
 
 // --- CANCELLED before approval + refunded (user's own cancel) ------------
 await boost({
-  profileId: sellers.builder.id, subjectKind: "listing", subjectId: builderListings[1].id,
-  code: "boost7", targeting: "india", geo: geoOf(builderListings[1]),
+  profileId: sellers.builder.id, subjectKind: "project", subjectId: builderProjects[1].id,
+  code: "boost7", targeting: "india", geo: geoOf(builderProjects[1]),
   status: "cancelled",
   stoppedReason: `Cancelled before approval`, refundedAt: iso(now - 2 * DAY),
 });

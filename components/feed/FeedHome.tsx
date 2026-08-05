@@ -13,6 +13,7 @@ import { storiesApi, feedApi, type StoryCircle } from "@/lib/feed/client";
 import { apiFetch } from "@/lib/auth/api-fetch";
 import type { CityRow } from "./CitySheet";
 import { cn } from "@/lib/utils";
+import { useNow } from "@/lib/hooks/useNow";
 
 // Guest city choice is a UI-only preference (no identity, no server profile to hold it) —
 // stored client-side so it survives reload/navigation instead of resetting every time.
@@ -52,7 +53,7 @@ export function FeedHome() {
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const feedRef = useRef<PropertyFeedHandle>(null);
-  const loadedAt = useRef<number>(Date.now());
+  const loadedAt = useRef<number>(useNow());
 
   const loadMe = useCallback(async () => {
     try {
@@ -134,6 +135,10 @@ export function FeedHome() {
         {me?.guest && (
           <div className="flex items-center gap-2 bg-accent-soft px-4 py-2 text-13">
             <span className="flex-1 text-ink-secondary">Sign in to save, inquire and chat</span>
+            {/* /login lives on the seller host — the middleware 307s this off
+                the public origin — so <Link> would prefetch a redirect and then
+                hand off anyway. */}
+            {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- see above */}
             <a href="/login" className="font-semibold text-accent">Sign In</a>
           </div>
         )}

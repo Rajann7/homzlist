@@ -24,7 +24,7 @@ export async function POST() {
       .eq("id", ctx.sessionId)
       .is("ended_at", null);
   }
-  const jar = cookies();
+  const jar = await cookies();
   jar.delete(IMP_COOKIE);
   jar.delete(COOKIE.ACCESS);
   return NextResponse.json({ ok: true, data: { ended: Boolean(ctx) } });

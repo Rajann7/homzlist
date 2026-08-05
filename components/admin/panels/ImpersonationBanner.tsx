@@ -20,6 +20,7 @@
  */
 
 import { useState } from "react";
+import { useNow } from "@/lib/hooks/useNow";
 
 export function ImpersonationBanner({
   name,
@@ -30,8 +31,9 @@ export function ImpersonationBanner({
   staffName: string;
   startedAt: string;
 }) {
+  const now = useNow();
   const [busy, setBusy] = useState(false);
-  const minutes = Math.max(1, Math.round((Date.now() - new Date(startedAt).getTime()) / 60_000));
+  const minutes = Math.max(1, Math.round((now - new Date(startedAt).getTime()) / 60_000));
 
   return (
     <div
@@ -67,6 +69,7 @@ export function ImpersonationBanner({
           window.close();
           // window.close() only works on a tab this script opened; if the admin
           // navigated here by hand it stays put, so land somewhere honest.
+          // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- The session identity changes here, so this has to be a real page load — router.push() would keep the previous user's client cache and rendered tree.
           window.location.href = "/login";
         }}
         style={{

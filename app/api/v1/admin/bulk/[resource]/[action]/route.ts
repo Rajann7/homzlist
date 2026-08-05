@@ -21,8 +21,9 @@ export const fetchCache = "force-no-store";
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { resource: string; action: string } },
+  props: { params: Promise<{ resource: string; action: string }> }
 ) {
+  const params = await props.params;
   const resource = resourceByName(params.resource);
   if (!resource) return fail("NOT_FOUND");
   const handler = bulkHandler(params.resource, params.action);

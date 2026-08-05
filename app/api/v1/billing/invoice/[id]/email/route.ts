@@ -14,19 +14,20 @@ export const dynamic = "force-dynamic";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export async function POST(_req: Request, { params }: { params: { id: string } }) {
-  const claims = await getCurrentUser();
-  if (!claims) return fail("UNAUTHORIZED");
-  if (!UUID_RE.test(params.id)) return fail("NOT_FOUND");
+export async function POST(_req: Request, props: { params: Promise<{ id: string }> }) {
+ const params = await props.params;
+ const claims = await getCurrentUser();
+ if (!claims) return fail("UNAUTHORIZED");
+ if (!UUID_RE.test(params.id)) return fail("NOT_FOUND");
 
-  const limited = await rateLimit(`invoice-email:${claims.sub}`, 5, 3600);
-  if (!limited.allowed) return fail("RATE_LIMITED");
+ const limited = await rateLimit(`invoice-email:${claims.sub}`, 5, 3600);
+ if (!limited.allowed) return fail("RATE_LIMITED");
 
-  const invoice = await getInvoice(params.id, claims.sub);
-  if (!invoice) return fail("NOT_FOUND");
+ const invoice = await getInvoice(params.id, claims.sub);
+ if (!invoice) return fail("NOT_FOUND");
 
-  // Resend delivery is wired in the notifications module; the send is queued
-  // there. Marking it here keeps the audit trail honest either way.
-  await markInvoiceEmailed(invoice.id);
-  return ok({ queued: true });
+ // Resend delivery is wired in the notifications module; the send is queued
+ // there. Marking it here keeps the audit trail honest either way.
+ await markInvoiceEmailed(invoice.id);
+ return ok({ queued: true });
 }

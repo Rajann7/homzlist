@@ -8,7 +8,8 @@ export const dynamic = "force-dynamic";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export async function DELETE(_req: Request, { params }: { params: { id: string; photoId: string } }) {
+export async function DELETE(_req: Request, props: { params: Promise<{ id: string; photoId: string }> }) {
+  const params = await props.params;
   const claims = await getCurrentUser();
   if (!claims) return fail("UNAUTHORIZED");
   if (!UUID_RE.test(params.id) || !UUID_RE.test(params.photoId)) return fail("NOT_FOUND");

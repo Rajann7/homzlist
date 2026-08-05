@@ -79,7 +79,7 @@ export function BoostBuy() {
       if ((!asked || !askedEligible) && first) setSubjectKind(first.subjectKind);
       setDuration((cur) => cur ?? (res.data.durations.find((d) => d.bestValue)?.code ?? res.data.durations[0]?.code ?? null));
     }
-  }, []);
+  }, [params]);
 
   useEffect(() => {
     void load();

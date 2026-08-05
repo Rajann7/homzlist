@@ -8,7 +8,8 @@ export const dynamic = "force-dynamic";
 // legal page, would never reach this endpoint. (memory: nextjs-data-cache-ssr-staleness)
 export const fetchCache = "force-no-store";
 
-export async function GET(_req: Request, { params }: { params: { slug: string } }) {
+export async function GET(_req: Request, props: { params: Promise<{ slug: string }> }) {
+  const params = await props.params;
   const view = await getHelpCategory(params.slug);
   if (!view) return fail("NOT_FOUND");
   return ok(view);

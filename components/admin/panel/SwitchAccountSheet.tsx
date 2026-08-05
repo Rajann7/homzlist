@@ -77,6 +77,7 @@ export function SwitchAccountSheet({ onClose }: { onClose: () => void }) {
       setAccounts(list?.ok ? (list.data?.accounts ?? []) : []);
       return;
     }
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- The session identity changes here, so this has to be a real page load — router.push() would keep the previous user's client cache and rendered tree.
     window.location.assign("/");
   }
 
@@ -91,6 +92,7 @@ export function SwitchAccountSheet({ onClose }: { onClose: () => void }) {
       return;
     }
     if (body?.ok && body.data?.outcome === "ok") {
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- The session identity changes here, so this has to be a real page load — router.push() would keep the previous user's client cache and rendered tree.
       window.location.assign("/");
       return;
     }

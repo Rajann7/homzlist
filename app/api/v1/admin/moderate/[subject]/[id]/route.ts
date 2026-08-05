@@ -38,7 +38,11 @@ async function gate(subject: string, id: string) {
   return { actorId: claims.sub };
 }
 
-export async function POST(req: NextRequest, { params }: { params: { subject: string; id: string } }) {
+export async function POST(
+  req: NextRequest,
+  props: { params: Promise<{ subject: string; id: string }> }
+) {
+  const params = await props.params;
   const g = await gate(params.subject, params.id);
   if (g.err) return g.err;
 
@@ -115,7 +119,11 @@ export async function POST(req: NextRequest, { params }: { params: { subject: st
   return ok({ status: res.status, locked: res.locked, rejectCount: res.rejectCount });
 }
 
-export async function GET(_req: NextRequest, { params }: { params: { subject: string; id: string } }) {
+export async function GET(
+  _req: NextRequest,
+  props: { params: Promise<{ subject: string; id: string }> }
+) {
+  const params = await props.params;
   const g = await gate(params.subject, params.id);
   if (g.err) return g.err;
   if (params.subject === "boost") return ok({ history: await boostReviewHistory(params.id) });

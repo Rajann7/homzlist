@@ -302,7 +302,15 @@ function NotifRow({
   const [dx, setDx] = useState(0);
   const [gone, setGone] = useState(false);
   const start = useRef<number | null>(null);
+  // The ref drives the HANDLERS and the state drives the RENDER.
+  //
+  // The handlers have to read this synchronously: touchmove can fire before the
+  // re-render from touchstart has committed, and a state read there would still
+  // say false and swallow the first frames of the swipe. But the transform below
+  // also needs it, and a ref read during render is not tracked. So both — the
+  // ref stays the source of truth for the gesture, the state only mirrors it.
   const dragging = useRef(false);
+  const [isDragging, setIsDragging] = useState(false);
   const wrap = useRef<HTMLDivElement>(null);
 
   function onTouchStart(e: React.TouchEvent) {
@@ -310,6 +318,7 @@ function NotifRow({
     if ((e.target as HTMLElement).closest("button")) return;
     start.current = e.touches[0].clientX;
     dragging.current = true;
+    setIsDragging(true);
   }
   function onTouchMove(e: React.TouchEvent) {
     if (!dragging.current || start.current == null) return;
@@ -318,6 +327,7 @@ function NotifRow({
   function onTouchEnd() {
     if (!dragging.current) return;
     dragging.current = false;
+    setIsDragging(false);
     if (dx < -90) { setGone(true); setDx(-window.innerWidth); setTimeout(onDismiss, 150); }
     else setDx(0);
   }
@@ -347,7 +357,7 @@ function NotifRow({
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
         onClick={onOpen}
-        style={{ transform: `translateX(${dx}px)`, transition: dragging.current ? "none" : undefined }}
+        style={{ transform: `translateX(${dx}px)`, transition: isDragging ? "none" : undefined }}
         className={cn(
           "relative flex items-start gap-3 bg-page p-4 transition-transform duration-100 will-change-transform active:bg-surface-2",
           row.unread && "bg-accent-soft pl-6",

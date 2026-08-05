@@ -317,6 +317,7 @@ function StringsTab() {
         </span>
         <span
           onClick={() => {
+            // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- Not a page — this hits an API route that responds with a file download.
             window.location.href = "/api/v1/admin/templates?what=strings-csv";
           }}
           style={{ fontSize: 13, color: "var(--accent)", fontWeight: 600, cursor: "pointer" }}

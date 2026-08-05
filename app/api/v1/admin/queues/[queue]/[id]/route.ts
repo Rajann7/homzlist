@@ -144,7 +144,11 @@ async function boostDecision(id: string, me: AdminIdentity, body: Body) {
   return ok(res);
 }
 
-export async function POST(req: NextRequest, { params }: { params: { queue: string; id: string } }) {
+export async function POST(
+  req: NextRequest,
+  props: { params: Promise<{ queue: string; id: string }> }
+) {
+  const params = await props.params;
   try {
     const me = await requireAdmin("staff");
     const body = ((await req.json().catch(() => null)) ?? {}) as Body;

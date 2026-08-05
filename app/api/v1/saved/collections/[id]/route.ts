@@ -9,7 +9,8 @@ import { renameCollection, deleteCollection } from "@/lib/saved/service";
  */
 export const dynamic = "force-dynamic";
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const claims = await getCurrentUser();
   if (!claims) return fail("UNAUTHORIZED");
   let body: Record<string, unknown>;
@@ -20,7 +21,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   return ok({ renamed: true });
 }
 
-export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(_req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const claims = await getCurrentUser();
   if (!claims) return fail("UNAUTHORIZED");
   const r = await deleteCollection(claims.sub, params.id);

@@ -10,7 +10,7 @@ export async function GET() {
   const claims = await getCurrentUser();
   if (!claims) return fail("UNAUTHORIZED");
 
-  const currentSid = cookies().get(COOKIE.REFRESH)?.value?.split(".")[1];
+  const currentSid = (await cookies()).get(COOKIE.REFRESH)?.value?.split(".")[1];
   const sessions = (await listSessions(claims.sub)).map((s) => ({
     id: s.sid,
     userAgent: s.ua,

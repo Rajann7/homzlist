@@ -23,6 +23,7 @@ import {
   RightSheet,
   useToast,
 } from "@/components/admin/ds";
+import { useNow } from "@/lib/hooks/useNow";
 
 export type ActionRunner = (
   body: Record<string, unknown>,
@@ -1082,13 +1083,14 @@ export function ImpersonateOverlay({
   onClose: () => void;
   onChanged: (session: ImpSession | null, message: string) => void;
 }) {
+  const now = useNow();
   const toast = useToast();
   const [busy, setBusy] = useState(false);
 
   if (live) {
     const minutes = Math.max(
       1,
-      Math.round((Date.now() - new Date(live.startedAt).getTime()) / 60_000),
+      Math.round((now - new Date(live.startedAt).getTime()) / 60_000),
     );
     return (
       <div

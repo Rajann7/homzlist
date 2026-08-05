@@ -45,12 +45,12 @@ function serialize(entries: PoolEntry[]): string {
 }
 
 /** Background accounts, most-recently-used first. */
-export function readPool(): PoolEntry[] {
-  return parse(cookies().get(COOKIE_POOL)?.value);
+export async function readPool(): Promise<PoolEntry[]> {
+  return parse((await cookies()).get(COOKIE_POOL)?.value);
 }
 
-export function writePool(entries: PoolEntry[]): void {
-  const jar = cookies();
+export async function writePool(entries: PoolEntry[]): Promise<void> {
+  const jar = await cookies();
   if (!entries.length) {
     jar.delete(COOKIE_POOL);
     return;
@@ -62,16 +62,16 @@ export function writePool(entries: PoolEntry[]): void {
  * Park a refresh token in the pool (used when another account takes over as
  * active). De-duplicates by profile so the same account can never appear twice.
  */
-export function addToPool(refreshToken: string, existing?: PoolEntry[]): void {
+export async function addToPool(refreshToken: string, existing?: PoolEntry[]): Promise<void> {
   const profileId = refreshToken.split(".")[0];
   if (!profileId) return;
-  const rest = (existing ?? readPool()).filter((e) => e.profileId !== profileId);
-  writePool([{ profileId, token: refreshToken }, ...rest]);
+  const rest = (existing ?? (await readPool())).filter((e) => e.profileId !== profileId);
+  await writePool([{ profileId, token: refreshToken }, ...rest]);
 }
 
 /** Take an account out of the pool, returning its token if it was there. */
-export function takeFromPool(profileId: string): { entry: PoolEntry | null; rest: PoolEntry[] } {
-  const pool = readPool();
+export async function takeFromPool(profileId: string): Promise<{ entry: PoolEntry | null; rest: PoolEntry[] }> {
+  const pool = await readPool();
   const entry = pool.find((e) => e.profileId === profileId) ?? null;
   return { entry, rest: pool.filter((e) => e.profileId !== profileId) };
 }
@@ -83,20 +83,20 @@ export function takeFromPool(profileId: string): { entry: PoolEntry | null; rest
  * A dead outgoing session is simply dropped.
  */
 export async function absorbOutgoingSession(newActiveProfileId: string, outgoingToken: string | undefined): Promise<void> {
-  const rest = readPool().filter((e) => e.profileId !== newActiveProfileId);
+  const rest = (await readPool()).filter((e) => e.profileId !== newActiveProfileId);
   const outgoingId = outgoingToken?.split(".")[0];
   if (outgoingToken && outgoingId && outgoingId !== newActiveProfileId && (await peekRefreshSession(outgoingToken))) {
-    writePool([{ profileId: outgoingId, token: outgoingToken }, ...rest]);
+    await writePool([{ profileId: outgoingId, token: outgoingToken }, ...rest]);
     return;
   }
-  writePool(rest);
+  await writePool(rest);
 }
 
 /** Sign every background account out of this device (server-side revoke + cookie). */
 export async function revokeAndClearPool(): Promise<void> {
-  for (const e of readPool()) {
+  for (const e of await readPool()) {
     const [profileId, sid] = e.token.split(".");
     if (profileId && sid) await revokeSession(profileId, sid);
   }
-  cookies().delete(COOKIE_POOL);
+  (await cookies()).delete(COOKIE_POOL);
 }

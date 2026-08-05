@@ -13,15 +13,16 @@ import { listingCardDTO } from "@/lib/listings/dto";
 export const dynamic = "force-dynamic";
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export async function GET(_req: Request, { params }: { params: { id: string } }) {
-  if (!UUID_RE.test(params.id)) return fail("NOT_FOUND");
-  const claims = await getCurrentUser();
+export async function GET(_req: Request, props: { params: Promise<{ id: string }> }) {
+ const params = await props.params;
+ if (!UUID_RE.test(params.id)) return fail("NOT_FOUND");
+ const claims = await getCurrentUser();
 
-  // Same visibility gate as the detail itself — no rail for a listing you
-  // aren't allowed to open.
-  const listing = await getListingForViewer(params.id, claims?.sub ?? null);
-  if (!listing) return fail("NOT_FOUND");
+ // Same visibility gate as the detail itself — no rail for a listing you
+ // aren't allowed to open.
+ const listing = await getListingForViewer(params.id, claims?.sub ?? null);
+ if (!listing) return fail("NOT_FOUND");
 
-  const items = await listSimilar(listing);
-  return ok({ items: items.map(listingCardDTO) });
+ const items = await listSimilar(listing);
+ return ok({ items: items.map(listingCardDTO) });
 }

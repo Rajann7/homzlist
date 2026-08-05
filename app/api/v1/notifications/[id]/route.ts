@@ -17,7 +17,8 @@ export const dynamic = "force-dynamic";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const claims = await getCurrentUser();
   if (!claims) return fail("UNAUTHORIZED");
   if (!UUID_RE.test(params.id)) return fail("NOT_FOUND");
@@ -44,7 +45,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   return ok({ text: res.text ?? null, toast: res.toast ?? null, dismissed: !!res.dismissed });
 }
 
-export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(_req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const claims = await getCurrentUser();
   if (!claims) return fail("UNAUTHORIZED");
   if (!UUID_RE.test(params.id)) return fail("NOT_FOUND");

@@ -31,12 +31,12 @@ export async function POST(req: NextRequest) {
   if (!profileId) return fail("VALIDATION_ERROR");
   if (profileId === claims.sub) return fail("FORBIDDEN"); // use /auth/logout
 
-  const { entry, rest } = takeFromPool(profileId);
+  const { entry, rest } = await takeFromPool(profileId);
   if (!entry) return fail("NOT_FOUND");
 
   const [pid, sid] = entry.token.split(".");
   if (pid && sid) await revokeSession(pid, sid);
-  writePool(rest);
+  await writePool(rest);
 
   return ok({ removed: true, profileId });
 }

@@ -17,7 +17,8 @@ export const dynamic = "force-dynamic";
 // legal page, would never reach this endpoint. (memory: nextjs-data-cache-ssr-staleness)
 export const fetchCache = "force-no-store";
 
-export async function GET(req: NextRequest, { params }: { params: { slug: string } }) {
+export async function GET(req: NextRequest, props: { params: Promise<{ slug: string }> }) {
+  const params = await props.params;
   const claims = await getCurrentUser();
   const article = await getHelpArticle(params.slug, {
     profileId: claims?.sub ?? null,

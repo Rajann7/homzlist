@@ -30,6 +30,7 @@ export function AvatarMenu({
     );
     // A full navigation, not a router push: every cookie, every cached server
     // payload and every piece of panel state belongs to a session that is gone.
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- The session identity changes here, so this has to be a real page load — router.push() would keep the previous user's client cache and rendered tree.
     window.location.assign("/login");
   }
 

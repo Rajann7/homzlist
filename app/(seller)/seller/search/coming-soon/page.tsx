@@ -4,7 +4,8 @@ import { createServiceClient } from "@/lib/supabase/server";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Coming soon", robots: { index: false, follow: false } };
 
-export default async function SellerComingSoonPage({ searchParams }: { searchParams: { city?: string } }) {
+export default async function SellerComingSoonPage(props: { searchParams: Promise<{ city?: string }> }) {
+  const searchParams = await props.searchParams;
   const city = (searchParams.city ?? "").trim().slice(0, 80) || "your city";
   const db = createServiceClient();
   const { data: match } = await db

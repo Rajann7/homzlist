@@ -91,6 +91,7 @@ export function ExportsScreen({ entities }: { entities: { value: string; label: 
     }
     // The download is audited server-side (P1b), which is why it is a real
     // navigation to the endpoint rather than a direct bucket URL.
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- Not a page — this hits an API route that responds with a file download.
     window.location.href = `/api/v1/admin/export/${r.id}`;
   };
 

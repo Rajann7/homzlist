@@ -3992,3 +3992,105 @@ Auditors: `npm run check:module12` is 170 checks, `check:module12-ui` is 57.
   fabricates a property photo.
 - **`requires_reacceptance` is seeded false** on all 8 legal pages. A decision,
   recorded above, not an omission.
+
+## Next 15 upgrade (4 Aug 2026) — verification-script defects, all FIXED
+
+None of these were application bugs and none were caused by the upgrade. They
+were defects in the *verification* scripts, and they mattered because a broken
+verifier makes a before/after comparison lie — which is the one thing an
+upgrade cannot afford. All three are fixed and proven; nothing is left open.
+
+- **FIXED · HIGH — `check:admin-p6` destroyed a real legal page on every run.**
+  The page-picker read `where kind is null or kind not in ('terms','privacy',
+  'grievance','refund')`, but `kind` holds `'legal'` or `'page'` — never a slug
+  — so the test was always true and the check grabbed a real legal page,
+  republished it with a 28-character throwaway body, and never put it back.
+  (The unpublish guard further down the same file already carried this exact
+  fix, with a comment saying the first version "never fired". Only half the bug
+  had been caught.)
+
+  Proven from the DB: `privacy` went 5798 → 28 chars at 02:58 on 4 Aug during
+  the *Next 14 baseline* run, and `refund` went 3317 → 28 at 05:20 during the
+  Next 15 run. Both restored with `npm run seed:module12`, which reported
+  removing exactly 2 throwaway `P6 check` versions.
+
+  Now: excludes by slug, prefers a page whose `kind` is not `'legal'`,
+  snapshots the row it borrows and restores it — body, version, flags, SEO
+  fields — then deletes the version rows it cut. Two new assertions prove the
+  restore. Verified by dumping all 8 `cms_pages` before and after a run: byte
+  identical, and the check passes.
+
+- **FIXED · MEDIUM — `check:messages` was not idempotent.** The builder for the
+  proposal walk was picked on "has a live project" alone, with no requirement
+  that they could actually afford a proposal, so a builder with no active plan
+  yielded `proposalBalance() = 0` and the walk failed with `NEED_TOPUP` for a
+  reason unrelated to the code under test. `proposal_used` was also never
+  rolled back, so on a finite plan every run burned one proposal for good.
+
+  Now: selection mirrors the server's own rule in `lib/listings/proposals.ts`
+  (an `active` plan row, either unlimited or with quota left), and the walk
+  returns the quota it spent. Verified by running the check twice back to back
+  — both green, where the second run used to fail.
+
+- **FIXED · LOW — `check:bundle-secrets` reported 49 false positives.** Three
+  `.env.local` values are byte-identical to hardcoded fallbacks in
+  `lib/env.ts` (`REDIS_URL` = the `redis://127.0.0.1:6379` default at line 49,
+  `EMAIL_FROM` = the `noreply@homzlist.com` default at line 70), and
+  `FCM_PROJECT_ID` is a 12-character value that is a substring of the build
+  path baked into every chunk. Next.js replaces non-`NEXT_PUBLIC_` env reads
+  with `undefined` on the client, so what the grep found was the source
+  default, not a secret. The real secrets all default to `""` and appear
+  nowhere in the client bundle — the `serverEnv()` guard held throughout.
+
+  Now: the gate skips values it cannot attribute — ones equal to their own
+  fallback literal in `lib/env.ts`, and short ones that are substrings of the
+  build path — and says why. The skip is by VALUE, not by name: a production
+  `REDIS_URL` carrying real credentials no longer matches the default and is
+  still checked. Result is now `PASS — 11 secret value(s) checked against 441
+  client bundle file(s): 0 leak(s)`.
+
+- **Not defects — network flakes.** `check:notifications`, `check:inbox` and
+  `check:admin-p4` each failed once with `ETIMEDOUT :5432`, `Connection
+  terminated unexpectedly` and `ECONNRESET`, and passed on retry. Network to
+  the dev Supabase, not code.
+
+## Still open after the Next 16 upgrade (4 Aug 2026) — `check:boost`
+
+`check:boost` is the one verification script that does not end green, and it
+did not end green before the upgrade either — it could not run at all, because
+`seed-module9` threw on a precondition that cannot exist.
+
+**Fixed, and it now gets most of the way through:**
+- it opened a single hard-coded DB host, so it died with `ETIMEDOUT` whenever
+  that host's IPv6 route dropped;
+- `seed-module9` demanded "a builder with a live listing", which contradicts the
+  product — builders post projects. Builders are matched on projects now and
+  their boosts carry `subject_kind = project`, a subject the schema has always
+  permitted and nothing had ever created (the table held 0 of them);
+- `seed-module9` ranked sellers by total listings while the fixtures need
+  live+available ones, and indexed `brokerListings[4]` where no broker in the
+  demo data has five;
+- the seed restores its own sellers' inventory before running.
+
+**What is still wrong: the check pollutes the state it depends on.**
+
+`check-boost-live.mjs` drives real flows — it marks a listing sold mid-approval,
+it approves, rejects, pauses and resumes boosts — and it never puts any of it
+back. Run it twice and the second run fails differently from the first:
+
+    run 1   2 failures
+    run 2   4 failures   (`alreadyDecided: true` — the boost was decided last run)
+
+So its result depends on how many times it has been run since the last seed,
+which makes it useless as a gate. The remaining failures are all downstream of
+that: `staff APPROVE puts the boost live` gets `LISTING_STATE_LOCKED /
+alreadyDecided`, and everything asserting on the resulting window, audit row,
+pause and resume fails with it.
+
+The fix is to make each flow restore what it touched — the same treatment
+`check-admin-p6` got in this pass — but that is a rewrite of a verification
+script, not upgrade work, so it is recorded rather than rushed.
+
+**This does not describe a fault in the boost feature.** The application paths
+it exercises answer correctly; it is the script's own leftovers that make the
+second run disagree with the first.

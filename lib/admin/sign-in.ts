@@ -85,7 +85,7 @@ async function alertOnRepeatedFailures(email: string): Promise<void> {
 
 export async function signInAdmin(identity: ProviderIdentity): Promise<SignInResult> {
   const db = createServiceClient();
-  const { ip, device } = requestContext();
+  const { ip, device } = await requestContext();
   const email = identity.email.toLowerCase();
 
   const log = async (success: boolean, reason: string) => {
@@ -129,7 +129,7 @@ export async function signInAdmin(identity: ProviderIdentity): Promise<SignInRes
   // Someone else may already be signed in on this device — the design's
   // "Add another account" path. Park them rather than dropping their session on
   // the floor, so the switch sheet can offer them back.
-  await parkOutgoingAdmin(staff.profile_id, cookies().get(ADMIN_COOKIE.REFRESH)?.value);
+  await parkOutgoingAdmin(staff.profile_id, (await cookies()).get(ADMIN_COOKIE.REFRESH)?.value);
 
   const name = staff.display_name ?? email;
   const access = await signAdminAccess({
@@ -194,7 +194,7 @@ async function adoptAdminRefresh(raw: string): Promise<{ staffId: string } | nul
 
 /** Rotate the pair. Returns false when the refresh token is spent or unknown. */
 export async function refreshAdminSession(): Promise<boolean> {
-  const raw = cookies().get(ADMIN_COOKIE.REFRESH)?.value;
+  const raw = (await cookies()).get(ADMIN_COOKIE.REFRESH)?.value;
   if (!raw) return false;
   return (await adoptAdminRefresh(raw)) !== null;
 }
@@ -217,7 +217,7 @@ export async function switchToParkedAdmin(
 
 /** Close the session server-side, then clear the cookies. Order matters. */
 export async function signOutAdmin(): Promise<void> {
-  const raw = cookies().get(ADMIN_COOKIE.REFRESH)?.value;
+  const raw = (await cookies()).get(ADMIN_COOKIE.REFRESH)?.value;
   const claims = await import("./session").then((m) => m.readAdminClaims());
   if (claims) {
     const db = createServiceClient();

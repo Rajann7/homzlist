@@ -74,6 +74,11 @@ const securityHeaders = [
 
 const nextConfig = {
   reactStrictMode: true,
+  // Next 15 walks up looking for a lockfile to decide what to trace into the
+  // standalone output. A stray package-lock.json in the home directory made it
+  // pick C:\Users\RAJAN as the root, which would trace the wrong tree at deploy
+  // time. Pin it to this project.
+  outputFileTracingRoot: new URL(".", import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1"),
   // Two dev servers on one checkout (e.g. a second Claude session) corrupt each
   // other's webpack cache and can deadlock the compiler. Set NEXT_DIST_DIR to
   // give a secondary server its own build directory.

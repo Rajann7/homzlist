@@ -12,6 +12,7 @@ import { ListingDetail } from "@/components/listings/ListingDetail";
  */
 export const dynamic = "force-dynamic";
 
-export default function Page({ params }: { params: { id: string } }) {
-  return <ListingDetail id={params.id} />;
+export default async function Page(props: { params: Promise<{ id: string }> }) {
+ const params = await props.params;
+ return <ListingDetail id={params.id} />;
 }

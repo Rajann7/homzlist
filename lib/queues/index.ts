@@ -29,7 +29,6 @@ const defaultJobOptions: JobsOptions = {
 
 // Singletons (avoid duplicate queues under hot-reload).
 declare global {
-  // eslint-disable-next-line no-var
   var __homzlistQueues: Record<string, Queue> | undefined;
 }
 

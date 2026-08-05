@@ -10,8 +10,8 @@ type CookieToSet = { name: string; value: string; options?: CookieOptions };
  * RLS applies as that user. Cookies are subdomain-scoped for session isolation
  * (Doc6 §4 / Doc9 §2).
  */
-export function createClient() {
-  const cookieStore = cookies();
+export async function createClient() {
+  const cookieStore = await cookies();
   const { cookieDomain } = serverEnv();
   const isProd = process.env.NODE_ENV === "production";
 

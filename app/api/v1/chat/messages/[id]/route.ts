@@ -12,7 +12,8 @@ import { createServiceClient } from "@/lib/supabase/server";
  */
 export const dynamic = "force-dynamic";
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const auth = await requireActive();
   if ("error" in auth) return fail(auth.error);
   if (!UUID_RE.test(params.id)) return fail("NOT_FOUND");
@@ -24,7 +25,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   return res.ok ? ok({ reactions: res.reactions }) : fail("VALIDATION_ERROR");
 }
 
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const auth = await requireActive();
   if ("error" in auth) return fail(auth.error);
   if (!UUID_RE.test(params.id)) return fail("NOT_FOUND");
@@ -33,7 +35,8 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
   return res.ok ? ok({ deleted: true, scope }) : fail("NOT_FOUND");
 }
 
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const auth = await requireActive();
   if ("error" in auth) return fail(auth.error);
   if (!UUID_RE.test(params.id)) return fail("NOT_FOUND");

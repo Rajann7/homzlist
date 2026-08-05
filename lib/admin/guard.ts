@@ -102,8 +102,8 @@ export async function requireAdmin(min: AdminRole): Promise<AdminIdentity> {
 }
 
 /** Request metadata every audit row carries. */
-export function requestContext(): { ip: string | null; device: string | null } {
-  const h = headers();
+export async function requestContext(): Promise<{ ip: string | null; device: string | null }> {
+  const h = await headers();
   const fwd = h.get("x-forwarded-for");
   return {
     ip: fwd ? fwd.split(",")[0].trim() : (h.get("x-real-ip") ?? null),

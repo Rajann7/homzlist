@@ -22,11 +22,13 @@ import { getProfileById } from "@/lib/profile/service";
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
 
-export function generateMetadata({ params }: { params: { username: string } }): Metadata {
+export async function generateMetadata(props: { params: Promise<{ username: string }> }): Promise<Metadata> {
+  const params = await props.params;
   return { title: `@${params.username}` };
 }
 
-export default async function SellerOtherProfilePage({ params }: { params: { username: string } }) {
+export default async function SellerOtherProfilePage(props: { params: Promise<{ username: string }> }) {
+  const params = await props.params;
   const claims = await getCurrentUser();
   if (claims) {
     const me = await getProfileById(claims.sub);

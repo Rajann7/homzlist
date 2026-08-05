@@ -404,10 +404,21 @@ for (const s of sellers) {
 // ---------------------------------------------------------------------------
 console.log("\n── BUILDER · proposal path ──");
 {
+  // Sending a proposal COSTS quota, and this walk used to pick any builder with
+  // a live project — including one with no active plan at all, whose balance is
+  // therefore 0. That builder gets NEED_TOPUP and the whole proposal section
+  // fails for a reason that has nothing to do with the code under test.
+  //
+  // Mirror the server's own rule (lib/listings/proposals.ts, proposalBalance):
+  // an ACTIVE plan row, either unlimited (quota < 0) or with quota left.
   const { rows: [builder] } = await db.query(`
     select p.id, p.name, p.phone from profiles p
      where p.role='builder' and p.state='active' and p.name is not null and p.city_id is not null
        and exists (select 1 from projects pr where pr.profile_id=p.id and pr.status='live')
+       and exists (
+         select 1 from user_plans up
+          where up.profile_id = p.id and up.status = 'active'
+            and (up.proposal_quota < 0 or up.proposal_quota > up.proposal_used))
      limit 1`);
   // The builder proposes on someone ELSE's live requirement.
   const { rows: [req] } = await db.query(`
@@ -494,6 +505,15 @@ console.log("\n── BUILDER · proposal path ──");
       const linked = (bl.json?.data?.leads ?? []).find((l) => l.source === "proposal");
       check("requirement lead links to its chat thread", !!linked?.threadId, `threadId=${linked?.threadId ?? "null"} label=${linked?.sourceLabel}`);
     }
+
+    // Give the quota back. The rows this walk created are deleted at the top of
+    // the next run, but `proposal_used` was never rolled back — so on a finite
+    // plan every run burned one proposal permanently and the walk eventually
+    // failed with NEED_TOPUP on a builder that had been fine the run before.
+    await db.query(
+      `update user_plans set proposal_used = greatest(0, proposal_used - 1)
+        where profile_id = $1 and status = 'active' and proposal_quota >= 0`,
+      [builder.id]);
 
     // Project leads must be filed as their own family, not as 'inquiry'.
     const { rows: projLeads } = await db.query(`select source, count(*)::int n from leads where project_id is not null group by source`);

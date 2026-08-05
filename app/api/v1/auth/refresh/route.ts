@@ -12,7 +12,7 @@ import { getProfileById } from "@/lib/auth/service";
 export const dynamic = "force-dynamic";
 
 export async function POST(_req: NextRequest) {
-  const rt = cookies().get(COOKIE.REFRESH)?.value;
+  const rt = (await cookies()).get(COOKIE.REFRESH)?.value;
   if (!rt) return fail("UNAUTHORIZED");
 
   const rotated = await rotateRefreshSession(rt);

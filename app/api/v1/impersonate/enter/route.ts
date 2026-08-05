@@ -53,7 +53,7 @@ export async function GET(req: NextRequest) {
     imp: claim.sessionId,
   });
 
-  const jar = cookies();
+  const jar = await cookies();
   const secure = url.protocol === "https:";
   jar.set(COOKIE.ACCESS, access, {
     httpOnly: true,

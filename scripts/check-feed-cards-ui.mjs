@@ -14,6 +14,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import pg from "pg";
 import { launchChrome, Session, sleep } from "./lib/cdp.mjs";
+import { connect as dbConnect } from "./lib/dbx.mjs";
 
 const PORT = process.env.PORT ?? "3000";
 /**
@@ -38,11 +39,10 @@ for (const l of fs.readFileSync(path.join(ROOT, ".env.local"), "utf8").split(/\r
 }
 // A POOL, not a single client: the walk is minutes long and an idle Postgres
 // connection gets dropped mid-run — the pool just opens another one.
-const pgc = new pg.Pool({
-  host: `db.${E.SUPABASE_PROJECT_REF}.supabase.co`, port: 5432, user: "postgres",
-  password: E.SUPABASE_DB_PASSWORD, database: "postgres", ssl: { rejectUnauthorized: false },
-  keepAlive: true, idleTimeoutMillis: 0, max: 2,
-});
+// The DIRECT host drops out often enough — DNS, and an IPv6 route that goes
+// dark — that a one-host client turns a run into a false failure. dbx.mjs walks
+// the ladder q.mjs and db-proof.mjs already use: direct, then the poolers.
+const pgc = await dbConnect();
 pgc.on("error", () => { /* a dropped idle connection is not a test failure */ });
 
 /**

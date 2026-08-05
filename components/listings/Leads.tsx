@@ -260,7 +260,13 @@ function LeadCard({ l, onMessage, onMove, onMore, onOpenProperty }: {
 function MoveStageSheet({ lead, onClose, onDone }: { lead: LeadView | null; onClose: () => void; onDone: (stage: LeadView["stage"], note: string | null) => void }) {
   const [stage, setStage] = useState<LeadView["stage"]>("new");
   const [note, setNote] = useState("");
-  useEffect(() => { if (lead) { setStage(lead.stage); setNote(""); } }, [lead]);
+  // Reset for whichever lead the sheet was opened on, during render — an effect
+  // here paints the previous lead's stage for a frame first.
+  const [prevLead, setPrevLead] = useState(lead);
+  if (lead !== prevLead) {
+    setPrevLead(lead);
+    if (lead) { setStage(lead.stage); setNote(""); }
+  }
 
   return (
     <BottomSheet open={Boolean(lead)} onClose={onClose} title="Move stage">
@@ -282,7 +288,11 @@ function MoveStageSheet({ lead, onClose, onDone }: { lead: LeadView | null; onCl
 
 function NoteSheet({ lead, onClose, onDone }: { lead: LeadView | null; onClose: () => void; onDone: (text: string) => void }) {
   const [text, setText] = useState("");
-  useEffect(() => { if (lead) setText(""); }, [lead]);
+  const [prevLead, setPrevLead] = useState(lead);
+  if (lead !== prevLead) {
+    setPrevLead(lead);
+    if (lead) setText("");
+  }
   return (
     <BottomSheet open={Boolean(lead)} onClose={onClose} title="Add note">
       <div className="flex flex-col gap-3 pb-2">

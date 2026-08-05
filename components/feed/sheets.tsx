@@ -249,7 +249,17 @@ export function LoginSheet({ open, onClose }: { open: boolean; onClose: () => vo
       <div className="flex flex-col items-center gap-4 py-4">
         <span className="text-20 font-bold"><span className="text-ink-primary">Homz</span><span className="text-accent">List</span></span>
         <p className="text-center text-15 text-ink-secondary">Sign in to continue — save properties, send inquiries and chat securely.</p>
-        <Button fullWidth onClick={() => { location.href = "/login"; }}>Continue with phone</Button>
+        {/* Signing in changes who the session belongs to, so this has to be a
+            real page load — router.push() would keep the guest render tree. */}
+        <Button
+          fullWidth
+          onClick={() => {
+            // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- see above
+            location.href = "/login";
+          }}
+        >
+          Continue with phone
+        </Button>
       </div>
     </BottomSheet>
   );
