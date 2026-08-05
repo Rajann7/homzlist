@@ -56,11 +56,22 @@ export function SearchResults({ basePath = "", isGuest = false }: { basePath?: s
   const filters: SearchFilters = useMemo(() => queryToFilters(new URLSearchParams(sp?.toString() ?? "")), [sp]);
   const qs = useMemo(() => filtersToQuery(filters), [filters]);
 
-  const [tab, setTab] = useState<SearchTab>("all");
+  // `?tab=` decides which tab opens. The feed's rails link here ("View all" on
+  // Projects / Top Builders / Top Brokers), and without this every one of them
+  // landed on the Properties tab — a link that promised projects and showed
+  // flats. Still local state after mount: tapping a tab must not push history.
+  const [tab, setTab] = useState<SearchTab>(() => {
+    const t = sp?.get("tab");
+    return TABS.some((x) => x.key === t) ? (t as SearchTab) : "all";
+  });
   const [sort, setSort] = useState<SearchSort>("latest");
 
   const [props, setProps] = useState<PropertySearchResponse | null>(null);
   const [projects, setProjects] = useState<CardData[] | null>(null);
+  /** The Projects tab paginates too — a feed rail's "View all 48" has to reach 48. */
+  const [projectsCursor, setProjectsCursor] = useState<string | null>(null);
+  /** How many projects MATCH — the header counts the set, not the page. */
+  const [projectsTotal, setProjectsTotal] = useState(0);
   const [brokers, setBrokers] = useState<BrokerResult[] | null>(null);
   const [areas, setAreas] = useState<AreaResult[] | null>(null);
   const [loading, setLoading] = useState(true);
@@ -81,7 +92,8 @@ export function SearchResults({ basePath = "", isGuest = false }: { basePath?: s
       else setOffline(r.error.code === "OFFLINE");
     } else if (tab === "projects") {
       const r = await searchApi.projects(qs);
-      if (r.ok) { setProjects(r.data.items); setOffline(false); } else setOffline(r.error.code === "OFFLINE");
+      if (r.ok) { setProjects(r.data.items); setProjectsCursor(r.data.nextCursor ?? null); setProjectsTotal(r.data.total); setOffline(false); }
+      else setOffline(r.error.code === "OFFLINE");
     } else if (tab === "brokers") {
       const r = await searchApi.brokers(qs);
       if (r.ok) { setBrokers(r.data.items); setOffline(false); } else setOffline(r.error.code === "OFFLINE");
@@ -100,6 +112,16 @@ export function SearchResults({ basePath = "", isGuest = false }: { basePath?: s
       router.replace(path(`/search/coming-soon?city=${encodeURIComponent(props.comingSoonCity)}`));
     }
   }, [props?.comingSoonCity]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const loadMoreProjects = async () => {
+    if (!projectsCursor || loadingMore) return;
+    setLoadingMore(true);
+    const r = await searchApi.projects(qs, projectsCursor);
+    setLoadingMore(false);
+    if (!r.ok) return;
+    setProjects((prev) => [...(prev ?? []), ...r.data.items]);
+    setProjectsCursor(r.data.nextCursor ?? null);
+  };
 
   const loadMore = async () => {
     if (!props?.nextCursor || loadingMore) return;
@@ -202,7 +224,7 @@ export function SearchResults({ basePath = "", isGuest = false }: { basePath?: s
     >
       {/* count + sort */}
       <div className="flex items-center justify-between bg-page px-4 py-2.5">
-        <span className="text-13 text-ink-tertiary">{countLine(tab, props, projects, brokers, areas, loading)}</span>
+        <span className="text-13 text-ink-tertiary">{countLine(tab, props, projects, brokers, areas, loading, projectsTotal)}</span>
         {(tab === "all" || tab === "properties") && (
           <button
             onClick={() => setSheet("sort")}
@@ -285,6 +307,16 @@ export function SearchResults({ basePath = "", isGuest = false }: { basePath?: s
             />
           ))}
 
+          {tab === "projects" && projectsCursor && (
+            <button
+              onClick={loadMoreProjects}
+              disabled={loadingMore}
+              className="mx-4 mt-4 grid h-11 w-[calc(100%-2rem)] place-items-center rounded-8 border border-border bg-surface-1 text-15 font-semibold text-ink-primary disabled:opacity-60"
+            >
+              {loadingMore ? "Loading…" : "Show more"}
+            </button>
+          )}
+
           {tab === "brokers" && brokers?.map((b) => (
             <Link
               key={b.id}
@@ -353,9 +385,14 @@ function countLine(
   brokers: BrokerResult[] | null,
   areas: AreaResult[] | null,
   loading: boolean,
+  /** Matches, not the loaded page — the tab paginates now. */
+  projectsTotal = 0,
 ): string {
   if (loading) return "Searching…";
-  if (tab === "projects") return `${projects?.length ?? 0} project${projects?.length === 1 ? "" : "s"}`;
+  if (tab === "projects") {
+    const n = projectsTotal || projects?.length || 0;
+    return `${n} project${n === 1 ? "" : "s"}`;
+  }
   if (tab === "brokers") return `${brokers?.length ?? 0} seller${brokers?.length === 1 ? "" : "s"}`;
   if (tab === "areas") return `${areas?.length ?? 0} area${areas?.length === 1 ? "" : "s"}`;
   const n = props?.total ?? 0;

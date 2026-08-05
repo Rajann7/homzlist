@@ -437,7 +437,12 @@ async function boostedSet(ids: string[], viewer: ViewerScope): Promise<Set<strin
 // Projects tab
 // ---------------------------------------------------------------------------
 
-export async function searchProjects(f: SearchFilters, viewerId: string | null, limit = 12): Promise<{ items: FeedCard[]; total: number }> {
+export async function searchProjects(
+  f: SearchFilters,
+  viewerId: string | null,
+  limit = 12,
+  cursor: string | null = null,
+): Promise<{ items: FeedCard[]; total: number; nextCursor: string | null }> {
   const parsed = await parseQuery(f.q ?? "", { cityId: f.cityId });
   const cityId = f.cityId ?? parsed.cityId;
   const areaIds = [...new Set([...(f.areas ?? []), ...parsed.areaIds])];
@@ -453,10 +458,17 @@ export async function searchProjects(f: SearchFilters, viewerId: string | null, 
   if (areaIds.length) q = q.in("area_id", areaIds);
   if (viewerId) q = q.neq("profile_id", viewerId);
   if (parsed.text) q = q.ilike("name", `%${parsed.text}%`);
+  // Scheme type — what a "Plotting schemes" rail's View all carries over, so
+  // the results page shows the same set the rail was showing.
+  if (f.ptypes?.length) q = q.in("project_type", f.ptypes);
+  // Keyed off the same column the order uses, so pages stay consistent — and so
+  // "View all" on a feed rail can actually reach all 48 projects instead of the
+  // first 12 under a header that counted 48.
+  if (cursor) q = q.lt("live_at", cursor);
 
   const { data, count } = await q;
   const rows = ((data ?? []) as any[]);
-  if (!rows.length) return { items: [], total: count ?? 0 };
+  if (!rows.length) return { items: [], total: count ?? 0, nextCursor: null };
 
   const posterIds = [...new Set(rows.map((r) => r.profile_id))];
   const [{ data: profs }, { data: vers }, extras] = await Promise.all([
@@ -491,7 +503,12 @@ export async function searchProjects(f: SearchFilters, viewerId: string | null, 
       contactNumber: viewerId && r.profile_id !== viewerId ? (p.phone ?? null) : null,
     };
   });
-  return { items, total: count ?? items.length };
+  const last = rows[rows.length - 1];
+  return {
+    items,
+    total: count ?? items.length,
+    nextCursor: rows.length === limit ? (last.live_at ?? last.created_at) : null,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -502,13 +519,25 @@ export async function searchBrokers(f: SearchFilters, viewerId: string | null, l
   const parsed = await parseQuery(f.q ?? "", { cityId: f.cityId });
   const cityId = f.cityId ?? parsed.cityId;
 
+  // `roles` narrows the same query to one role — what the feed's Top Builders
+  // and Top Brokers rails ask for. Unset = the search tab's three roles, so the
+  // Brokers & Builders tab is unchanged.
+  const ROLES = ["broker", "builder", "owner"];
+  const roles = f.roles?.filter((r) => ROLES.includes(r));
+
   let q = db().from("profiles")
     .select("id,name,username,role,photo_url,city_id,response_label", { count: "exact" })
-    .in("role", ["broker", "builder", "owner"])
+    .in("role", roles?.length ? roles : ROLES)
     // Suspended/banned accounts must not surface in search (Doc2 §11 "Suspended
     // → unavailable"), and `state` is where that lives.
     .eq("state", "active")
-    .limit(limit);
+    // NOT `.limit(limit)`. Whether a seller belongs in the result is decided
+    // AFTER this query — by their live listing/project count — and so is the
+    // order. Cutting to `limit` here meant "the top 20 of an arbitrary 20": the
+    // feed's Top Builders rail said 21 builders and this tab showed 11, because
+    // the two asked for different-sized slices of the same set. Scan the city,
+    // then rank, then cut (below).
+    .limit(SELLER_SCAN);
   if (parsed.text) q = q.ilike("name", `%${parsed.text}%`);
   if (cityId) q = q.eq("city_id", cityId);
   if (viewerId) q = q.neq("id", viewerId);
@@ -546,8 +575,16 @@ export async function searchBrokers(f: SearchFilters, viewerId: string | null, l
     .filter((b) => b.listingCount > 0)
     .sort((a, b) => b.listingCount - a.listingCount);
 
-  return { items, total: items.length };
+  // `total` is how many qualify, `items` is the page — so a rail's "21
+  // builders" and this tab's header are the same number.
+  return { items: items.slice(0, limit), total: items.length };
 }
+
+/**
+ * How many seller profiles to examine before ranking them. A city's broker +
+ * builder + owner population, not a page size — see the comment on the query.
+ */
+const SELLER_SCAN = 200;
 
 async function listingCountsFor(profileIds: string[]): Promise<Map<string, number>> {
   const map = new Map<string, number>();

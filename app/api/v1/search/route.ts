@@ -48,11 +48,15 @@ export async function GET(req: NextRequest) {
     }
 
     if (tab === "projects") {
-      const r = await searchProjects(filters, viewerId);
+      const r = await searchProjects(filters, viewerId, 12, url.searchParams.get("cursor"));
       return ok({ tab, ...r, filterCount: activeFilterCount(filters) });
     }
     if (tab === "brokers") {
-      const r = await searchBrokers(filters, viewerId);
+      // The tab has no "load more", so the page size has to cover a city's
+      // sellers rather than a screen's worth — otherwise the header ("21
+      // sellers") counts rows the list never shows. Beyond 100 it would still
+      // truncate; recorded in docs/PENDING-INTEGRATIONS.md.
+      const r = await searchBrokers(filters, viewerId, 100);
       return ok({ tab, ...r, filterCount: activeFilterCount(filters) });
     }
     if (tab === "areas") {

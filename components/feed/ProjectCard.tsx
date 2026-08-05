@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { FactsStrip, MetaChip, OverlayChip } from "./cardChrome";
 import type { FeedCard as Card } from "@/lib/feed/client";
+import { cn } from "@/lib/utils";
 
 /**
  * The PROJECT card in the home feed.
@@ -22,7 +23,7 @@ import type { FeedCard as Card } from "@/lib/feed/client";
  * area) and the RERA pair.
  */
 export function ProjectCard({
-  card, onOpen, onOpenPoster, onContact, onMore,
+  card, onOpen, onOpenPoster, onContact, onMore, chrome = "feed",
 }: {
   card: Card;
   onOpen: () => void;
@@ -30,6 +31,8 @@ export function ProjectCard({
   /** Call / WhatsApp — records a real lead for the builder (migration 0051). */
   onContact: (channel: "call" | "whatsapp") => void;
   onMore: () => void;
+  /** "rail" mounts the same card inside a P2 carousel — see FeedCard. */
+  chrome?: "feed" | "rail";
 }) {
   const units = card.unitTypes ?? [];
   const shownUnits = units.slice(0, 3);
@@ -38,8 +41,15 @@ export function ProjectCard({
     ...(card.facts ?? []),
   ].slice(0, 4);
 
+  const rail = chrome === "rail";
+
   return (
-    <article className="border-b border-divider bg-surface-1 pb-3">
+    <article
+      className={cn(
+        "bg-surface-1 pb-3",
+        rail ? "flex h-full flex-col overflow-hidden rounded-8 border border-border" : "border-b border-divider",
+      )}
+    >
       {/* ---- Cover — the feed's existing 16/9, unchanged ---- */}
       <button type="button" onClick={onOpen} className="relative block w-full" aria-label={`Open ${card.title ?? "project"}`}>
         <div className="aspect-[16/9] w-full overflow-hidden">
@@ -73,7 +83,7 @@ export function ProjectCard({
       </button>
 
       {/* ---- Body ---- */}
-      <div className="flex flex-col gap-2 px-4 pt-3">
+      <div className={cn("flex flex-col gap-2 px-4 pt-3", rail && "flex-1")}>
         <button type="button" onClick={onOpen} className="flex w-full flex-col gap-2 text-left">
           {/* Name + RERA */}
           <span className="flex w-full items-start gap-2">
@@ -104,7 +114,7 @@ export function ProjectCard({
             </span>
           )}
 
-          <FactsStrip facts={facts} />
+          <FactsStrip facts={facts} compact={rail} />
 
           <span className="flex items-center gap-1 text-13 text-ink-tertiary">
             <Icon name="pin" size={14} /> {card.areaLabel ?? "Rajkot"}
@@ -131,7 +141,7 @@ export function ProjectCard({
             `saves` is keyed to listings, so a project has never been savable and
             the old heart silently persisted nothing. Call and WhatsApp write a
             real lead; the primary opens the project. */}
-        <div className="mt-1 flex items-center gap-2">
+        <div className={cn("flex items-center gap-2", rail ? "mt-auto pt-1" : "mt-1")}>
           {card.isOwn ? (
             <Button variant="outline" className="h-10 flex-1 text-13" onClick={onOpen}>View Project</Button>
           ) : (

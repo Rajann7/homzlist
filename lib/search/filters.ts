@@ -136,7 +136,7 @@ export async function bucketRange(fieldKey: string, label: string): Promise<{ mi
 // searches, so a shared link reproduces the exact same result set.
 // ---------------------------------------------------------------------------
 
-const LIST_KEYS = ["types", "areas", "amenities"] as const;
+const LIST_KEYS = ["types", "ptypes", "roles", "areas", "amenities"] as const;
 const BOOL_KEYS = ["negotiableOnly", "readyToMove", "newConstruction", "verifiedOnly"] as const;
 
 export function filtersToParams(f: SearchFilters): URLSearchParams {
@@ -184,6 +184,8 @@ export function paramsToFilters(p: URLSearchParams): SearchFilters {
     intent: intent === "sell" || intent === "rent" ? intent : undefined,
     cityId: p.get("city") || undefined,
     types: list("types")?.slice(0, 20),
+    ptypes: list("ptypes")?.slice(0, 20),
+    roles: list("roles")?.slice(0, 4),
     areas: list("areas")?.slice(0, 30),
     amenities: list("amenities")?.slice(0, 30),
     budgetMin: num("bmin"),

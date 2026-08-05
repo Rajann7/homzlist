@@ -55,7 +55,33 @@ export interface StorySegment {
 }
 export interface StoryCircle { posterId: string; posterName: string; posterUsername: string | null; posterAvatar: string | null; verified: boolean; ring: "unseen" | "seen" | "project" | "boosted"; boosted: boolean; isProject: boolean; segments: StorySegment[]; }
 
+/** One rail on the carousel feed — see lib/feed/sections.ts. */
+export interface FeedSectionMeta {
+  key: string;
+  kind: "projects" | "builders" | "brokers" | "property_type" | "project_type";
+  title: string;
+  subtitle: string;
+  total: number;
+  viewAll: string;
+}
+/** A seller on a Top Builders / Top Brokers rail (search's BrokerResult). */
+export interface FeedPerson {
+  id: string; name: string; username: string | null; role: string | null;
+  verified: boolean; avatarUrl: string | null; stats: string; listingCount: number;
+}
+export interface FeedSectionPage { items: FeedCard[]; people: FeedPerson[]; nextCursor: string | null }
+
 export const feedApi = {
+  /** The rails to draw, in order. Metadata only — each rail loads its own cards. */
+  sections: (filter?: string) =>
+    req<{ sections: FeedSectionMeta[] }>(`/feed/sections${filter && filter !== "all" ? `?filter=${filter}` : ""}`),
+  section: (key: string, opts: { filter?: string; sort?: string; cursor?: string | null } = {}) =>
+    req<FeedSectionPage>(`/feed/section?${new URLSearchParams({
+      key,
+      ...(opts.filter ? { filter: opts.filter } : {}),
+      ...(opts.sort ? { sort: opts.sort } : {}),
+      ...(opts.cursor ? { cursor: opts.cursor } : {}),
+    }).toString()}`),
   list: (opts: { filter?: string; sort?: string; cursor?: string | null } = {}) =>
     req<FeedResult>(`/feed?${new URLSearchParams({ ...(opts.filter ? { filter: opts.filter } : {}), ...(opts.sort ? { sort: opts.sort } : {}), ...(opts.cursor ? { cursor: opts.cursor } : {}) }).toString()}`),
   builderDashboard: () =>

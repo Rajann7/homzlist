@@ -64,7 +64,16 @@ export function MetaChip({ children, tone, className }: { children: React.ReactN
  * The facts strip. Server-built: it only ever receives values the row actually
  * stored, so an empty strip means an empty listing, never a missing query.
  */
-export function FactsStrip({ facts }: { facts: { label: string; value: string }[] }) {
+export function FactsStrip({ facts, compact = false }: {
+  facts: { label: string; value: string }[];
+  /**
+   * The card is in a carousel rail, so the strip is ~70px per column instead of
+   * ~85px. At that width "Unfurnished" broke mid-word ("Unfurnishe/d"), so the
+   * size ladder shifts one step down here. Rail-only: the full-width card keeps
+   * exactly the sizes it was designed with.
+   */
+  compact?: boolean;
+}) {
   if (!facts.length) return null;
   return (
     <span className="flex w-full items-stretch gap-0.5 rounded-8 bg-surface-2 px-1 py-2.5">
@@ -73,7 +82,10 @@ export function FactsStrip({ facts }: { facts: { label: string; value: string }[
           {/* A long value drops a size instead of being clipped — a 4-column
               strip at 375px cut "Unfurnished" to "Unfurnish…". Never truncated:
               a half-shown fact is worse than a slightly smaller one. */}
-          <span className={cn("block break-words font-semibold leading-[1.15] text-ink-primary", f.value.length > 9 ? "text-13" : "text-15")}>{f.value}</span>
+          <span className={cn(
+            "block break-words font-semibold leading-[1.15] text-ink-primary",
+            f.value.length > 9 ? (compact ? "text-11" : "text-13") : (compact ? "text-13" : "text-15"),
+          )}>{f.value}</span>
           <span className="mt-[3px] block break-words text-11 leading-[1.2] text-ink-tertiary">{f.label}</span>
         </span>
       ))}

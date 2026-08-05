@@ -6,6 +6,7 @@ import { AppShell, Button, Header, Icon, Skeleton } from "@/components/billing/u
 import { BackButton } from "@/components/billing/primitives";
 import { ConfirmDialog } from "@/components/ui/Dialog";
 import { listingsApi } from "@/lib/listings/client";
+import { TYPE_ICON } from "@/lib/listings/type-icon";
 import { cn } from "@/lib/utils";
 
 /**
@@ -148,25 +149,6 @@ export function PostType({ entitlements }: { entitlements?: Entitlements }) {
     </AppShell>
   );
 }
-
-// Per-type icon (Doc1 component gallery / designs/P5 S3) — decorative mapping
-// keyed to the fixed set of type codes, not business data, so it's safe to
-// keep client-side even though the type LIST itself comes from server config.
-const TYPE_ICON: Record<string, Parameters<typeof Icon>[0]["name"]> = {
-  flat: "type-flat",
-  bungalow: "type-bungalow",
-  tenement: "type-tenement",
-  farmhouse: "type-farmhouse",
-  office: "type-office",
-  shop: "type-shop",
-  showroom: "type-showroom",
-  godown: "type-godown",
-  plot_res: "type-plot-res",
-  plot_com: "type-plot-com",
-  plot_agri: "type-plot-agri",
-  plot_farm: "type-plot-farm",
-  pg: "type-pg",
-};
 
 /**
  * P5 S3 — Property type picker: flat category sections over a 3-up icon grid,

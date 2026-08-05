@@ -4094,3 +4094,38 @@ script, not upgrade work, so it is recorded rather than rushed.
 **This does not describe a fault in the boost feature.** The application paths
 it exercises answer correctly; it is the script's own leftovers that make the
 second run disagree with the first.
+
+---
+
+## Carousel home feed (5 Aug 2026) — found while building it
+
+**1. Brokers & Builders tab has no pagination.**
+The tab's page size is now 100 (it was 20, applied *before* the "has live
+inventory" filter — so a "21 builders" rail linked to a screen that listed 11).
+The count and the list agree today, but a city with more than 100 active sellers
+would show 100 under a header counting all of them. The Projects tab got a real
+`Show more` in this pass; the sellers tab still needs one.
+
+**2. A guest's city is not sent to the server.**
+`FeedHome` stores a guest's chosen city in `localStorage` (UI-only preference,
+no profile to hold it) and re-fetches — but `/api/v1/feed`, `/feed/sections` and
+`/feed/section` all resolve the city from `profiles.city_id`, which a guest does
+not have. So a signed-out visitor who picks "Rajkot" still gets the un-scoped
+feed. This predates the carousel change (the old vertical feed had it too); the
+fix is a `?city=` parameter validated server-side against `locations`, not
+trusting it for anything but scope.
+
+**3. `ptypes` / `roles` filters are not in the filter sheet.**
+The rails' "View all" links carry `ptypes=<scheme type>` and `roles=builder|broker`
+so the results page shows exactly what the rail showed. Both are parsed and
+enforced server-side, but the P3 filter sheet has no chip for either, so they
+can only be cleared with "Clear filters" (which does drop them). They are
+deliberately left out of `activeFilterCount` — a badge for a chip that isn't in
+the sheet would be worse than no badge.
+
+**4. Scheme-type → property-type pairing has no admin screen yet.**
+`project_types.property_type_codes` (migration 0123) decides which rail a scheme
+type appears on. It is real data and editable by SQL, but the P14 master-data
+screens do not expose the column, so changing the pairing today means a
+migration. The feed reads it live, so an admin edit would take effect with no
+deploy — only the UI is missing.

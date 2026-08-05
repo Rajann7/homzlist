@@ -22,7 +22,7 @@ import { cn } from "@/lib/utils";
  * Every number and label is server-computed; this renders, it never derives.
  */
 export function FeedCard({
-  card, onOpen, onOpenPoster, onSave, onInquiry, onMore,
+  card, onOpen, onOpenPoster, onSave, onInquiry, onMore, chrome = "feed",
 }: {
   card: Card;
   onOpen: () => void;
@@ -31,6 +31,13 @@ export function FeedCard({
   onSave: () => void;
   onInquiry: () => void;
   onMore: () => void;
+  /**
+   * Where the card is mounted. "feed" = the full-bleed row it has always been.
+   * "rail" = inside a carousel (P2 rails): a bounded box instead of a divider,
+   * and the action bar pinned to the bottom so neighbouring cards of different
+   * heights still line their buttons up. Nothing INSIDE the card changes.
+   */
+  chrome?: "feed" | "rail";
 }) {
   const photos = card.photos.length ? card.photos : card.coverUrl ? [card.coverUrl] : [];
   const [idx, setIdx] = useState(0);
@@ -68,8 +75,15 @@ export function FeedCard({
     lastTap.current = now;
   };
 
+  const rail = chrome === "rail";
+
   return (
-    <article className="border-b border-divider bg-surface-1 pb-3">
+    <article
+      className={cn(
+        "bg-surface-1 pb-3",
+        rail ? "flex h-full flex-col overflow-hidden rounded-8 border border-border" : "border-b border-divider",
+      )}
+    >
       {/* ---- Photo / carousel ---- */}
       <div className="relative">
         <div
@@ -135,7 +149,7 @@ export function FeedCard({
       </div>
 
       {/* ---- Body ---- */}
-      <div className="flex flex-col gap-2 px-4 pt-3">
+      <div className={cn("flex flex-col gap-2 px-4 pt-3", rail && "flex-1")}>
         {/* The whole info block opens the detail — not just the "View Property"
             button it used to be. One <button> wrapping the text keeps it
             keyboard-reachable instead of an onClick on a bare <div>. */}
@@ -158,7 +172,7 @@ export function FeedCard({
             </span>
           )}
 
-          <FactsStrip facts={card.facts ?? []} />
+          <FactsStrip facts={card.facts ?? []} compact={rail} />
 
           <span className="flex items-center gap-1 text-13 text-ink-tertiary">
             <Icon name="pin" size={14} /> {card.areaLabel ?? "Rajkot"}
@@ -183,7 +197,7 @@ export function FeedCard({
         </div>
 
         {/* action bar */}
-        <div className="mt-1 flex items-center gap-2">
+        <div className={cn("flex items-center gap-2", rail ? "mt-auto pt-1" : "mt-1")}>
           {/* Your own post carries no wishlist heart — it is already yours, and
               the server refuses a self-save anyway. */}
           {card.isOwn ? (

@@ -19,6 +19,17 @@ export interface SearchFilters {
   intent?: "sell" | "rent";
   /** property_types.code values (DB-driven chips, never a hardcoded list). */
   types?: string[];
+  /**
+   * project_types.code values — the Projects tab's equivalent of `types`.
+   * Carried by the feed's per-scheme-type rails ("Plotting schemes → View
+   * all"), so the results page opens on exactly the set the rail showed.
+   */
+  ptypes?: string[];
+  /**
+   * profiles.role values for the Brokers & Builders tab. The feed's Top
+   * Builders / Top Brokers rails are the same tab narrowed to one role.
+   */
+  roles?: string[];
   /** location ids (areas). Empty → whole city. */
   areas?: string[];
   /** location id (city). Falls back to the viewer's city, then to none. */

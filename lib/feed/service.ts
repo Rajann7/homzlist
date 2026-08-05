@@ -81,14 +81,14 @@ export interface FeedResult {
   sections: { label: string | null; items: FeedCard[] }[];
 }
 
-async function viewerCity(viewerId: string | null): Promise<string | null> {
+export async function viewerCity(viewerId: string | null): Promise<string | null> {
   if (!viewerId) return null;
   const { data } = await db().from("profiles").select("city_id").eq("id", viewerId).maybeSingle();
   return (data as { city_id: string | null } | null)?.city_id ?? null;
 }
 
 
-async function notInterested(viewerId: string | null): Promise<{ types: Set<string>; areas: Set<string> }> {
+export async function notInterested(viewerId: string | null): Promise<{ types: Set<string>; areas: Set<string> }> {
   const types = new Set<string>(); const areas = new Set<string>();
   if (!viewerId) return { types, areas };
   const { data } = await db().from("feed_not_interested").select("type_code, area_id").eq("profile_id", viewerId);
@@ -111,14 +111,90 @@ export const PROJECT_COLS =
   "id,profile_id,name,project_type,build_status,possession_date,towers,floors,total_units,available_units," +
   "attributes,rera_number,rera_exempt,area_label,area_id,city_id,cover_url,created_at,live_at";
 
+/**
+ * Narrowing options used by the carousel rails (lib/feed/sections.ts).
+ *
+ * They exist so a "Flats" rail and the old single feed are the SAME query with
+ * the same ranking, boosts, not-interested rules and card builder — a rail that
+ * built its own query is how a boosted listing would silently stop being
+ * boosted inside one section. Absent → byte-identical behaviour to before.
+ */
+export interface FeedNarrow {
+  /** Restrict the candidate pool to one card kind. */
+  only?: "property" | "project";
+  /** `listings.type_code` — one property-type rail. */
+  typeCode?: string;
+  /** `projects.project_type` — the scheme types that belong on this rail. */
+  projectTypes?: string[];
+  /**
+   * A type rail carries BOTH kinds, in one order (Rajan, 5 Aug 2026):
+   *   boosted (any kind, FIFO) → projects (recency) → properties (recency).
+   * Absent → the mixed feed's original ordering, untouched.
+   */
+  groupOrder?: "project-first";
+}
+
+/**
+ * A `project-first` rail cannot page on a bare timestamp: the same cursor would
+ * have to mean "more projects" on one page and "more properties" on the next.
+ * So the cursor carries which PHASE it is in — `P|<ts>~<id>` while projects are
+ * still coming, `L|<ts>~<id>` once they are exhausted and only listings remain.
+ * Plain feeds get the same `<ts>~<id>` without the phase. A bare timestamp (an
+ * old link, a hand-edited URL) still parses — it just loses the tiebreaker.
+ */
+function parsePhaseCursor(cursor: string | null): { phase: "P" | "L" | null; ts: string | null; id: string | null; boostOffset: number } {
+  if (!cursor) return { phase: null, ts: null, id: null, boostOffset: 0 };
+  const m = /^([PL])\|(.+)$/.exec(cursor);
+  let rest = m ? m[2] : cursor;
+  // `@<n>` — how many boosted subjects have already been handed out. Boosts
+  // paginate by FIFO rank, the rest by timestamp; one cursor carries both.
+  let boostOffset = 0;
+  const at = rest.lastIndexOf("@");
+  if (at !== -1) {
+    const n = Number(rest.slice(at + 1));
+    if (Number.isInteger(n) && n >= 0) { boostOffset = n; rest = rest.slice(0, at); }
+  }
+  const sep = rest.lastIndexOf("~");
+  return {
+    phase: m ? (m[1] as "P" | "L") : null,
+    ts: sep === -1 ? rest : rest.slice(0, sep),
+    id: sep === -1 ? null : rest.slice(sep + 1),
+    boostOffset,
+  };
+}
+
+/** A cursor that means "no constraint — continue from the newest". */
+const NO_CONSTRAINT = "9999-12-31T23:59:59.999Z";
+
+/**
+ * Keyset pagination on (live_at, id).
+ *
+ * `live_at < cursor` alone loses rows: seeded and bulk-published inventory
+ * shares timestamps to the millisecond, and every tie sitting on a page
+ * boundary was silently skipped — the Tenement and Shop rails each came up one
+ * listing short of the count printed above them. The id is the tiebreaker, so a
+ * page boundary can land in the middle of a tie without dropping anything.
+ */
+function applyKeyset<T extends { or: (f: string) => T; lt: (c: string, v: string) => T }>(
+  q: T, ts: string | null, id: string | null,
+): T {
+  if (!ts || ts === NO_CONSTRAINT) return q;
+  if (!id) return q.lt("live_at", ts);
+  return q.or(`live_at.lt."${ts}",and(live_at.eq."${ts}",id.lt."${id}")`);
+}
+
 export async function getFeed(
   viewerId: string | null,
-  opts: { filter?: FeedFilter; sort?: FeedSort; cursor?: string | null; limit?: number },
+  opts: { filter?: FeedFilter; sort?: FeedSort; cursor?: string | null; limit?: number } & FeedNarrow,
 ): Promise<FeedResult> {
   const filter = opts.filter ?? "all";
   const sort = opts.sort ?? "latest";
   const limit = Math.min(opts.limit ?? PAGE, 30);
   const cursor = opts.cursor ?? null;
+  const only = opts.only ?? null;
+  const grouped = opts.groupOrder === "project-first";
+  // A rail's cursor carries its phase; every other caller's is a bare timestamp.
+  const { phase, ts: cursorTs, id: cursorId, boostOffset } = parsePhaseCursor(cursor);
 
   const cityId = await viewerCity(viewerId);
   const hidden = await notInterested(viewerId);
@@ -143,54 +219,79 @@ export async function getFeed(
     .eq("status", "live")
     .eq("availability", "available")
     .order("live_at", { ascending: false })
+    // The tiebreaker the keyset cursor pages on — without it, rows sharing a
+    // live_at come back in an arbitrary order and the cursor cannot be exact.
+    .order("id", { ascending: false })
     .limit(60);
   if (cityId) lq = lq.eq("city_id", cityId);
   if (viewerId) lq = lq.neq("profile_id", viewerId);
   if (filter === "buy") lq = lq.eq("kind", "sell");
   if (filter === "rent") lq = lq.eq("kind", "rent");
-  if (cursor) lq = lq.lt("live_at", cursor);
+  if (opts.typeCode) lq = lq.eq("type_code", opts.typeCode);
+  // In phase "P" the rail is still handing out projects, so no listing has been
+  // shown yet — the listing half starts from the newest, not from the cursor.
+  if (!grouped || phase !== "P") lq = applyKeyset(lq, cursorTs, cursorId);
 
   // ---- project candidates (only in the "all" / unfiltered feed) ----
+  // A project rail asks for projects explicitly, so it is allowed through the
+  // same gate; nothing else changes about when projects appear.
   let projRows: any[] = [];
-  if (filter === "all") {
+  // Phase "L" means the projects ran out on an earlier page — don't re-query them.
+  // `projectTypes: []` is a real answer, not an absent filter: "this type has no
+  // scheme types" (PG / Hostel). Treating an empty array as "no constraint" put
+  // every project in the app inside the PG rail.
+  const wantProjects = only !== "property"
+    && (filter === "all" || only === "project")
+    && !(grouped && phase === "L")
+    && !(opts.projectTypes !== undefined && opts.projectTypes.length === 0);
+  if (wantProjects) {
     let pq = db()
       .from("projects")
       .select(PROJECT_COLS)
       .eq("status", "live")
       .order("live_at", { ascending: false })
+      .order("id", { ascending: false })
       .limit(20);
     if (cityId) pq = pq.eq("city_id", cityId);
     if (viewerId) pq = pq.neq("profile_id", viewerId);
-    if (cursor) pq = pq.lt("live_at", cursor);
+    if (opts.projectTypes?.length) pq = pq.in("project_type", opts.projectTypes);
+    if (!grouped || phase === "P") pq = applyKeyset(pq, cursorTs, cursorId);
     // "Not interested in this area" was applied to listings and silently
     // skipped for projects, so a hidden area kept posting project cards.
     projRows = (((await pq).data ?? []) as any[]).filter((p) => !(p.area_id && hidden.areas.has(p.area_id)));
   }
 
-  const { data: lData } = await lq;
+  // A project-only rail must not pay for a listings query it will discard.
+  const { data: lData } = only === "project" ? { data: [] as any[] } : await lq;
   let listings = ((lData ?? []) as any[]).filter(
     (l) => !hidden.types.has(l.type_code) && !(l.area_id && hidden.areas.has(l.area_id)),
   );
 
   const rank = placements.rank;
 
-  // ---- boosted candidates from OUTSIDE the viewer's city ---------------------
-  // A state- or All-India-targeted boost reaches viewers whose city the subject
-  // isn't in — and the city-scoped queries above can never produce those rows.
-  // Without this fetch, wider targeting was money for nothing: it is what the
-  // buyer paid the same ₹1,499 for.
-  //
-  // Only on the FIRST page: boosts occupy the top slots, and re-injecting them
-  // on every page would repeat the same cards forever.
-  if (!cursor) {
-    const injected = await injectOutOfCity(placements, {
-      cityId, viewerId, filter,
-      haveListingIds: new Set(listings.map((l) => l.id)),
-      haveProjectIds: new Set(projRows.map((p) => p.id)),
-    });
-    listings = [...injected.listings, ...listings];
-    projRows = [...injected.projects, ...projRows];
-  }
+  // ---- the boosted block, fetched by id on EVERY page ------------------------
+  // Boosted rows are a rank-ordered sequence, not part of the recency window
+  // the organic queries page through — see fetchBoostedRows. This also covers
+  // the state / All-India targeted boosts on subjects outside the viewer's
+  // city, which the city-scoped queries above can never produce: without it,
+  // wider targeting was money for nothing.
+  const boostedRows = await fetchBoostedRows(placements, {
+    cityId, viewerId, filter,
+    only, typeCode: opts.typeCode ?? null, projectTypes: opts.projectTypes ?? null,
+    wantProjects,
+  });
+  const boostedIds = new Set([...boostedRows.listings, ...boostedRows.projects].map((r) => r.id));
+  // Keep the two sequences disjoint: a boosted row must be ranked by rank, not
+  // caught a second time by the recency window it also happens to fall inside.
+  // The same not-interested rules apply to a boosted row as to any other.
+  listings = [
+    ...boostedRows.listings.filter((l) => !hidden.types.has(l.type_code) && !(l.area_id && hidden.areas.has(l.area_id))),
+    ...listings.filter((l) => !boostedIds.has(l.id)),
+  ];
+  projRows = [
+    ...boostedRows.projects.filter((p) => !(p.area_id && hidden.areas.has(p.area_id))),
+    ...projRows.filter((p) => !boostedIds.has(p.id)),
+  ];
 
   // Merge listings + projects into one candidate list with a common sort key.
   type Cand = { row: any; kind: "property" | "project"; ts: string; boost: number | null; price: number };
@@ -201,18 +302,71 @@ export async function getFeed(
     ...projRows.map((p) => ({ row: p, kind: "project" as const, ts: p.live_at ?? p.created_at, boost: rank.has(p.id) ? rank.get(p.id)! : null, price: Number.MAX_SAFE_INTEGER })),
   ];
 
-  // Boosted always first (FIFO). The rest by the chosen sort.
-  cands.sort((a, b) => {
-    if (a.boost !== null && b.boost !== null) return a.boost - b.boost;
-    if (a.boost !== null) return -1;
-    if (b.boost !== null) return 1;
+  // ---- boosted rows paginate by RANK, organic rows by timestamp -------------
+  //
+  // These are two different sequences and they cannot share one cursor. A boost
+  // jumps the queue regardless of how old the row is, so a boosted card sitting
+  // at the top of page 1 also satisfies `live_at < cursor` and came back on
+  // page 2 — the same card twice, ten times over a full walk of the feed.
+  //
+  // So the cursor carries how many boosted subjects have already been handed
+  // out (`@<n>`), and the boosted block is sliced by that offset in FIFO order.
+  // Nothing repeats, and a boost that did not fit on page 1 still gets its turn
+  // on page 2 instead of being dropped — it was paid for.
+  const boosted = cands.filter((c) => c.boost !== null).sort((a, b) => (a.boost ?? 0) - (b.boost ?? 0));
+  const organic = cands.filter((c) => c.boost === null);
+
+  organic.sort((a, b) => {
+    // A type rail is one carousel of both kinds: after the boosted cards come
+    // the PROJECTS, then the properties. Only rails ask for this.
+    if (grouped && a.kind !== b.kind) return a.kind === "project" ? -1 : 1;
     if (sort === "price_asc") return a.price - b.price;
     if (sort === "price_desc") return b.price - a.price;
     return b.ts.localeCompare(a.ts); // latest / nearby fallback → recency
   });
 
-  const page = cands.slice(0, limit);
-  const nextCursor = page.length === limit ? page[page.length - 1].ts : null;
+  const boostSlice = boosted.slice(boostOffset);
+  const paged = [...boostSlice, ...organic];
+
+  const page = paged.slice(0, limit);
+  // The cursor is the OLDEST timestamp handed out, not the last one in render
+  // order — with boosts on top, the last card can be newer than one above it,
+  // and a "last card" cursor would have skipped everything in between.
+  //
+  // On a rail it also carries the phase. The page ends in projects → there are
+  // (or may be) more projects, so stay in "P" and measure only the projects
+  // handed out. The page ends in a listing → the projects are exhausted, so
+  // switch to "L" and measure the listings.
+  // How many boosted subjects this page consumed — the next page resumes the
+  // rank sequence from there.
+  const nextBoostOffset = boostOffset + page.filter((c) => c.boost !== null).length;
+  let nextCursor: string | null = null;
+  if (page.length === limit) {
+    // BOOSTED rows are excluded from the measurement. A boost is served out of
+    // date order, so an old boosted card sets a cursor far in the past and every
+    // row between it and the page's real tail is skipped — the Shop rail lost a
+    // listing exactly this way. Later pages drop the boosted ids anyway
+    // (`boostedShown`), so nothing repeats by leaving them out here.
+    // A page that is ALL boost has no timestamp to give: the sentinel means "no
+    // constraint — continue from the newest".
+    const oldestOrganic = (cs: Cand[]) => {
+      const organic = cs.filter((c) => c.boost === null);
+      if (!organic.length) return NO_CONSTRAINT;
+      const last = organic.reduce((min, c) => (c.ts < min.ts || (c.ts === min.ts && c.row.id < min.row.id) ? c : min), organic[0]);
+      return `${last.ts}~${last.row.id}`;
+    };
+    // A page that hands out no organic row of the relevant kind must not move
+    // the timestamp — it carries the one it came in with, so nothing is skipped.
+    const carried = cursorTs ? `${cursorTs}${cursorId ? `~${cursorId}` : ""}` : NO_CONSTRAINT;
+    const advance = (cs: Cand[]) => (cs.some((c) => c.boost === null) ? oldestOrganic(cs) : carried);
+    if (!grouped) {
+      nextCursor = `${advance(page)}@${nextBoostOffset}`;
+    } else {
+      const stillProjects = page[page.length - 1].kind === "project";
+      const kindRows = page.filter((c) => (stillProjects ? c.kind === "project" : c.kind === "property"));
+      nextCursor = `${stillProjects ? "P" : "L"}|${advance(kindRows)}@${nextBoostOffset}`;
+    }
+  }
 
   // Resolve posters, photos, saved flags in bulk for the page.
   const posterIds = [...new Set(page.map((c) => c.row.profile_id))];
@@ -246,26 +400,45 @@ export async function getFeed(
 }
 
 /**
- * Fetch the boosted listings/projects that the city-scoped candidate queries
- * couldn't see (state / All-India targeting), minus anything already in hand.
+ * Fetch every boosted listing/project this viewer is entitled to see, BY ID.
  *
- * Everything the normal query enforces is re-applied here — live, available,
- * not the viewer's own, matching the Buy/Rent filter — so the injection is a
- * widening of REACH, never a way for a boost to bypass a feed rule.
+ * By id, on every page, because the boosted block paginates by FIFO rank rather
+ * than by timestamp: the recency window the organic queries page through can
+ * neither be trusted to contain a boosted row (it may be newer than the cursor)
+ * nor to exclude one (it may be older). Fetching them separately is what makes
+ * "no duplicates, and nothing paid for goes unshown" true at the same time.
+ *
+ * It also covers what the city-scoped queries can never see — a state- or
+ * All-India-targeted boost on a subject outside the viewer's city. Reach is
+ * widened here and nowhere else: everything the normal query enforces (live,
+ * available, not the viewer's own, the Buy/Rent filter, the rail's type) is
+ * re-applied, so a boost can never bypass a feed rule.
  */
-async function injectOutOfCity(
+async function fetchBoostedRows(
   placements: PlacementSet,
   ctx: {
     cityId: string | null;
     viewerId: string | null;
     filter: FeedFilter;
-    haveListingIds: Set<string>;
-    haveProjectIds: Set<string>;
+    /** The rail's narrowing — a boost may widen REACH, never a rail's subject. */
+    only: "property" | "project" | null;
+    typeCode: string | null;
+    projectTypes: string[] | null;
+    /** False once a rail has run out of projects — don't re-inject them. */
+    wantProjects: boolean;
   },
 ): Promise<{ listings: any[]; projects: any[] }> {
-  const listingIds = outOfCityIds(placements, "listing").filter((id) => !ctx.haveListingIds.has(id));
-  const projectIds = outOfCityIds(placements, "project").filter((id) => !ctx.haveProjectIds.has(id));
+  const ofKind = (kind: "listing" | "project") =>
+    placements.all.filter((p) => p.subjectKind === kind).map((p) => p.subjectId);
+  const listingIds = ctx.only === "project" ? [] : ofKind("listing");
+  const projectIds = ctx.wantProjects ? ofKind("project") : [];
   if (!listingIds.length && !projectIds.length) return { listings: [], projects: [] };
+
+  // A boosted subject OUTSIDE the viewer's city is only reachable when the buyer
+  // paid for state / All-India targeting. In-city ones need no such permission.
+  const wide = new Set([...outOfCityIds(placements, "listing"), ...outOfCityIds(placements, "project")]);
+  const inScope = (row: { id: string; city_id: string | null }) =>
+    !ctx.cityId || row.city_id === ctx.cityId || wide.has(row.id);
 
   const tasks: Promise<any>[] = [];
 
@@ -279,22 +452,27 @@ async function injectOutOfCity(
     if (ctx.viewerId) q = q.neq("profile_id", ctx.viewerId);
     if (ctx.filter === "buy") q = q.eq("kind", "sell");
     if (ctx.filter === "rent") q = q.eq("kind", "rent");
+    if (ctx.typeCode) q = q.eq("type_code", ctx.typeCode);
     tasks.push(q);
   } else tasks.push(Promise.resolve({ data: [] }));
 
   // Projects only appear in the unfiltered feed, same as the main query.
-  if (projectIds.length && ctx.filter === "all") {
+  if (projectIds.length) {
     let q = db()
       .from("projects")
       .select(PROJECT_COLS)
       .in("id", projectIds)
       .eq("status", "live");
     if (ctx.viewerId) q = q.neq("profile_id", ctx.viewerId);
+    if (ctx.projectTypes?.length) q = q.in("project_type", ctx.projectTypes);
     tasks.push(q);
   } else tasks.push(Promise.resolve({ data: [] }));
 
   const [lRes, pRes] = await Promise.all(tasks);
-  return { listings: (lRes.data ?? []) as any[], projects: (pRes.data ?? []) as any[] };
+  return {
+    listings: ((lRes.data ?? []) as any[]).filter(inScope),
+    projects: ((pRes.data ?? []) as any[]).filter(inScope),
+  };
 }
 
 async function photosFor(listingIds: string[]): Promise<Map<string, string[]>> {

@@ -52,7 +52,7 @@ export interface PropertySearchResponse {
   comingSoonCity: string | null;
 }
 
-export interface TabResponse<T> { tab: SearchTab; items: T[]; total: number; filterCount: number }
+export interface TabResponse<T> { tab: SearchTab; items: T[]; total: number; filterCount: number; /** Projects tab paginates (same live_at cursor the feed uses); other tabs return null. */ nextCursor?: string | null }
 
 export interface ExploreTile {
   id: string; coverUrl: string | null; photoCount: number; promoted: boolean;
@@ -76,7 +76,7 @@ export type SearchConfigResponse = FilterConfig & {
 export const searchApi = {
   /** The results screen (All / Properties tabs). */
   properties: (qs: string) => req<PropertySearchResponse>(`/search?${qs}`),
-  projects: (qs: string) => req<TabResponse<FeedCard>>(`/search?${qs}&tab=projects`),
+  projects: (qs: string, cursor?: string | null) => req<TabResponse<FeedCard>>(`/search?${qs}&tab=projects${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`),
   brokers: (qs: string) => req<TabResponse<BrokerResult>>(`/search?${qs}&tab=brokers`),
   areas: (qs: string) => req<TabResponse<AreaResult>>(`/search?${qs}&tab=areas`),
 
@@ -123,6 +123,8 @@ export function filtersToQuery(f: SearchFilters): string {
   if (f.intent) p.set("intent", f.intent);
   if (f.cityId) p.set("city", f.cityId);
   if (f.types?.length) p.set("types", f.types.join(","));
+  if (f.ptypes?.length) p.set("ptypes", f.ptypes.join(","));
+  if (f.roles?.length) p.set("roles", f.roles.join(","));
   if (f.areas?.length) p.set("areas", f.areas.join(","));
   if (f.amenities?.length) p.set("amenities", f.amenities.join(","));
   if (f.budgetMin != null) p.set("bmin", String(f.budgetMin));
@@ -148,6 +150,8 @@ export function queryToFilters(sp: URLSearchParams): SearchFilters {
     intent: intent === "sell" || intent === "rent" ? intent : undefined,
     cityId: sp.get("city") ?? undefined,
     types: list("types"),
+    ptypes: list("ptypes"),
+    roles: list("roles"),
     areas: list("areas"),
     amenities: list("amenities"),
     budgetMin: num("bmin"),
