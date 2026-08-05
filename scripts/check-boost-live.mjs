@@ -55,6 +55,34 @@ const pgc = await dbConnect();
 const sql = (s, p) => pgc.query(s, p);
 const row1 = async (s, p) => (await sql(s, p)).rows[0];
 
+/**
+ * Run a step that SELLS a listing, and put the listing back whatever happens.
+ *
+ * Several steps below need a boosted listing to go sold so the auto-stop and
+ * refund paths have something to react to. They used to restore the row on the
+ * happy path only — a `finally`-less restore — and one step never restored at
+ * all. Any failed assertion in between therefore left a real listing archived
+ * and sold for good: nine of them had piled up, which then made the NEXT run
+ * fail on "boost IS promoted for a Rajkot viewer", because the listing behind
+ * that boost was no longer live. A check that damages the data it inspects
+ * reports on a world it created.
+ */
+async function withListingRestored(listingId, step) {
+  const before = await row1(
+    `select status, availability, sold_at, archived_at from listings where id=$1`, [listingId]);
+  try {
+    return await step();
+  } finally {
+    if (before) {
+      await sql(
+        `update listings set status=$2, availability=$3, sold_at=$4, archived_at=$5, updated_at=now()
+          where id=$1`,
+        [listingId, before.status, before.availability, before.sold_at, before.archived_at],
+      );
+    }
+  }
+}
+
 // ---- HTTP with a per-identity cookie jar -----------------------------------
 const jar = new Map();
 function save(res, key) {
@@ -237,9 +265,22 @@ if (paused && rajkotFeed) {
 // ---------------------------------------------------------------------------
 console.log("\n== Requirement boost — locked-but-top ==");
 const reqBoost = active.find((b) => b.subject_kind === "requirement");
-if (reqBoost && viewers.ahmedabad) {
-  await login(viewers.ahmedabad.phone);
-  const r = await api(viewers.ahmedabad.phone, "/api/v1/requirements/browse");
+/**
+ * Browse as someone the boost actually TARGETS.
+ *
+ * This step is about the locked-but-top rule, not about targeting — but it was
+ * hardcoded to the Ahmedabad viewer while the seeded requirement boost is
+ * targeted at Rajkot. A city-targeted boost is supposed not to reach another
+ * city, so the check was asserting that targeting is broken, and "failing"
+ * when it worked. Pick the viewer that matches the boost's own city.
+ */
+const reqViewer = !reqBoost ? null
+  : reqBoost.target_city_id === cityId.Rajkot ? viewers.rajkot
+  : reqBoost.target_city_id === cityId.Surat ? viewers.surat
+  : viewers.ahmedabad;
+if (reqBoost && reqViewer) {
+  await login(reqViewer.phone);
+  const r = await api(reqViewer.phone, "/api/v1/requirements/browse");
   const sections = r.json?.data?.sections ?? [];
   const cards = sections.flatMap((s) => s.cards ?? []);
   const first = cards[0];
@@ -471,22 +512,19 @@ console.log("\n== Race seal: subject sold while the boost waited (Doc2 §13) =="
   if (!victim) {
     console.log("  [skip] no pending_approval boost left after the approval tests");
   } else {
-    const before = await row1(`select status, availability from listings where id=$1`, [victim.listing_id]);
-    await sql(`update listings set availability='sold', status='archived' where id=$1`, [victim.listing_id]);
+    await withListingRestored(victim.listing_id, async () => {
+      await sql(`update listings set availability='sold', status='archived' where id=$1`, [victim.listing_id]);
 
-    await login(staff.phone);
-    const ap = await api(staff.phone, `/api/v1/admin/moderate/boost/${victim.id}`, {
-      method: "POST", body: { action: "approve" },
+      await login(staff.phone);
+      const ap = await api(staff.phone, `/api/v1/admin/moderate/boost/${victim.id}`, {
+        method: "POST", body: { action: "approve" },
+      });
+      check(ap.status !== 200, "approving a sold listing's boost is refused", `got ${ap.status}`);
+      check(ap.json?.error?.autoRejected === true || ap.json?.autoRejected === true
+            || JSON.stringify(ap.json).includes("autoRejected"), "…and the response says it was auto-rejected");
+      const after = await row1(`select status, reject_reason from boosts where id=$1`, [victim.id]);
+      check(after?.status === "rejected", "DB row: rejected, not active", after?.reject_reason ?? "");
     });
-    check(ap.status !== 200, "approving a sold listing's boost is refused", `got ${ap.status}`);
-    check(ap.json?.error?.autoRejected === true || ap.json?.autoRejected === true
-          || JSON.stringify(ap.json).includes("autoRejected"), "…and the response says it was auto-rejected");
-    const after = await row1(`select status, reject_reason from boosts where id=$1`, [victim.id]);
-    check(after?.status === "rejected", "DB row: rejected, not active", after?.reject_reason ?? "");
-
-    // put the listing back
-    await sql(`update listings set availability=$2, status=$3 where id=$1`,
-      [victim.listing_id, before.availability, before.status]);
   }
 }
 
@@ -502,24 +540,28 @@ console.log("\n== Auto-stop on sold (Doc2 §13) ==");
       order by b.starts_at limit 1`,
   );
   if (live) {
-    await login(live.phone);
-    const r = await api(live.phone, `/api/v1/listings/${live.listing_id}/status`, {
-      method: "POST", body: { action: "sold" },
-    });
-    check(r.status === 200, "owner marks the boosted listing sold", `got ${r.status}`);
-    const after = await row1(`select status, stopped_reason from boosts where id=$1`, [live.id]);
-    check(after?.status === "stopped", "the running boost auto-stopped", after?.stopped_reason ?? "");
-    const notif = await row1(
-      `select title from notifications where profile_id=$1 and type='boost_stopped' order by created_at desc limit 1`,
-      [live.profile_id],
-    );
-    check(!!notif, "the seller was told the boost stopped", notif?.title ?? "(none)");
+    // This step had no restore at all — it sold a live listing and left it
+    // sold, which is where most of the accumulated damage came from.
+    await withListingRestored(live.listing_id, async () => {
+      await login(live.phone);
+      const r = await api(live.phone, `/api/v1/listings/${live.listing_id}/status`, {
+        method: "POST", body: { action: "sold" },
+      });
+      check(r.status === 200, "owner marks the boosted listing sold", `got ${r.status}`);
+      const after = await row1(`select status, stopped_reason from boosts where id=$1`, [live.id]);
+      check(after?.status === "stopped", "the running boost auto-stopped", after?.stopped_reason ?? "");
+      const notif = await row1(
+        `select title from notifications where profile_id=$1 and type='boost_stopped' order by created_at desc limit 1`,
+        [live.profile_id],
+      );
+      check(!!notif, "the seller was told the boost stopped", notif?.title ?? "(none)");
 
-    // And it must be gone from placement immediately.
-    const f = await api(null, "/api/v1/feed?limit=30");
-    const items = f.json?.data?.items ?? [];
-    check(!items.some((i) => i.id === live.listing_id && i.promoted),
-      "…and it is no longer promoted anywhere");
+      // And it must be gone from placement immediately.
+      const f = await api(null, "/api/v1/feed?limit=30");
+      const items = f.json?.data?.items ?? [];
+      check(!items.some((i) => i.id === live.listing_id && i.promoted),
+        "…and it is no longer promoted anywhere");
+    });
   }
 }
 
@@ -535,14 +577,14 @@ console.log("\n== Sold BEFORE approval → refund, not 'stopped' ==");
   if (!cand) {
     console.log("  [skip] no pending_approval boost left to sell out from under");
   } else {
-    const before = await row1(`select status, availability from listings where id=$1`, [cand.listing_id]);
-    await login(cand.phone);
-    const r = await api(cand.phone, `/api/v1/listings/${cand.listing_id}/status`, { method: "POST", body: { action: "sold" } });
-    check(r.status === 200, "owner marks a listing sold while its boost is pending approval");
-    const after = await row1(`select status, stopped_reason from boosts where id=$1`, [cand.id]);
-    check(after?.status === "cancelled", "the never-live boost is CANCELLED (a refundable state), not 'stopped'",
-      `status=${after?.status} · ${after?.stopped_reason ?? ""}`);
-    await sql(`update listings set availability=$2, status=$3 where id=$1`, [cand.listing_id, before.availability, before.status]);
+    await withListingRestored(cand.listing_id, async () => {
+      await login(cand.phone);
+      const r = await api(cand.phone, `/api/v1/listings/${cand.listing_id}/status`, { method: "POST", body: { action: "sold" } });
+      check(r.status === 200, "owner marks a listing sold while its boost is pending approval");
+      const after = await row1(`select status, stopped_reason from boosts where id=$1`, [cand.id]);
+      check(after?.status === "cancelled", "the never-live boost is CANCELLED (a refundable state), not 'stopped'",
+        `status=${after?.status} · ${after?.stopped_reason ?? ""}`);
+    });
   }
 }
 
@@ -555,12 +597,19 @@ console.log("\n== IDOR / authorization (Doc9 §API1) ==");
     `select b.id, p.phone from boosts b join profiles p on p.id=b.profile_id
       where b.status='pending_approval' and p.phone is not null limit 1`,
   );
+  // The other seller has to be an account that can actually SIGN IN. This took
+  // the first profile row with a phone, which is just as likely to be a
+  // suspended or never-registered one — it then failed to log in, the request
+  // came back 401 for want of a session, and the check reported that as "IDOR
+  // returned 401 instead of 404". The authorization rule was never exercised.
   const other = await row1(
-    `select phone from profiles where phone is not null and phone <> coalesce($1,'') limit 1`,
+    `select phone from profiles
+      where phone is not null and phone <> coalesce($1,'')
+        and state = 'active' and is_registered
+      order by phone limit 1`,
     [mine?.phone ?? null],
   );
-  if (mine && other) {
-    await login(other.phone);
+  if (mine && other && await need(other.phone, "IDOR probe as another seller")) {
     const c = await api(other.phone, `/api/v1/billing/boost/${mine.id}/cancel`, { method: "POST" });
     check(c.status === 404, "cancelling someone else's boost → 404", `got ${c.status}`);
     const rn = await api(other.phone, `/api/v1/billing/boost/${mine.id}/renew`, { method: "POST" });
