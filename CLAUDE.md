@@ -106,7 +106,24 @@ decided in the frontend or localStorage.
 Rule of thumb: the frontend is a thin view over a server that owns and verifies
 all truth. If I cannot show you the database row, the feature is not done.
 
+## CHANGE PROTOCOL (STRICT — applies to EVERY change prompt)
+
+**Read CHANGE-PROTOCOL.md before executing ANY change request — one line of copy, a card,
+a field, a rule, an admin toggle. No exceptions, no "it's small".**
+
+A change is never "edit the file the user pointed at". It is:
+map every surface the thing lives on → record how each works today → trace DB→API→UI both
+directions → change all of them in one pass from a single source of truth → verify A–H
+(flow, DB rows, no-dead, regression, production-ready, responsive/clipping, design-lock,
+hidden-issue hunt) → report in the fixed format.
+
+Responsive scope: **website = mobile device only**; **admin dashboard = all three device
+layouts**. If the change lands in one place and the same thing is stale in another, it is
+NOT done.
+
 ## Absolute rules
+0. EVERY change follows CHANGE-PROTOCOL.md — map all surfaces, change all of them,
+   verify A–H, report. Partial-surface changes are rejected.
 1. DESIGN IS FINAL. Implement designs/ pixel-exact. Never redesign/improve/rearrange.
    Mobile design = 0% change. Every popup/sheet/toast/dialog/notification kept as-is, only wired.
 2. Desktop/tablet = SEPARATE native layouts (user-side only), built from mobile design without altering it. Admin already 3-device ready — don't touch its layouts.
@@ -184,3 +201,13 @@ record it; never quietly leave it.
 
 If any of the five is missing, the module is NOT done — say so plainly rather
 than reporting it complete.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

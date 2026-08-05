@@ -1,6 +1,10 @@
 # HomzList — Master Build Rules (RULES.md)
 
 > Give this file to Claude on every build session, together with CLAUDE.md.
+> **Every change request executes through CHANGE-PROTOCOL.md** (map all surfaces → change
+> all of them → verify A–H → report). That file governs the *process* of any change; this
+> file governs the standards the result must meet.
+>
 > ROLE: You are a senior frontend + full-stack engineer. Your job is to implement
 > my given wireframe/design EXACTLY. Do not add your own creativity, suggestions, or
 > "improvements" to the design. What I provide IS the final design.
