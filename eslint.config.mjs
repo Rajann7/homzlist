@@ -35,31 +35,45 @@ export default defineConfig([
     rules: {
       "@next/next/no-img-element": "warn",
 
-      // ---------------------------------------------------------------------
-      // Rules that arrived WITH the upgrade, not with the code.
-      //
-      // On Next 14 `npm run lint` exited 0 with only warnings. eslint-config-next
-      // 16 ships eslint-plugin-react-hooks v6 (the React Compiler-aware rules)
-      // and two new @next/next rules, and those turn 155 pre-existing lines into
-      // errors — 110 of them `set-state-in-effect` alone.
-      //
-      // Clearing them means rewriting component logic and changing navigation
-      // behaviour (<a> does a full load, <Link> does a client transition). That
-      // is not upgrade work: the upgrade's job is to leave the app behaving
-      // exactly as it did. So they are warnings — visible, not enforced, and
-      // not silently deleted — and the list is tracked in
-      // docs/PENDING-INTEGRATIONS.md as its own piece of work.
-      //
-      // Anything NEWLY written should still satisfy these. Promote them back to
-      // "error" once the existing findings are cleared.
+      /**
+       * The one rule left at warn, and why.
+       *
+       * eslint-config-next 16 brings the React Compiler rules. Everything else
+       * they flagged has been dealt with at the callsite — purity, refs,
+       * immutability, static-components, exhaustive-deps and the two new
+       * @next/next rules are all at zero. This one is not, and it should not be
+       * "fixed" the way the others were.
+       *
+       * 104 of its 110 findings are one shape, repeated in 88 files:
+       *
+       *     const load = useCallback(async () => {
+       *       const r = await someApi.get();
+       *       if (r.ok) setData(r.data);
+       *     }, []);
+       *     useEffect(() => { void load(); }, [load]);
+       *
+       * The setState runs AFTER an await, in a later task — not synchronously
+       * in the effect body — so it does not cause the cascading render the rule
+       * is named for. The rule cannot see across the await and flags every
+       * setState reachable from an effect, which is every fetch-on-mount screen
+       * in this app.
+       *
+       * Clearing them honestly would mean replacing effect-based fetching
+       * everywhere with a data library or Server Components. That is an
+       * architecture change across 88 screens, not a lint fix, and this app's
+       * design is locked.
+       *
+       * The six findings that WERE the real pattern — a synchronous setState in
+       * an effect body — are fixed, using React's own "adjusting state when a
+       * prop changes" render-phase form: Dialog, FilterBar, Leads (x2),
+       * ProjectForm and ProfileSheets. Where a reset is entangled with a
+       * debounce, a DOM measurement or a fetch, it belongs in an effect and
+       * stays there.
+       *
+       * Anything NEWLY written should still satisfy this. Promote it to "error"
+       * if the fetching layer is ever reworked.
+       */
       "react-hooks/set-state-in-effect": "warn",
-      "react-hooks/static-components": "warn",
-      "react-hooks/purity": "warn",
-      "react-hooks/preserve-manual-memoization": "warn",
-      "react-hooks/refs": "warn",
-      "react-hooks/immutability": "warn",
-      "@next/next/no-location-assign-relative-destination": "warn",
-      "@next/next/no-html-link-for-pages": "warn",
     },
   },
 ]);

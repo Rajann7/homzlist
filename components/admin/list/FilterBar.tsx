@@ -45,7 +45,13 @@ export function FilterBar({
   const [term, setTerm] = useState(search);
 
   // Keep in step when the URL changes underneath (Back button, saved view).
-  useEffect(() => setTerm(search), [search]);
+  // Adjusted during render rather than in an effect, so the box shows the new
+  // term in the same commit instead of one paint later.
+  const [prevSearch, setPrevSearch] = useState(search);
+  if (search !== prevSearch) {
+    setPrevSearch(search);
+    setTerm(search);
+  }
 
   // Debounced so typing is one query per pause, not one per keystroke.
   useEffect(() => {

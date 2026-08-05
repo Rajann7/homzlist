@@ -230,13 +230,16 @@ export function CreateFeaturedSheet({
   const [picked, setPicked] = useState<string[]>([]);
 
   // A fresh sheet every time it opens — a half-filled form from last time is
-  // never what the user meant.
-  useEffect(() => {
+  // never what the user meant. Cleared during render so the stale values are
+  // never painted, not even for one frame.
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
     if (open) {
       setName("");
       setPicked([]);
     }
-  }, [open]);
+  }
 
   const toggle = (id: string) =>
     setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : p.length >= maxItems ? p : [...p, id]));

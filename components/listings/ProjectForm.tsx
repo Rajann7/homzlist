@@ -851,7 +851,13 @@ function UnitSheet({
   const planRef = useRef<HTMLInputElement>(null);
   const toast = useToast();
 
-  useEffect(() => { if (open) setU(initial ?? BLANK_UNIT); }, [open, initial]);
+  // Seeded during render rather than in an effect, so the sheet never paints
+  // the previous unit's values for a frame before swapping them.
+  const [seed, setSeed] = useState<{ open: boolean; initial: typeof initial }>({ open, initial });
+  if (open !== seed.open || initial !== seed.initial) {
+    setSeed({ open, initial });
+    if (open) setU(initial ?? BLANK_UNIT);
+  }
 
   const set = (k: keyof UnitDraft, v: string | null) => setU((c) => ({ ...c, [k]: v }));
   const bump = (delta: number) =>
