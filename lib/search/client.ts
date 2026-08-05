@@ -42,6 +42,8 @@ export interface PropertySearchResponse {
   sort: SearchSort;
   sections: SearchSection<FeedCard>[];
   total: number;
+  /** Matching projects on the All tab (0 elsewhere); count line = total + this. */
+  projectTotal: number;
   nextCursor: string | null;
   filterCount: number;
   scope: {

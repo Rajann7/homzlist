@@ -395,6 +395,12 @@ function countLine(
   }
   if (tab === "brokers") return `${brokers?.length ?? 0} seller${brokers?.length === 1 ? "" : "s"}`;
   if (tab === "areas") return `${areas?.length ?? 0} area${areas?.length === 1 ? "" : "s"}`;
+  // The All tab interleaves projects with properties, so it counts BOTH kinds
+  // ("150 results"); the Properties tab stays properties-only ("142 properties").
+  if (tab === "all") {
+    const n = (props?.total ?? 0) + (props?.projectTotal ?? 0);
+    return `${n.toLocaleString("en-IN")} result${n === 1 ? "" : "s"}`;
+  }
   const n = props?.total ?? 0;
   return `${n.toLocaleString("en-IN")} propert${n === 1 ? "y" : "ies"}`;
 }

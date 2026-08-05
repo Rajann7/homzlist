@@ -32,6 +32,12 @@ export interface PropertySearchResult {
   sections: SearchSection<FeedCard>[];
   /** Exact number of EXACT-tier matches — the "142 properties" count line. */
   total: number;
+  /**
+   * Matching projects on the ALL tab (0 on every other tab). The count line
+   * reads "N results" = `total + projectTotal`, because the All tab now
+   * interleaves projects with properties (Properties tab stays properties-only).
+   */
+  projectTotal: number;
   nextCursor: string | null;
   /** Resolved scope, so the UI can label the landing-suggestion row. */
   scope: {
@@ -269,6 +275,38 @@ export async function searchProperties(
     }
   }
 
+  /**
+   * ALL-tab project interleave (the P3 "All" tab, Rajan 5 Aug 2026).
+   *
+   * The Properties tab stays properties-only and the Projects tab stays
+   * projects-only — but "All" is one interleaved list of BOTH kinds, so a
+   * search like "3 BHK" surfaces the builder projects that have a 3 BHK unit
+   * next to the flats, instead of hiding every project behind a second tab.
+   *
+   * Only page 1 (offset 0): projects are few and bounded, so they all ride the
+   * first page. Later pages append more PROPERTIES into section[0] (same rule
+   * the cascade already follows — nothing new outranks unseen exact results).
+   * The card renderer already switches on `kind`, so no UI change is needed.
+   */
+  let projectTotal = 0;
+  if (opts.tab === "all" && offset === 0) {
+    const projMatches = await matchProjects(f, parsed, viewerId, scope);
+    projectTotal = projMatches.length;
+    if (projMatches.length && sections[0]) {
+      const propMeta = await listingSortMeta(exact.ids);
+      const propItems: MergeItem[] = exactCards.map((card) => {
+        const m = propMeta.get(card.id);
+        return { card, promoted: card.promoted, ts: m?.ts ?? 0, price: m?.price ?? null };
+      });
+      const projItems: MergeItem[] = projMatches.map((m) => ({
+        card: m.card, promoted: m.promoted, ts: m.ts, price: m.price,
+      }));
+      // Properties FIRST in the input so their server ranking wins ties and the
+      // `nearby` sort (which projects can't answer) keeps the RPC's order.
+      sections[0] = { label: null, items: mergeMixed([...propItems, ...projItems], sort).map((x) => x.card) };
+    }
+  }
+
   const citySlug = args.p_city_id ? await locationSlug(args.p_city_id) : null;
   const cityName = args.p_city_id ? await locationName(args.p_city_id) : null;
   const areaNames = args.p_area_ids?.length ? await locationNames(args.p_area_ids) : [];
@@ -276,6 +314,7 @@ export async function searchProperties(
   return {
     sections,
     total: exact.total,
+    projectTotal,
     nextCursor: offset + limit < exact.total ? offsetToCursor(offset + limit) : null,
     scope: {
       cityId: args.p_city_id, cityName, citySlug,
@@ -434,61 +473,199 @@ async function boostedSet(ids: string[], viewer: ViewerScope): Promise<Set<strin
 }
 
 // ---------------------------------------------------------------------------
-// Projects tab
+// Projects tab + the ALL-tab interleave (one matcher, two callers)
 // ---------------------------------------------------------------------------
 
-export async function searchProjects(
+/** A card plus the two keys the All-tab merge orders on (recency, price). */
+interface MergeItem {
+  card: FeedCard;
+  promoted: boolean;
+  ts: number;
+  price: number | null;
+}
+
+/**
+ * Order a mixed property+project list the way the All tab wants: boosted first,
+ * then by the active sort. Stable, so the input order (properties before
+ * projects) breaks ties — that keeps the RPC's own ranking and makes `nearby`,
+ * which a project cannot answer, fall back to the property order.
+ */
+function mergeMixed(items: MergeItem[], sort: SearchSort): MergeItem[] {
+  const key = (m: MergeItem): number => {
+    if (sort === "price_asc") return m.price ?? Number.POSITIVE_INFINITY;      // on-request last
+    if (sort === "price_desc") return -(m.price ?? Number.NEGATIVE_INFINITY);  // on-request last
+    if (sort === "nearby") return 0;                                           // preserve input order
+    return -m.ts;                                                              // latest → newest first
+  };
+  return items
+    .map((m, i) => ({ m, i }))
+    .sort((a, b) => {
+      if (a.m.promoted !== b.m.promoted) return a.m.promoted ? -1 : 1;
+      const d = key(a.m) - key(b.m);
+      return d !== 0 ? d : a.i - b.i;
+    })
+    .map((x) => x.m);
+}
+
+/** Recency + price for a set of listing ids, to merge them against projects. */
+async function listingSortMeta(ids: string[]): Promise<Map<string, { ts: number; price: number | null }>> {
+  const map = new Map<string, { ts: number; price: number | null }>();
+  if (!ids.length) return map;
+  const { data } = await db().from("listings")
+    .select("id,live_at,created_at,price_paise,price_on_request").in("id", ids);
+  for (const r of ((data ?? []) as any[])) {
+    map.set(r.id, {
+      ts: new Date(r.live_at ?? r.created_at).getTime() || 0,
+      price: r.price_on_request ? null : (r.price_paise ?? null),
+    });
+  }
+  return map;
+}
+
+/**
+ * Property-type codes → the scheme types paired with them
+ * (`project_types.property_type_codes`, the SAME mapping the feed's type rails
+ * use). So filtering the All tab to "Flat" also narrows its projects to
+ * apartment schemes, instead of showing every project regardless of type.
+ */
+async function projectTypesForPropertyTypes(propertyCodes: string[]): Promise<string[]> {
+  if (!propertyCodes.length) return [];
+  const { data } = await db().from("project_types").select("code,property_type_codes").eq("is_active", true);
+  const out = new Set<string>();
+  for (const r of ((data ?? []) as { code: string; property_type_codes: string[] | null }[])) {
+    if ((r.property_type_codes ?? []).some((c) => propertyCodes.includes(c))) out.add(r.code);
+  }
+  return [...out];
+}
+
+/** The BHK a `project_units.unit_type` implies ("3 BHK Villa" → "3"), or null. */
+function bhkOfUnitType(unitType: string | null): string | null {
+  const m = (unitType ?? "").match(/(\d+)\s*BHK/i);
+  return m ? m[1] : null;
+}
+
+interface ProjectMatch { card: FeedCard; ts: number; price: number | null; promoted: boolean }
+
+/**
+ * Every LIVE project that matches the query, honouring the SAME structured
+ * filters properties get (Doc2 §12): city/area scope, scheme type, BHK and
+ * budget. BHK and budget live on `project_units` (a project offers several
+ * configurations), so a project matches if ANY of its units does. Ordered
+ * newest-first; the caller decides paging (Projects tab) or the merge (All tab).
+ *
+ * Projects are for-SALE inventory, so a rent-intent search returns none rather
+ * than pretending a booking is a rental.
+ */
+async function matchProjects(
   f: SearchFilters,
+  parsed: ParsedQuery,
   viewerId: string | null,
-  limit = 12,
-  cursor: string | null = null,
-): Promise<{ items: FeedCard[]; total: number; nextCursor: string | null }> {
-  const parsed = await parseQuery(f.q ?? "", { cityId: f.cityId });
+  scope: ViewerScope,
+): Promise<ProjectMatch[]> {
+  if ((f.intent ?? parsed.intent) === "rent") return [];
+
   const cityId = f.cityId ?? parsed.cityId;
   const areaIds = [...new Set([...(f.areas ?? []), ...parsed.areaIds])];
+  const typeCodes = [...new Set([...(f.types ?? []), ...parsed.typeCodes])];
+  const ptypes = [...new Set([...(f.ptypes ?? []), ...(await projectTypesForPropertyTypes(typeCodes))])];
 
+  // Projects are bounded per city, so we scan the scope and filter by unit in
+  // JS — that keeps the BHK/budget total EXACT (which a `.limit` + count would
+  // not) without needing an RPC.
   let q = db().from("projects")
     // The SAME column set the feed's project card reads — search renders the
     // same card, so a column missing here is a blank block on that card.
-    .select(PROJECT_COLS, { count: "exact" })
+    .select(PROJECT_COLS)
     .eq("status", "live")
     .order("live_at", { ascending: false })
-    .limit(limit);
+    .limit(PROJECT_SCAN);
   if (cityId) q = q.eq("city_id", cityId);
   if (areaIds.length) q = q.in("area_id", areaIds);
   if (viewerId) q = q.neq("profile_id", viewerId);
   if (parsed.text) q = q.ilike("name", `%${parsed.text}%`);
-  // Scheme type — what a "Plotting schemes" rail's View all carries over, so
-  // the results page shows the same set the rail was showing.
-  if (f.ptypes?.length) q = q.in("project_type", f.ptypes);
-  // Keyed off the same column the order uses, so pages stay consistent — and so
-  // "View all" on a feed rail can actually reach all 48 projects instead of the
-  // first 12 under a header that counted 48.
-  if (cursor) q = q.lt("live_at", cursor);
+  if (ptypes.length) q = q.in("project_type", ptypes);
 
-  const { data, count } = await q;
-  const rows = ((data ?? []) as any[]);
-  if (!rows.length) return { items: [], total: count ?? 0, nextCursor: null };
+  const { data } = await q;
+  let rows = ((data ?? []) as any[]);
+  if (!rows.length) return [];
 
+  // ---- BHK / budget filter + per-project min price, both from project_units ----
+  const bhkValues = [...new Set([...(f.attrs?.bhk ?? []), ...parsed.bhk])];
+  const budgetMinPaise = f.budgetMin != null ? Math.round(f.budgetMin * 100_000 * 100) : parsed.budgetMinPaise;
+  const budgetMaxPaise = f.budgetMax != null ? Math.round(f.budgetMax * 100_000 * 100) : parsed.budgetMaxPaise;
+  const needUnitFilter = bhkValues.length > 0 || budgetMinPaise != null || budgetMaxPaise != null;
+
+  const minPrice = new Map<string, number>();
+  const unitsByProject = new Map<string, { unit_type: string | null; price_from_paise: number | null }[]>();
+  {
+    const { data: unitRows } = await db().from("project_units")
+      .select("project_id,unit_type,price_from_paise").in("project_id", rows.map((r) => r.id));
+    for (const u of ((unitRows ?? []) as { project_id: string; unit_type: string | null; price_from_paise: number | null }[])) {
+      const arr = unitsByProject.get(u.project_id) ?? [];
+      arr.push({ unit_type: u.unit_type, price_from_paise: u.price_from_paise });
+      unitsByProject.set(u.project_id, arr);
+      if (u.price_from_paise != null) {
+        const cur = minPrice.get(u.project_id);
+        if (cur == null || u.price_from_paise < cur) minPrice.set(u.project_id, u.price_from_paise);
+      }
+    }
+  }
+
+  if (needUnitFilter) {
+    rows = rows.filter((r) => {
+      const us = unitsByProject.get(r.id) ?? [];
+      const bhkOk = !bhkValues.length || us.some((u) => {
+        const b = bhkOfUnitType(u.unit_type);
+        return b != null && bhkValues.includes(b);
+      });
+      const budgetOk = (budgetMinPaise == null && budgetMaxPaise == null) || us.some((u) =>
+        u.price_from_paise != null
+        && (budgetMinPaise == null || u.price_from_paise >= budgetMinPaise)
+        && (budgetMaxPaise == null || u.price_from_paise <= budgetMaxPaise));
+      return bhkOk && budgetOk;
+    });
+  }
+  if (!rows.length) return [];
+
+  const cards = await hydrateProjects(rows, viewerId, scope);
+  const cardById = new Map(cards.map((c) => [c.id, c]));
+  return rows
+    .map((r) => {
+      const card = cardById.get(r.id);
+      if (!card) return null;
+      return {
+        card,
+        ts: new Date(r.live_at ?? r.created_at).getTime() || 0,
+        price: minPrice.get(r.id) ?? null,
+        promoted: card.promoted,
+      } as ProjectMatch;
+    })
+    .filter((m): m is ProjectMatch => m !== null);
+}
+
+/** The scan ceiling for a scope's projects — a city's builder output, bounded. */
+const PROJECT_SCAN = 200;
+
+/** Project rows → the SAME ProjectCard the feed renders, boost-tag included. */
+async function hydrateProjects(rows: any[], viewerId: string | null, scope: ViewerScope): Promise<FeedCard[]> {
+  if (!rows.length) return [];
   const posterIds = [...new Set(rows.map((r) => r.profile_id))];
-  const [{ data: profs }, { data: vers }, extras] = await Promise.all([
+  const [{ data: profs }, { data: vers }, extras, boosted] = await Promise.all([
     // `phone` for the same reason the feed selects it: a project's Call and
     // WhatsApp are real actions (Doc2 §6), and withheld from guests below.
     db().from("profiles").select("id,name,username,role,photo_url,phone").in("id", posterIds),
     db().from("verifications").select("profile_id").eq("status", "approved").in("level", ["phone", "id", "rera"]).in("profile_id", posterIds),
     projectCardExtras(rows),
+    projectBoostedSet(rows.map((r) => r.id), scope),
   ]);
   const profMap = new Map<string, any>(((profs ?? []) as any[]).map((p) => [p.id, p]));
   const verified = new Set(((vers ?? []) as { profile_id: string }[]).map((v) => v.profile_id));
 
-  const items: FeedCard[] = rows.map((r) => {
+  return rows.map((r) => {
     const p = profMap.get(r.profile_id) ?? {};
     return {
       ...extras.get(r.id),
-      kind: "project", id: r.id, promoted: false, saved: false,
-      // The query above already excludes the viewer's own projects
-      // (`neq profile_id`), so this is false by construction — stated rather
-      // than assumed, so it stays true if that filter ever changes.
+      kind: "project", id: r.id, promoted: boosted.has(r.id), saved: false,
       isOwn: viewerId !== null && r.profile_id === viewerId,
       coverUrl: r.cover_url, photos: r.cover_url ? [r.cover_url] : [],
       areaLabel: r.area_label, areaId: r.area_id ?? null,
@@ -501,13 +678,38 @@ export async function searchProjects(
       buildStatus: r.build_status === "ready" ? "Ready to move" : r.build_status === "under_construction" ? "Under construction" : "Booking open",
       rera: Boolean(r.rera_number) || r.rera_exempt,
       contactNumber: viewerId && r.profile_id !== viewerId ? (p.phone ?? null) : null,
-    };
+    } as FeedCard;
   });
-  const last = rows[rows.length - 1];
+}
+
+/** Which of these project ids carry a "Promoted" tag for THIS viewer. */
+async function projectBoostedSet(ids: string[], viewer: ViewerScope): Promise<Set<string>> {
+  if (!ids.length) return new Set();
+  const set = await placementsFor(viewer, ["project"]);
+  return new Set(ids.filter((id) => set.rank.has(id)));
+}
+
+export async function searchProjects(
+  f: SearchFilters,
+  viewerId: string | null,
+  limit = 12,
+  cursor: string | null = null,
+): Promise<{ items: FeedCard[]; total: number; nextCursor: string | null }> {
+  const parsed = await parseQuery(f.q ?? "", { cityId: f.cityId });
+  const cityId = f.cityId ?? parsed.cityId;
+  const scope: ViewerScope = await viewerScope(viewerId, cityId);
+  scope.areaIds = [...new Set([...(f.areas ?? []), ...parsed.areaIds])];
+
+  const matches = await matchProjects(f, parsed, viewerId, scope);
+  // Ordered newest-first already; page with the same live_at cursor the feed
+  // rail's "View all" carries, so paging stays consistent across surfaces.
+  const cursorTs = cursor ? (new Date(cursor).getTime() || Number.POSITIVE_INFINITY) : Number.POSITIVE_INFINITY;
+  const page = matches.filter((m) => m.ts < cursorTs).slice(0, limit);
+  const more = matches.filter((m) => m.ts < cursorTs).length > limit;
   return {
-    items,
-    total: count ?? items.length,
-    nextCursor: rows.length === limit ? (last.live_at ?? last.created_at) : null,
+    items: page.map((m) => m.card),
+    total: matches.length,
+    nextCursor: more && page.length ? new Date(page[page.length - 1].ts).toISOString() : null,
   };
 }
 
