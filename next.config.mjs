@@ -1,4 +1,5 @@
 /** @type {import('next').NextConfig} */
+import os from "node:os";
 
 // Doc9 §14 — HTTP security headers applied at the app layer (Cloudflare adds edge layer too).
 const isProd = process.env.NODE_ENV === "production";
@@ -72,8 +73,34 @@ const securityHeaders = [
   },
 ];
 
+// Next 16 blocks /_next/static/* and /_next/hmr when the request's origin is not
+// localhost. Opening the dev server from a phone on the LAN (http://<ip>:3000)
+// therefore serves the HTML but NONE of the chunks: the page renders its
+// skeleton, never hydrates, and sits on the loading shimmer forever — while
+// desktop-on-localhost looks perfectly fine.
+//
+// Allow this machine's own LAN addresses (read at startup, so a new hotspot/IP
+// needs no edit) plus their nip.io forms, which are how the seller/account
+// subdomains are reached from a phone. Dev only — prod never sets this.
+const devOrigins = isProd
+  ? undefined
+  : (() => {
+      const ips = Object.values(os.networkInterfaces())
+        .flat()
+        .filter((n) => n && n.family === "IPv4" && !n.internal)
+        .map((n) => n.address);
+      return [
+        "localhost",
+        ...ips,
+        // seller.<ip>.nip.io / account.<ip>.nip.io — subdomain routing on a phone
+        ...ips.map((ip) => `*.${ip}.nip.io`),
+        ...ips.map((ip) => `${ip}.nip.io`),
+      ];
+    })();
+
 const nextConfig = {
   reactStrictMode: true,
+  ...(devOrigins ? { allowedDevOrigins: devOrigins } : {}),
   // Next 15 walks up looking for a lockfile to decide what to trace into the
   // standalone output. A stray package-lock.json in the home directory made it
   // pick C:\Users\RAJAN as the root, which would trace the wrong tree at deploy
