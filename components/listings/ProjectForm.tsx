@@ -127,6 +127,14 @@ export function ProjectForm() {
   const [place, setPlace] = useState<Record<string, any>>({});
   const setPlaceField = (k: string, v: unknown) => setPlace((p) => ({ ...p, [k]: v }));
 
+  // The React Compiler cannot preserve this useCallback and so reports that it
+  // would skip optimising the component. Nothing is skipped today: the compiler
+  // is not enabled (no reactCompiler in next.config.mjs, no
+  // babel-plugin-react-compiler), so this is advice about a future opt-in, not
+  // a defect. Restructuring a five-step form's loader to satisfy a compiler
+  // that is not running would be risk without a return; revisit it as part of
+  // turning the compiler on.
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization -- see above
   const load = useCallback(async () => {
     const [cfg, me] = await Promise.all([
       listingsApi.config(),

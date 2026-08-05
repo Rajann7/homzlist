@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AppShell, Button, Header, Icon, Skeleton, Spinner, useToast } from "./ui";
 import {
@@ -110,8 +110,12 @@ export function Checkout() {
   }, [loadQuote, couponCode]);
 
   // Only the methods the gateway will actually accept. Until the quote lands we
-  // show none rather than guessing.
-  const methodRows = enabled ? METHODS.filter((m) => enabled[m.flag]) : [];
+  // show none rather than guessing. Memoised because the effect below depends on
+  // it — a fresh array each render would re-run that effect on every render.
+  const methodRows = useMemo(
+    () => (enabled ? METHODS.filter((m) => enabled[m.flag]) : []),
+    [enabled],
+  );
 
   useEffect(() => {
     if (!method && methodRows.length) setMethod(methodRows[0].key);

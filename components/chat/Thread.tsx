@@ -112,11 +112,16 @@ export function Thread({ threadId, base = "/messages" }: { threadId: string; bas
   }, [view?.pinned?.priceLabel]);
 
   // Open scrolled to the unread divider (Doc2 §10.2) or the bottom.
+  //
+  // Keyed on the message COUNT, not on `view`. Depending on the whole object
+  // would re-scroll on any change to the thread — a price edit, a read receipt
+  // — and yank the reader out of position mid-message.
+  const messageCount = view?.messages?.length ?? 0;
   useEffect(() => {
-    if (!view) return;
+    if (!messageCount) return;
     const el = dividerRef.current ?? bottomRef.current;
     el?.scrollIntoView({ block: "center" });
-  }, [view?.messages?.length]);
+  }, [messageCount]);
 
   if (loading) return <ThreadSkeleton base={base} onBack={() => router.push(base)} />;
   if (!view) return <NotFound base={base} onBack={() => router.push(base)} />;

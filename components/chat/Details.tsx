@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AppShell, Header, Icon, Avatar, VerifiedBadge, Toggle, BottomSheet, ConfirmDialog, Skeleton, useToast } from "@/components";
 import { PhotoViewer } from "./PhotoViewer";
@@ -21,8 +21,11 @@ export function Details({ threadId, base = "/messages" }: { threadId: string; ba
   const [reportReason, setReportReason] = useState(REPORT_REASONS[0]);
   const [reportNote, setReportNote] = useState("");
 
-  const load = async () => { const res = await chatApi.details(threadId); if (res.ok) setD(res.data); };
-  useEffect(() => { load(); }, []);
+  const load = useCallback(async () => {
+    const res = await chatApi.details(threadId);
+    if (res.ok) setD(res.data);
+  }, [threadId]);
+  useEffect(() => { void load(); }, [load]);
 
   if (!d) return <AppShell showNav={false} header={<Header left={<Back onClick={() => router.back()} />} title="Chat details" />}><div className="space-y-3 p-4"><Skeleton className="h-40 w-full rounded-12" /><Skeleton className="h-24 w-full rounded-12" /></div></AppShell>;
   const p = d.person;

@@ -212,7 +212,8 @@ function RescheduleSheet({ visit, onClose, onDone }: { visit: VisitView | null; 
       out.push({ label: d.toLocaleDateString("en-IN", { weekday: "short", day: "numeric" }), date: d });
     }
     return out;
-  }, [visit]);
+    // `visit` is not read in here — the seven days are always the next seven.
+  }, []);
   const times = ["10:00", "11:00", "12:00", "15:00", "16:00", "17:00", "18:00"];
 
   const send = () => {

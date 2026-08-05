@@ -20,6 +20,7 @@
  */
 
 import { useState } from "react";
+import { useNow } from "@/lib/hooks/useNow";
 
 export function ImpersonationBanner({
   name,
@@ -30,8 +31,9 @@ export function ImpersonationBanner({
   staffName: string;
   startedAt: string;
 }) {
+  const now = useNow();
   const [busy, setBusy] = useState(false);
-  const minutes = Math.max(1, Math.round((Date.now() - new Date(startedAt).getTime()) / 60_000));
+  const minutes = Math.max(1, Math.round((now - new Date(startedAt).getTime()) / 60_000));
 
   return (
     <div

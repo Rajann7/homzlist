@@ -27,6 +27,7 @@ import {
   useToast,
   usePanels,
 } from "@/components/admin/ds";
+import { useNow } from "@/lib/hooks/useNow";
 
 type Tab = "revenue" | "churn" | "recon" | "exports";
 const TABS: [Tab, string][] = [
@@ -463,6 +464,7 @@ function ChurnTab({
   data: Record<string, unknown>;
   onRemind: (id: string) => void;
 }) {
+  const now = useNow();
   const { pushPanel } = usePanels();
   const k = data.kpis as Record<string, number>;
   const rows = (data.rows ?? []) as Record<string, string | number | boolean | null>[];
@@ -516,7 +518,7 @@ function ChurnTab({
             <tbody>
               {rows.map((r) => {
                 const days = r.expires_at
-                  ? Math.ceil((new Date(String(r.expires_at)).getTime() - Date.now()) / 86_400_000)
+                  ? Math.ceil((new Date(String(r.expires_at)).getTime() - now) / 86_400_000)
                   : null;
                 const soon = Boolean(r.expiring_soon);
                 return (
@@ -782,6 +784,9 @@ function ExportsTab({
     // silently exported all time while the header said "Last 30 days" would be
     // a file nobody could reconcile with the number above it.
     const days = range === "7d" ? 7 : range === "30d" ? 30 : range === "6m" ? 182 : 365;
+    // The real clock, not a mount-time one: an export has to cover the window
+    // ending when the button was pressed, not when the screen was opened.
+    // eslint-disable-next-line react-hooks/purity -- see above
     const from = new Date(Date.now() - days * 86_400_000).toISOString();
     const query = new URLSearchParams({ from }).toString();
     const res = await fetch("/api/v1/admin/export", {
