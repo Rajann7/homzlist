@@ -24,7 +24,12 @@ import { ShareAreaButton } from "./ShareAreaButton";
 
 export function LandingView({ page, basePath = "" }: { page: LandingPage; basePath?: string }) {
   const path = (p: string) => `${basePath}${p}`;
-  const thin = page.cards.length === 0;
+  // "Nothing listed here" is only true when there are NO listings AND NO
+  // projects. A city like Surat (0 listings, 1 live project) was showing the
+  // empty-state CTA with the project rendered right below it — the page
+  // contradicting itself. Projects are content, so they lift the page out of
+  // the empty state.
+  const thin = page.cards.length === 0 && page.projects.length === 0;
 
   return (
     <AppShell
@@ -173,7 +178,7 @@ export function LandingView({ page, basePath = "" }: { page: LandingPage; basePa
             ))}
             {page.stats.count > page.cards.length && (
               <Link
-                href={path(`/search/results?q=${encodeURIComponent(page.spec.area?.name ?? page.spec.city.name)}`)}
+                href={path(page.seeAllHref)}
                 className="grid h-11 w-full place-items-center rounded-8 border border-border bg-surface-1 text-15 font-semibold text-ink-primary"
               >
                 See all {page.stats.count} listings

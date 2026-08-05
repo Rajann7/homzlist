@@ -66,8 +66,26 @@ export interface LandingPage {
   breadcrumbs: { label: string; href: string }[];
   /** Chips under the highlights block (design S4). */
   chips: { label: string; href: string; active: boolean }[];
+  /** "See all N listings" → search, carrying THIS page's scope (type/intent/BHK/area). */
+  seeAllHref: string;
   updatedLabel: string;
   lastmod: string;
+}
+
+/**
+ * The "See all N listings" target. It must reproduce the landing page's scope,
+ * or the number ("See all 30 listings") and the destination disagree — a
+ * type/intent/BHK page linked to a bare city search that shows every listing.
+ */
+export function seeAllHref(spec: LandingSpec): string {
+  const p = new URLSearchParams();
+  p.set("q", spec.area?.name ?? spec.city.name);
+  p.set("city", spec.city.id);
+  if (spec.area) p.set("areas", spec.area.id);
+  if (spec.typeCodes.length) p.set("types", spec.typeCodes.join(","));
+  if (spec.intent) p.set("intent", spec.intent);
+  if (spec.bhk) p.set("a.bhk", spec.bhk);
+  return `/search/results?${p.toString()}`;
 }
 
 /** "Flats for Sale in Mavdi, Rajkot" — the H1, and the phrase every formula reuses. */
@@ -155,6 +173,7 @@ export async function buildLandingPage(spec: LandingSpec, viewerId: string | nul
     faqs,
     breadcrumbs: breadcrumbs(spec),
     chips: await chipsFor(spec),
+    seeAllHref: seeAllHref(spec),
     updatedLabel: freshnessLabel(lastmod),
     lastmod,
   };
@@ -206,7 +225,7 @@ async function statsFor(spec: LandingSpec): Promise<LandingStats> {
 /** Count + price envelope for any spec scope, straight off the listings table. */
 async function scopedCount(spec: LandingSpec): Promise<{ count: number; min: number | null; max: number | null; avg: number | null }> {
   let q = db().from("listings")
-    .select("price_paise,area_sqft")
+    .select("price_paise,area_sqft,price_on_request")
     .eq("status", "live").eq("availability", "available")
     .eq("city_id", spec.city.id);
   if (spec.area) q = q.eq("area_id", spec.area.id);
@@ -215,10 +234,15 @@ async function scopedCount(spec: LandingSpec): Promise<{ count: number; min: num
   if (spec.bhk) q = q.eq("attributes->>bhk", spec.bhk);
 
   const { data } = await q.limit(2000);
-  const rows = ((data ?? []) as { price_paise: number | null; area_sqft: number | null }[]);
-  const priced = rows.map((r) => r.price_paise).filter((p): p is number => p != null);
-  const perSqft = rows
-    .filter((r) => r.price_paise != null && (r.area_sqft ?? 0) > 0)
+  const rows = ((data ?? []) as { price_paise: number | null; area_sqft: number | null; price_on_request: boolean | null }[]);
+  // The COUNT is every live listing (a price-on-request flat is still a listing).
+  // The price ENVELOPE and the average are NOT: a price-on-request listing has no
+  // public price, and one such row here stores price_paise 0 — which was pinning
+  // the "Sale range" floor to ₹0. Only publicly, positively priced rows count.
+  const publiclyPriced = rows.filter((r) => !r.price_on_request && (r.price_paise ?? 0) > 0);
+  const priced = publiclyPriced.map((r) => r.price_paise as number);
+  const perSqft = publiclyPriced
+    .filter((r) => (r.area_sqft ?? 0) > 0)
     .map((r) => (r.price_paise! / 100) / r.area_sqft!);
   return {
     count: rows.length,
@@ -267,11 +291,28 @@ async function nearbyLinks(spec: LandingSpec): Promise<{ label: string; href: st
     // Count within the SAME type/intent scope, so the chip's number matches
     // what the visitor will actually find when they follow it.
     const scoped: LandingSpec = { ...spec, area: { id: r.id, name: r.name, slug: r.slug, highlights: null } };
-    const c = await scopedCount(scoped);
-    if (c.count === 0) continue;
-    out.push({ label: `${r.name} (${c.count})`, href: buildPath(scoped), count: c.count });
+    // A city hub carries `kind: "city"`, and buildPath serialises that to
+    // `/rajkot` REGARDLESS of the area — so every nearby chip on a city page
+    // pointed back at the city itself. An area's own URL is the area hub, so
+    // link there (typed/projects pages already serialise the area correctly).
+    const linkSpec: LandingSpec = spec.kind === "city" ? { ...scoped, kind: "area" } : scoped;
+    // A projects page links to /new-projects-in-<area>, so its chip must count
+    // PROJECTS in that area — not listings. The listing count sent visitors to
+    // an empty projects page ("Kuvadva Road (11)" with zero projects there).
+    const count = spec.kind === "projects"
+      ? await areaProjectCount(r.id)
+      : (await scopedCount(scoped)).count;
+    if (count === 0) continue;
+    out.push({ label: `${r.name} (${count})`, href: buildPath(linkSpec), count });
   }
   return out.sort((a, b) => b.count - a.count).slice(0, 6);
+}
+
+/** Live projects in one area — the nearby-chip count on a projects page. */
+async function areaProjectCount(areaId: string): Promise<number> {
+  const { count } = await db().from("projects").select("id", { count: "exact", head: true })
+    .eq("status", "live").eq("area_id", areaId);
+  return count ?? 0;
 }
 
 /**
