@@ -30,6 +30,25 @@ Status as of **2 Aug 2026**.
 have, a deploy step, or a decision — and in every case the code refuses honestly
 rather than pretending.
 
+## KEYS AT LAUNCH — what each one needs, verified from the code (5 Aug 2026)
+
+Rajan will hand over the keys at the end. This is the checklist for that moment —
+which are optional, which is mandatory, and the exact env switch for each. Every
+"skip" below was read out of the code, not assumed.
+
+| Key | Skippable? | How it degrades / what to set | Verified at |
+|---|---|---|---|
+| **MSG91** | 🔴 **NO — required for prod** | OTP login. In production the dev OTP provider **throws** — with no MSG91, nobody can sign in. Set `OTP_PROVIDER=msg91` + its keys. | `lib/auth/otp-provider.ts:34,47` |
+| **R2** | ✅ yes | Media already lives in Supabase Storage. Leave `STORAGE_DRIVER=supabase` (the default). Switching to R2 later is a config change + object migration, no code change. | `lib/storage.ts:12-18,89` |
+| **Resend** | ✅ yes | Email send is guarded: `if (!resendApiKey) return { sent:false, reason:"no_credentials" }`. Emails are **recorded** in `notification_deliveries`, just not delivered. | `lib/notifications/email.ts:58` |
+| **FCM** | ✅ yes | Push is guarded the same way — notifications are recorded, not pushed to the device. | `lib/notifications/push-client.ts:46` |
+| **Redis** | ⚠️ partial | Cache runs without it: `KV_DRIVER=memory`. But that store is **per-process**, so it only holds on a SINGLE server, and the BullMQ crons (boost expiry, refund, reminders, anomalies — see **B2**) need a real Redis. | `lib/kv.ts:151-152` |
+
+**Short version:** only **MSG91** is a hard blocker. R2 / Resend / FCM can all be
+skipped and turned on later; the app runs and records the work. Redis can be
+skipped for a single-server launch with `KV_DRIVER=memory`, but the scheduled
+jobs need a real one.
+
 ## Closed by Module 11
 
 | # | Was | Closed by |
