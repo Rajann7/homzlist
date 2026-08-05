@@ -67,8 +67,35 @@ console.log(`BASE=${BASE}\n== Guest (public site) ==`);
     check(d.status === 200, "property detail opens for a guest");
     check(n(l?.attributeRows) >= 5, "detail has attribute rows", `${n(l?.attributeRows)} rows`);
     check((l?.amenities ?? []).every((a) => !/_/.test(a)), "amenities render as labels, not codes", (l?.amenities ?? []).slice(0, 3).join(", "));
-    check(l?.contact == null, "guest payload carries NO contact number");
   }
+
+  /**
+   * The number rule, tested against the rule Doc2 §10.1 actually states.
+   *
+   * This used to assert that a guest NEVER receives a contact, using whichever
+   * property happened to be first in the feed. That is not the rule — a
+   * public-number listing publishes its number on purpose ("no number-request
+   * needed for poster's number since public"), and a private one withholds it.
+   * The assertion only passed because no public-number listing had ever landed
+   * in the first feed slot; moving inventory around put one there and the check
+   * called a documented feature a leak.
+   *
+   * Worse, it only ever looked at ONE listing, so a genuine leak on a private
+   * listing went untested whenever a public one came first. Every property on
+   * the page is checked now, against its own setting.
+   */
+  const props = items.filter((i) => i.kind === "property");
+  let priv = 0, pub = 0, leaks = [];
+  for (const p of props) {
+    const l = (await api(null, `/api/v1/listings/${p.id}`)).json?.data?.listing;
+    if (!l) continue;
+    if (l.contactPublic) { pub++; if (l.contact?.number == null) leaks.push(`${p.id} public but no number`); }
+    else { priv++; if (l.contact != null) leaks.push(`${p.id} PRIVATE but leaked ${JSON.stringify(l.contact)}`); }
+  }
+  check(leaks.length === 0,
+    "every guest payload follows its own number setting — private withholds, public publishes",
+    `${priv} private, ${pub} public${leaks.length ? " — " + leaks.slice(0, 2).join(" ; ") : ""}`);
+
   if (proj) {
     const d = await api(null, `/api/v1/projects/${proj.id}`);
     check(d.status === 200, "project detail opens for a guest", d.json?.data?.project?.name);
