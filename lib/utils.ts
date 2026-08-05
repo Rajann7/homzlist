@@ -17,6 +17,26 @@ const twMerge = extendTailwindMerge({
   },
 });
 
+/**
+ * An absolute URL for a page that only exists on the PUBLIC host.
+ *
+ * Legal, blog and the rest of the marketing surface are served from
+ * homzlist.com; the seller and admin apps are separate subdomains. A bare
+ * `/legal/terms` from the seller app therefore resolves to
+ * seller.homzlist.com/legal/terms, which the middleware does not serve — it
+ * redirects to /login. That is how the Checkout screen ended up telling people
+ * "by paying you agree to our Terms" over a link that went to a sign-in page.
+ *
+ * Always absolute, including on the public host itself: deciding per-host would
+ * need `window`, which renders one href on the server and a different one in
+ * the browser — a hydration mismatch. These are plain <a> tags either way, so
+ * an absolute same-origin URL costs nothing.
+ */
+export function legalHref(path: string): string {
+  const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000").replace(/\/$/, "");
+  return `${appUrl}${path}`;
+}
+
 /** Merge conditional class names, de-duplicating conflicting Tailwind classes. */
 export function cn(...inputs: ClassValue[]): string {
   return twMerge(clsx(inputs));

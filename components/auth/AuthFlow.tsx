@@ -39,7 +39,10 @@ export function AuthFlow() {
   const [offline, setOffline] = useState(false);
   const [flow, setFlow] = useState<{ phone: string; otpSession: string; devCode?: string; role?: string }>({ phone: "", otpSession: "" });
   const [saved, setSaved] = useState<SavedAccountHint[]>([]);
-  const legalRef = useRef<"terms" | "privacy">("terms");
+  // State, not a ref: the render below chooses its title from this. A ref read
+  // during render is not tracked, so the screen would only happen to update
+  // because go() re-renders at the same moment.
+  const [legalDoc, setLegalDoc] = useState<"terms" | "privacy">("terms");
   // /login?add=1 — arriving from the P9 switch sheet to sign a SECOND account
   // into this device. The server keeps both sessions (lib/auth/account-pool).
   // Read on every render, NOT via useState: this component is server-rendered
@@ -92,6 +95,7 @@ export function AuthFlow() {
       const refreshed = await authApi.refresh().catch(() => ({ ok: false }) as const);
       if (cancelled) return;
       if (refreshed.ok) {
+        // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- The session identity changes here, so this has to be a real page load — router.push() would keep the previous user's client cache and rendered tree.
         window.location.href = "/";
         return;
       }
@@ -148,7 +152,7 @@ export function AuthFlow() {
           }}
           onGuest={() => go("guest")}
           onLegal={(which) => {
-            legalRef.current = which;
+            setLegalDoc(which);
             go("legal");
           }}
         />
@@ -191,7 +195,7 @@ export function AuthFlow() {
       {screen === "coach" && <Coach onDone={goHome} />}
       {screen === "browserUnsupported" && <BrowserUnsupported />}
       {screen === "guest" && <Placeholder title="Feed — coming in Batch P2" onBack={back} />}
-      {screen === "legal" && <Placeholder title={`${legalRef.current === "terms" ? "Terms" : "Privacy Policy"} — coming in Batch P12`} onBack={back} />}
+      {screen === "legal" && <Placeholder title={`${legalDoc === "terms" ? "Terms" : "Privacy Policy"} — coming in Batch P12`} onBack={back} />}
     </div>
   );
 }

@@ -40,7 +40,9 @@ export function SettingsHome({ base = "" }: { base?: string }) {
 
   async function logout() {
     const r = await authApi.logout();
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- Cross-subdomain: the target is on a different host, which the App Router cannot navigate to.
     if (r.ok && r.data.switchedTo) { window.location.href = `${base}/profile`; return; }
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- Cross-subdomain: the target is on a different host, which the App Router cannot navigate to.
     window.location.href = `${base}/login`;
   }
 

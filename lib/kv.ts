@@ -144,7 +144,6 @@ class RedisKV implements KV {
 }
 
 declare global {
-  // eslint-disable-next-line no-var
   var __homzlistKV: KV | undefined;
 }
 

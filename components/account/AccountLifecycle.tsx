@@ -160,6 +160,7 @@ export function AccountLifecycle({ base = "" }: { base?: string }) {
             className="mt-4 min-w-[180px]"
             onClick={async () => {
               await fetch("/api/v1/auth/logout", { method: "POST", credentials: "same-origin" });
+              // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- The session identity changes here, so this has to be a real page load — router.push() would keep the previous user's client cache and rendered tree.
               window.location.href = "/login";
             }}
           >
@@ -197,6 +198,7 @@ export function AccountLifecycle({ base = "" }: { base?: string }) {
             variant="text"
             onClick={async () => {
               await fetch("/api/v1/auth/logout", { method: "POST", credentials: "same-origin" });
+              // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- The session identity changes here, so this has to be a real page load — router.push() would keep the previous user's client cache and rendered tree.
               window.location.href = "/login";
             }}
           >

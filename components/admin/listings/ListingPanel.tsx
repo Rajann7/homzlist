@@ -12,6 +12,7 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   AdminIcon,
   Avatar,
@@ -52,6 +53,7 @@ const day = (iso: unknown) =>
     : "—";
 
 export function ListingPanelBody({ panel }: { panel: PanelEntry }) {
+  const router = useRouter();
   const id = String(panel.data.id ?? "");
   const kind = (panel.data.kind as string) === "project" ? "project" : "listing";
   const toast = useToast();
@@ -296,7 +298,7 @@ export function ListingPanelBody({ panel }: { panel: PanelEntry }) {
           ) : tab === "boost" ? (
             <BoostTab data={data} onPause={() => setConfirm("pause")} onResume={() => void act("resume_boost")} />
           ) : tab === "reports" ? (
-            <ReportsTab data={data} onOpenQueue={() => (window.location.href = "/queues/reports")} />
+            <ReportsTab data={data} onOpenQueue={() => router.push("/queues/reports")} />
           ) : (
             <TimelineTab data={data} />
           )}

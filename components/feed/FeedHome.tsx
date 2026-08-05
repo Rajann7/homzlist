@@ -134,6 +134,10 @@ export function FeedHome() {
         {me?.guest && (
           <div className="flex items-center gap-2 bg-accent-soft px-4 py-2 text-13">
             <span className="flex-1 text-ink-secondary">Sign in to save, inquire and chat</span>
+            {/* /login lives on the seller host — the middleware 307s this off
+                the public origin — so <Link> would prefetch a redirect and then
+                hand off anyway. */}
+            {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- see above */}
             <a href="/login" className="font-semibold text-accent">Sign In</a>
           </div>
         )}

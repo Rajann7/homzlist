@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { AppShell, BottomSheet, Button, Header, Icon, Skeleton } from "./ui";
 import { billingApi, type PlanCard } from "@/lib/billing/client";
 import { BackButton, CouponRow, MicroBadge } from "./primitives";
-import { cn } from "@/lib/utils";
+import { cn, legalHref } from "@/lib/utils";
 
 /**
  * P5 S1 — Plan wall ("Choose a plan"), the PAYMENT-FIRST gate.
@@ -150,7 +150,7 @@ export function PlanWall({
         </button>
 
         <div className="mt-4 text-center text-11 leading-[1.4] text-ink-tertiary">
-          No refunds after purchase. See <a href="/legal/refund" className="text-accent">Refund Policy</a>.
+          No refunds after purchase. See <a href={legalHref("/legal/refund")} className="text-accent">Refund Policy</a>.
         </div>
       </div>
 

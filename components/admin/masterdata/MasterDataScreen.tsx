@@ -14,6 +14,7 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   AdminIcon,
   Avatar,
@@ -107,6 +108,7 @@ type Node = {
 };
 
 function LocationsTab() {
+  const router = useRouter();
   const toast = useToast();
   const [roots, setRoots] = useState<Node[] | null>(null);
   const [children, setChildren] = useState<Record<string, Node[]>>({});
@@ -249,7 +251,7 @@ function LocationsTab() {
               [
                 "View listings here",
                 () => {
-                  window.location.href = `${SCREEN_ROUTES.listingsMaster}?city=${encodeURIComponent(node.name)}`;
+                  router.push(`${SCREEN_ROUTES.listingsMaster}?city=${encodeURIComponent(node.name)}`);
                 },
               ],
               [

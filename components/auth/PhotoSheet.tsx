@@ -23,7 +23,29 @@ export function PhotoSheet({
   onChoose: () => void;
   onRemove: () => void;
 }) {
-  const Row = ({ icon, label, destructive, onClick }: { icon: IconName; label: string; destructive?: boolean; onClick: () => void }) => (
+  return (
+    <BottomSheet open={open} onClose={onClose} title="Profile photo">
+      <div className="flex flex-col">
+        <Row icon="camera" label="Take photo" onClick={onTake} onClose={onClose} />
+        <Row icon="image" label="Choose from gallery" onClick={onChoose} onClose={onClose} />
+        {hasPhoto && <Row icon="close" label="Remove photo" destructive onClick={onRemove} onClose={onClose} />}
+      </div>
+    </BottomSheet>
+  );
+}
+
+/**
+ * Hoisted out of PhotoSheet. Declaring a component inside another one gives it
+ * a new identity on every render, so React unmounts and remounts the row rather
+ * than updating it — it loses DOM state and restarts any transition. It only
+ * closed over `onClose`, which is now a prop.
+ */
+function Row({
+  icon, label, destructive, onClick, onClose,
+}: {
+  icon: IconName; label: string; destructive?: boolean; onClick: () => void; onClose: () => void;
+}) {
+  return (
     <button
       onClick={() => {
         onClick();
@@ -34,15 +56,5 @@ export function PhotoSheet({
       <Icon name={icon} size={22} strokeWidth={1.7} />
       {label}
     </button>
-  );
-
-  return (
-    <BottomSheet open={open} onClose={onClose} title="Profile photo">
-      <div className="flex flex-col">
-        <Row icon="camera" label="Take photo" onClick={onTake} />
-        <Row icon="image" label="Choose from gallery" onClick={onChoose} />
-        {hasPhoto && <Row icon="close" label="Remove photo" destructive onClick={onRemove} />}
-      </div>
-    </BottomSheet>
   );
 }

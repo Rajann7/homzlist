@@ -10,7 +10,7 @@ import {
 import { GSTIN_RE } from "@/lib/billing/money";
 import { BackButton, CouponRow, Radio } from "./primitives";
 import { payWithRazorpay, pollOrder } from "./pay";
-import { cn } from "@/lib/utils";
+import { cn, legalHref } from "@/lib/utils";
 
 /**
  * P6 S2 — Checkout.
@@ -117,6 +117,18 @@ export function Checkout() {
     if (!method && methodRows.length) setMethod(methodRows[0].key);
   }, [method, methodRows]);
 
+  // Declared ABOVE the polling effect that calls it, and memoised, so the
+  // effect can depend on it honestly instead of suppressing the dependency
+  // check — the previous order meant the effect closed over a `finish` that had
+  // not been initialised yet at the time the effect was created.
+  const finish = useCallback((id?: string) => {
+    setPhase("done");
+    const qs = new URLSearchParams({ kind: listingId ? "boost" : "plan" });
+    if (id) qs.set("order", id);
+    if (next) qs.set("next", next);
+    router.replace(`/checkout/success?${qs.toString()}`);
+  }, [listingId, next, router]);
+
   // Auto-poll a pending (UPI-collect) order. The page is safe to close — the
   // webhook activates regardless — but polling gets the user there sooner.
   useEffect(() => {
@@ -131,16 +143,7 @@ export function Checkout() {
     };
     let timer = setTimeout(tick, 5000);
     return () => { stop = true; clearTimeout(timer); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, orderId]);
-
-  const finish = (id?: string) => {
-    setPhase("done");
-    const qs = new URLSearchParams({ kind: listingId ? "boost" : "plan" });
-    if (id) qs.set("order", id);
-    if (next) qs.set("next", next);
-    router.replace(`/checkout/success?${qs.toString()}`);
-  };
+  }, [phase, orderId, finish]);
 
   /**
    * Apply through `/billing/quote` rather than the validate endpoint, so the
@@ -385,8 +388,8 @@ export function Checkout() {
         )}
         <div className="mt-2.5 text-11 leading-[1.4] text-ink-tertiary">Payments are processed securely by Razorpay.</div>
         <div className="mt-4 text-11 leading-[1.4] text-ink-tertiary">
-          By paying you agree to our <a href="/legal/terms" className="text-accent">Terms</a> and{" "}
-          <a href="/legal/refund" className="text-accent">No-Refund Policy</a>.
+          By paying you agree to our <a href={legalHref("/legal/terms")} className="text-accent">Terms</a> and{" "}
+          <a href={legalHref("/legal/refund")} className="text-accent">No-Refund Policy</a>.
         </div>
       </div>
 

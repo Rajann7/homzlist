@@ -186,6 +186,7 @@ function RequirementCardView({
   onToggle: (on: boolean) => void; onProposals: () => void; onEdit: () => void;
   onFulfil: () => void; onReopen: () => void; onMore: () => void; onOpenMatch: (id: string) => void;
 }) {
+  const router = useRouter();
   const expired = r.status === "expired";
   const fulfilled = r.status === "fulfilled";
   const live = r.status === "live";
@@ -221,7 +222,7 @@ function RequirementCardView({
       {expired && (
         <div className="flex flex-col gap-2 rounded-8 bg-warning-soft p-3">
           <p className="text-11 text-ink-secondary">This requirement expired. Renew your plan to reactivate it.</p>
-          <Button className="h-9 self-start px-4 text-13" onClick={() => location.assign("/plans")}>View Plans</Button>
+          <Button className="h-9 self-start px-4 text-13" onClick={() => router.push("/plans")}>View Plans</Button>
         </div>
       )}
 

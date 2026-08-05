@@ -33,6 +33,11 @@ export default function Error({ error, reset }: { error: Error & { digest?: stri
       >
         Reload
       </button>
+      {/* Deliberately a plain anchor, not <Link>. This is the global error
+          boundary: the render that just failed may have left the client router
+          in a state that cannot navigate, so the escape hatch has to be a real
+          page load. */}
+      {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- see above */}
       <a
         href="/help"
         className="mt-3.5 text-15 font-semibold leading-none text-accent"

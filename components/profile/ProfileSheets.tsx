@@ -171,13 +171,6 @@ export function ProfileMenuSheet({
   /** Route push for the seller destinations below. */
   onNavigate: (href: string) => void;
 }) {
-  const Row = ({ icon, label, badge, onClick }: { icon: IconName; label: string; badge?: string; onClick: () => void }) => (
-    <button onClick={onClick} className="flex h-12 w-full items-center gap-3 text-left text-15 text-ink-primary active:bg-surface-2">
-      <Icon name={icon} size={22} strokeWidth={1.7} />
-      <span className="flex-1">{label}</span>
-      {badge && <span className="grid h-5 min-w-5 place-items-center rounded-full bg-accent px-1 text-11 font-semibold text-ink-inverse">{badge}</span>}
-    </button>
-  );
   return (
     <BottomSheet open={open} onClose={onClose} hideHeader>
       <div className="flex flex-col pt-1">
@@ -380,5 +373,21 @@ export function FeaturedCollectionSheet({
         )}
       </div>
     </BottomSheet>
+  );
+}
+
+/**
+ * Hoisted out of MoreSheet. A component declared inside another one is a new
+ * component type on every render, so React tears the row down and rebuilds it
+ * instead of updating it. This one closed over nothing — it only ever used its
+ * own props.
+ */
+function Row({ icon, label, badge, onClick }: { icon: IconName; label: string; badge?: string; onClick: () => void }) {
+  return (
+    <button onClick={onClick} className="flex h-12 w-full items-center gap-3 text-left text-15 text-ink-primary active:bg-surface-2">
+      <Icon name={icon} size={22} strokeWidth={1.7} />
+      <span className="flex-1">{label}</span>
+      {badge && <span className="grid h-5 min-w-5 place-items-center rounded-full bg-accent px-1 text-11 font-semibold text-ink-inverse">{badge}</span>}
+    </button>
   );
 }

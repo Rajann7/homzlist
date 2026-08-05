@@ -170,8 +170,11 @@ export function PincodeField({
   const [open, setOpen] = useState(false);
   // `onChange` is a new closure every render; keeping it in a ref stops the
   // fetch effect from re-running on each keystroke elsewhere in the form.
+  // The assignment belongs in an effect, not in the render body — writing a ref
+  // while rendering is a side effect, and it makes the value depend on whether
+  // a render was committed or thrown away.
   const onChangeRef = useRef(onChange);
-  onChangeRef.current = onChange;
+  useEffect(() => { onChangeRef.current = onChange; }, [onChange]);
 
   useEffect(() => {
     if (!cityId) { setOptions(null); return; }

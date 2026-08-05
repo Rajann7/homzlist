@@ -173,6 +173,7 @@ export function OwnProfile() {
       // Hard navigation: every server-rendered page and cached payload on screen
       // belongs to the account being left, so none of it may survive the switch.
       sessionStorage.setItem(SWITCH_TOAST_KEY, a.username);
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- The session identity changes here, so this has to be a real page load — router.push() would keep the previous user's client cache and rendered tree.
       window.location.href = "/profile";
       return;
     }
@@ -240,9 +241,11 @@ export function OwnProfile() {
     const r = await authApi.logout();
     // With another account signed in on this device we land on it, not on /login.
     if (r.ok && r.data.switchedTo) {
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- The session identity changes here, so this has to be a real page load — router.push() would keep the previous user's client cache and rendered tree.
       window.location.href = "/profile";
       return;
     }
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- The session identity changes here, so this has to be a real page load — router.push() would keep the previous user's client cache and rendered tree.
     window.location.href = "/login";
   }
 
@@ -467,6 +470,7 @@ export function OwnProfile() {
           // Hard navigation on purpose: a soft push can render the auth flow
           // before the router has committed the `add` param, and this screen's
           // cached RSC payload belongs to the account we may be about to leave.
+          // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- The session identity changes here, so this has to be a real page load — router.push() would keep the previous user's client cache and rendered tree.
           window.location.href = "/login?add=1";
         }}
         onLogout={logout}

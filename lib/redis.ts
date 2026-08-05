@@ -12,9 +12,7 @@ import { serverEnv } from "@/lib/env";
  */
 
 declare global {
-  // eslint-disable-next-line no-var
   var __homzlistRedis: Redis | undefined;
-  // eslint-disable-next-line no-var
   var __homzlistBull: Redis | undefined;
 }
 

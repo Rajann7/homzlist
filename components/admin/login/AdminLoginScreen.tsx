@@ -62,6 +62,7 @@ export function AdminLoginScreen({
       if (body?.ok && body.data?.outcome === "ok") {
         // A server-side redirect, so the panel's first paint already has the
         // session rather than mounting once as a guest.
+        // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- The session identity changes here, so this has to be a real page load — router.push() would keep the previous user's client cache and rendered tree.
         window.location.assign("/");
         return;
       }
