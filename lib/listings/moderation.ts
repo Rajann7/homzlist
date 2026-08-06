@@ -242,6 +242,29 @@ export async function moderationHistory(subject: ModerationSubject, id: string) 
  * owner's daily approval bucket, and the count comes back from the atomic
  * upsert — a real count, never a client-side tally.
  */
+/**
+ * The three link shapes a decision needs, per SUBJECT.
+ *
+ * This function is shared by listings, projects and requirements, but the
+ * notification types it uses are listing-shaped (`/listings/{listingId}`,
+ * `/create/form?edit={listingId}`). Letting the template resolve meant an
+ * approved REQUIREMENT linked to `/listings/<requirement id>` and an approved
+ * PROJECT to `/listings/<project id>` — a real page showing the wrong thing,
+ * or nothing. The href is therefore built from the subject, here, once.
+ */
+const ownerHref = (subject: ModerationSubject, id: string) =>
+  subject === "project" ? `/projects/${id}`
+  : subject === "requirement" ? `/requirements/${id}`
+  : `/listings/${id}`;
+
+const editHref = (subject: ModerationSubject, id: string) =>
+  subject === "project" ? `/projects/new?edit=${id}`
+  : subject === "requirement" ? `/requirements/new?edit=${id}`
+  : `/create/form?edit=${id}`;
+
+const listHref = (subject: ModerationSubject) =>
+  subject === "requirement" ? "/requirements/mine" : "/listings";
+
 async function notifyModerationDecision(
   subject: ModerationSubject,
   id: string,
@@ -264,12 +287,13 @@ async function notifyModerationDecision(
       body: "It is visible in the feed and in search.",
       thumbUrl: brief.thumbUrl,
       groupKey: `approved:${subject}`,
+      href: ownerHref(subject, id),
       entityKind: subject, entityId: id,
       data: { listingId: id, subject },
     });
     if (res.grouped && res.groupCount > 1 && res.id) {
       await db().from("notifications")
-        .update({ title: `**${res.groupCount} ${noun}s approved** — tap to review`, href: "/listings", thumb_url: null })
+        .update({ title: `**${res.groupCount} ${noun}s approved** — tap to review`, href: listHref(subject), thumb_url: null })
         .eq("id", res.id);
     }
     return;
@@ -284,6 +308,9 @@ async function notifyModerationDecision(
       type: "listing_changes_requested",
       title: `Changes requested on **${brief.title}**${notes ? ` — ${notes}` : ""}`,
       body: notes || "Open the listing to see what needs changing.",
+      // "Edit listing" has to open the right FORM — the project and
+      // requirement forms take ?edit= too, on their own routes.
+      href: editHref(subject, id),
       entityKind: subject, entityId: id,
       data: { listingId: id, subject },
     });
@@ -297,6 +324,7 @@ async function notifyModerationDecision(
       type: "listing_rejected",
       title: `Your ${noun} was rejected — **${reason || "does not meet our guidelines"}**`,
       body: locked ? "This item is locked after three rejections. You can appeal." : "Fix the reason and re-submit.",
+      href: ownerHref(subject, id),
       entityKind: subject, entityId: id,
       data: { listingId: id, subject, rejectReason: reason },
     });

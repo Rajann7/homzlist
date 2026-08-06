@@ -34,6 +34,20 @@ export type MasterResult =
 const TABLE: Record<MasterKind, string> = { listing: "listings", project: "projects" };
 const TITLE: Record<MasterKind, string> = { listing: "title", project: "name" };
 
+/**
+ * The OWNER's own page for the thing an admin acted on — the target of the
+ * notification that tells them about it. `admin_message` has no href template
+ * (its subject changes per producer), so a producer that KNOWS the subject has
+ * to say so, or the row falls back to Account status and the user has to go
+ * looking for which listing we meant.
+ */
+const ownerHref = (kind: MasterKind, id: string) =>
+  kind === "project" ? `/projects/${id}` : `/listings/${id}`;
+
+/** …and the form that reopens it — a project does not edit in the flat form. */
+const editHref = (kind: MasterKind, id: string) =>
+  kind === "project" ? `/projects/new?edit=${id}` : `/create/form?edit=${id}`;
+
 async function subject(kind: MasterKind, id: string) {
   const { data } = await db()
     .from(TABLE[kind])
@@ -357,6 +371,7 @@ export async function editListing(
       ? "Your listing is being re-reviewed after an edit"
       : "A compliance edit was made to your listing",
     body: reason.trim().slice(0, 300),
+    href: reReview ? editHref(kind, id) : ownerHref(kind, id),
     entityKind: kind,
     entityId: id,
     actorId: me.id,
@@ -392,6 +407,7 @@ export async function hideListing(
     type: "admin_message",
     title: "Your listing has been hidden",
     body: reason?.trim() || "It is no longer shown in feed or search.",
+    href: ownerHref(kind, id),
     entityKind: kind,
     entityId: id,
     actorId: me.id,

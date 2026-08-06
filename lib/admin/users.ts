@@ -914,6 +914,9 @@ export async function grantTrial(
     type: "admin_message",
     title: "You've received a trial from HomzList",
     body: `${contents.listings} listing + ${contents.requirements} requirement for ${durationDays} days`,
+    // The plan they were just given — not the generic Account status page the
+    // rest of the admin broadcasts fall back to.
+    href: "/plans/my",
     actorId: me.id,
   });
 

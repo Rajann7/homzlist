@@ -969,6 +969,10 @@ export async function approveAreaRequest(id: string, me: AdminIdentity): Promise
       type: "area_added",
       title: `${req.name} is now on HomzList`,
       body: "The area you asked for has been added — you can post and search in it now.",
+      // The type's template (0129) lands on /create — the screen whose
+      // location picker took the request. It used to resolve to `/area`,
+      // which is not a route on the seller host at all.
+      data: { areaId, areaName: req.name },
       actorId: me.id,
     }).catch(() => {});
   }

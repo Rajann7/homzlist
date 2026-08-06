@@ -63,6 +63,12 @@ export interface TypeConfig {
   leadIcon: string | null;
   leadTone: "accent" | "warn" | "err" | "info" | "neutral";
   hrefTemplate: string | null;
+  /**
+   * Where the row lands when the specific target cannot be built — a missing
+   * placeholder, or a type with no template at all (0129). Always a real route
+   * on the seller host, because that is the only host the inbox renders on.
+   */
+  hrefFallback: string | null;
   actions: NotificationAction[];
   isUrgent: boolean;
   isMarketing: boolean;
@@ -93,6 +99,7 @@ function rowToConfig(r: any): TypeConfig {
     leadIcon: r.lead_icon,
     leadTone: r.lead_tone,
     hrefTemplate: r.href_template,
+    hrefFallback: r.href_fallback ?? null,
     actions: Array.isArray(r.actions) ? r.actions : [],
     isUrgent: !!r.is_urgent,
     isMarketing: !!r.is_marketing,
@@ -131,19 +138,25 @@ export async function loadCategories(): Promise<CategoryConfig[]> {
 
 /**
  * Fill a deep-link template from the notification's `data` bag.
- * A template whose placeholder has no value falls back to the path prefix
- * before that segment, so a tap can never land on `/property/undefined`.
+ *
+ * A placeholder with no value used to trim the path back to its prefix, which
+ * produced targets like `/property` and `/area` — neither of which is a route,
+ * so the tap 404'd. The type's own `href_fallback` is the answer instead: a
+ * real seller screen chosen per type (a saved-listing alert lands on Saved, a
+ * thread alert on Messages). A type with no template at all resolves to the
+ * same fallback, so "no link" is a decision rather than an accident.
  */
-export function resolveHref(template: string | null, data: Record<string, unknown>): string | null {
-  if (!template) return null;
+export function resolveHref(
+  template: string | null,
+  data: Record<string, unknown>,
+  fallback: string | null = null,
+): string | null {
+  if (!template) return fallback;
   let missing = false;
   const filled = template.replace(/\{(\w+)\}/g, (_m, key) => {
     const v = data?.[key];
     if (v == null || v === "") { missing = true; return ""; }
     return encodeURIComponent(String(v));
   });
-  if (!missing) return filled;
-  // Trim back to the last complete segment (drops "/{id}" and any trailing "?x=").
-  const noQuery = filled.split("?")[0].replace(/\/+$/, "");
-  return noQuery || "/";
+  return missing ? fallback : filled;
 }

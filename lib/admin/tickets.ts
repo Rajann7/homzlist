@@ -274,6 +274,11 @@ export async function closeTicket(
     type: "report_outcome",
     title: `${t.number} closed`,
     body: note,
+    // The ticket the user can still read (P12 S5). Without it the row was the
+    // one notification about their own ticket that could not open it.
+    href: `/help/tickets/${id}`,
+    entityKind: "ticket",
+    entityId: id,
     actorId: me.id,
   }).catch(() => {});
 
@@ -549,6 +554,12 @@ export async function resolveDispute(
       type: "report_outcome",
       title: `Dispute ${d.number} resolved`,
       body: note.slice(0, 200),
+      // A dispute has no screen of its own on the user side; Help is where
+      // either party can take it further, and it beats a row that opens
+      // nothing at all.
+      href: "/help",
+      entityKind: "dispute",
+      entityId: id,
       actorId: me.id,
     }).catch(() => {});
   }

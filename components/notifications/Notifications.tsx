@@ -101,7 +101,9 @@ export function Notifications({ base = "" }: { base?: string }) {
 
   async function onOpen(row: NotificationRow) {
     const target = safeHref(row.href);
-    if (!row.unread && !target) return;
+    // A tap always DOES something: every type carries a target (migrations
+    // 0129/0132), and the read state is written even on the rare row whose
+    // link the server could not build — never an inert row.
     if (row.unread) { await notificationsApi.markRead(row.id); void load(); }
     if (target) router.push(target);
   }
@@ -123,10 +125,17 @@ export function Notifications({ base = "" }: { base?: string }) {
     if (res.data.toast) toast.show(res.data.toast);
   }
 
-  /** Navigation-only actions (Renew, Edit listing, View invoice…). */
+  /**
+   * Navigation-only actions (Renew, Edit listing, View invoice…).
+   *
+   * These take the row's own href. A row that somehow has none must not leave
+   * a button that silently does nothing, so it falls back to the row tap —
+   * which at minimum marks it read.
+   */
   function onNavAction(row: NotificationRow) {
     const target = safeHref(row.href);
     if (target) router.push(target);
+    else void onOpen(row);
   }
 
   const right = (
@@ -301,7 +310,7 @@ function NotifRow({
 }) {
   const [dx, setDx] = useState(0);
   const [gone, setGone] = useState(false);
-  const start = useRef<number | null>(null);
+  const start = useRef<{ x: number; y: number } | null>(null);
   // The ref drives the HANDLERS and the state drives the RENDER.
   //
   // The handlers have to read this synchronously: touchmove can fire before the
@@ -310,23 +319,55 @@ function NotifRow({
   // also needs it, and a ref read during render is not tracked. So both — the
   // ref stays the source of truth for the gesture, the state only mirrors it.
   const dragging = useRef(false);
+  /** null until the first move decides horizontal (swipe) vs vertical (scroll). */
+  const axis = useRef<"x" | "y" | null>(null);
+  /** Set by a horizontal gesture so the click it ends with is not a tap. */
+  const swiped = useRef(false);
   const [isDragging, setIsDragging] = useState(false);
   const wrap = useRef<HTMLDivElement>(null);
+
+  function reset() {
+    dragging.current = false;
+    axis.current = null;
+    start.current = null;
+    setIsDragging(false);
+    setDx(0);
+  }
 
   function onTouchStart(e: React.TouchEvent) {
     // A drag that starts on a button is a tap on that button, not a swipe.
     if ((e.target as HTMLElement).closest("button")) return;
-    start.current = e.touches[0].clientX;
+    start.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    axis.current = null;
+    // Cleared per gesture, not per click: a swipe usually ends WITHOUT a click,
+    // and a flag left set would have swallowed the next real tap.
+    swiped.current = false;
     dragging.current = true;
     setIsDragging(true);
   }
+
   function onTouchMove(e: React.TouchEvent) {
     if (!dragging.current || start.current == null) return;
-    setDx(Math.min(0, e.touches[0].clientX - start.current));
+    const mx = e.touches[0].clientX - start.current.x;
+    const my = e.touches[0].clientY - start.current.y;
+
+    // Decide the axis once, at the first move that is big enough to mean
+    // something. A finger that is scrolling the list must not drag rows
+    // sideways by the few pixels of horizontal wobble every scroll has.
+    if (axis.current === null) {
+      if (Math.abs(mx) < 8 && Math.abs(my) < 8) return;
+      axis.current = Math.abs(mx) > Math.abs(my) ? "x" : "y";
+      if (axis.current === "y") { reset(); return; }
+      swiped.current = true;
+    }
+    setDx(Math.min(0, mx));
   }
+
   function onTouchEnd() {
     if (!dragging.current) return;
     dragging.current = false;
+    axis.current = null;
+    start.current = null;
     setIsDragging(false);
     if (dx < -90) { setGone(true); setDx(-window.innerWidth); setTimeout(onDismiss, 150); }
     else setDx(0);
@@ -356,8 +397,19 @@ function NotifRow({
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
-        onClick={onOpen}
-        style={{ transform: `translateX(${dx}px)`, transition: isDragging ? "none" : undefined }}
+        // Without this the gesture never completed on a real device. The row
+        // sits inside a vertically scrolling <main>; with the default
+        // `touch-action: auto` the browser owns BOTH axes, so it claimed the
+        // horizontal drag, fired `touchcancel` instead of `touchend`, and the
+        // dismiss never ran — leaving the row stuck mid-swipe. `pan-y` gives
+        // the browser the vertical scroll and keeps the horizontal drag for
+        // us. `touchcancel` is still handled, because a system gesture (a
+        // call, a notification shade) can cancel any touch at any time.
+        onTouchCancel={onTouchEnd}
+        // A swipe that ends is not also a tap — without this a released swipe
+        // could still open the row it was dismissing.
+        onClick={() => { if (!swiped.current) onOpen(); }}
+        style={{ transform: `translateX(${dx}px)`, transition: isDragging ? "none" : undefined, touchAction: "pan-y" }}
         className={cn(
           "relative flex items-start gap-3 bg-page p-4 transition-transform duration-100 will-change-transform active:bg-surface-2",
           row.unread && "bg-accent-soft pl-6",

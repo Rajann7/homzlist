@@ -4284,3 +4284,67 @@ wired to SIGINT/SIGTERM/uncaught/EPIPE too, because a run killed mid-way (a bare
 `| head` is enough) used to strand the row inside the window, which then
 suppressed the next run's seeding and left the original `live_at`
 unrecoverable — nothing in the schema remembers it.
+
+## Notifications A-to-Z sweep (6 Aug 2026) — found beyond the prompt
+
+**1. RESOLVED (6 Aug 2026) — every notification now leads to a real screen.**
+The inbox renders only on `seller.<host>`, but several deep links pointed at
+routes that exist on the PUBLIC host or nowhere at all: `verification_*` →
+`/settings/verification` (404, the real screen is `/profile/verification`),
+`area_added` → `/area/<slug>` (a public page; the seller rewrite 404s), and a
+placeholder with no value trimmed `/property/{id}` back to `/property`, which is
+not a route either. `report_outcome`, `new_device_login` and
+`area_request_dismissed` had no template at all — 221 rows that were not
+clickable, one of them carrying a "View status" button with nowhere to go.
+Migration 0129 adds `notification_types.href_fallback` (a real seller route per
+type), corrects the wrong templates, teaches `notify_upsert` never to store an
+unresolved template, and repairs the rows already in people's inboxes.
+Proven live: all 697 distinct stored links answer < 400, enforced from now on by
+`npm run check:notifications`.
+
+**2. RESOLVED (6 Aug 2026) — a moderation decision opened the wrong entity.**
+`notifyModerationDecision` is shared by listings, projects and requirements, but
+its three notification types are listing-shaped, so an approved PROJECT linked to
+`/listings/<project id>` and an approved REQUIREMENT to `/listings/<requirement
+id>` — a real page showing the wrong thing. The producer now derives the link
+from `subject` (`/projects/<id>`, `/requirements/<id>`, and the matching `?edit=`
+forms); migration 0130 repairs the 39 rows that were already wrong.
+
+**3. RESOLVED (6 Aug 2026) — swipe-to-dismiss never completed on a real device.**
+The row had `touch-action: auto` inside a vertically scrolling `<main>`, so the
+browser owned both axes: it claimed the horizontal drag, fired `touchcancel`
+instead of `touchend`, and the dismiss never ran — the row simply stuck
+mid-swipe. It only ever "worked" under synthetic events, which is why the API
+check passed while the gesture did not. Fixed with `touch-action: pan-y`, an
+axis lock on the first move, and a `touchcancel` handler. Appearance unchanged.
+
+**4. Seeds were writing links the real producers never write.**
+`seed-admin.mjs` gave all 420 seeded rows `href = '/notifications'` (the inbox
+pointing at itself) and `seed-module10.mjs` relied on `notify_upsert`'s old
+`coalesce(p_href, t.href_template)`, which stored raw text like
+`/requirements/{requirementId}`. Both are fixed — the admin seed now reads
+`href_fallback` from the config table — but the lesson is the general one: a
+seed that writes a shape the producer cannot produce turns every manual test
+into a false pass.
+
+**5. RESOLVED (6 Aug 2026) — `check:module12` failed on a date, not on the code.**
+Its delete-path step restored a payment's real `created_at` and then expected the
+7-day payment hold to be clear. Whether that passed depended on how long ago the
+seed was run (`scripts/seed-admin.mjs` pins NOW to 30 Jul 2026), so on 6 Aug 2026
+it returned a correct 403 and the script threw on the undefined `otpSession` — a
+red run that said nothing about the app. It now pushes the payment safely OUTSIDE
+the window to clear the hold and restores the true timestamps in a
+`restorePayment()` wired to SIGINT/SIGTERM/uncaught/EPIPE, the same discipline
+`check:story` already got, plus a clean message instead of a throw if the code is
+ever refused. 170/170 passing, and no payment left sitting in the past.
+
+**6. RESOLVED (6 Aug 2026) — the admin broadcast is clickable too.**
+0129 left `admin_message` as the one type with no target, on the reasoning that
+its content is the row itself. Overruled: the message is always ABOUT something.
+The producers that know their subject now say so — a compliance edit or a hidden
+listing opens that listing (the project form for a project, not the flat one), a
+granted trial opens My Plan — and everything else lands on Account status, the
+screen that already lists exactly these notices with their severity dots.
+Migration 0132 repairs the 1276 existing rows and then ASSERTS the invariant:
+zero notification rows with no link, zero types with no landing page. The check
+script's exemption is gone with it, so nothing can quietly reintroduce a dead row.

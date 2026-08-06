@@ -1706,6 +1706,9 @@ await bulk("admin_notifications", ["kind", "title", "body", "link_screen", "seve
     kind: pick(["queue", "payment", "report", "staff", "system"]),
     title: pick(["New listing in the queue", "Refund requested", "Report spike on a listing", "Staff added", "Cron job failed", "Verification pending over 24h"]),
     body: pick(["Oldest item is now 26 hours old.", "₹2,999 refund waiting for approval.", "5 reports in 2 hours.", "Rohit Mehta was added as Staff.", "Orphan media cleanup failed."]),
+    // Every real producer (lib/admin/sign-in, lib/admin/decisions) sets a
+    // link_screen; a seeded row without one is an admin bell row that cannot
+    // be opened, which is not a state the panel can actually reach.
     link_screen: pick(["listings", "payments", "reports", "staff", "cron"]),
     severity: pick(["info", "warning", "error"]),
     read_at: i > 8 ? hoursAgo(int(1, 40)) : null, created_at: hoursAgo(int(0, 72)),
@@ -1877,7 +1880,12 @@ await bulk("exports", ["name", "entity", "filters", "format", "row_count", "stat
     };
   }));
 
-// notifications so the user-side bell and the admin comm-log line up
+// notifications so the user-side bell and the admin comm-log line up.
+// The link a row carries is read from the config table, never invented here —
+// the seed has to produce the same shape the real producer does.
+const NOTIF_FALLBACK = Object.fromEntries(
+  (await q("select code, href_fallback from notification_types")).rows.map((r) => [r.code, r.href_fallback]),
+);
 await bulk("notifications", ["profile_id", "type", "title", "body", "category", "href", "read_at", "created_at", "last_event_at"],
   Array.from({ length: 420 }, () => {
     const u = pick(activeUsers);
@@ -1893,7 +1901,12 @@ await bulk("notifications", ["profile_id", "type", "title", "body", "category", 
       category: t.startsWith("listing") || t.startsWith("boost") ? "listing"
         : t.startsWith("payment") || t.startsWith("refund") || t.startsWith("plan") || t === "trial_ending" ? "payment"
           : t.startsWith("requirement") || t.startsWith("proposal") ? "requirement" : "inquiry",
-      href: "/notifications", read_at: chance(0.55) ? at : null, created_at: at, last_event_at: at,
+      // The type's own safe landing page (notification_types.href_fallback,
+      // migration 0129). Seeding every row with "/notifications" pointed the
+      // inbox at itself — 420 rows whose tap did nothing, and every one of
+      // them a false pass when the inbox was being tested by hand.
+      href: NOTIF_FALLBACK[t] ?? null,
+      read_at: chance(0.55) ? at : null, created_at: at, last_event_at: at,
     };
   }), { shared: true });
 
