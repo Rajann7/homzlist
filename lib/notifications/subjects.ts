@@ -46,6 +46,30 @@ export async function requirementBrief(requirementId: string | null | undefined)
   return { title: bits.join(", ") || "your requirement", thumbUrl: null };
 }
 
+/**
+ * The same brief WITHOUT the budget — for notifications that go to someone who
+ * is not the poster.
+ *
+ * `requirementBrief` is right for the poster's own reminders ("your requirement
+ * expires in 5 days"), where the budget is their own. It was also being used
+ * for the "New requirement matches your area" alert, which fans out to every
+ * broker and builder in the city — so an unpaid recipient was handed, in a push
+ * notification, the exact figure that every screen in the app strips
+ * server-side behind the ₹2,999 wall (Doc9 §17).
+ */
+export async function requirementBriefPreview(requirementId: string | null | undefined): Promise<SubjectBrief> {
+  if (!requirementId) return { title: "a new requirement", thumbUrl: null };
+  const { data } = await db()
+    .from("requirements")
+    .select("bhk,kind,area_label")
+    .eq("id", requirementId)
+    .maybeSingle();
+  const r = data as { bhk: number | null; kind: string; area_label: string | null } | null;
+  if (!r) return { title: "a new requirement", thumbUrl: null };
+  const bits = [r.bhk ? `${r.bhk} BHK` : null, r.kind === "rent" ? "Rent" : "Buy", r.area_label].filter(Boolean);
+  return { title: bits.join(", ") || "a new requirement", thumbUrl: null };
+}
+
 export async function nameOf(profileId: string | null | undefined): Promise<string> {
   if (!profileId) return "Someone";
   const { data } = await db().from("profiles").select("name").eq("id", profileId).maybeSingle();

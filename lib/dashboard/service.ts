@@ -1,5 +1,6 @@
 import "server-only";
 import { createServiceClient } from "@/lib/supabase/server";
+import { stateIdOfCity } from "@/lib/billing/placement";
 import type { DashboardCounts } from "./service.types";
 
 export type { DashboardCounts };
@@ -45,6 +46,31 @@ async function count(build: () => PromiseLike<{ count: number | null }>): Promis
   }
 }
 
+/**
+ * The tile's number must be the number of cards the tile OPENS.
+ *
+ * `browseRequirements` falls back to the rest of the state when the viewer's
+ * city has nothing live, so a city-only count printed "0" over a screen that
+ * then showed nine Gujarat cards. Same three scopes, same order, same
+ * exclusions — a straight count instead of a page of rows.
+ */
+async function browseRequirementCount(profileId: string, cityId: string | null): Promise<number> {
+  const base = () =>
+    db().from("requirements").select("id", { count: "exact", head: true })
+      .eq("status", "live")
+      .eq("is_active", true)
+      .neq("profile_id", profileId); // never browse your own
+
+  if (!cityId) return count(() => base());
+
+  const inCity = await count(() => base().eq("city_id", cityId));
+  if (inCity > 0) return inCity;
+
+  const stateId = await stateIdOfCity(cityId);
+  if (!stateId) return 0;
+  return count(() => base().eq("state_id", stateId).neq("city_id", cityId));
+}
+
 export async function dashboardCounts(profileId: string): Promise<DashboardCounts> {
   if (!profileId) return ZERO;
 
@@ -75,14 +101,7 @@ export async function dashboardCounts(profileId: string): Promise<DashboardCount
         .eq("is_relevant", true)
         .eq("stage", "new"),
     ),
-    count(() => {
-      let q = db().from("requirements").select("id", { count: "exact", head: true })
-        .eq("status", "live")
-        .eq("is_active", true)
-        .neq("profile_id", profileId); // never browse your own
-      if (cityId) q = q.eq("city_id", cityId);
-      return q;
-    }),
+    browseRequirementCount(profileId, cityId),
     count(() =>
       db().from("requirements").select("id", { count: "exact", head: true })
         .eq("profile_id", profileId)

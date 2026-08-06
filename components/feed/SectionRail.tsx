@@ -36,11 +36,13 @@ function dedupe<T>(prev: T[], next: T[], key: (x: T) => string): T[] {
 }
 
 export function SectionRail({
-  section, filter, sort, renderCard, renderPerson, onViewAll,
+  section, filter, sort, cityId = null, renderCard, renderPerson, onViewAll,
 }: {
   section: FeedSectionMeta;
   filter: string;
   sort: string;
+  /** Guest's city, so a rail's pages stay in the same scope as its heading. */
+  cityId?: string | null;
   renderCard: (card: Card) => React.ReactNode;
   renderPerson: (person: FeedPerson) => React.ReactNode;
   onViewAll: (href: string) => void;
@@ -60,7 +62,7 @@ export function SectionRail({
 
   const loadFirst = useCallback(async () => {
     setFailed(false);
-    const res = await feedApi.section(section.key, { filter, sort });
+    const res = await feedApi.section(section.key, { filter, sort, cityId });
     if (res.ok) {
       setItems(res.data.items);
       setPeople(res.data.people);
@@ -97,7 +99,7 @@ export function SectionRail({
   const loadMore = useCallback(async () => {
     if (!cursor || loadingMore) return;
     setLoadingMore(true);
-    const res = await feedApi.section(section.key, { filter, sort, cursor });
+    const res = await feedApi.section(section.key, { filter, sort, cursor, cityId });
     setLoadingMore(false);
     if (!res.ok) return;
     // Append by id, never blindly. The server no longer repeats a boosted card

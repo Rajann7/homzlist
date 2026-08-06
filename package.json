@@ -59,7 +59,8 @@
     "check:bundle-secrets": "node scripts/check-bundle-secrets.mjs",
     "seed:module12": "node scripts/seed-module12.mjs",
     "check:module12": "node scripts/check-module12-live.mjs",
-    "check:module12-ui": "node scripts/check-module12-ui.mjs"
+    "check:module12-ui": "node scripts/check-module12-ui.mjs",
+    "check:req-visibility": "node scripts/check-requirement-visibility.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1091.0",

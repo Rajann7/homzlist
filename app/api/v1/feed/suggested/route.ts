@@ -11,5 +11,6 @@ export async function GET(req: NextRequest) {
   const limited = await rateLimit(`feed-sug:${clientIp(req.headers)}`, 120, 60);
   if (!limited.allowed) return fail("RATE_LIMITED");
   const claims = await getCurrentUser();
-  return ok({ items: await suggested(claims?.sub ?? null) });
+  const city = new URL(req.url).searchParams.get("city");
+  return ok({ items: await suggested(claims?.sub ?? null, city) });
 }

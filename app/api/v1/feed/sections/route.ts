@@ -23,11 +23,14 @@ export async function GET(req: NextRequest) {
   if (!limited.allowed) return fail("RATE_LIMITED");
 
   const claims = await getCurrentUser();
-  const filterRaw = new URL(req.url).searchParams.get("filter");
+  const url = new URL(req.url);
+  const filterRaw = url.searchParams.get("filter");
   const filter: FeedFilter = filterRaw === "buy" || filterRaw === "rent" ? filterRaw : "all";
 
   try {
-    const sections = await getFeedSections(claims?.sub ?? null, { filter });
+  // Guest's city-chip pick; validated server-side and ignored for anyone whose
+  // profile already has a city (lib/location/viewer-city).
+    const sections = await getFeedSections(claims?.sub ?? null, { filter, cityId: url.searchParams.get("city") });
     return ok({ sections });
   } catch (err) {
     // Doc9 §20: the detail stays in the log, the caller gets a clean code.

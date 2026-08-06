@@ -6,7 +6,7 @@ import { AppShell, Button, Header, Icon, Skeleton, StatusBadge, Toggle, useToast
 import { BackButton, Checklist, OfflineBanner } from "@/components/billing/primitives";
 import { ConfirmDialog } from "@/components/ui/Dialog";
 import { ProposalSheet } from "./ProposalSheet";
-import { requirementsApi, type RequirementDetail as Detail } from "@/lib/listings/client";
+import { requirementsApi, type RequirementDetail as Detail, type UnlockPlan } from "@/lib/listings/client";
 import { DetailAnswerGrid, DetailCard, DetailSection } from "./detailBody";
 
 /**
@@ -23,6 +23,7 @@ export function RequirementDetail({ id, isGuest = false }: { id: string; isGuest
   const goOrLogin = (path: string) => router.push(isGuest ? "/login" : path);
 
   const [r, setR] = useState<Detail | null>(null);
+  const [unlockPlan, setUnlockPlan] = useState<UnlockPlan | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [offline, setOffline] = useState(false);
@@ -33,7 +34,7 @@ export function RequirementDetail({ id, isGuest = false }: { id: string; isGuest
 
   const load = useCallback(async () => {
     const res = await requirementsApi.get(id);
-    if (res.ok) setR(res.data.requirement);
+    if (res.ok) { setR(res.data.requirement); setUnlockPlan(res.data.unlockPlan ?? null); }
     else if (res.error.code === "OFFLINE") setOffline(true);
     else setNotFound(true);
     setLoading(false);
@@ -64,7 +65,7 @@ export function RequirementDetail({ id, isGuest = false }: { id: string; isGuest
 
   if (loading) {
     return (
-      <Shell>
+      <Shell isGuest={isGuest}>
         <div className="flex flex-col gap-4 p-4">
           <Skeleton className="h-8 w-40" />
           <Skeleton className="h-[120px] w-full rounded-12" />
@@ -76,11 +77,16 @@ export function RequirementDetail({ id, isGuest = false }: { id: string; isGuest
 
   if (notFound || !r) {
     return (
-      <Shell>
+      <Shell isGuest={isGuest}>
         <div className="flex flex-col items-center gap-3 px-6 py-16 text-center">
           <h2 className="text-20 font-bold text-ink-primary">Requirement not found</h2>
           <p className="text-15 text-ink-secondary">It may have been fulfilled, expired or removed.</p>
-          <Button className="mt-2" onClick={() => router.push("/requirements")}>Go to My Requirements</Button>
+          {/* `/requirements` exists on the SELLER host only — the public host
+              has just `/requirements/:id`, so this button 404'd for exactly the
+              visitors most likely to hit a dead requirement link. */}
+          <Button className="mt-2" onClick={() => router.push(isGuest ? "/" : "/requirements")}>
+            {isGuest ? "Back to Home" : "Go to My Requirements"}
+          </Button>
         </div>
       </Shell>
     );
@@ -90,7 +96,7 @@ export function RequirementDetail({ id, isGuest = false }: { id: string; isGuest
   const locked = r.access === "locked";
 
   return (
-    <Shell>
+    <Shell isGuest={isGuest}>
       {offline && <OfflineBanner />}
 
       {/* Same card language as the property / project detail (detailBody): a
@@ -187,12 +193,19 @@ export function RequirementDetail({ id, isGuest = false }: { id: string; isGuest
                 <Icon name="lock" size={32} className="text-accent" />
                 <h3 className="text-17 font-semibold text-ink-primary">Unlock all requirements</h3>
                 <p className="text-13 text-ink-secondary">See full details, budgets and contact posters directly</p>
+                {/* Price + period come from `plan_catalog`, for the plan THIS
+                    viewer's role can actually buy. */}
                 <div className="flex items-baseline gap-1">
-                  <span className="text-24 font-bold text-ink-primary">₹2,999</span>
-                  <span className="text-13 text-ink-tertiary">/month</span>
+                  <span className="text-24 font-bold text-ink-primary">{unlockPlan?.price ?? ""}</span>
+                  <span className="text-13 text-ink-tertiary">{unlockPlan?.subLabel ?? ""}</span>
                 </div>
                 <Checklist items={["View all requirements", "30 proposals included", "Instant match alerts"]} />
-                <Button fullWidth className="mt-1" onClick={() => goOrLogin("/checkout?plan=p2999")}>
+                <Button
+                  fullWidth
+                  className="mt-1"
+                  disabled={!unlockPlan}
+                  onClick={() => unlockPlan && goOrLogin(`/checkout?plan=${unlockPlan.code}`)}
+                >
                   Continue to Payment
                 </Button>
                 <button onClick={() => goOrLogin("/plans")} className="text-13 font-semibold text-accent">
@@ -323,10 +336,11 @@ export function RequirementDetail({ id, isGuest = false }: { id: string; isGuest
   );
 }
 
-function Shell({ children }: { children: React.ReactNode }) {
+function Shell({ children, isGuest = false }: { children: React.ReactNode; isGuest?: boolean }) {
   return (
     <AppShell showNav={false}>
-      <Header left={<BackButton fallback="/requirements" />} title="Requirement" />
+      {/* Same host rule as the not-found CTA: `/requirements` is seller-only. */}
+      <Header left={<BackButton fallback={isGuest ? "/" : "/requirements"} />} title="Requirement" />
       {children}
     </AppShell>
   );

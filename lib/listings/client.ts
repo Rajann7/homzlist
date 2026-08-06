@@ -596,7 +596,8 @@ export interface RequirementDetail {
 }
 
 export const requirementsApi = {
-  get: (id: string) => req<{ requirement: RequirementDetail }>(`/requirements/${id}`, "GET"),
+  /** `unlockPlan` is non-null only for a LOCKED viewer — the plan their role can buy. */
+  get: (id: string) => req<{ requirement: RequirementDetail; unlockPlan: UnlockPlan | null }>(`/requirements/${id}`, "GET"),
   setActive: (id: string, isActive: boolean) =>
     req<{ requirement: RequirementDetail }>(`/requirements/${id}`, "PATCH", { isActive }),
   fulfill: (id: string) =>
@@ -626,9 +627,20 @@ export interface BrowseCard {
   posterVerified?: boolean;
   proposalCount?: number;
   alreadySent?: boolean;
-  tier: "exact" | "adjacent" | "city";
+  tier: BrowseTier;
 }
-export interface BrowseSection { tier: "exact" | "adjacent" | "city"; label: string | null; cards: BrowseCard[]; }
+/** "state" / "india" are the widened fallbacks — see lib/listings/matching. */
+export type BrowseTier = "exact" | "adjacent" | "city" | "state" | "india";
+export interface BrowseSection { tier: BrowseTier; label: string | null; cards: BrowseCard[]; }
+
+/** Server-decided empty screen — copy AND the action it offers. */
+export interface BrowseEmpty { title: string; subtitle: string; action: "pick_city" | null; }
+/** Where the browse list is anchored (profile city / guest's picked city / none). */
+export interface BrowseScope {
+  cityId: string | null; cityName: string | null;
+  stateId: string | null; stateName: string | null;
+  source: "profile" | "picked" | "none";
+}
 
 export interface MatchedListing {
   id: string; title: string | null; priceLabel: string; areaLabel: string | null;
@@ -670,13 +682,45 @@ export interface UnlockPlan {
   short: string;
 }
 
+export interface BrowseResult {
+  sections: BrowseSection[];
+  unlocked: boolean;
+  cityName: string | null;
+  scope: BrowseScope;
+  /** non-null ONLY when there is nothing to show; carries its own copy + action */
+  empty: BrowseEmpty | null;
+  balance: { left: number; total: number; unlimited: boolean };
+  canPropose: boolean;
+  unlockPlan: UnlockPlan | null;
+}
+
 export const browseApi = {
-  list: (kind?: "sell" | "rent" | null, typeCode?: string | null) =>
-    req<{ sections: BrowseSection[]; unlocked: boolean; cityName: string | null; balance: { left: number; total: number; unlimited: boolean }; canPropose: boolean; unlockPlan: UnlockPlan | null }>(
-      `/requirements/browse?${new URLSearchParams({ ...(kind ? { kind } : {}), ...(typeCode ? { type: typeCode } : {}) }).toString()}`,
-      "GET",
-    ),
+  /**
+   * `cityId` is the GUEST's city-chip choice. A signed-in profile's city always
+   * wins server-side, so this can only ever scope a viewer who has no city of
+   * their own — it is a filter the browser asks for, not a fact it asserts.
+   */
+  list: (kind?: "sell" | "rent" | null, typeCode?: string | null, cityId?: string | null) =>
+    req<BrowseResult>(`/requirements/browse?${browseQuery(kind, typeCode, cityId)}`, "GET"),
+
+  /**
+   * The same answer for the FEED shell (Doc7 §79). Identical payload — one
+   * server engine — but this route is IP rate-limited, which the feed needs and
+   * the browse screen does not: the requirement-mode feed is reachable
+   * anonymously on the public host. It existed with no caller at all; the guest
+   * feed was quietly hitting the unlimited browse route instead.
+   */
+  feed: (kind?: "sell" | "rent" | null, typeCode?: string | null, cityId?: string | null) =>
+    req<BrowseResult>(`/feed/requirement-mode?${browseQuery(kind, typeCode, cityId)}`, "GET"),
 };
+
+function browseQuery(kind?: "sell" | "rent" | null, typeCode?: string | null, cityId?: string | null) {
+  return new URLSearchParams({
+    ...(kind ? { kind } : {}),
+    ...(typeCode ? { type: typeCode } : {}),
+    ...(cityId ? { city: cityId } : {}),
+  }).toString();
+}
 
 export const proposalsApi = {
   /** The sender's own live listings for the picker + current balance. */

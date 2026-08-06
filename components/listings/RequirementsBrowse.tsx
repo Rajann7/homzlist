@@ -5,8 +5,9 @@ import { useRouter } from "next/navigation";
 import { AppShell, BottomSheet, Button, Chip, EmptyState, Header, Icon, Skeleton, useToast } from "@/components/billing/ui";
 import { Checklist, OfflineBanner } from "@/components/billing/primitives";
 import { ProposalSheet } from "./ProposalSheet";
-import { browseApi, type BrowseCard, type BrowseSection, type UnlockPlan } from "@/lib/listings/client";
-import { cn } from "@/lib/utils";
+import { CitySheet, type CityRow } from "@/components/feed/CitySheet";
+import { apiFetch } from "@/lib/auth/api-fetch";
+import { browseApi, type BrowseCard, type BrowseResult, type UnlockPlan } from "@/lib/listings/client";
 
 /**
  * P8 S3 — Requirements Browse (Doc7 §63).
@@ -20,23 +21,52 @@ export function RequirementsBrowse() {
   const router = useRouter();
   const toast = useToast();
 
-  type Data = { sections: BrowseSection[]; unlocked: boolean; cityName: string | null; balance: { left: number; total: number; unlimited: boolean }; unlockPlan: UnlockPlan | null };
-  const [data, setData] = useState<Data | null>(null);
+  const [data, setData] = useState<BrowseResult | null>(null);
   const [offline, setOffline] = useState(false);
   const [kind, setKind] = useState<"all" | "sell" | "rent">("all");
   const [paywall, setPaywall] = useState(false);
+  const [citySheet, setCitySheet] = useState(false);
   const [proposalFor, setProposalFor] = useState<string | null>(null);
   const [sentIds, setSentIds] = useState<Set<string>>(new Set());
+
+  // Not an empty list — a failed one. Kept separate so an offline browse never
+  // renders the server's "no requirements in your city" copy, which would be a
+  // lie about the database.
+  const EMPTY: BrowseResult = {
+    sections: [], unlocked: false, cityName: null,
+    scope: { cityId: null, cityName: null, stateId: null, stateName: null, source: "none" },
+    empty: null, balance: { left: 0, total: 0, unlimited: false }, canPropose: true, unlockPlan: null,
+  };
 
   const load = useCallback(async () => {
     setData(null);
     const res = await browseApi.list(kind === "all" ? null : kind, null);
     if (res.ok) { setData(res.data); setOffline(false); }
-    else if (res.error.code === "OFFLINE") { setOffline(true); setData({ sections: [], unlocked: false, cityName: null, balance: { left: 0, total: 0, unlimited: false }, unlockPlan: null }); }
-    else { setData({ sections: [], unlocked: false, cityName: null, balance: { left: 0, total: 0, unlimited: false }, unlockPlan: null }); }
+    else if (res.error.code === "OFFLINE") { setOffline(true); setData(EMPTY); }
+    else { setData(EMPTY); }
+    // EMPTY is a constant literal; re-creating it per render is not a dep.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kind]);
 
   useEffect(() => { void load(); }, [load]);
+
+  /**
+   * This screen is seller-host only, so the viewer is always signed in and the
+   * city belongs on their PROFILE — the same write the feed's city chip makes.
+   * Without it, a broker whose profile has no city (44 of them in the live data)
+   * had no way to scope this screen at all.
+   */
+  const pickCity = async (c: CityRow) => {
+    setCitySheet(false);
+    await apiFetch("/api/v1/profile/me", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      cache: "no-store",
+      body: JSON.stringify({ cityId: c.id }),
+    });
+    toast.show(`Showing requirements in ${c.name}`);
+    void load();
+  };
 
   const total = data ? data.sections.reduce((n, s) => n + s.cards.length, 0) : 0;
 
@@ -93,10 +123,15 @@ export function RequirementsBrowse() {
           {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-[168px] w-full rounded-12" />)}
         </div>
       ) : total === 0 ? (
+        // Copy AND the action come from the server, which is the only side that
+        // knows whether the city is empty, the whole state is empty, or the
+        // viewer simply has no city yet. It used to say "expand your city" with
+        // nothing on the screen that could expand anything.
         <EmptyState
-          title="No requirements in your area yet"
-          subtitle="Check back soon or expand your city — new requirements appear here as people post them."
+          title={data.empty?.title ?? "No requirements in your area yet"}
+          subtitle={data.empty?.subtitle ?? "New requirements appear here as people post them."}
           illustration={<MegaphoneArt />}
+          cta={data.empty?.action === "pick_city" ? { label: "Change city", onClick: () => setCitySheet(true) } : undefined}
         />
       ) : (
         <div className="flex flex-col gap-4 p-4 pb-6">
@@ -116,8 +151,13 @@ export function RequirementsBrowse() {
                     key={card.id}
                     card={card}
                     sent={sentIds.has(card.id) || Boolean(card.alreadySent)}
+                    // A builder with no LIVE project cannot propose (0087). The
+                    // feed card learned that; this one kept offering a button
+                    // the POST answers with PROJECT_REQUIRED.
+                    canPropose={data.canPropose}
                     onOpen={() => router.push(`/requirements/${card.id}`)}
                     onPropose={() => setProposalFor(card.id)}
+                    onPostProject={() => router.push("/create")}
                   />
                 ),
               )}
@@ -141,6 +181,13 @@ export function RequirementsBrowse() {
           <p className="text-11 text-ink-tertiary">Auto-renewal is off. You&apos;ll be reminded before expiry.</p>
         </div>
       </BottomSheet>
+
+      <CitySheet
+        open={citySheet}
+        onClose={() => setCitySheet(false)}
+        selectedId={data?.scope.cityId ?? null}
+        onSelect={(c) => void pickCity(c)}
+      />
 
       {proposalFor && (
         <ProposalSheet
@@ -198,8 +245,8 @@ function LockedCard({ card, plan, onUnlock }: { card: BrowseCard; plan: UnlockPl
 }
 
 function UnlockedCard({
-  card, sent, onOpen, onPropose,
-}: { card: BrowseCard; sent: boolean; onOpen: () => void; onPropose: () => void }) {
+  card, sent, canPropose, onOpen, onPropose, onPostProject,
+}: { card: BrowseCard; sent: boolean; canPropose: boolean; onOpen: () => void; onPropose: () => void; onPostProject: () => void }) {
   return (
     <div className="relative overflow-hidden rounded-12 border border-border bg-surface-1 p-4 pl-5">
       <span className="absolute inset-y-0 left-0 w-[3px] bg-accent" aria-hidden />
@@ -228,14 +275,20 @@ function UnlockedCard({
         <span className="ml-auto text-11 text-ink-tertiary">{card.postedAgo}</span>
       </div>
 
-      <div className="mt-3 flex items-center justify-between border-t border-divider pt-3">
-        <span className="text-11 text-ink-tertiary">{card.proposalCount ?? 0} proposal{(card.proposalCount ?? 0) === 1 ? "" : "s"} sent so far</span>
+      <div className="mt-3 flex items-center justify-between gap-3 border-t border-divider pt-3">
+        <span className="min-w-0 text-11 text-ink-tertiary">{card.proposalCount ?? 0} proposal{(card.proposalCount ?? 0) === 1 ? "" : "s"} sent so far</span>
         {sent ? (
-          <span className="flex items-center gap-1 text-13 font-semibold text-accent"><Icon name="check" size={16} /> Proposal sent</span>
+          <span className="flex shrink-0 items-center gap-1 text-13 font-semibold text-accent"><Icon name="check" size={16} /> Proposal sent</span>
+        ) : canPropose ? (
+          <Button className="h-9 shrink-0 px-4 text-13" onClick={onPropose}>Send Proposal</Button>
         ) : (
-          <Button className="h-9 px-4 text-13" onClick={onPropose}>Send Proposal</Button>
+          // Same reason-instead-of-a-dead-button treatment the feed card uses.
+          <Button variant="outline" className="h-9 shrink-0 px-4 text-13" onClick={onPostProject}>Post a Project</Button>
         )}
       </div>
+      {!sent && !canPropose && (
+        <div className="mt-2 text-11 text-ink-tertiary">Publish a project to send proposals</div>
+      )}
     </div>
   );
 }

@@ -16,5 +16,6 @@ export async function GET(req: NextRequest) {
   const limited = await rateLimit(`stories:${clientIp(req.headers)}`, 120, 60);
   if (!limited.allowed) return fail("RATE_LIMITED");
   const claims = await getCurrentUser();
-  return ok({ circles: await getStories(claims?.sub ?? null) });
+  const city = new URL(req.url).searchParams.get("city");
+  return ok({ circles: await getStories(claims?.sub ?? null, city) });
 }

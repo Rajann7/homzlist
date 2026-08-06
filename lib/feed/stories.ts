@@ -2,6 +2,7 @@ import "server-only";
 import { createServiceClient } from "@/lib/supabase/server";
 import { formatShortRupees } from "@/lib/billing/money";
 import { placementsFor, outOfCityIds, stateIdOfCity } from "@/lib/billing/placement";
+import { feedScope, applyFeedScope } from "./scope";
 import { getFieldDefinitions, getFieldGroups, type FieldDefinitionRow, type FieldGroupRow, type PropertyTypeRow } from "@/lib/listings/service";
 import { attributeRows, resolveKeySpecs, topUpSpecs, type KeySpecCandidate } from "@/lib/listings/dto";
 import { timeAgo } from "@/lib/listings/matching";
@@ -229,15 +230,19 @@ function projectSegment(p: any, ctx: SegCtx, available: boolean): StorySegment {
   };
 }
 
-async function viewerCity(viewerId: string | null): Promise<string | null> {
-  if (!viewerId) return null;
-  const { data } = await db().from("profiles").select("city_id").eq("id", viewerId).maybeSingle();
-  return (data as { city_id: string | null } | null)?.city_id ?? null;
-}
-
-/** Build the story row for a viewer. */
-export async function getStories(viewerId: string | null, cityOverride?: string | null): Promise<StoryCircle[]> {
-  const cityId = cityOverride ?? (await viewerCity(viewerId));
+/**
+ * Build the story row for a viewer.
+ *
+ * `pickedCityId` is the guest's city-chip choice (validated server-side; a
+ * signed-in profile's city always wins). The row sits directly under that chip,
+ * so it scoping differently from the chip's label was the most visible half of
+ * the guest-city bug.
+ */
+export async function getStories(viewerId: string | null, pickedCityId?: string | null): Promise<StoryCircle[]> {
+  const scope = await feedScope(viewerId, pickedCityId ?? null);
+  // Story SEEN state is keyed by the viewer's real city, not the widened one —
+  // otherwise widening would reset every ring the viewer had already watched.
+  const cityId = scope.cityId;
   const since = new Date(Date.now() - DAY_MS).toISOString();
 
   // Approved-in-last-24h listings + projects in the city.
@@ -251,7 +256,7 @@ export async function getStories(viewerId: string | null, cityOverride?: string 
     // on the very next feed read — the button wrote nothing.
     .is("story_suppressed_at", null)
     .order("live_at", { ascending: false });
-  if (cityId) lq = lq.eq("city_id", cityId);
+  lq = applyFeedScope(lq, scope);
   if (viewerId) lq = lq.neq("profile_id", viewerId); // never a "your story" circle (Doc2 §9.3)
 
   let pq = db()
@@ -261,7 +266,7 @@ export async function getStories(viewerId: string | null, cityOverride?: string 
     .gte("live_at", since)
     .is("story_suppressed_at", null)
     .order("live_at", { ascending: false });
-  if (cityId) pq = pq.eq("city_id", cityId);
+  pq = applyFeedScope(pq, scope);
   if (viewerId) pq = pq.neq("profile_id", viewerId);
 
   const [{ data: lRows }, { data: pRows }] = await Promise.all([lq, pq]);
@@ -272,7 +277,7 @@ export async function getStories(viewerId: string | null, cityOverride?: string 
   // `status = 'active'` read, so an area-targeted boost in another city put a
   // gold ring at the front of everyone's row.
   const placements = await placementsFor(
-    { cityId, stateId: cityId ? await stateIdOfCity(cityId) : null },
+    { cityId, stateId: scope.stateId },
     ["listing", "project"],
   );
   const boostedIds = placements.rank;

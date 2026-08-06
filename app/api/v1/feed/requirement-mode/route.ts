@@ -24,9 +24,12 @@ export async function GET(req: NextRequest) {
   const kind = url.searchParams.get("kind");
   const type = url.searchParams.get("type");
 
-  const { sections, unlocked, cityName } = await browseRequirements(claims?.sub ?? null, {
+  const { sections, unlocked, cityName, scope, empty } = await browseRequirements(claims?.sub ?? null, {
     kind: kind === "sell" || kind === "rent" ? kind : null,
     typeCode: type || null,
+    // A guest has no profile to hold a city, so their city-chip pick rides the
+    // request and is validated against `locations` before it reaches a query.
+    cityId: url.searchParams.get("city"),
   });
   const balance = claims && unlocked ? await proposalBalance(claims.sub) : { left: 0, total: 0, unlimited: false };
   // Same builder rule the POST enforces (0087) — the card needs it to render a
@@ -36,5 +39,5 @@ export async function GET(req: NextRequest) {
   // builder at checkout (0087), so the wall can't name it for everyone.
   const role = claims ? (await getProfileById(claims.sub))?.role ?? null : "owner";
   const unlockPlan = unlocked ? null : requirementUnlockDTO(await requirementUnlockPlan(role as never));
-  return ok({ sections, unlocked, cityName, balance, canPropose, unlockPlan });
+  return ok({ sections, unlocked, cityName, scope, empty, balance, canPropose, unlockPlan });
 }

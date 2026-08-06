@@ -242,6 +242,7 @@ export function SearchResults({ basePath = "", isGuest = false }: { basePath?: s
         <ZeroResults
           tab={tab}
           basePath={basePath}
+          isGuest={isGuest}
           onClearFilters={clearFilters}
           hasFilters={filterCount > 0}
           onPickArea={(name) => router.push(`${path("/search/results")}?q=${encodeURIComponent(name)}`)}
@@ -455,8 +456,8 @@ const ZERO_COPY: Record<SearchTab, { title: string; hint: string; cta: boolean }
 };
 
 function ZeroResults({
-  tab, basePath, onClearFilters, hasFilters, onPickArea,
-}: { tab: SearchTab; basePath: string; onClearFilters: () => void; hasFilters: boolean; onPickArea: (name: string) => void }) {
+  tab, basePath, isGuest, onClearFilters, hasFilters, onPickArea,
+}: { tab: SearchTab; basePath: string; isGuest: boolean; onClearFilters: () => void; hasFilters: boolean; onPickArea: (name: string) => void }) {
   const [popular, setPopular] = useState<{ id: string; name: string }[]>([]);
   useEffect(() => {
     void (async () => {
@@ -495,9 +496,16 @@ function ZeroResults({
       )}
 
       {copy.cta && (
-        <Link href={`${basePath}/requirements/new`} className="mt-5 grid h-11 place-items-center rounded-8 bg-accent px-6 text-15 font-semibold text-white">
+        // `/requirements/new` is a SELLER-host route; on the public host this
+        // CTA led to a 404. A guest goes to login first (the middleware 307s
+        // /login onto the seller host), which is where the form lives anyway.
+        // Plain <a> so <Link> doesn't prefetch a cross-host redirect.
+        <a
+          href={isGuest ? "/login" : `${basePath}/requirements/new`}
+          className="mt-5 grid h-11 place-items-center rounded-8 bg-accent px-6 text-15 font-semibold text-white"
+        >
           Post a Requirement
-        </Link>
+        </a>
       )}
       {hasFilters && (
         <button onClick={onClearFilters} className="mt-3 text-15 font-semibold text-accent">Clear filters</button>

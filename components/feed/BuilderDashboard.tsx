@@ -7,6 +7,7 @@ import { Skeleton } from "@/components/ui/Skeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { RequirementFeed } from "./RequirementFeed";
 import { feedApi } from "@/lib/feed/client";
+import type { BrowseCard } from "@/lib/listings/client";
 import { cn } from "@/lib/utils";
 
 /**
@@ -14,11 +15,11 @@ import { cn } from "@/lib/utils";
  * requirements matched to those projects. NEVER any foreign listing. Stats use
  * REAL data (units + the builder's real lead count) — no fabricated view count.
  */
-export function BuilderDashboard({ cityName }: { cityName?: string | null }) {
+export function BuilderDashboard({ cityName, cityId = null }: { cityName?: string | null; cityId?: string | null }) {
   const router = useRouter();
   type Data = {
     projects: { id: string; name: string; coverUrl: string | null; statLine: string; buildStatus: string }[];
-    matched: { requirement: any; matchedTo: string; tierLabel: string | null }[];
+    matched: { card: BrowseCard; matchedTo: string; tierLabel: string | null }[];
   };
   const [data, setData] = useState<Data | null>(null);
   // A FAILED call is not an empty dashboard. This used to collapse the two:
@@ -73,7 +74,7 @@ export function BuilderDashboard({ cityName }: { cityName?: string | null }) {
         <div className="px-4 pb-1 text-13 font-semibold uppercase tracking-[0.3px] text-ink-tertiary">
           {cityName ? `Requirements in ${cityName}` : "Requirements near you"}
         </div>
-        <RequirementFeed kind="all" />
+        <RequirementFeed kind="all" cityId={cityId} />
       </div>
     );
   }
@@ -103,18 +104,32 @@ export function BuilderDashboard({ cityName }: { cityName?: string | null }) {
       {data.matched.length > 0 && (
         <div className="flex flex-col gap-3">
           <div className="text-13 font-semibold uppercase tracking-[0.3px] text-ink-tertiary">Matching Requirements for your projects</div>
-          {data.matched.map((m, i) => (
-            <div key={m.requirement.id}>
-              {m.tierLabel && <div className="mb-1.5 flex items-center gap-1.5"><Icon name="pin" size={14} className="text-ink-tertiary" /><span className="text-13 font-semibold uppercase tracking-[0.3px] text-ink-tertiary">{m.tierLabel}</span></div>}
-              <div className="relative overflow-hidden rounded-12 border border-border bg-surface-1 p-4 pl-5">
-                <span className="absolute inset-y-0 left-0 w-[3px] bg-accent" />
-                <span className="mb-2 inline-block rounded-full bg-accent-soft px-2 py-0.5 text-11 font-semibold text-accent">Matched to: {m.matchedTo}</span>
-                <div className="text-17 font-bold text-ink-primary">{m.requirement.budgetLabel}</div>
-                <div className="mt-0.5 text-13 text-ink-secondary">{[m.requirement.bhk ? `${m.requirement.bhk} BHK` : null, "Buy", m.requirement.areaLabel].filter(Boolean).join(" · ")}</div>
-                <button onClick={() => router.push(`/requirements/${m.requirement.id}`)} className="mt-3 text-13 font-semibold text-accent">View requirement</button>
+          {data.matched.map((m) => {
+            // Locked/unlocked exactly as Doc2 §9.1 words it ("matched
+            // RequirementCards locked/unlocked"). The budget is not in the
+            // payload for a builder with no active requirement-access plan, so
+            // the blur is honest — same treatment as every other locked card.
+            const locked = m.card.access === "locked";
+            return (
+              <div key={m.card.id}>
+                {m.tierLabel && <div className="mb-1.5 flex items-center gap-1.5"><Icon name="pin" size={14} className="text-ink-tertiary" /><span className="text-13 font-semibold uppercase tracking-[0.3px] text-ink-tertiary">{m.tierLabel}</span></div>}
+                <div className="relative overflow-hidden rounded-12 border border-border bg-surface-1 p-4 pl-5">
+                  {!locked && <span className="absolute inset-y-0 left-0 w-[3px] bg-accent" />}
+                  <span className="mb-2 inline-block rounded-full bg-accent-soft px-2 py-0.5 text-11 font-semibold text-accent">Matched to: {m.matchedTo}</span>
+                  {locked ? (
+                    <div className="relative w-fit">
+                      <div className="select-none text-17 font-bold text-ink-primary blur-[6px]" aria-hidden>₹00L – ₹00L</div>
+                      <span className="absolute inset-0 grid place-items-center"><Icon name="lock" size={16} className="text-ink-tertiary" /></span>
+                    </div>
+                  ) : (
+                    <div className="text-17 font-bold text-ink-primary">{m.card.budgetLabel}</div>
+                  )}
+                  <div className="mt-0.5 text-13 text-ink-secondary">{m.card.summary}</div>
+                  <button onClick={() => router.push(`/requirements/${m.card.id}`)} className="mt-3 text-13 font-semibold text-accent">View requirement</button>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
 
   try {
     const page = await getFeedSectionItems(claims?.sub ?? null, key, {
-      filter, sort, cursor: url.searchParams.get("cursor"),
+      filter, sort, cursor: url.searchParams.get("cursor"), cityId: url.searchParams.get("city"),
     });
     return ok(page);
   } catch (err) {

@@ -71,30 +71,46 @@ export interface FeedPerson {
 }
 export interface FeedSectionPage { items: FeedCard[]; people: FeedPerson[]; nextCursor: string | null }
 
+/**
+ * The GUEST's city, sent with every feed read.
+ *
+ * A signed-in viewer's city lives on their profile and the server reads it from
+ * the session, so this is `null` for them and ignored server-side even if sent.
+ * A guest has no profile row, so without this the city chip re-labelled itself
+ * and every query stayed unscoped — Mumbai on the chip, Rajkot in the feed.
+ */
+const city = (cityId?: string | null): Record<string, string> => (cityId ? { city: cityId } : {});
+
 export const feedApi = {
   /** The rails to draw, in order. Metadata only — each rail loads its own cards. */
-  sections: (filter?: string) =>
-    req<{ sections: FeedSectionMeta[] }>(`/feed/sections${filter && filter !== "all" ? `?filter=${filter}` : ""}`),
-  section: (key: string, opts: { filter?: string; sort?: string; cursor?: string | null } = {}) =>
+  sections: (filter?: string, cityId?: string | null) =>
+    req<{ sections: FeedSectionMeta[] }>(`/feed/sections?${new URLSearchParams({
+      ...(filter && filter !== "all" ? { filter } : {}),
+      ...city(cityId),
+    }).toString()}`),
+  section: (key: string, opts: { filter?: string; sort?: string; cursor?: string | null; cityId?: string | null } = {}) =>
     req<FeedSectionPage>(`/feed/section?${new URLSearchParams({
       key,
       ...(opts.filter ? { filter: opts.filter } : {}),
       ...(opts.sort ? { sort: opts.sort } : {}),
       ...(opts.cursor ? { cursor: opts.cursor } : {}),
+      ...city(opts.cityId),
     }).toString()}`),
-  list: (opts: { filter?: string; sort?: string; cursor?: string | null } = {}) =>
-    req<FeedResult>(`/feed?${new URLSearchParams({ ...(opts.filter ? { filter: opts.filter } : {}), ...(opts.sort ? { sort: opts.sort } : {}), ...(opts.cursor ? { cursor: opts.cursor } : {}) }).toString()}`),
+  list: (opts: { filter?: string; sort?: string; cursor?: string | null; cityId?: string | null } = {}) =>
+    req<FeedResult>(`/feed?${new URLSearchParams({ ...(opts.filter ? { filter: opts.filter } : {}), ...(opts.sort ? { sort: opts.sort } : {}), ...(opts.cursor ? { cursor: opts.cursor } : {}), ...city(opts.cityId) }).toString()}`),
   builderDashboard: () =>
     req<{ projects: { id: string; name: string; coverUrl: string | null; views: number; leads: number; spark: number[] }[]; sections: { label: string | null; items: any[] }[] }>("/feed/builder-dashboard"),
-  suggested: () => req<{ items: { id: string; coverUrl: string | null; price: string; areaLabel: string | null }[] }>("/feed/suggested"),
-  newCount: (since: string) => req<{ count: number }>(`/feed/new-count?since=${encodeURIComponent(since)}`),
+  suggested: (cityId?: string | null) =>
+    req<{ items: { id: string; coverUrl: string | null; price: string; areaLabel: string | null }[] }>(`/feed/suggested?${new URLSearchParams(city(cityId)).toString()}`),
+  newCount: (since: string, cityId?: string | null) =>
+    req<{ count: number }>(`/feed/new-count?${new URLSearchParams({ since, ...city(cityId) }).toString()}`),
   banner: () => req<{ banner: { id: string; title: string; subtitle: string | null; imageUrl: string | null; targetUrl: string | null } | null }>("/feed/banner"),
   badges: () => req<{ messages: number; notifications: number | null }>("/feed/badges"),
   notInterested: (target: { typeCode?: string; areaId?: string }) => req<{ ok: boolean }>("/feed/not-interested", "POST", target),
 };
 
 export const storiesApi = {
-  list: () => req<{ circles: StoryCircle[] }>("/stories"),
+  list: (cityId?: string | null) => req<{ circles: StoryCircle[] }>(`/stories?${new URLSearchParams(city(cityId)).toString()}`),
   seen: (segmentId: string) => req<{ ok: boolean }>(`/stories/${segmentId}/seen`, "POST", {}),
   segment: (segmentId: string) => req<{ segment: StorySegment }>(`/stories/${segmentId}`),
 };
