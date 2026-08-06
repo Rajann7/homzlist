@@ -1,6 +1,7 @@
 import { ok } from "@/lib/api";
 import { createServiceClient } from "@/lib/supabase/server";
 import { kv } from "@/lib/kv";
+import { browsableCityIds } from "@/lib/seo/slugs";
 
 /**
  * GET /api/v1/locations/cities (Doc7 §11 public read) — the city sheet's list.
@@ -14,8 +15,10 @@ import { kv } from "@/lib/kv";
  * by filtering a cached array in the browser.
  */
 export const dynamic = "force-dynamic";
-// v3: `q` is resolved server-side and the default list is launched cities only.
-const CACHE_KEY = "cache:cities:popular:v3";
+// v4: the default list is launched cities PLUS cities auto-opened on their own
+// inventory (≥3 live listings) — the same browsable set the SEO pages use, so a
+// city that has a working `/jamnagar` page is also pickable here.
+const CACHE_KEY = "cache:cities:popular:v4";
 const CACHE_TTL = 300;
 const LIMIT = 40;
 
@@ -29,7 +32,7 @@ export async function GET(req: Request) {
   if (!q) {
     const cached = await kv.get(CACHE_KEY).catch(() => null);
     if (cached) return ok({ cities: JSON.parse(cached) as CityDTO[] });
-    const cities = await decorate(db, await launchedCities(db));
+    const cities = await decorate(db, await popularCities(db));
     await kv.set(CACHE_KEY, JSON.stringify(cities), CACHE_TTL).catch(() => {});
     return ok({ cities });
   }
@@ -88,6 +91,30 @@ async function launchedCities(db: ReturnType<typeof createServiceClient>) {
     .order("name")
     .limit(LIMIT);
   return (data ?? []) as CityRow[];
+}
+
+/**
+ * The default sheet list: launched cities PLUS the cities that opened on their
+ * own inventory. `browsableCityIds()` is the SAME gate the SEO pages use, so a
+ * city with a working `/jamnagar` hub is offered here too — otherwise it would
+ * be pickable only by typing its name, a surface it now has a real page for.
+ */
+async function popularCities(db: ReturnType<typeof createServiceClient>): Promise<CityRow[]> {
+  const [launched, browsable] = await Promise.all([launchedCities(db), browsableCityIds()]);
+  const have = new Set(launched.map((c) => c.id));
+  const extraIds = [...browsable].filter((id) => !have.has(id));
+  if (!extraIds.length) return launched;
+
+  const { data } = await db
+    .from("locations")
+    .select("id,name,slug,parent_id,is_launched")
+    .in("id", extraIds)
+    .eq("level", "city")
+    .eq("is_active", true);
+  const extras = ((data ?? []) as CityRow[]);
+  // Launched first, then inventory-opened, each alphabetical.
+  extras.sort((a, b) => a.name.localeCompare(b.name));
+  return [...launched, ...extras].slice(0, LIMIT);
 }
 
 /** Attach the state name and a live listing count to one page of cities. */

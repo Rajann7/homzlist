@@ -107,17 +107,13 @@ async function browsable(): Promise<{ rows: CityRow[]; ids: Set<string> }> {
   const launched = await launchedCities();
   const launchedIds = new Set(launched.map((c) => c.id));
 
-  // Tally live inventory per city, keep the cities that clear the floor.
-  const { data: lrows } = await db()
-    .from("listings").select("city_id")
-    .eq("status", "live").eq("availability", "available").limit(50_000);
-  const tally = new Map<string, number>();
-  for (const r of ((lrows ?? []) as { city_id: string | null }[])) {
-    if (r.city_id) tally.set(r.city_id, (tally.get(r.city_id) ?? 0) + 1);
-  }
-  const extraIds = [...tally.entries()]
-    .filter(([id, n]) => n >= CITY_INVENTORY_FLOOR && !launchedIds.has(id))
-    .map(([id]) => id);
+  // The inventory-qualified city ids, tallied in the DB (migration 0125) rather
+  // than by streaming every live listing here — this runs on every root
+  // catch-all hit, so the aggregate has to stay on the server side of the wire.
+  const { data: invRows } = await db().rpc("hz_cities_with_inventory", { p_min: CITY_INVENTORY_FLOOR });
+  const extraIds = ((invRows ?? []) as { city_id: string }[])
+    .map((r) => r.city_id)
+    .filter((id) => id && !launchedIds.has(id));
 
   let extras: CityRow[] = [];
   if (extraIds.length) {
