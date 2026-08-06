@@ -5,6 +5,7 @@ import { timeAgo } from "@/lib/listings/matching";
 import { projectCardExtras, PROJECT_COLS, type FeedCard } from "@/lib/feed/service";
 import { placementsFor, viewerScope, type ViewerScope } from "@/lib/billing/placement";
 import { parseQuery, pgrstSafe, findPlaces, type ParsedQuery, type PlaceRow } from "./parse";
+import { browsableCityIds } from "@/lib/seo/slugs";
 import { bucketRange } from "./filters";
 import type {
   AreaResult, AutocompleteResult, BrokerResult,
@@ -944,9 +945,10 @@ export async function autocomplete(q: string, viewerId: string | null, mode: "pr
     // with a launched area — there is a city "Mavdi" as well as the launched
     // Mavdi area — used to put "Mavdi is coming soon" in the dropdown directly
     // above real Mavdi results.
+    const browsableIds = await browsableCityIds();
     const unlaunched = suggestions.length || pages.length
       ? null
-      : locRows.find((r) => r.level === "city" && !r.is_launched);
+      : locRows.find((r) => r.level === "city" && !browsableIds.has(r.id));
     if (unlaunched) comingSoonCity = { name: unlaunched.name, slug: unlaunched.slug };
     else if (!suggestions.length && !pages.length) {
       // Nothing matched at all — offer the term as an expansion signal rather

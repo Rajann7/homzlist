@@ -80,6 +80,67 @@ async function launchedCities(): Promise<CityRow[]> {
   return rows;
 }
 
+/**
+ * The floor at which a city opens on its OWN inventory — the same ≥3 threshold
+ * a landing page needs to be indexable (Doc3 §4).
+ */
+export const CITY_INVENTORY_FLOOR = 3;
+
+/**
+ * The cities we render browse pages for: the ones an admin explicitly launched,
+ * PLUS any city that has earned a page by carrying real inventory (≥3 live,
+ * available listings).
+ *
+ * A seller can list in any town in the master (the city picker never gated on
+ * launch). The gap that created was a live listing whose city hub/landing/area
+ * all 404'd and whose search said "coming soon" while the listing sat right
+ * there. Auto-opening a city once it clears the inventory floor closes that gap:
+ * gating on real inventory instead of a manual flag, so Jamnagar's 8 listings
+ * become a working `/jamnagar` the moment they're live.
+ *
+ * Memoised (60s) like the launched list — `resolvePlace` runs on every root
+ * catch-all hit, misses included, so the inventory tally must not be per-request.
+ */
+let browsableCache: { at: number; rows: CityRow[]; ids: Set<string> } | null = null;
+async function browsable(): Promise<{ rows: CityRow[]; ids: Set<string> }> {
+  if (browsableCache && Date.now() - browsableCache.at < 60_000) return browsableCache;
+  const launched = await launchedCities();
+  const launchedIds = new Set(launched.map((c) => c.id));
+
+  // Tally live inventory per city, keep the cities that clear the floor.
+  const { data: lrows } = await db()
+    .from("listings").select("city_id")
+    .eq("status", "live").eq("availability", "available").limit(50_000);
+  const tally = new Map<string, number>();
+  for (const r of ((lrows ?? []) as { city_id: string | null }[])) {
+    if (r.city_id) tally.set(r.city_id, (tally.get(r.city_id) ?? 0) + 1);
+  }
+  const extraIds = [...tally.entries()]
+    .filter(([id, n]) => n >= CITY_INVENTORY_FLOOR && !launchedIds.has(id))
+    .map(([id]) => id);
+
+  let extras: CityRow[] = [];
+  if (extraIds.length) {
+    const { data } = await db()
+      .from("locations").select("id,name,slug,highlights")
+      .in("id", extraIds).eq("level", "city").eq("is_active", true);
+    extras = ((data ?? []) as CityRow[]);
+  }
+  const rows = [...launched, ...extras];
+  browsableCache = { at: Date.now(), rows, ids: new Set(rows.map((r) => r.id)) };
+  return browsableCache;
+}
+
+/** The set of city ids that have a browse page — for the search/parse gate. */
+export async function browsableCityIds(): Promise<Set<string>> {
+  return (await browsable()).ids;
+}
+
+/** The city rows that have a browse page — for the sitemap. */
+export async function browsableCities(): Promise<CityRow[]> {
+  return (await browsable()).rows;
+}
+
 let typeCache: { at: number; rows: TypeRow[] } | null = null;
 async function types(): Promise<TypeRow[]> {
   if (typeCache && Date.now() - typeCache.at < 60_000) return typeCache.rows;
@@ -102,7 +163,7 @@ async function types(): Promise<TypeRow[]> {
  */
 export async function resolvePlace(tail: string): Promise<{ city: any; area: any } | null> {
   if (!tail) return null;
-  const cityRows = await launchedCities();
+  const cityRows = (await browsable()).rows;
 
   // Longest suffix wins, so "…-rajkot" is not stolen by a shorter city slug.
   const matches = cityRows
@@ -267,11 +328,12 @@ export async function enumerateLandings(): Promise<MatrixEntry[]> {
   // city and area used to be five rows; since migration 0054 it is 155k, and
   // none of the ones nobody has listed in can contribute a landing page.
   const referenced = [...new Set(rows.flatMap((l) => [l.city_id, l.area_id]).filter(Boolean) as string[])];
-  const [{ data: locs }, typeRows] = await Promise.all([
+  const [{ data: locs }, typeRows, browsableIds] = await Promise.all([
     referenced.length
       ? db().from("locations").select("id,name,slug,level,parent_id,is_launched").in("id", referenced).eq("is_active", true)
       : Promise.resolve({ data: [] as any[] }),
     types(),
+    browsableCityIds(),
   ]);
   const locMap = new Map<string, any>(((locs ?? []) as any[]).map((l) => [l.id, l]));
   const typeMap = new Map<string, TypeRow>(typeRows.map((t) => [t.code, t]));
@@ -286,7 +348,9 @@ export async function enumerateLandings(): Promise<MatrixEntry[]> {
 
   for (const l of rows) {
     const city = l.city_id ? locMap.get(l.city_id) : null;
-    if (!city || !city.is_launched) continue;
+    // A city earns landing pages once it's launched OR clears the inventory
+    // floor — the same rule that opens its hub in resolvePlace.
+    if (!city || !browsableIds.has(city.id)) continue;
     const area = l.area_id ? locMap.get(l.area_id) : null;
     const type = typeMap.get(l.type_code);
     if (!type) continue;

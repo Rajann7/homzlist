@@ -1,6 +1,6 @@
 import "server-only";
 import { createServiceClient } from "@/lib/supabase/server";
-import { enumerateLandings } from "./slugs";
+import { enumerateLandings, browsableCities } from "./slugs";
 import { siteUrl } from "./schema";
 
 /**
@@ -82,13 +82,14 @@ export async function sitemapFor(type: SitemapType): Promise<UrlEntry[]> {
   }
 
   if (type === "areas") {
-    const { data: cities } = await db().from("locations")
-      .select("id,slug").eq("level", "city").eq("is_active", true).eq("is_launched", true);
-    const cityRows = ((cities ?? []) as { id: string; slug: string }[]);
+    // Cities that have a browse page — launched, or opened on their own
+    // inventory (≥3 live listings). Same gate as resolvePlace, so the sitemap
+    // never advertises a hub that 404s and never hides one that resolves.
+    const cityRows = (await browsableCities()).map((c) => ({ id: c.id, slug: c.slug }));
     const citySlug = new Map(cityRows.map((c) => [c.id, c.slug]));
 
-    // Areas of LAUNCHED cities only. Unscoped this reads all 50,950 area rows
-    // (migration 0054) to then discard every one whose city isn't launched.
+    // Areas of browsable cities only. Unscoped this reads all 50,950 area rows
+    // (migration 0054) to then discard every one whose city isn't browsable.
     const { data: areas } = cityRows.length
       ? await db().from("locations")
           .select("id,slug,parent_id").eq("level", "area").eq("is_active", true)
