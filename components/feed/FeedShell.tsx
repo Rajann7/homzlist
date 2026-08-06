@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { createContext, useContext, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { BottomNav, DEFAULT_NAV } from "@/components/nav/BottomNav";
@@ -16,6 +16,15 @@ import { CitySheet, type CityRow } from "./CitySheet";
  * etc.) — CLAUDE.md rule 6: one nav, fixed everywhere. The city chip opens the
  * City sheet; selecting swaps the feed in place via `onCity`.
  */
+/**
+ * The shell owns the city sheet (the header chip opens it), but content INSIDE
+ * the shell needs it too — an empty requirement feed has to be able to offer
+ * "Change city" as a real action rather than as a sentence. One context instead
+ * of threading a callback through every child.
+ */
+const CityPickerContext = createContext<(() => void) | null>(null);
+export const useCityPicker = () => useContext(CityPickerContext);
+
 export function FeedShell({
   cityName, selectedCityId, onCity, onRefresh, badges, children, scrollRef,
 }: {
@@ -76,7 +85,10 @@ export function FeedShell({
     } else setPull(0);
   };
 
+  const openCityPicker = useMemo(() => () => setCitySheet(true), []);
+
   return (
+    <CityPickerContext.Provider value={openCityPicker}>
     <div className="mx-auto flex h-[100dvh] w-full max-w-column flex-col bg-surface-1">
       <FeedHeader
         compact={compact}
@@ -104,5 +116,6 @@ export function FeedShell({
 
       <CitySheet open={citySheet} onClose={() => setCitySheet(false)} selectedId={selectedCityId} onSelect={onCity} />
     </div>
+    </CityPickerContext.Provider>
   );
 }

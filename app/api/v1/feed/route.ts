@@ -21,6 +21,10 @@ export async function GET(req: NextRequest) {
   const filter: FeedFilter = filterRaw === "buy" || filterRaw === "rent" ? filterRaw : "all";
   const sort: FeedSort = ["latest", "nearby", "price_asc", "price_desc"].includes(sortRaw ?? "") ? (sortRaw as FeedSort) : "latest";
 
-  const res = await getFeed(claims?.sub ?? null, { filter, sort, cursor: url.searchParams.get("cursor") });
+  // Guest's city-chip pick; validated server-side and ignored for anyone whose
+  // profile already has a city (lib/location/viewer-city).
+  const res = await getFeed(claims?.sub ?? null, {
+    filter, sort, cursor: url.searchParams.get("cursor"), cityId: url.searchParams.get("city"),
+  });
   return ok(res);
 }

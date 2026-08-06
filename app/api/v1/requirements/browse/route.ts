@@ -25,9 +25,12 @@ export async function GET(req: NextRequest) {
   const kind = url.searchParams.get("kind");
   const type = url.searchParams.get("type");
 
-  const { sections, unlocked, cityName } = await browseRequirements(claims?.sub ?? null, {
+  const { sections, unlocked, cityName, scope, empty } = await browseRequirements(claims?.sub ?? null, {
     kind: kind === "sell" || kind === "rent" ? kind : null,
     typeCode: type || null,
+    // Guest's city-chip choice. Ignored server-side for anyone whose profile
+    // already has a city, so it can only ever scope a viewer who has none.
+    cityId: url.searchParams.get("city"),
   });
 
   // The proposal-counter strip only makes sense for a signed-in unlocked viewer.
@@ -47,5 +50,5 @@ export async function GET(req: NextRequest) {
   const role = claims ? (await getProfileById(claims.sub))?.role ?? null : "owner";
   const unlockPlan = unlocked ? null : requirementUnlockDTO(await requirementUnlockPlan(role as never));
 
-  return ok({ sections, unlocked, cityName, balance, canPropose, unlockPlan });
+  return ok({ sections, unlocked, cityName, scope, empty, balance, canPropose, unlockPlan });
 }

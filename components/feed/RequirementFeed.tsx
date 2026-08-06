@@ -10,7 +10,8 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { Checklist } from "@/components/billing/primitives";
 import { ProposalSheet } from "@/components/listings/ProposalSheet";
 import { LoginSheet } from "./sheets";
-import { browseApi, type BrowseCard, type UnlockPlan } from "@/lib/listings/client";
+import { useCityPicker } from "./FeedShell";
+import { browseApi, type BrowseCard, type BrowseResult, type UnlockPlan } from "@/lib/listings/client";
 import { cn } from "@/lib/utils";
 
 /**
@@ -18,10 +19,25 @@ import { cn } from "@/lib/utils";
  * Reuses Module 5's `browseApi` (server-stripped locked cards) + `ProposalSheet`
  * + the same paywall. No re-modelling — this is the feed skin over browse.
  */
-export function RequirementFeed({ kind, guest = false }: { kind: "all" | "sell" | "rent"; guest?: boolean }) {
+export function RequirementFeed({
+  kind, guest = false, cityId = null, onPickCity,
+}: {
+  kind: "all" | "sell" | "rent";
+  guest?: boolean;
+  /**
+   * The viewer's city as the shell knows it. For a GUEST this is their city-chip
+   * choice, which has no profile to live on — without it the requirement feed
+   * ignored the chip entirely and served a Mumbai visitor Rajkot requirements
+   * under a header that said nothing about where they were from.
+   */
+  cityId?: string | null;
+  /** Overrides the shell's city sheet. Absent → the shell's own picker is used. */
+  onPickCity?: () => void;
+}) {
   const router = useRouter();
-  type Data = { sections: { tier: string; label: string | null; cards: BrowseCard[] }[]; unlocked: boolean; balance: { left: number; unlimited: boolean }; canPropose: boolean; unlockPlan: UnlockPlan | null };
-  const [data, setData] = useState<Data | null>(null);
+  const shellCityPicker = useCityPicker();
+  const pickCity = onPickCity ?? shellCityPicker;
+  const [data, setData] = useState<BrowseResult | null>(null);
   const [paywall, setPaywall] = useState(false);
   const [loginSheet, setLoginSheet] = useState(false);
   const [proposalFor, setProposalFor] = useState<string | null>(null);
@@ -32,17 +48,31 @@ export function RequirementFeed({ kind, guest = false }: { kind: "all" | "sell" 
 
   const load = useCallback(async () => {
     setData(null);
-    const res = await browseApi.list(kind === "all" ? null : kind, null);
-    if (res.ok) setData(res.data as never);
-    else setData({ sections: [], unlocked: false, balance: { left: 0, unlimited: false }, canPropose: true, unlockPlan: null });
-  }, [kind]);
+    // The FEED endpoint (Doc7 §79), not the browse one: this surface is
+    // reachable anonymously on the public host and needs its IP rate limit.
+    const res = await browseApi.feed(kind === "all" ? null : kind, null, cityId);
+    if (res.ok) setData(res.data);
+    else setData({
+      sections: [], unlocked: false, cityName: null,
+      scope: { cityId: null, cityName: null, stateId: null, stateName: null, source: "none" },
+      empty: null, balance: { left: 0, total: 0, unlimited: false }, canPropose: true, unlockPlan: null,
+    });
+  }, [kind, cityId]);
   useEffect(() => { void load(); }, [load]);
 
   if (!data) return <div className="flex flex-col gap-3 p-4">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-[150px] w-full rounded-12" />)}</div>;
 
   const total = data.sections.reduce((n, s) => n + s.cards.length, 0);
   if (total === 0) {
-    return <EmptyState title="No requirements in your area yet" subtitle="Check back soon or expand your city." />;
+    // Server-decided copy + action — same source as the browse screen, so the
+    // two can never disagree about why the screen is empty.
+    return (
+      <EmptyState
+        title={data.empty?.title ?? "No requirements in your area yet"}
+        subtitle={data.empty?.subtitle ?? "New requirements appear here as people post them."}
+        cta={data.empty?.action === "pick_city" && pickCity ? { label: "Change city", onClick: pickCity } : undefined}
+      />
+    );
   }
 
   return (

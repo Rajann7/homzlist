@@ -2,7 +2,6 @@ import { ok, fail } from "@/lib/api";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { getProfileById } from "@/lib/profile/service";
 import { builderDashboard, PROJECT_STATE_LABEL } from "@/lib/feed/service";
-import { requirementDTO } from "@/lib/listings/dto";
 
 /**
  * GET /api/v1/feed/builder-dashboard (Doc7 §80) — builder role ONLY: own project
@@ -32,6 +31,10 @@ export async function GET() {
       ].filter(Boolean).join(" · "),
       buildStatus: p.buildStatus,
     })),
-    matched: matched.map((m) => ({ requirement: requirementDTO(m.requirement), matchedTo: m.matchedTo, tierLabel: m.tierLabel })),
+    // Already access-stripped by the matching engine: a builder without an
+    // active requirement-access plan receives preview fields only — no budget,
+    // no poster — exactly like a locked browse card (Doc9 §17). It used to send
+    // the full requirement to every builder.
+    matched,
   });
 }

@@ -15,7 +15,8 @@ export async function GET(req: NextRequest) {
   const limited = await rateLimit(`feed-nc:${clientIp(req.headers)}`, 240, 60);
   if (!limited.allowed) return fail("RATE_LIMITED");
   const claims = await getCurrentUser();
-  const since = new URL(req.url).searchParams.get("since");
+  const url = new URL(req.url);
+  const since = url.searchParams.get("since");
   const sinceIso = since && !Number.isNaN(Date.parse(since)) ? since : new Date(Date.now() - 60_000).toISOString();
-  return ok({ count: await newCount(claims?.sub ?? null, sinceIso) });
+  return ok({ count: await newCount(claims?.sub ?? null, sinceIso, url.searchParams.get("city")) });
 }

@@ -8,6 +8,8 @@ import {
   updateRequirementContent, reopenRequirement,
 } from "@/lib/listings/requirements";
 import { requirementDetailDTO } from "@/lib/listings/dto";
+import { requirementUnlockPlan } from "@/lib/billing/service";
+import { requirementUnlockDTO } from "@/lib/billing/dto";
 import { getProfileById } from "@/lib/profile/service";
 import { getPropertyType } from "@/lib/listings/service";
 import { canPostRequirement } from "@/lib/listings/capabilities";
@@ -52,7 +54,23 @@ export async function GET(_req: Request, props: { params: Promise<{ id: string }
   if (!res) return fail("NOT_FOUND");
 
   const proposals = res.access === "own" ? await requirementProposalCount(params.id) : null;
-  return ok({ requirement: requirementDetailDTO(res.row, res.access, proposals, (await getPropertyType(res.row.type_code))?.label ?? null) });
+
+  // WHICH plan unlocks this card, for THIS viewer's role. The screen hardcoded
+  // "₹2,999 /month" and `plan=p2999` — a price that belongs in `plan_catalog`
+  // (CLAUDE.md rule 12), and a plan checkout refuses to a builder (0087), so
+  // every Unlock on a builder's requirement detail dead-ended at "That plan
+  // isn't available for your account". The browse card and the feed card were
+  // fixed for this; the detail behind them was not.
+  const unlockPlan = res.access === "locked"
+    ? requirementUnlockDTO(await requirementUnlockPlan(
+        (claims ? (await getProfileById(claims.sub))?.role ?? null : "owner") as never,
+      ))
+    : null;
+
+  return ok({
+    requirement: requirementDetailDTO(res.row, res.access, proposals, (await getPropertyType(res.row.type_code))?.label ?? null),
+    unlockPlan,
+  });
 }
 
 export async function PATCH(req: NextRequest, props: { params: Promise<{ id: string }> }) {

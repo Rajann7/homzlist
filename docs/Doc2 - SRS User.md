@@ -108,6 +108,14 @@
 
 - Structured: type, Buy/Rent, budget min–max, preferred areas (multi), BHK, urgency (Immediate/1–3mo/Exploring). Admin-approved. 30-day life (independent of plan). Reminders 5d+1d pre-expiry.
 - **Visibility**: posting via quota; viewing others = ₹2,999. Unpaid see locked cards (type+area+intent only; poster blurred; details stripped SERVER-side — API returns preview fields only). Unlocked shows poster name+role+badges+city (never number). Searchable (locked results for unpaid). `noindex`.
+- **Location scope (amended 6 Aug 2026).** WHERE a viewer's requirement list comes from is one server decision (`requirementScope`, lib/listings/matching) used by the browse screen, the requirement-mode feed and the dashboard tile alike:
+  - Signed-in → `profiles.city_id`. A guest has no profile, so their city-chip pick rides the request as `?city=` and is validated against `locations` (level `city`); a signed-in profile's city always wins, so the param can never re-scope an account.
+  - Inside the city the cascade is unchanged: exact areas → adjacent → rest of city. **The leading section takes no header** (it is the primary group) — the city tier only reads "Other areas in X" when an exact/adjacent section precedes it.
+  - **City empty → widen ONCE to the rest of the STATE**, in its own section headed "Other cities in `<State>`". `requirements.state_id` (migration 0126, DB trigger) makes this a real query.
+  - **No city anywhere → all-India**, headed "Across India" — never an unlabelled mix that reads as local.
+  - **Nothing anywhere → server-supplied empty copy + a working "Change city" action.** The screen never says "expand your city" with nothing to tap.
+  - The ₹2,999 wall is orthogonal to all of it: widening changes WHICH requirements are listed, never how much of one is revealed.
+- **Access strip applies on every surface**, not just browse: the requirement detail's unlock card reads its price and plan code from `plan_catalog` for the viewer's ROLE (a builder is offered ₹9,999, which checkout accepts — not ₹2,999, which it refuses); the builder dashboard's matched-requirement cards are stripped by the same engine (plan lapsed → locked card, no budget in the payload); and the "matching requirement" notification carries the budget only for a recipient who holds requirement access.
 - States: active → expired → (renew plan → Activate toggle → active again, quota consumed) / OFF / fulfilled (button; stops proposals; quota stays consumed) / deleted (quota stays consumed). Multiple active allowed (1/plan). Edit → re-review + re-match. Expired/OFF: chats continue (banner), proposals stop.
 - Reverse-match: poster sees "Matching properties on platform" strip (same engine).
 

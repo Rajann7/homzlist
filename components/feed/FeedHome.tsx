@@ -14,22 +14,9 @@ import { apiFetch } from "@/lib/auth/api-fetch";
 import type { CityRow } from "./CitySheet";
 import { cn } from "@/lib/utils";
 import { useNow } from "@/lib/hooks/useNow";
-
-// Guest city choice is a UI-only preference (no identity, no server profile to hold it) —
-// stored client-side so it survives reload/navigation instead of resetting every time.
-const GUEST_CITY_KEY = "hz_guest_city";
-function readGuestCity(): { cityId: string | null; cityName: string | null } {
-  if (typeof window === "undefined") return { cityId: null, cityName: null };
-  try {
-    const raw = window.localStorage.getItem(GUEST_CITY_KEY);
-    if (!raw) return { cityId: null, cityName: null };
-    const { id, name } = JSON.parse(raw);
-    return { cityId: id ?? null, cityName: name ?? null };
-  } catch { return { cityId: null, cityName: null }; }
-}
-function writeGuestCity(id: string, name: string) {
-  try { window.localStorage.setItem(GUEST_CITY_KEY, JSON.stringify({ id, name })); } catch { /* ignore */ }
-}
+// Guest city choice is a UI-only preference (no identity, no server profile to
+// hold it) — shared with the story viewer so the two agree on scope.
+import { readGuestCity, writeGuestCity } from "@/lib/feed/guest-city";
 
 /**
  * The P2 feed home — the app's main screen. Orchestrates the shell (header +
@@ -54,6 +41,16 @@ export function FeedHome() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const feedRef = useRef<PropertyFeedHandle>(null);
   const loadedAt = useRef<number>(useNow());
+  /**
+   * The current city, as a ref.
+   *
+   * `loadStories` and the new-count interval are created ONCE (deps `[]`), so
+   * they cannot close over `me` — reading it directly would pin them to
+   * whatever the city was on first render, and a guest switching city would
+   * keep polling the old one. `onCity` writes this before it refreshes, so the
+   * very next call already carries the new city.
+   */
+  const cityRef = useRef<string | null>(null);
 
   const loadMe = useCallback(async () => {
     try {
@@ -67,13 +64,22 @@ export function FeedHome() {
       if (res.ok) {
         const j = await res.json();
         const p = j.data?.profile;
+        cityRef.current = p?.cityId ?? null;
         setMe({ guest: false, role: p?.role ?? null, cityId: p?.cityId ?? null, cityName: p?.cityName ?? null });
-      } else setMe({ guest: true, role: null, ...readGuestCity() });
-    } catch { setMe({ guest: true, role: null, ...readGuestCity() }); }
+      } else {
+        const g = readGuestCity();
+        cityRef.current = g.cityId;
+        setMe({ guest: true, role: null, ...g });
+      }
+    } catch {
+      const g = readGuestCity();
+      cityRef.current = g.cityId;
+      setMe({ guest: true, role: null, ...g });
+    }
   }, []);
 
   const loadStories = useCallback(async () => {
-    const res = await storiesApi.list();
+    const res = await storiesApi.list(cityRef.current);
     setStories(res.ok ? res.data.circles : []);
   }, []);
 
@@ -98,13 +104,14 @@ export function FeedHome() {
     const since = new Date().toISOString();
     const t = setInterval(async () => {
       if (Date.now() - loadedAt.current < 30_000) return;
-      const res = await feedApi.newCount(since);
+      const res = await feedApi.newCount(since, cityRef.current);
       if (res.ok) setNewCount(res.data.count);
     }, 20_000);
     return () => clearInterval(t);
   }, []);
 
   const onCity = async (c: CityRow) => {
+    cityRef.current = c.id;
     setMe((m) => (m ? { ...m, cityId: c.id, cityName: c.name } : m));
     if (me && !me.guest) {
       await apiFetch("/api/v1/profile/me", { method: "PATCH", headers: { "Content-Type": "application/json" }, cache: "no-store", body: JSON.stringify({ cityId: c.id }) });
@@ -144,7 +151,7 @@ export function FeedHome() {
         )}
 
         {isBuilder ? (
-          <BuilderDashboard cityName={me?.cityName ?? null} />
+          <BuilderDashboard cityName={me?.cityName ?? null} cityId={me?.cityId ?? null} />
         ) : (
           <>
             <StoryRow circles={stories ?? []} loading={stories === null} />
@@ -186,8 +193,8 @@ export function FeedHome() {
             </div>
 
             {mode === "property"
-              ? <PropertyFeed ref={feedRef} filter={filter} sort={sort} guest={me?.guest ?? true} />
-              : <RequirementFeed kind={reqKind} guest={me?.guest ?? true} />}
+              ? <PropertyFeed ref={feedRef} filter={filter} sort={sort} guest={me?.guest ?? true} cityId={me?.cityId ?? null} />
+              : <RequirementFeed kind={reqKind} guest={me?.guest ?? true} cityId={me?.cityId ?? null} />}
           </>
         )}
       </div>

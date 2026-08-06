@@ -1,7 +1,7 @@
 import "server-only";
 import { createServiceClient } from "@/lib/supabase/server";
 import { notify } from "./service";
-import { requirementBrief, listingBrief, rupeesExact } from "./subjects";
+import { requirementBrief, requirementBriefPreview, listingBrief, rupeesExact } from "./subjects";
 
 /**
  * The scheduled half of the Doc2 §14 event catalog — the events that are a JOB,
@@ -296,7 +296,28 @@ export async function notifyMatchingRequirement(requirementId: string): Promise<
     .limit(500);
 
   const day = new Date().toISOString().slice(0, 10);
-  const brief = await requirementBrief(requirementId);
+  // Two briefs, chosen per recipient: the paid one carries the budget, the
+  // unpaid one must not. This alert fans out to every broker and builder in the
+  // city, so using the full brief for all of them handed the budget — the one
+  // thing the ₹2,999 wall exists to sell — to people who had not bought it.
+  const [briefFull, briefPreview] = await Promise.all([
+    requirementBrief(requirementId),
+    requirementBriefPreview(requirementId),
+  ]);
+
+  // One query for the whole fan-out rather than a plan lookup per recipient.
+  const proIds = ((pros ?? []) as { id: string }[]).map((p) => p.id);
+  const unlocked = new Set<string>();
+  if (proIds.length) {
+    const { data: plans } = await db()
+      .from("user_plans")
+      .select("profile_id,terms")
+      .in("profile_id", proIds)
+      .eq("status", "active");
+    for (const p of ((plans ?? []) as { profile_id: string; terms?: Record<string, unknown> }[])) {
+      if (p.terms?.requirement_access) unlocked.add(p.profile_id);
+    }
+  }
   let sent = 0;
 
   for (const p of ((pros ?? []) as { id: string; role: string }[])) {
@@ -311,8 +332,10 @@ export async function notifyMatchingRequirement(requirementId: string): Promise<
     await notify({
       profileId: p.id,
       type: "requirement_match",
-      title: `New requirement matches your area — **${brief.title}**`,
-      body: "Send a proposal before someone else does.",
+      title: `New requirement matches your area — **${(unlocked.has(p.id) ? briefFull : briefPreview).title}**`,
+      body: unlocked.has(p.id)
+        ? "Send a proposal before someone else does."
+        : "Unlock requirements to see the budget and send a proposal.",
       groupKey: `req-match:${day}`,
       entityKind: "requirement", entityId: requirementId,
       data: { requirementId },

@@ -6,6 +6,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { Icon, type IconName } from "@/components/ui/Icon";
 import { useToast } from "@/components/ui/Toast";
 import { storiesApi, interactionsApi, type StoryCircle } from "@/lib/feed/client";
+import { readGuestCity } from "@/lib/feed/guest-city";
 import { cn } from "@/lib/utils";
 
 /**
@@ -51,7 +52,10 @@ export function StoryViewer({ posterId }: { posterId: string }) {
 
   useEffect(() => {
     void (async () => {
-      const res = await storiesApi.list();
+      // Same scope the ROW that opened this used. Unscoped, a guest's circle
+      // list would not contain the poster they just tapped and the viewer would
+      // close itself the moment it opened.
+      const res = await storiesApi.list(readGuestCity().cityId);
       if (!res.ok) { close(); return; }
       const list = res.data.circles;
       const start = Math.max(0, list.findIndex((c) => c.posterId === posterId));

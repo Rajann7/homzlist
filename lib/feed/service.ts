@@ -1,8 +1,10 @@
 import "server-only";
 import { createServiceClient } from "@/lib/supabase/server";
 import { formatShortRupees } from "@/lib/billing/money";
-import { timeAgo } from "@/lib/listings/matching";
+import { timeAgo, matchRequirementsForProjects, type MatchedRequirementCard } from "@/lib/listings/matching";
 import { placementsFor, outOfCityIds, stateIdOfCity, type PlacementSet } from "@/lib/billing/placement";
+import { resolveViewerCity } from "@/lib/location/viewer-city";
+import { feedScope, applyFeedScope, type FeedScope } from "./scope";
 import { getFieldDefinitions, getAreaUnits, type FieldDefinitionRow } from "@/lib/listings/service";
 
 /**
@@ -81,10 +83,14 @@ export interface FeedResult {
   sections: { label: string | null; items: FeedCard[] }[];
 }
 
-export async function viewerCity(viewerId: string | null): Promise<string | null> {
-  if (!viewerId) return null;
-  const { data } = await db().from("profiles").select("city_id").eq("id", viewerId).maybeSingle();
-  return (data as { city_id: string | null } | null)?.city_id ?? null;
+/**
+ * The viewer's city. `pickedCityId` is the GUEST's city-chip choice — validated
+ * server-side, and always beaten by a signed-in profile's own city (see
+ * lib/location/viewer-city). Until it was threaded through, the chip changed
+ * its own label and nothing else: a guest who picked Mumbai still got Rajkot.
+ */
+export async function viewerCity(viewerId: string | null, pickedCityId?: string | null): Promise<string | null> {
+  return resolveViewerCity(viewerId, pickedCityId ?? null);
 }
 
 
@@ -185,7 +191,17 @@ function applyKeyset<T extends { or: (f: string) => T; lt: (c: string, v: string
 
 export async function getFeed(
   viewerId: string | null,
-  opts: { filter?: FeedFilter; sort?: FeedSort; cursor?: string | null; limit?: number } & FeedNarrow,
+  opts: {
+    filter?: FeedFilter; sort?: FeedSort; cursor?: string | null; limit?: number;
+    /** Guest's city-chip pick; ignored when the viewer's profile has a city. */
+    cityId?: string | null;
+    /**
+     * An already-resolved scope. The rails call this function once per rail, and
+     * resolving the scope costs three reads — so `getFeedSections` resolves it
+     * once for the whole request and hands the same one down.
+     */
+    scope?: FeedScope;
+  } & FeedNarrow,
 ): Promise<FeedResult> {
   const filter = opts.filter ?? "all";
   const sort = opts.sort ?? "latest";
@@ -196,14 +212,19 @@ export async function getFeed(
   // A rail's cursor carries its phase; every other caller's is a bare timestamp.
   const { phase, ts: cursorTs, id: cursorId, boostOffset } = parsePhaseCursor(cursor);
 
-  const cityId = await viewerCity(viewerId);
+  const scope = opts.scope ?? (await feedScope(viewerId, opts.cityId ?? null));
+  const cityId = scope.cityId;
   const hidden = await notInterested(viewerId);
 
   // Which boosts target THIS viewer (Doc2 §13 targeting), FIFO by boost start.
   // Resolved once per request and reused for ranking, for the out-of-city
   // injection below, and for the Promoted flag on the card.
+  //
+  // Anchored to the viewer's REAL city even when the result set widened: a boost
+  // buys reach to where the viewer is, and widening is about what we can show
+  // them, not about who paid to reach them.
   const placements = await placementsFor(
-    { cityId, stateId: cityId ? await stateIdOfCity(cityId) : null },
+    { cityId, stateId: scope.stateId },
     ["listing", "project"],
   );
 
@@ -223,7 +244,10 @@ export async function getFeed(
     // live_at come back in an arbitrary order and the cursor cannot be exact.
     .order("id", { ascending: false })
     .limit(60);
-  if (cityId) lq = lq.eq("city_id", cityId);
+  // City-scoped, or state-scoped when the viewer's city is empty and the
+  // request widened (Doc4 §9 "new-city empty (+nearby auto)"). One helper so the
+  // listing half, the project half and the rail counts can never disagree.
+  lq = applyFeedScope(lq, scope);
   if (viewerId) lq = lq.neq("profile_id", viewerId);
   if (filter === "buy") lq = lq.eq("kind", "sell");
   if (filter === "rent") lq = lq.eq("kind", "rent");
@@ -252,7 +276,7 @@ export async function getFeed(
       .order("live_at", { ascending: false })
       .order("id", { ascending: false })
       .limit(20);
-    if (cityId) pq = pq.eq("city_id", cityId);
+    pq = applyFeedScope(pq, scope);
     if (viewerId) pq = pq.neq("profile_id", viewerId);
     if (opts.projectTypes?.length) pq = pq.in("project_type", opts.projectTypes);
     if (!grouped || phase === "P") pq = applyKeyset(pq, cursorTs, cursorId);
@@ -879,15 +903,17 @@ function toCard(
  * New-listings count since a timestamp (Doc7 §83). The CLIENT decides whether to
  * SHOW the pill (only after ≥30s on feed); the server just answers "how many".
  */
-export async function newCount(viewerId: string | null, sinceIso: string): Promise<number> {
-  const cityId = await viewerCity(viewerId);
+export async function newCount(viewerId: string | null, sinceIso: string, pickedCityId?: string | null): Promise<number> {
+  // Same scope as the feed the pill sits on — counting a city the feed is not
+  // showing would fire "5 new listings" over an unchanged screen.
+  const scope = await feedScope(viewerId, pickedCityId ?? null);
   // "New" = newly IN THE FEED, i.e. went live after `since` — `live_at`, not
   // `created_at`. A listing is drafted, moderated, then published, so
   // created_at can be days older than the moment it appeared. Counting by
   // created_at meant the pill never fired for a genuinely new listing.
   let q = db().from("listings").select("id", { count: "exact", head: true })
     .eq("status", "live").eq("availability", "available").gt("live_at", sinceIso);
-  if (cityId) q = q.eq("city_id", cityId);
+  q = applyFeedScope(q, scope);
   if (viewerId) q = q.neq("profile_id", viewerId);
   const { count } = await q;
   return count ?? 0;
@@ -920,7 +946,7 @@ export const PROJECT_STATE_LABEL: Record<string, string> = {
 
 export async function builderDashboard(builderId: string): Promise<{
   projects: BuilderProjectStat[];
-  matched: { requirement: any; matchedTo: string; tierLabel: string | null }[];
+  matched: MatchedRequirementCard[];
 }> {
   // Every project the builder owns except drafts and deletions — NOT just live.
   // A project sits in `pending_review` after posting, and while it did, it
@@ -929,7 +955,8 @@ export async function builderDashboard(builderId: string): Promise<{
   // paid ₹9,999 for something they could not see.
   const { data: projData } = await db()
     .from("projects")
-    .select("id,name,cover_url,available_units,total_units,build_status,city_id,area_id,area_label,status")
+    // `project_type` feeds the shared matcher's DB-driven type pairing.
+    .select("id,name,project_type,cover_url,available_units,total_units,build_status,city_id,area_id,area_label,status")
     .eq("profile_id", builderId)
     .not("status", "in", "(draft,deleted)")
     .order("created_at", { ascending: false });
@@ -947,40 +974,19 @@ export async function builderDashboard(builderId: string): Promise<{
     status: p.status,
   }));
 
-  // Requirements matched to the builder's projects: residential requirements in
-  // the projects' cities/areas, tagged with the project + cascade tier. Only a
-  // LIVE project pulls matches — an under-review project must not start
-  // generating leads before it is approved.
-  const liveProjects = projects.filter((p) => p.status === "live");
-  const matched: { requirement: any; matchedTo: string; tierLabel: string | null }[] = [];
-  const seen = new Set<string>();
-  const RESIDENTIAL = new Set(["flat", "bungalow", "tenement", "farmhouse", "villa", "penthouse", "studio"]);
-  for (const p of liveProjects) {
-    if (!p.city_id) continue;
-    const adj = p.area_id ? await adjacentAreaSet([p.area_id]) : new Set<string>();
-    const { data: reqs } = await db()
-      .from("requirements")
-      .select("*")
-      .eq("status", "live").eq("is_active", true).eq("kind", "sell").eq("city_id", p.city_id)
-      .order("created_at", { ascending: false }).limit(10);
-    for (const r of (reqs ?? []) as any[]) {
-      if (seen.has(r.id) || !RESIDENTIAL.has(r.type_code)) continue;
-      seen.add(r.id);
-      const inExact = (r.area_ids ?? []).some((a: string) => a === p.area_id);
-      const inAdj = (r.area_ids ?? []).some((a: string) => adj.has(a));
-      const tierLabel = inExact ? null : inAdj ? `Nearby: ${r.area_label ?? "area"}` : `Other areas`;
-      matched.push({ requirement: r, matchedTo: p.name, tierLabel });
-      if (matched.length >= 8) break;
-    }
-    if (matched.length >= 8) break;
-  }
+  // Requirements matched to the builder's projects, from the SHARED matching
+  // engine (lib/listings/matching). Only a LIVE project pulls matches — an
+  // under-review project must not start generating leads before it is approved.
+  // The engine owns the access strip (a builder without an active
+  // requirement-access plan gets locked preview cards, same as everywhere else)
+  // and reads the project-type → property-type pairing from `project_types`
+  // instead of a hardcoded "residential" list.
+  const matched = await matchRequirementsForProjects(
+    builderId,
+    projects.filter((p) => p.status === "live"),
+    8,
+  );
   return { projects: projectStats, matched };
-}
-
-async function adjacentAreaSet(areaIds: string[]): Promise<Set<string>> {
-  if (!areaIds.length) return new Set();
-  const { data } = await db().from("location_adjacency").select("adjacent_id").in("location_id", areaIds);
-  return new Set(((data ?? []) as { adjacent_id: string }[]).map((r) => r.adjacent_id));
 }
 
 export interface FeedBanner {
@@ -1017,13 +1023,13 @@ export async function activeFeedBanner(): Promise<FeedBanner | null> {
 }
 
 /** "Suggested for you" strip (Doc7 §81) — a small area/recency set, mini cards. */
-export async function suggested(viewerId: string | null): Promise<{ id: string; coverUrl: string | null; price: string; areaLabel: string | null }[]> {
-  const cityId = await viewerCity(viewerId);
+export async function suggested(viewerId: string | null, pickedCityId?: string | null): Promise<{ id: string; coverUrl: string | null; price: string; areaLabel: string | null }[]> {
+  const scope = await feedScope(viewerId, pickedCityId ?? null);
   let q = db().from("listings")
     .select("id,cover_url,price_paise,price_on_request,area_label")
     .eq("status", "live").eq("availability", "available")
     .order("created_at", { ascending: false }).limit(8);
-  if (cityId) q = q.eq("city_id", cityId);
+  q = applyFeedScope(q, scope);
   if (viewerId) q = q.neq("profile_id", viewerId);
   const { data } = await q;
   return ((data ?? []) as any[]).map((l) => ({

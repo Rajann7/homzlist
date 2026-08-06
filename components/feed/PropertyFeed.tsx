@@ -30,8 +30,19 @@ export interface PropertyFeedHandle { refresh: () => void; }
  * the server (lib/feed/sections.ts). This component asks "what rails?" and
  * renders them; a rail then loads its own cards as it scrolls into view.
  */
-export const PropertyFeed = forwardRef<PropertyFeedHandle, { filter: string; sort: string; guest: boolean }>(
-  function PropertyFeed({ filter, sort, guest }, ref) {
+export const PropertyFeed = forwardRef<
+  PropertyFeedHandle,
+  {
+    filter: string; sort: string; guest: boolean;
+    /**
+     * The GUEST's city-chip choice. A signed-in viewer's city comes from their
+     * profile server-side, so this is null for them. Without it the chip
+     * re-labelled itself and the rails stayed all-India.
+     */
+    cityId?: string | null;
+  }
+>(
+  function PropertyFeed({ filter, sort, guest, cityId = null }, ref) {
     const router = useRouter();
     const toast = useToast();
     const [sections, setSections] = useState<FeedSectionMeta[] | null>(null);
@@ -53,14 +64,14 @@ export const PropertyFeed = forwardRef<PropertyFeedHandle, { filter: string; sor
     const load = useCallback(async () => {
       setSections(null);
       setSavedOverride({});
-      const res = await feedApi.sections(filter);
+      const res = await feedApi.sections(filter, cityId);
       if (res.ok) { setSections(res.data.sections); setOffline(false); }
       else { setOffline(res.error.code === "OFFLINE"); setSections([]); }
       // The "Suggested for you" strip (Doc7 §81) is unchanged — it just sits
       // after the first rail now instead of after the first card.
-      const sug = await feedApi.suggested();
+      const sug = await feedApi.suggested(cityId);
       if (sug.ok) setSuggested(sug.data.items);
-    }, [filter]);
+    }, [filter, cityId]);
 
     useEffect(() => { void load(); }, [load]);
     useImperativeHandle(ref, () => ({ refresh: () => void load() }), [load]);
@@ -147,10 +158,11 @@ export const PropertyFeed = forwardRef<PropertyFeedHandle, { filter: string; sor
             <SectionRail
               // key includes the filter/sort so a Buy/Rent tap remounts the
               // rail with fresh state instead of showing the old page.
-              key={`${s.key}:${filter}:${sort}`}
+              key={`${s.key}:${filter}:${sort}:${cityId ?? ""}`}
               section={s}
               filter={filter}
               sort={sort}
+              cityId={cityId}
               renderCard={renderCard}
               renderPerson={(p) => <PersonCard person={p} onOpen={() => openPerson(p)} />}
               onViewAll={(href) => router.push(href)}

@@ -130,12 +130,18 @@ export function LandingView({ page, basePath = "" }: { page: LandingPage; basePa
               Post what you&apos;re looking for and verified owners and brokers in{" "}
               {page.spec.area?.name ?? page.spec.city.name} will reach out with matches.
             </p>
-            <Link
-              href={path("/requirements/new")}
+            {/* The requirement FORM is seller-host only — `/requirements/new`
+                does not exist on the public host, so this CTA 404'd for every
+                guest who reached an empty area page. `/login` is 307'd to the
+                seller host by the middleware; a plain <a> because <Link> would
+                prefetch that redirect and hand off anyway (same reason as the
+                feed's guest strip). */}
+            <a
+              href={basePath ? path("/requirements/new") : "/login"}
               className="mx-auto mt-4 grid h-11 w-full max-w-[260px] place-items-center rounded-8 bg-accent text-15 font-semibold text-white"
             >
               Post a Requirement
-            </Link>
+            </a>
           </section>
         ) : (
           <div className="mb-4">

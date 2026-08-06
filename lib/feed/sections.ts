@@ -1,9 +1,10 @@
 import "server-only";
 import { createServiceClient } from "@/lib/supabase/server";
 import {
-  getFeed, viewerCity, notInterested,
+  getFeed, notInterested,
   type FeedCard, type FeedFilter, type FeedSort,
 } from "./service";
+import { feedScope, type FeedScope } from "./scope";
 import { searchBrokers } from "@/lib/search/service";
 import type { BrokerResult } from "@/lib/search/types";
 
@@ -73,9 +74,14 @@ const PEOPLE_PAGE = 12;
 
 interface CountRow { scope: string; code: string; n: number }
 
-async function typeCounts(cityId: string | null, viewerId: string | null, filter: FeedFilter) {
+async function typeCounts(scope: FeedScope, viewerId: string | null, filter: FeedFilter) {
+  // EITHER city OR state, never both (migration 0127) — the widened case has to
+  // count what the widened rails will actually fetch, or a rail would be
+  // announced from a count of 0 and render nothing.
   const { data, error } = await db().rpc("hz_feed_type_counts", {
-    p_city: cityId, p_viewer: viewerId, p_filter: filter,
+    p_city: scope.widened ? null : scope.cityId,
+    p_state: scope.widened ? scope.stateId : null,
+    p_viewer: viewerId, p_filter: filter,
   });
   if (error) throw error;
   const property = new Map<string, number>();
@@ -86,15 +92,15 @@ async function typeCounts(cityId: string | null, viewerId: string | null, filter
   return { property, project };
 }
 
-async function cityName(cityId: string | null): Promise<string | null> {
-  if (!cityId) return null;
-  const { data } = await db().from("locations").select("name").eq("id", cityId).maybeSingle();
-  return (data as { name: string } | null)?.name ?? null;
-}
-
-/** "12 available in Rajkot" / "12 available" when the viewer has no city set. */
-function inCity(text: string, city: string | null): string {
-  return city ? `${text} in ${city}` : text;
+/**
+ * "12 available in Rajkot" / "12 available" when the viewer has no city set.
+ *
+ * The place name comes from the SCOPE, not from the viewer's city: a request
+ * that widened to the state is showing state-wide cards, so "in Mumbai" over
+ * Rajkot inventory would be the label lying about the rows beneath it.
+ */
+function inPlace(text: string, place: string | null): string {
+  return place ? `${text} in ${place}` : text;
 }
 
 /**
@@ -106,14 +112,15 @@ function inCity(text: string, city: string | null): string {
  */
 export async function getFeedSections(
   viewerId: string | null,
-  opts: { filter?: FeedFilter } = {},
+  opts: { filter?: FeedFilter; cityId?: string | null } = {},
 ): Promise<FeedSectionMeta[]> {
   const filter = opts.filter ?? "all";
-  const cityId = await viewerCity(viewerId);
+  const scope = await feedScope(viewerId, opts.cityId ?? null);
+  const cityId = scope.cityId;
+  const city = scope.placeLabel;
 
-  const [counts, city, hidden, { data: propTypes }, { data: projTypes }] = await Promise.all([
-    typeCounts(cityId, viewerId, filter),
-    cityName(cityId),
+  const [counts, hidden, { data: propTypes }, { data: projTypes }] = await Promise.all([
+    typeCounts(scope, viewerId, filter),
     notInterested(viewerId),
     db().from("property_types").select("code,label,sort_order").eq("is_active", true).order("sort_order"),
     db().from("project_types").select("code,label,sort_order,property_type_codes").eq("is_active", true).order("sort_order"),
@@ -122,8 +129,8 @@ export async function getFeedSections(
   // Sellers are ranked over the whole city and only then counted, so a rail
   // that would show nobody is never announced.
   const [builders, brokers] = await Promise.all([
-    topPeople(viewerId, cityId, "builder"),
-    topPeople(viewerId, cityId, "broker"),
+    topPeople(viewerId, scope, "builder"),
+    topPeople(viewerId, scope, "broker"),
   ]);
 
   // Which scheme types ride on which property-type rail — a DB column
@@ -151,7 +158,7 @@ export async function getFeedSections(
       kind: "property_type" as const,
       title: t.label,
       // The subtitle says what is actually in the rail, in the order it appears.
-      subtitle: inCity(
+      subtitle: inPlace(
         [projs ? `${projs} ${projs === 1 ? "project" : "projects"}` : null,
          props ? `${props} ${props === 1 ? "property" : "properties"}` : null]
           .filter(Boolean).join(" · "),
@@ -177,7 +184,7 @@ export async function getFeedSections(
       key: `ptype:${t.code}`,
       kind: "project_type" as const,
       title: t.label,
-      subtitle: inCity(`${n} ${n === 1 ? "project" : "projects"}`, city),
+      subtitle: inPlace(`${n} ${n === 1 ? "project" : "projects"}`, city),
       total: n,
       viewAll: searchHref({ tab: "projects", ptypes: [t.code] }),
     }));
@@ -192,7 +199,7 @@ export async function getFeedSections(
       key: "projects",
       kind: "projects",
       title: "New Projects",
-      subtitle: inCity(`${projectTotal} live ${projectTotal === 1 ? "project" : "projects"}`, city),
+      subtitle: inPlace(`${projectTotal} live ${projectTotal === 1 ? "project" : "projects"}`, city),
       total: projectTotal,
       viewAll: searchHref({ tab: "projects" }),
     });
@@ -206,7 +213,7 @@ export async function getFeedSections(
       key: "builders",
       kind: "builders",
       title: "Top Builders",
-      subtitle: inCity(`${builders.length} ${builders.length === 1 ? "builder" : "builders"} with live projects`, city),
+      subtitle: inPlace(`${builders.length} ${builders.length === 1 ? "builder" : "builders"} with live projects`, city),
       total: builders.length,
       viewAll: searchHref({ tab: "brokers", roles: ["builder"] }),
     });
@@ -216,7 +223,7 @@ export async function getFeedSections(
       key: "brokers",
       kind: "brokers",
       title: "Top Brokers",
-      subtitle: inCity(`${brokers.length} ${brokers.length === 1 ? "broker" : "brokers"} with live listings`, city),
+      subtitle: inPlace(`${brokers.length} ${brokers.length === 1 ? "broker" : "brokers"} with live listings`, city),
       total: brokers.length,
       viewAll: searchHref({ tab: "brokers", roles: ["broker"] }),
     });
@@ -237,16 +244,22 @@ export async function getFeedSections(
 export async function getFeedSectionItems(
   viewerId: string | null,
   key: string,
-  opts: { filter?: FeedFilter; sort?: FeedSort; cursor?: string | null; limit?: number } = {},
+  opts: {
+    filter?: FeedFilter; sort?: FeedSort; cursor?: string | null; limit?: number;
+    cityId?: string | null; scope?: FeedScope;
+  } = {},
 ): Promise<FeedSectionPage> {
   const filter = opts.filter ?? "all";
   const sort = opts.sort ?? "latest";
   const cursor = opts.cursor ?? null;
   const limit = Math.min(opts.limit ?? RAIL_PAGE, 20);
 
+  const scope = opts.scope ?? (await feedScope(viewerId, opts.cityId ?? null));
+
   if (key === "builders" || key === "brokers") {
-    const cityId = await viewerCity(viewerId);
-    const all = await topPeople(viewerId, cityId, key === "builders" ? "builder" : "broker");
+    // Sellers follow the same widening: a state-wide rail of cards over an empty
+    // "Top Brokers" strip would be the one rail contradicting the rest.
+    const all = await topPeople(viewerId, scope, key === "builders" ? "builder" : "broker");
     const offset = Number.isFinite(Number(cursor)) && Number(cursor) > 0 ? Number(cursor) : 0;
     const page = all.slice(offset, offset + PEOPLE_PAGE);
     const next = offset + PEOPLE_PAGE < all.length ? String(offset + PEOPLE_PAGE) : null;
@@ -254,7 +267,7 @@ export async function getFeedSectionItems(
   }
 
   if (key === "projects") {
-    const r = await getFeed(viewerId, { filter, sort, cursor, limit, only: "project" });
+    const r = await getFeed(viewerId, { filter, sort, cursor, limit, only: "project", scope });
     return { items: r.items, people: [], nextCursor: r.nextCursor };
   }
 
@@ -267,14 +280,14 @@ export async function getFeedSectionItems(
     const projectTypes = ((data ?? []) as { code: string }[]).map((r) => r.code);
     const r = await getFeed(viewerId, {
       filter, sort, cursor, limit,
-      typeCode: code, projectTypes, groupOrder: "project-first",
+      typeCode: code, projectTypes, groupOrder: "project-first", scope,
     });
     return { items: r.items, people: [], nextCursor: r.nextCursor };
   }
 
   if (key.startsWith("ptype:")) {
     const code = key.slice(6);
-    const r = await getFeed(viewerId, { filter, sort, cursor, limit, only: "project", projectTypes: [code] });
+    const r = await getFeed(viewerId, { filter, sort, cursor, limit, only: "project", projectTypes: [code], scope });
     return { items: r.items, people: [], nextCursor: r.nextCursor };
   }
 
@@ -291,11 +304,21 @@ export async function getFeedSectionItems(
  * nothing live, counts projects for a builder and listings for a broker, and
  * sorts by that count.
  */
-async function topPeople(viewerId: string | null, cityId: string | null, role: "builder" | "broker"): Promise<BrokerResult[]> {
+async function topPeople(viewerId: string | null, scope: FeedScope, role: "builder" | "broker"): Promise<BrokerResult[]> {
   // `total` from that helper is the number who QUALIFY; `items` is the ranked
   // list. Asking for PEOPLE_SCAN of them means the rail can page through the
   // whole city without a second round trip per page.
-  const { items } = await searchBrokers({ cityId: cityId ?? undefined, roles: [role] }, viewerId, PEOPLE_SCAN);
+  //
+  // A widened request drops the city filter entirely rather than passing the
+  // state: `searchBrokers` ranks by live inventory and takes a cityId only, so
+  // un-scoping it and letting the ranking decide is the honest approximation —
+  // the sellers it surfaces are the ones whose inventory the rails are already
+  // showing. Narrower state support belongs in searchBrokers, not a fork here.
+  const { items } = await searchBrokers(
+    { cityId: scope.widened ? undefined : scope.cityId ?? undefined, roles: [role] },
+    viewerId,
+    PEOPLE_SCAN,
+  );
   return items;
 }
 
