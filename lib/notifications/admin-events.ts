@@ -62,12 +62,19 @@ export async function resolveReport(
   return { ok: true };
 }
 
-/** The reported thing's own page — a "View status" that actually resolves. */
-function hrefForSubject(kind: string, id: string): string | null {
+/**
+ * The reported thing's own page — a "View status" that actually resolves.
+ *
+ * A message or user report has no page the reporter may open, and returning
+ * null there left the row with the config's "View status" button and nowhere
+ * to send it: a button that did nothing. Support is where the reporter can
+ * actually follow up, so that is where those land.
+ */
+export function hrefForSubject(kind: string, id: string): string {
   if (kind === "listing") return `/property/${id}`;
   if (kind === "project") return `/project/${id}`;
   if (kind === "requirement") return `/requirements/${id}`;
-  return null; // message / user reports have no page the reporter may open
+  return "/help";
 }
 
 /**
@@ -140,7 +147,9 @@ export async function approveAreaRequest(
       type: "area_added",
       title: `**${r.name}** is now available — post your listing there`,
       body: "The area you asked for is live in the location picker.",
-      href: areaSlug ? `/area/${areaSlug}` : "/create",
+      // No href override: the type's template (0129) is `/create`, the screen
+      // whose location picker took the request. `/area/<slug>` was a PUBLIC
+      // route — on seller.<host>, where this inbox lives, it 404'd.
       data: { areaSlug, areaName: r.name },
     });
   }

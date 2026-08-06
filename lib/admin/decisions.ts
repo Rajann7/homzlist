@@ -1,6 +1,7 @@
 import "server-only";
 import { createServiceClient } from "@/lib/supabase/server";
 import { notify } from "@/lib/notifications/service";
+import { hrefForSubject } from "@/lib/notifications/admin-events";
 import type { AdminIdentity } from "./guard";
 
 /**
@@ -181,6 +182,11 @@ export async function decideAppeal(
         ? "You can edit and resubmit this listing once more."
         : "The flag was removed and your content is visible again."
       : (note ?? "The original decision stands."),
+    // An appeal outcome the poster cannot open is half an answer: an unlocked
+    // listing is waiting to be edited and resubmitted, and a flag decision is
+    // about their own profile. `report_outcome` has no href template (the
+    // subject varies by producer), so the link is passed here.
+    href: isFlag ? "/profile/edit" : row.subject_id ? `/listings/${row.subject_id}` : "/listings",
     entityKind: "appeal",
     entityId: row.id,
     actorId: me.id,
@@ -418,6 +424,9 @@ export async function actOnReport(
         action === "dismiss"
           ? "We did not find a violation this time. Thank you for flagging it."
           : "Thank you — we have taken action on the content you reported.",
+      // The same "reported thing's own page" the A9 path uses, so a reporter
+      // gets a row they can open whichever screen closed the report.
+      href: hrefForSubject(subjectType, subjectId),
       entityKind: subjectType,
       entityId: subjectId,
       actorId: me.id,

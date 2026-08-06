@@ -79,7 +79,30 @@ export async function notify(input: NotifyInput): Promise<NotifyResult> {
     const data = input.data ?? {};
 
     // ---- 1. Write the in-app row (atomic group-or-insert) -------------------
-    const href = input.href ?? resolveHref(cfg.hrefTemplate, { ...data, threadId: input.threadId ?? undefined });
+    // The template's placeholders, filled from what the caller already told
+    // us. `threadId` and the entity are first-class fields on NotifyInput, so
+    // a producer that sets `entityKind: "listing", entityId: x` should not
+    // ALSO have to repeat it in `data` to get a deep link — forgetting that
+    // silently downgraded the row to its list page (127 approvals landed on
+    // /listings instead of the listing).
+    const entityKeys: Record<string, string> = {
+      listing: "listingId",
+      project: "projectId",
+      requirement: "requirementId",
+      ticket: "ticketId",
+    };
+    const entityKey = input.entityKind ? entityKeys[input.entityKind] : undefined;
+    const href =
+      input.href ??
+      resolveHref(
+        cfg.hrefTemplate,
+        {
+          ...(entityKey && input.entityId ? { [entityKey]: input.entityId } : {}),
+          ...data,                                        // an explicit value still wins
+          threadId: input.threadId ?? data.threadId,
+        },
+        cfg.hrefFallback,
+      );
     const { data: rpc, error } = await db().rpc("notify_upsert", {
       p_profile: input.profileId,
       p_type: input.type,

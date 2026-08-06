@@ -245,6 +245,68 @@ if (E.CRON_SECRET) {
 }
 
 // ---------------------------------------------------------------------------
+// 2b. Every row leads somewhere REAL (migration 0129)
+//
+// The inbox renders on seller.<host>, so every href a row carries has to be a
+// route on THAT host. Two whole families were 404s before this ran:
+// `/settings/verification` (which only exists as /profile/verification) and
+// `/area/<slug>` (a public-host page). Config alone cannot prove it — the only
+// proof is asking the server for each distinct target and reading the status.
+// ---------------------------------------------------------------------------
+{
+  const { rows: cfg } = await db.query(
+    `select code, href_template, href_fallback from notification_types order by code`);
+  const noFallback = cfg.filter((r) => !r.href_fallback);
+  check("every notification type has a safe landing page", noFallback.length === 0,
+    noFallback.map((r) => r.code).join(", ") || "all types");
+  const templatedFallback = cfg.filter((r) => (r.href_fallback ?? "").includes("{"));
+  check("no fallback is itself an unresolved template", templatedFallback.length === 0,
+    templatedFallback.map((r) => r.code).join(", "));
+
+  const { rows: raw } = await db.query(
+    `select type, count(*) n from notifications where href like '%{%' group by 1`);
+  check("no stored row carries an unresolved {placeholder}", raw.length === 0,
+    raw.map((r) => `${r.type}×${r.n}`).join(", "));
+
+  const { rows: selfLink } = await db.query(
+    `select count(*) n from notifications where href = '/notifications'`);
+  check("no row links to the inbox it is already on", Number(selfLink[0].n) === 0);
+
+  // No exemptions (0132): a notification you cannot open is a dead row,
+  // including the admin broadcast — it lands on Account status, which is the
+  // screen that already lists those notices.
+  const { rows: nullHref } = await db.query(
+    `select type, count(*) n from notifications where href is null group by 1`);
+  check("every notification row is clickable", nullHref.length === 0,
+    nullHref.map((r) => `${r.type}×${r.n}`).join(", "));
+
+  // Any signed-in seller can prove a route EXISTS; ownership of the specific
+  // row is a different check (the IDOR probes above), and a 404 from a missing
+  // route looks the same to every account.
+  const { rows: who } = await db.query(
+    `select phone from profiles where state='active' and phone is not null
+       and role in ('owner','broker','builder') order by created_at limit 1`);
+  const walker = actor("link-walker");
+  await walker.login(who[0].phone);
+
+  const { rows: targets } = await db.query(
+    `select distinct href from notifications where href is not null order by 1`);
+  const dead = [];
+  for (const { href } of targets) {
+    const r = await walker.req(href);
+    // 200 renders, 3xx is a redirect the router follows. Anything else is a
+    // notification the user taps and lands on nothing.
+    if (r.status >= 400) dead.push(`${href} → ${r.status}`);
+  }
+  check(`every distinct deep link resolves (${targets.length} targets)`, dead.length === 0,
+    dead.join(" · ") || `${targets.length} ok`);
+
+  const { rows: bell } = await db.query(
+    `select count(*) n from admin_notifications where link_screen is null`);
+  check("every admin bell row opens a screen", Number(bell[0].n) === 0, `${bell[0].n} without a screen`);
+}
+
+// ---------------------------------------------------------------------------
 // 3. Ledger + config proof
 // ---------------------------------------------------------------------------
 const { rows: ledger } = await db.query(

@@ -48,6 +48,53 @@ const results = [];
 const check = (n, p, d = "") => { results.push({ n, p: !!p }); console.log(`${p ? "✅" : "❌"} ${n}${d ? ` — ${d}` : ""}`); };
 const section = (t) => console.log(`\n\x1b[1m── ${t}\x1b[0m`);
 
+/**
+ * The account-deletion section moves a real payment in and out of the 7-day
+ * hold window (`payments.order_id` is NOT NULL, so a fabricated row would not
+ * survive the schema this is meant to test). Its true timestamps live here so
+ * they go back however this process ends — a crash, a Ctrl-C or a closed pipe
+ * would otherwise leave the test account's payment history wrong, and nothing
+ * in the schema remembers what it was.
+ */
+let heldPayment = null;
+async function restorePayment() {
+  if (!heldPayment) return;
+  const p = heldPayment;
+  heldPayment = null;                                   // never restore twice
+  await db.query(`update payments set created_at = $2, captured_at = $3 where id = $1`,
+    [p.id, p.created_at, p.captured_at]);
+}
+
+/** Print the summary, put the database back, and exit with the right code. */
+async function finish() {
+  await restorePayment().catch(() => {});
+  const failed = results.filter((r) => !r.p);
+  console.log(`\n${results.length - failed.length}/${results.length} checks passed`);
+  if (failed.length) {
+    console.log("\nFAILED:");
+    for (const f of failed) console.log(`  ✗ ${f.n}`);
+  }
+  try { await db.end(); } catch { /* already closed */ }
+  process.exit(failed.length ? 1 : 0);
+}
+
+for (const sig of ["SIGINT", "SIGTERM", "SIGHUP"]) {
+  process.on(sig, async () => {
+    await restorePayment().catch(() => {});
+    try { await db.end(); } catch { /* already closed */ }
+    process.exit(130);
+  });
+}
+process.on("uncaughtException", async (err) => {
+  console.error("\nuncaught:", err?.message ?? err);
+  await restorePayment().catch(() => {});
+  try { await db.end(); } catch { /* already closed */ }
+  process.exit(1);
+});
+// A closed stdout (`… | head`) raises EPIPE on the next write and would kill
+// the process before the restore runs.
+process.stdout.on("error", (e) => { if (e.code !== "EPIPE") throw e; });
+
 function actor(label, base = SELLER) {
   const jar = new Map();
   return {
@@ -515,6 +562,7 @@ if (created.length) {
       where profile_id = $1 and status = 'success'
       order by created_at desc limit 1`, [profileId]);
   if (!pay) throw new Error("no successful payment on the test account to move into the hold window");
+  heldPayment = pay;                       // restored however this process ends
   await db.query(`update payments set created_at = now(), captured_at = now() where id = $1`, [pay.id]);
   const held = await a.req("/api/v1/account/verify/start", "POST", { action: "delete" });
   check("payment hold refuses to even SEND a delete code", held.status === 403, `got ${held.status}`);
@@ -545,10 +593,24 @@ if (created.length) {
   check("an account_event is written", ev?.kind === "deactivate", ev?.kind);
 
   // Clear the hold and run the delete path end to end.
-  await db.query(`update payments set created_at = $2, captured_at = $3 where id = $1`,
-    [pay.id, pay.created_at, pay.captured_at]);
+  //
+  // Pushed OUTSIDE the window rather than back to its real timestamp: the row
+  // this picks is the account's most RECENT payment, and whether that is older
+  // than PAYMENT_HOLD_DAYS depends on how long ago the seed was run (it pins
+  // NOW to 30 Jul 2026). On 6 Aug 2026 the "cleared" hold was still active, so
+  // the endpoint correctly answered 403 and the script then threw on an
+  // undefined otpSession — a red run that said nothing about the code. The
+  // true timestamps go back in restorePayment(), wired to every exit.
+  await db.query(
+    `update payments set created_at = now() - interval '400 days', captured_at = now() - interval '400 days' where id = $1`,
+    [pay.id]);
   const delStart = await a.req("/api/v1/account/verify/start", "POST", { action: "delete", reason: "Found a property" });
   check("with the hold cleared, a delete code IS sent", delStart.status === 200, `got ${delStart.status}`);
+  if (delStart.status !== 200) {
+    // Say what happened instead of throwing on `undefined.otpSession`.
+    console.log(`\ndelete code was refused: ${JSON.stringify(delStart.json)}`);
+    await finish();
+  }
   const delDone = await a.req("/api/v1/account/verify/confirm", "POST",
     { otpSession: delStart.json.data.otpSession, code: delStart.json.data.devCode });
   check("confirming a DELETE code schedules deletion", delDone.json?.data?.action === "delete", delDone.json?.data?.action);
@@ -774,11 +836,4 @@ section("11 · SEO — canonical, robots, sitemap, structured data");
 for (const c of created) await db.query(`delete from support_tickets where id=$1`, [c.id]);
 await db.query(`delete from support_tickets where subject like 'M12 probe%'`);
 
-const failed = results.filter((r) => !r.p);
-console.log(`\n${results.length - failed.length}/${results.length} checks passed`);
-if (failed.length) {
-  console.log("\nFAILED:");
-  for (const f of failed) console.log(`  ✗ ${f.n}`);
-}
-await db.end();
-process.exit(failed.length ? 1 : 0);
+await finish();
