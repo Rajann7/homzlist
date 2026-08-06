@@ -296,6 +296,13 @@ const { rows: [builder] } = await db.query(`
     from profiles p
    where p.role='builder' and p.state='active'
      and exists (select 1 from projects x where x.profile_id=p.id and x.status='live')
+   -- Prefer an UNLOCKED builder. The plan-lapsed block below only runs for one,
+   -- and whichever row happened to come back first decided whether five
+   -- assertions ran at all — a suite that quietly shrinks from 46 to 41 is how a
+   -- regression hides in a green run.
+   order by (exists (select 1 from user_plans u where u.profile_id=p.id and u.status='active'
+                       and coalesce((u.terms->>'requirement_access')::boolean,false))) desc,
+            p.id
    limit 1`);
 if (builder) {
   const a = actor("builder");

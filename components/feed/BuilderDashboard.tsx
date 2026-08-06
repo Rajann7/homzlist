@@ -104,15 +104,21 @@ export function BuilderDashboard({ cityName, cityId = null }: { cityName?: strin
       {data.matched.length > 0 && (
         <div className="flex flex-col gap-3">
           <div className="text-13 font-semibold uppercase tracking-[0.3px] text-ink-tertiary">Matching Requirements for your projects</div>
-          {data.matched.map((m) => {
+          {data.matched.map((m, i, all) => {
             // Locked/unlocked exactly as Doc2 §9.1 words it ("matched
             // RequirementCards locked/unlocked"). The budget is not in the
             // payload for a builder with no active requirement-access plan, so
             // the blur is honest — same treatment as every other locked card.
             const locked = m.card.access === "locked";
+            // One header per GROUP, not one per card. This list is a cascade
+            // like every other, and four city-tier matches in a row printed
+            // "OTHER AREAS" four times — a heading repeated over each of the
+            // things it heads. Same rule the requirement browse and feed use:
+            // the label appears when the group it names begins.
+            const showLabel = Boolean(m.tierLabel) && m.tierLabel !== all[i - 1]?.tierLabel;
             return (
               <div key={m.card.id}>
-                {m.tierLabel && <div className="mb-1.5 flex items-center gap-1.5"><Icon name="pin" size={14} className="text-ink-tertiary" /><span className="text-13 font-semibold uppercase tracking-[0.3px] text-ink-tertiary">{m.tierLabel}</span></div>}
+                {showLabel && <div className="mb-1.5 flex items-center gap-1.5"><Icon name="pin" size={14} className="text-ink-tertiary" /><span className="text-13 font-semibold uppercase tracking-[0.3px] text-ink-tertiary">{m.tierLabel}</span></div>}
                 <div className="relative overflow-hidden rounded-12 border border-border bg-surface-1 p-4 pl-5">
                   {!locked && <span className="absolute inset-y-0 left-0 w-[3px] bg-accent" />}
                   <span className="mb-2 inline-block rounded-full bg-accent-soft px-2 py-0.5 text-11 font-semibold text-accent">Matched to: {m.matchedTo}</span>

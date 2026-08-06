@@ -4247,19 +4247,19 @@ live listings AND zero live projects widens to the rest of the state
 (`lib/feed/scope.ts`), the rail counts widen with it (migration 0127 teaches
 `hz_feed_type_counts` a state scope), and every subtitle then reads "in
 <State>". A city with any inventory is untouched.
-Still open, deliberately: `searchBrokers` takes a cityId and no state, so the
-Top Builders / Top Brokers rails in a WIDENED request drop the location filter
-rather than restricting to the state. Their ranking is by live inventory, so the
-sellers surfaced are the ones whose stock the widened rails are already showing
-— but a state predicate belongs in `searchBrokers` and should be added there
-rather than forked into the rails.
+Closed too: `searchBrokers` now takes a `stateId` (migration 0128 gives
+`profiles` a trigger-derived `state_id`), so the Top Builders / Top Brokers
+rails in a widened request are scoped to the same state as the cards beside
+them instead of dropping the location filter. Verified against the DB: Kachchh
+widens to "20 builders … in Gujarat / 29 brokers … in Gujarat", which is exactly
+what the state holds; Rajkot is unchanged at 17 / 22.
 
-**2. Builder dashboard prints its cascade label per CARD, not per group.**
-`BuilderDashboard`'s matched-requirements list renders `m.tierLabel` inside the
-map, so a run of four city-tier matches shows "OTHER AREAS" four times. It is
-pre-existing and purely cosmetic; grouping them would change the mobile design,
-so it was left alone under the design lock. Flagging it so it is a decision, not
-an oversight.
+**2. RESOLVED (6 Aug 2026) — builder dashboard groups its cascade label.**
+It rendered `m.tierLabel` inside the map, so five city-tier matches printed
+"OTHER AREAS" five times — a heading repeated over each of the things it heads.
+The label now appears when the group it names BEGINS, which is the rule the
+requirement browse and feed already use. Nothing else about the card moved;
+verified in the browser at 375px (1 heading over 5 cards, was 5).
 
 **3. `requirements.city_id` can be NULL.**
 `cityIdFor()` reads the FIRST preferred area's `parent_id`, which is the taluka
@@ -4270,7 +4270,7 @@ city-scoped or state-scoped browse. Zero such rows live today (all 36 resolve to
 Gujarat cities — verified 6 Aug 2026), so nothing is stranded right now; worth
 watching as more cities open.
 
-**4. `check:story` needs inventory that went live in the last 24 hours.**
+**4. RESOLVED (6 Aug 2026) — `check:story` seeds its own 24h window.**
 Stories are DERIVED from `live_at >= now() - 24h`, and the dev seed is older
 than that, so `scripts/check-story-live.mjs` opens with "0 circle(s)" and then
 throws on the first segment it tries to inspect. Verified 6 Aug 2026 that this
@@ -4278,3 +4278,9 @@ is data, not code: bumping one listing's `live_at` to `now() - 2h` makes the
 same script pass 17/17, and the timestamp was put straight back. Worth either
 seeding a fresh row as part of the script or having it skip cleanly when the
 window is empty — right now a green run depends on when the seed was last run.
+Done: the script pulls the newest live listing into the window, runs, and
+restores the timestamp — asserting the restore as its 18th check. The restore is
+wired to SIGINT/SIGTERM/uncaught/EPIPE too, because a run killed mid-way (a bare
+`| head` is enough) used to strand the row inside the window, which then
+suppressed the next run's seeding and left the original `live_at`
+unrecoverable — nothing in the schema remembers it.

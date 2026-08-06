@@ -309,13 +309,13 @@ async function topPeople(viewerId: string | null, scope: FeedScope, role: "build
   // list. Asking for PEOPLE_SCAN of them means the rail can page through the
   // whole city without a second round trip per page.
   //
-  // A widened request drops the city filter entirely rather than passing the
-  // state: `searchBrokers` ranks by live inventory and takes a cityId only, so
-  // un-scoping it and letting the ranking decide is the honest approximation —
-  // the sellers it surfaces are the ones whose inventory the rails are already
-  // showing. Narrower state support belongs in searchBrokers, not a fork here.
+  // A widened request passes the STATE instead of the city (0128 gave profiles
+  // a state_id), so the people rails are scoped exactly like the card rails
+  // beside them — not un-scoped to the whole country.
   const { items } = await searchBrokers(
-    { cityId: scope.widened ? undefined : scope.cityId ?? undefined, roles: [role] },
+    scope.widened
+      ? { stateId: scope.stateId ?? undefined, roles: [role] }
+      : { cityId: scope.cityId ?? undefined, roles: [role] },
     viewerId,
     PEOPLE_SCAN,
   );
