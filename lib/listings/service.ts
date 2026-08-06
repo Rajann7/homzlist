@@ -1137,6 +1137,24 @@ export async function updateListing(
     await notifySaversOfPriceDrop(id, current.price_paise, patch.price_paise);
   }
 
+  // "Price updated" system line in every open chat about this listing (Doc2
+  // §10.2) — on ANY real price move (up, down, or to/from on-request), on a
+  // listing that stays live. Best-effort: a chat write must never fail the edit.
+  const priceChanged =
+    ("price_paise" in patch && patch.price_paise !== current.price_paise) ||
+    ("price_on_request" in patch && patch.price_on_request !== current.price_on_request);
+  if (wasLive && next.status !== "pending_review" && priceChanged) {
+    try {
+      const { postListingPriceSystemLine } = await import("@/lib/chat/service");
+      await postListingPriceSystemLine(
+        id,
+        current.price_paise,
+        ("price_paise" in patch ? (patch.price_paise as number | null) : current.price_paise),
+        ("price_on_request" in patch ? (patch.price_on_request as boolean) : current.price_on_request),
+      );
+    } catch { /* chat line is a nicety; the edit already succeeded */ }
+  }
+
   return { listing: data as ListingRow, reReview: isMajor && wasLive };
 }
 

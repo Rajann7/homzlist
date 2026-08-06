@@ -87,8 +87,18 @@ export async function getThread(threadId: string, me: string, opts: { before?: s
   // Pinned property / requirement card (live price — read fresh every load, Doc2 §10.2).
   let pinned: any = null;
   let listingBanner: string | null = null;
+  /**
+   * A number that is ALREADY public, so chat must not pretend it is secret.
+   *   • project  → the builder's number is ALWAYS public (Doc2 §6); the project
+   *     page shows Call/WhatsApp to everyone.
+   *   • listing  → only when `contact_public` is set, and then the public value
+   *     is the LISTING's contact_number — never the poster's profile phone,
+   *     which may be a different, private number.
+   * Set only for the buyer side; the poster already sees the buyer's number.
+   */
+  let publicContactNumber: string | null = null;
   if (t.listing_id) {
-    const { data: l } = await db().from("listings").select("id,title,price_paise,price_on_request,cover_url,status,availability,area_label,kind").eq("id", t.listing_id).maybeSingle();
+    const { data: l } = await db().from("listings").select("id,title,price_paise,price_on_request,cover_url,status,availability,area_label,kind,contact_public,contact_number").eq("id", t.listing_id).maybeSingle();
     if (l) {
       const row = l as any;
       pinned = {
@@ -99,6 +109,7 @@ export async function getThread(threadId: string, me: string, opts: { before?: s
       };
       if (row.status === "sold" || row.status === "rented" || row.availability !== "available") listingBanner = "This property is no longer available";
       if (row.status === "archived" || row.status === "hidden") listingBanner = "This property is no longer available";
+      if (side === "buyer" && row.contact_public && row.contact_number) publicContactNumber = row.contact_number as string;
     }
   } else if ((t as any).project_id) {
     // The third subject (migration 0084). A project has no price of its own —
@@ -128,6 +139,10 @@ export async function getThread(threadId: string, me: string, opts: { before?: s
         unitLabel: (unitRow as { unit_type?: string } | null)?.unit_type ?? null,
       };
       if (row.status !== "live") listingBanner = "This project is no longer live";
+      // Doc2 §6 — a builder publishes their number on the project page, so the
+      // buyer in this chat is already entitled to it (the "other" here IS the
+      // builder, because a project thread's poster is always the builder).
+      if (side === "buyer" && other?.state !== "deleted" && other?.phone) publicContactNumber = other.phone as string;
     }
   } else if (t.requirement_id) {
     const { data: r } = await db().from("requirements").select("id,kind,bhk,budget_min_paise,budget_max_paise,area_label,status,is_active").eq("id", t.requirement_id).maybeSingle();
@@ -158,7 +173,18 @@ export async function getThread(threadId: string, me: string, opts: { before?: s
   const myReadAt = (myPart as any)?.last_read_at ?? "epoch";
 
   // The number the VIEWER is entitled to (sealed).
-  const otherNumber = allowed && other?.state !== "deleted" ? other?.phone ?? null : undefined;
+  //
+  // Two ways to be entitled, and the payload carries a number ONLY under one of
+  // them: an `allowed` number_request (→ the poster's profile phone), or a
+  // number that is already published on the post itself (→ that public value,
+  // Doc2 §6/§10.1). Everything else leaves the key ABSENT, as before.
+  const numberIsPublic = !!publicContactNumber;
+  const allowedOrPublic = allowed || numberIsPublic;
+  let otherNumber: string | null | undefined = undefined;
+  if (other?.state !== "deleted") {
+    if (allowed) otherNumber = other?.phone ?? null;
+    else if (publicContactNumber) otherNumber = publicContactNumber;
+  }
 
   const messages = visible.map((m) => {
     const mine = m.sender_id === me;
@@ -232,7 +258,11 @@ export async function getThread(threadId: string, me: string, opts: { before?: s
     messages,
     firstUnreadId: firstUnread?.id ?? null,
     hasMore: raw.length === PAGE,
-    numberAllowed: allowed,
+    // Drives whether "Request number" is offered — a number already on the post
+    // needs no request, so the button correctly disappears for project chats and
+    // public-number listings instead of being a control that changes nothing.
+    numberAllowed: allowedOrPublic,
+    numberIsPublic,
     // The thread's live visit (null when none) — drives the card's real controls.
     visit: await liveVisit(threadId, me),
     block: blocks,

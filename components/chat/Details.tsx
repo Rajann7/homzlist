@@ -48,13 +48,17 @@ export function Details({ threadId, base = "/messages" }: { threadId: string; ba
           </div>
         </div>
 
-        {/* pinned property / requirement card (Doc4 §39) */}
+        {/* pinned property / project / requirement card (Doc4 §39). The subject's
+            own href comes sealed from the server (getThread) — the three kinds go
+            to /property, /projects and /requirements respectively, so we never
+            rebuild it here (a project used to be sent to /requirements → 404). */}
         {d.pinnedCard && (
           <button
-            onClick={() => router.push(d.pinnedCard.type === "listing" ? `/property/${d.pinnedCard.id}` : `/requirements/${d.pinnedCard.id}`)}
-            className="flex w-full items-center gap-3 rounded-12 border border-border bg-surface-1 p-3 text-left"
+            onClick={() => d.pinnedCard.href && router.push(d.pinnedCard.href)}
+            disabled={!d.pinnedCard.href}
+            className="flex w-full items-center gap-3 rounded-12 border border-border bg-surface-1 p-3 text-left disabled:active:bg-transparent"
           >
-            {d.pinnedCard.cover ? <img src={d.pinnedCard.cover} alt="" className="h-14 w-14 rounded-8 object-cover" /> : <span className="grid h-14 w-14 place-items-center rounded-8 bg-surface-2"><Icon name={d.pinnedCard.type === "listing" ? "home" : "search"} size={20} className="text-ink-tertiary" /></span>}
+            {d.pinnedCard.cover ? <img src={d.pinnedCard.cover} alt="" className="h-14 w-14 rounded-8 object-cover" /> : <span className="grid h-14 w-14 place-items-center rounded-8 bg-surface-2"><Icon name={d.pinnedCard.type === "project" ? "building" : d.pinnedCard.type === "requirement" ? "search-list" : "home"} size={20} className="text-ink-tertiary" /></span>}
             <span className="min-w-0 flex-1">
               <span className="block truncate text-15 font-semibold text-ink-primary">{d.pinnedCard.title}</span>
               {d.pinnedCard.priceLabel && <span className="block text-13 text-ink-tertiary">{d.pinnedCard.priceLabel}</span>}
@@ -95,7 +99,7 @@ export function Details({ threadId, base = "/messages" }: { threadId: string; ba
           <Row label="Pin chat" trailing={<Toggle checked={d.pinned} onChange={async (v) => { await chatApi.setState(threadId, { pinned: v }); load(); }} />} />
           <Row label="Archive chat" chevron onClick={async () => { await chatApi.setState(threadId, { archived: true }); toast.show("Chat archived"); router.push(base); }} />
           <Row label="Search in chat" chevron onClick={() => router.push(`${base}/${threadId}?search=1`)} />
-          <Row label="Block user" danger onClick={() => setBlockDialog(true)} />
+          <Row label={d.block?.iBlocked ? "Unblock user" : "Block user"} danger onClick={() => setBlockDialog(true)} />
           <Row label="Report" danger onClick={() => setReportOpen(true)} />
           <Row label="Delete chat" danger onClick={() => setDeleteDialog(true)} last />
         </div>

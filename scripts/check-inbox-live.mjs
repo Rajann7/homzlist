@@ -377,7 +377,21 @@ check("photo: the server refuses a photo send (composer has no photo button)", p
 
 // -- number_request → system + number_card + continuity ----------------------
 const preNum = await buyerA.req(`/api/v1/chat/threads/${t0.id}`);
-check("number: SEALED — the poster's number is absent before any allow", !("otherNumber" in (preNum.json?.data ?? {})), `keys=${Object.keys(preNum.json?.data ?? {}).includes("otherNumber")}`);
+/**
+ * This thread's subject is a PROJECT, and Doc2 §6 says "Project contact numbers
+ * ALWAYS public (Call + WhatsApp + Inquiry)" — `/api/v1/projects/:id` serves the
+ * builder's number to anonymous visitors. So chat must NOT pretend it is secret:
+ * the payload carries it up front and no request is offered.
+ *
+ * This assertion used to demand the opposite (absent before any allow), which
+ * encoded a bug rather than the spec — the buyer was shown "Request number" for
+ * a number already printed on the page they arrived from. The genuine sealing
+ * test — a PRIVATE number stays out of the payload entirely — is asserted below
+ * on a listing thread, which is where the seal actually has to hold.
+ */
+check("number: a PROJECT's builder number is public up front (Doc2 §6)",
+  preNum.json?.data?.numberIsPublic === true && typeof preNum.json?.data?.otherNumber === "string",
+  `numberIsPublic=${preNum.json?.data?.numberIsPublic} present=${"otherNumber" in (preNum.json?.data ?? {})}`);
 const numReq = await buyerA.req(`/api/v1/chat/threads/${t0.id}/number`, "POST", { action: "request" });
 const { rows: [nrRow] } = await db.query(`select status from number_requests where thread_id=$1 order by created_at desc limit 1`, [t0.id]);
 check("number_request: a real request row is written", numReq.json?.ok === true && nrRow?.status === "requested", `status=${nrRow?.status}`);
@@ -439,6 +453,39 @@ if (mine2) {
   check("delete for everyone: the payload shows a tombstone, never the text", tomb?.deleted === true && tomb?.body === null, `body=${tomb?.body}`);
 } else {
   check("delete for everyone walked", false, "no eligible message left");
+}
+
+// -- the seal that must hold: a PRIVATE number never reaches the payload -----
+//
+// The project thread above publishes its builder's number by design (Doc2 §6).
+// The seal is about the OTHER case: a listing whose owner kept their number
+// private, with no `allowed` request. There the key must be ABSENT — not
+// blanked, not null — so DevTools shows nothing to find (Doc9 §10).
+{
+  const { rows: [priv] } = await db.query(`
+    select t.id, bp.phone buyer_phone, pp.phone poster_phone
+      from chat_threads t
+      join listings l on l.id = t.listing_id
+      join profiles bp on bp.id = t.buyer_id
+      join profiles pp on pp.id = t.poster_id
+     where t.status = 'accepted' and l.contact_public = false
+       and bp.state = 'active' and bp.name is not null and bp.city_id is not null
+       and not exists (select 1 from number_requests nr where nr.thread_id = t.id and nr.status = 'allowed')
+     limit 1`);
+  if (priv) {
+    const privBuyer = actor("priv-buyer");
+    await privBuyer.login(priv.buyer_phone);
+    const v = await privBuyer.req(`/api/v1/chat/threads/${priv.id}`);
+    const d = v.json?.data ?? {};
+    check("number: SEALED — a PRIVATE poster's number is absent before any allow",
+      !("otherNumber" in d) && d.numberAllowed === false && d.numberIsPublic === false,
+      `present=${"otherNumber" in d} allowed=${d.numberAllowed} public=${d.numberIsPublic}`);
+    check("number: SEALED — the poster's digits appear nowhere in the payload",
+      !JSON.stringify(d).includes(priv.poster_phone),
+      `poster=${String(priv.poster_phone).slice(-4)}`);
+  } else {
+    check("number: SEALED — private-number thread available to test", false, "no private-number thread in the data");
+  }
 }
 
 // -- a stranger may not touch any of it (IDOR across message endpoints) ------

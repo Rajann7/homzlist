@@ -1124,3 +1124,41 @@ export async function reportUserById(me: string, userId: string, reason: string,
 }
 
 export { PAGE, MESSAGE_MAX, UUID_RE };
+
+/**
+ * "Price updated" system line (Doc2 §10.2). When a listing's price changes, drop
+ * a centred system message into every OPEN (accepted) thread pinned to it, so the
+ * conversation carries a record of the change — not just the silent bar re-price
+ * on the next load. Best-effort: a listing with no live chats writes nothing.
+ *
+ * Called from `updateListing` (the one price-edit path) so there is a single
+ * trigger; the client's bar flash stays as the live visual cue on top of this.
+ */
+export async function postListingPriceSystemLine(
+  listingId: string,
+  oldPaise: number | null,
+  newPaise: number | null,
+  onRequest: boolean,
+): Promise<void> {
+  const { data } = await db()
+    .from("chat_threads")
+    .select("id,buyer_id,poster_id")
+    .eq("listing_id", listingId)
+    .eq("status", "accepted");
+  const threads = (data as { id: string; buyer_id: string; poster_id: string }[] | null) ?? [];
+  if (!threads.length) return;
+
+  const label = onRequest
+    ? "Price is now on request"
+    : `Price updated to ${formatShortRupees(Number(newPaise ?? 0))}`;
+
+  await Promise.all(
+    threads.map(async (t) => {
+      await db().from("chat_messages").insert({
+        thread_id: t.id, sender_id: null, kind: "system",
+        body: label, meta: { subtype: "price_update", oldPaise, newPaise, onRequest },
+      });
+      await Promise.all([pingThread(t.id), pingInbox(t.buyer_id), pingInbox(t.poster_id)]);
+    }),
+  );
+}

@@ -66,6 +66,17 @@ export function Thread({ threadId, base = "/messages" }: { threadId: string; bas
   const queueRef = useRef<{ text: string; replyTo: string | null }[]>([]);
   const [priceFlash, setPriceFlash] = useState(false);
   const prevPrice = useRef<string | null>(null);
+  // Older history paged in on up-scroll (Doc4 §36 "50-pagination"). Kept in its
+  // OWN state, apart from the live 50-message window, so the 15s poll / realtime
+  // refresh (which replaces view.messages) can never drop the pages the reader
+  // scrolled up to. `load()` stays untouched — the hot path is not the place for
+  // a merge.
+  const [older, setOlder] = useState<any[]>([]);
+  // undefined = "not paged yet, defer to the live window's hasMore"; a boolean
+  // is the answer the last up-scroll fetch gave, so an exactly-50 thread stops
+  // instead of re-fetching an empty page on every scroll to the top.
+  const [moreAbove, setMoreAbove] = useState<boolean | undefined>(undefined);
+  const loadingOlder = useRef(false);
 
   const load = useCallback(async (markRead = true) => {
     const res = await chatApi.thread(threadId);
@@ -74,6 +85,22 @@ export function Thread({ threadId, base = "/messages" }: { threadId: string; bas
   }, [threadId]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Composer draft persists per-thread (Doc4 §36 "draft persist"). UI-only pref
+  // in localStorage — NO business truth (CLAUDE.md permits theme/onboarding-class
+  // client prefs). Written on each keystroke via saveDraft — NOT through an
+  // effect on `text`, which in React StrictMode double-ran on mount and wiped the
+  // just-restored draft before it committed. Restored when the thread opens,
+  // cleared the moment the message is sent. Switching threads also drops any
+  // paged history so the next thread starts clean.
+  const draftKey = `chat-draft:${threadId}`;
+  const saveDraft = useCallback((v: string) => {
+    try { if (v.trim()) localStorage.setItem(draftKey, v); else localStorage.removeItem(draftKey); } catch { /* private mode */ }
+  }, [draftKey]);
+  useEffect(() => {
+    try { setText(localStorage.getItem(draftKey) || ""); } catch { setText(""); }
+    setOlder([]); setMoreAbove(undefined);
+  }, [draftKey]);
   // Open straight into in-chat search when arriving from Details → "Search in chat".
   const searchParams = useSearchParams();
   useEffect(() => { if (searchParams?.get("search") === "1") setChatSearch(true); }, [searchParams]);
@@ -128,24 +155,53 @@ export function Thread({ threadId, base = "/messages" }: { threadId: string; bas
 
   const p = view.person;
 
+  // Full history the reader can see = paged-in older messages + the live window,
+  // deduped by id (an up-scroll page is strictly older than the window, but we
+  // dedupe defensively). Everything below reads `msgs`, never view.messages
+  // alone, so search/seen/visit/quoted-reply all span the loaded history.
+  const msgs: any[] = older.length ? dedupeById([...older, ...(view.messages ?? [])]) : (view.messages ?? []);
+  const canLoadOlder = moreAbove === undefined ? !!view.hasMore : moreAbove;
+
+  async function loadOlder() {
+    if (loadingOlder.current || !canLoadOlder) return;
+    const earliest = msgs[0];
+    if (!earliest) return;
+    loadingOlder.current = true;
+    const el = scrollRef.current;
+    const prevH = el?.scrollHeight ?? 0;
+    const res = await chatApi.thread(threadId, earliest.createdAt);
+    if (res.ok) {
+      const page = (res.data.messages as any[]) ?? [];
+      if (page.length) setOlder((prev) => dedupeById([...page, ...prev]));
+      setMoreAbove(page.length > 0 && !!res.data.hasMore);
+      // Keep the reader anchored on the same message after the prepend grows the
+      // scroll height — otherwise the list jumps to the top on every page.
+      requestAnimationFrame(() => { const e = scrollRef.current; if (e) e.scrollTop += e.scrollHeight - prevH; });
+    }
+    loadingOlder.current = false;
+  }
+
   // In-thread search (Doc2 §10.2): highlight matching text bubbles + N-of-M stepper.
   const searchQ = chatSearchQuery.trim().toLowerCase();
   const matchIds: string[] = searchQ
-    ? (view.messages ?? [])
+    ? msgs
         .filter((m: any) => (m.kind === "text" || m.kind === "link") && m.body && !m.deleted && m.body.toLowerCase().includes(searchQ))
         .map((m: any) => m.id)
     : [];
   const activeMatchId = matchIds.length ? matchIds[Math.min(searchIdx, matchIds.length - 1)] : null;
   const searchCounter = matchIds.length ? `${Math.min(searchIdx + 1, matchIds.length)} of ${matchIds.length}` : "0 of 0";
   // The most recent of MY messages the other side has seen → "Seen HH:MM" label (Doc4 §36).
-  const lastSeenId = [...(view.messages ?? [])].reverse().find((m: any) => m.mine && m.seen && !m.pending)?.id ?? null;
+  const lastSeenId = [...msgs].reverse().find((m: any) => m.mine && m.seen && !m.pending)?.id ?? null;
   // Only the newest card for the LIVE visit carries the controls; older ones in
   // the scrollback are a record of what was proposed, not a second set of buttons.
   const lastVisitCardId = view.visit
-    ? [...(view.messages ?? [])].reverse().find((m: any) => (m.kind === "visit_proposal" || m.kind === "visit_confirmed") && m.meta?.visitId === view.visit.id)?.id ?? null
+    ? [...msgs].reverse().find((m: any) => (m.kind === "visit_proposal" || m.kind === "visit_confirmed") && m.meta?.visitId === view.visit.id)?.id ?? null
     : null;
 
-  const composerDisabled = view.status === "declined" || view.block.iBlocked || view.block.blockedMe || p.deleted || (view.status === "pending" && view.side === "poster");
+  // A pending inquiry locks the composer for BOTH sides: the poster hasn't
+  // accepted yet (accept-before-seen), and the buyer waits rather than piling on
+  // messages that would sit invisible behind the "waiting" card (Rajan, 6 Aug).
+  const composerDisabled = view.status === "declined" || view.block.iBlocked || view.block.blockedMe || p.deleted || view.status === "pending";
   const showNumberWarn = !warnDismissed && !view.numberAllowed && view.side === "buyer" && NUMBER_RE.test(text);
 
   async function doSend(body?: string) {
@@ -155,7 +211,7 @@ export function Thread({ threadId, base = "/messages" }: { threadId: string; bas
     const replyId = reply?.id ?? null;
     const optimistic = { id: `tmp-${Date.now()}`, mine: true, kind: "text", body: t, reactions: {}, seen: false, pending: true, createdAt: new Date().toISOString(), time: "" };
     setView((v: any) => ({ ...v, messages: [...v.messages, optimistic] }));
-    setText(""); setReply(null);
+    setText(""); saveDraft(""); setReply(null);
     const res = await chatApi.send(threadId, { text: t, replyTo: replyId });
     setSending(false);
     if (!res.ok) {
@@ -299,17 +355,29 @@ export function Thread({ threadId, base = "/messages" }: { threadId: string; bas
       {view.listingBanner && <div className="shrink-0 bg-warning-soft px-4 py-1.5 text-center text-11 text-warning">{view.listingBanner}</div>}
 
       {/* Message area */}
-      <div ref={scrollRef} onScroll={(e) => { const el = e.currentTarget; setShowJump(el.scrollHeight - el.scrollTop - el.clientHeight > 240); }}
+      <div ref={scrollRef} onScroll={(e) => { const el = e.currentTarget; setShowJump(el.scrollHeight - el.scrollTop - el.clientHeight > 240); if (el.scrollTop < 80) void loadOlder(); }}
         className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto px-3 py-3">
+        {/* Up-scroll pages in older history (Doc4 §36). The spinner is also the
+            affordance that there IS more above the top of the window. */}
+        {canLoadOlder && msgs.length > 0 && (
+          <div className="flex justify-center py-2">
+            {[0, 1, 2].map((i) => <span key={i} className="mx-0.5 h-1.5 w-1.5 rounded-full bg-ink-tertiary" style={{ animation: `dotb 1.2s ${i * 0.15}s infinite` }} />)}
+          </div>
+        )}
+        {/* First-message safety warning (Doc2 §10.2 / §36) — never pay a token or
+            advance before verifying. Static safety copy, not business data. Shown
+            only when the thread has no server-seeded safety line, so it never
+            doubles up. */}
+        {view.status === "accepted" && msgs.length > 0 && !msgs.some((m: any) => m.kind === "system" && m.meta?.subtype === "safety") && <SafetyNotice />}
         {view.status === "pending" && view.side === "buyer" ? (
           <PendingCard name={p.name} />
         ) : view.status === "declined" ? (
           <DeclinedCard until={view.cooldownUntil} />
-        ) : view.messages.length === 0 ? (
+        ) : msgs.length === 0 ? (
           <EmptyThread onChip={(c) => setText(c)} />
         ) : (
-          view.messages.map((m: any, i: number) => (
-            <MessageItem key={m.id} m={m} prev={view.messages[i - 1]} view={view}
+          msgs.map((m: any, i: number) => (
+            <MessageItem key={m.id} m={m} prev={msgs[i - 1]} all={msgs} view={view}
               isDivider={m.id === view.firstUnreadId}
               dividerRef={m.id === view.firstUnreadId ? dividerRef : undefined}
               searchMatch={matchIds.includes(m.id)}
@@ -354,7 +422,7 @@ export function Thread({ threadId, base = "/messages" }: { threadId: string; bas
       {/* Composer / state strips */}
       {composerDisabled ? (
         <div className="shrink-0 border-t border-border bg-surface-2 px-4 py-3 text-center text-13 text-ink-tertiary">
-          {view.block.iBlocked ? "You can't message a blocked user." : view.block.blockedMe ? "You can't reply to this conversation." : p.deleted ? "This account no longer exists." : view.status === "declined" ? "Inquiry declined." : "You can message after they accept."}
+          {view.block.iBlocked ? "You can't message a blocked user." : view.block.blockedMe ? "You can't reply to this conversation." : p.deleted ? "This account no longer exists." : view.status === "declined" ? "Inquiry declined." : view.status === "pending" && view.side === "buyer" ? `You can send more once ${p.name} accepts your inquiry.` : "You can message after they accept."}
         </div>
       ) : (
         <div className="shrink-0 border-t border-border bg-surface-1">
@@ -369,13 +437,22 @@ export function Thread({ threadId, base = "/messages" }: { threadId: string; bas
               <button aria-label="Cancel reply" onClick={() => setReply(null)}><Icon name="close" size={16} className="text-ink-tertiary" /></button>
             </div>
           )}
-          {view.side === "buyer" && !view.numberAllowed && view.status === "accepted" && (
-            <button onClick={requestNumber} className="flex w-full items-center justify-center gap-1.5 border-b border-divider py-2 text-13 font-semibold text-accent"><Icon name="phone" size={16} /> Request number</button>
+          {/* One slot, two truths. A private number gets "Request number"; a
+              number the post already publishes (project builder / public-number
+              listing, Doc2 §6/§10.1) gets a Call row instead — same position and
+              styling, but a control that does something rather than asking for
+              a number the buyer can already read on the listing page. */}
+          {view.side === "buyer" && view.status === "accepted" && (
+            view.numberIsPublic && view.otherNumber ? (
+              <a href={`tel:${view.otherNumber}`} className="flex w-full items-center justify-center gap-1.5 border-b border-divider py-2 text-13 font-semibold text-accent"><Icon name="phone" size={16} /> Call {view.otherNumber}</a>
+            ) : !view.numberAllowed ? (
+              <button onClick={requestNumber} className="flex w-full items-center justify-center gap-1.5 border-b border-divider py-2 text-13 font-semibold text-accent"><Icon name="phone" size={16} /> Request number</button>
+            ) : null
           )}
           {/* Photo sending removed on Rajan's instruction — the composer is text
               only. Photos already in a thread still render and open full-screen. */}
           <div className="flex items-end gap-2 px-2 py-2">
-            <textarea value={text} onChange={(e) => { setText(e.target.value); setWarnDismissed(false); onComposerType(); }} rows={1} placeholder="Message…"
+            <textarea value={text} onChange={(e) => { const v = e.target.value; setText(v); saveDraft(v); setWarnDismissed(false); onComposerType(); }} rows={1} placeholder="Message…"
               className={cn("max-h-28 min-h-11 flex-1 resize-none bg-surface-2 px-3 py-2.5 text-15 text-ink-primary outline-none placeholder:text-ink-tertiary", text.length > 60 ? "rounded-16" : "rounded-full")} />
             <button aria-label="Quick replies" onClick={openQuick} className="grid h-11 w-11 shrink-0 place-items-center text-ink-secondary"><Glyph name="bolt" s={22} /></button>
             <button aria-label="Send" disabled={!text.trim()} onClick={() => doSend()} className={cn("grid h-11 w-11 shrink-0 place-items-center transition-colors", text.trim() ? "text-accent" : "text-ink-tertiary")}><Icon name="send" size={22} /></button>
@@ -482,7 +559,7 @@ export function Thread({ threadId, base = "/messages" }: { threadId: string; bas
 // ---------------------------------------------------------------------------
 // Message renderer
 // ---------------------------------------------------------------------------
-function MessageItem({ m, prev, view, isDivider, dividerRef, onLong, onAllow, onDeny, onContinuity, onCopyNumber, onVisit, lastVisitCardId, toast, searchMatch, activeMatch, isLastSeen, onViewPhoto, onReply }: any) {
+function MessageItem({ m, prev, all, view, isDivider, dividerRef, onLong, onAllow, onDeny, onContinuity, onCopyNumber, onVisit, lastVisitCardId, toast, searchMatch, activeMatch, isLastSeen, onViewPhoto, onReply }: any) {
   const router = useRouter();
   const longTimer = useRef<any>(null);
   const bubbleRef = useRef<HTMLDivElement>(null);
@@ -503,8 +580,9 @@ function MessageItem({ m, prev, view, isDivider, dividerRef, onLong, onAllow, on
     setDragX(0);
     dragStart.current = null;
   };
-  // Quoted-reply: the original this message replied to (looked up client-side).
-  const orig = m.replyTo ? (view.messages ?? []).find((x: any) => x.id === m.replyTo) : null;
+  // Quoted-reply: the original this message replied to (looked up across the
+  // full loaded history, so a reply to a paged-in older message still resolves).
+  const orig = m.replyTo ? (all ?? view.messages ?? []).find((x: any) => x.id === m.replyTo) : null;
   function jumpToOrig() {
     if (!orig) return;
     const el = document.querySelector(`[data-mid="${orig.id}"]`) as HTMLElement | null;
@@ -728,6 +806,32 @@ function MenuRow({ label, onClick, danger }: { label: string; onClick: () => voi
   return <button onClick={onClick} className={cn("flex h-12 w-full items-center px-4 text-left text-15", danger ? "text-error" : "text-ink-primary")}>{label}</button>;
 }
 
+/**
+ * The first-message safety warning (Doc2 §10.2, Doc4 §36) — sits at the top of
+ * every live thread. Static safety copy carrying no business data, so it lives
+ * client-side like the composer's other fixed strings; the design draws it as
+ * the shield card the message renderer already styles for `system/safety`.
+ */
+function SafetyNotice() {
+  // Exact copy + styling of the design's safety card (P7) — same as the
+  // system/safety message renderer above, so it reads identically whether the
+  // line is seeded server-side or shown here on threads that have none.
+  return (
+    <div className="mx-auto my-1 max-w-[90%] rounded-8 bg-surface-2 p-3 text-center">
+      <span className="mb-1 inline-flex text-accent"><Icon name="shield" size={18} /></span>
+      <p className="text-11 text-ink-secondary">Never pay token or advance before a site visit. HomzList is not responsible for payments made outside the platform. <span className="font-semibold text-accent">Learn more</span></p>
+    </div>
+  );
+}
+
+/** Keep the first occurrence of each message id (older pages + live window). */
+function dedupeById(arr: any[]): any[] {
+  const seen = new Set<string>();
+  const out: any[] = [];
+  for (const m of arr) { if (seen.has(m.id)) continue; seen.add(m.id); out.push(m); }
+  return out;
+}
+
 function QuickRepliesSheet({ open, onClose, templates, onPick, onChange, toast }: any) {
   const [editing, setEditing] = useState<any>(null);
   const [draft, setDraft] = useState("");
@@ -761,12 +865,41 @@ function VisitSheet({ open, onClose, onPropose, mode = "propose" }: { open: bool
   const times = ["10:00", "11:00", "16:00"];
   const [day, setDay] = useState(0);
   const [time, setTime] = useState("11:00");
+  // A specific date/time beyond the quick chips (Rajan, 6 Aug) — when set it wins
+  // over the chip selection. The date is bounded today..+90d so it can't propose
+  // a visit in the past or absurdly far out.
+  const [customDate, setCustomDate] = useState("");
+  const [customTime, setCustomTime] = useState("");
+  const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const minStr = ymd(new Date());
+  const maxStr = (() => { const d = new Date(); d.setDate(d.getDate() + 90); return ymd(d); })();
+  function propose() {
+    const base = customDate ? new Date(`${customDate}T00:00:00`) : new Date(days[day]);
+    const [h, m] = (customTime || time).split(":");
+    base.setHours(+h, +m, 0, 0);
+    onPropose(base.toISOString());
+  }
   return (
     <BottomSheet open={open} onClose={onClose} title={mode === "reschedule" ? "Pick a new time" : "Propose a site visit"}>
       <div className="p-4">
-        <div className="mb-3 flex gap-2">{days.map((d, i) => <button key={i} onClick={() => setDay(i)} className={cn("flex-1 rounded-8 py-2 text-13 font-medium", day === i ? "bg-accent text-ink-inverse" : "bg-surface-2 text-ink-secondary")}>{d.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" })}</button>)}</div>
-        <div className="mb-4 flex gap-2">{times.map((t) => <button key={t} onClick={() => setTime(t)} className={cn("flex-1 rounded-8 py-2 text-13 font-medium", time === t ? "bg-accent text-ink-inverse" : "bg-surface-2 text-ink-secondary")}>{fmtTime(t)}</button>)}</div>
-        <button onClick={() => { const d = days[day]; const [h, m] = time.split(":"); d.setHours(+h, +m, 0, 0); onPropose(d.toISOString()); }} className="h-11 w-full rounded-8 bg-accent text-15 font-semibold text-ink-inverse">{mode === "reschedule" ? "Propose new time" : "Propose visit"}</button>
+        <div className="mb-3 flex gap-2">{days.map((d, i) => <button key={i} onClick={() => { setDay(i); setCustomDate(""); }} className={cn("flex-1 rounded-8 py-2 text-13 font-medium", !customDate && day === i ? "bg-accent text-ink-inverse" : "bg-surface-2 text-ink-secondary")}>{d.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" })}</button>)}</div>
+        {/* Any specific date — the native picker keeps it a system control the OS
+            styles, and clearing it falls back to the quick chips above. Selected
+            state uses the SAME accent language as the chips, so the sheet reads
+            as one control set rather than chips plus a form field. */}
+        <label className={cn("mb-3 flex items-center gap-2 rounded-8 px-3 py-2.5 transition-colors", customDate ? "bg-accent-soft" : "bg-surface-2")}>
+          <span className={cn("text-13", customDate ? "font-semibold text-accent" : "text-ink-secondary")}>Or pick a date</span>
+          <input type="date" min={minStr} max={maxStr} value={customDate} onChange={(e) => setCustomDate(e.target.value)}
+            className={cn("ml-auto min-w-0 bg-transparent text-13 outline-none", customDate ? "font-semibold text-accent" : "text-ink-tertiary")} />
+        </label>
+        <div className="mb-3 flex gap-2">{times.map((t) => <button key={t} onClick={() => { setTime(t); setCustomTime(""); }} className={cn("flex-1 rounded-8 py-2 text-13 font-medium", !customTime && time === t ? "bg-accent text-ink-inverse" : "bg-surface-2 text-ink-secondary")}>{fmtTime(t)}</button>)}</div>
+        {/* Any specific time, same pattern as the date row. */}
+        <label className={cn("mb-4 flex items-center gap-2 rounded-8 px-3 py-2.5 transition-colors", customTime ? "bg-accent-soft" : "bg-surface-2")}>
+          <span className={cn("text-13", customTime ? "font-semibold text-accent" : "text-ink-secondary")}>Or pick a time</span>
+          <input type="time" value={customTime} onChange={(e) => setCustomTime(e.target.value)}
+            className={cn("ml-auto min-w-0 bg-transparent text-13 outline-none", customTime ? "font-semibold text-accent" : "text-ink-tertiary")} />
+        </label>
+        <button onClick={propose} className="h-11 w-full rounded-8 bg-accent text-15 font-semibold text-ink-inverse">{mode === "reschedule" ? "Propose new time" : "Propose visit"}</button>
       </div>
     </BottomSheet>
   );

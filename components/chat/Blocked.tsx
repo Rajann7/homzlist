@@ -21,8 +21,11 @@ export function Blocked({ base = "/messages" }: { base?: string }) {
 
   async function unblock(u: any) {
     setUsers((us) => (us ?? []).filter((x) => x.id !== u.id));
-    await chatApi.unblockUser(u.id);
-    toast.show(`Unblocked ${u.name}`, { variant: "success" });
+    const res = await chatApi.unblockUser(u.id);
+    if (res.ok) toast.show(`Unblocked ${u.name}`, { variant: "success" });
+    // The optimistic removal must be undone if the server didn't take it —
+    // otherwise the person silently drops off a security screen while still blocked.
+    else { toast.show("Couldn't unblock — try again", { variant: "error" }); load(); }
   }
 
   return (

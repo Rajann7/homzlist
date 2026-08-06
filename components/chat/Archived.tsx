@@ -22,8 +22,11 @@ export function Archived({ base = "/messages" }: { base?: string }) {
 
   async function unarchive(r: any) {
     setRows((rs) => (rs ?? []).filter((x) => x.threadId !== r.threadId));
-    await chatApi.setState(r.threadId, { archived: false });
-    toast.show("Chat unarchived");
+    const res = await chatApi.setState(r.threadId, { archived: false });
+    if (res.ok) toast.show("Chat unarchived");
+    // Put the row back (re-fetch the true list) if the server didn't take it,
+    // rather than leaving the chat gone from Archived but still archived.
+    else { toast.show("Couldn't unarchive — try again", { variant: "error" }); load(); }
   }
 
   return (

@@ -127,6 +127,41 @@ queueing a run nothing will pick up or showing a success toast over nothing.
 
 ---
 
+## Found by Messages/Chat audit (6 Aug 2026)
+
+Fixed in the same pass (no entry needed, listed for the trail): Chat Details sent
+project chats to `/requirements/<id>` (404) → now uses the server's sealed
+`pinnedCard.href`; the "Block user" row showed the wrong label once blocked;
+composer **draft persistence** (Doc4 §36) and **50-message up-scroll pagination**
+(Doc4 §36) were both missing and are now implemented; the **first-message safety
+card** (Doc2 §10.2) renderer was dead — a client `SafetyNotice` now shows it.
+
+**CHAT-4 — public numbers were treated as private in chat (fixed 6 Aug 2026).**
+`numberAllowed()` only ever granted the number through an `allowed` number_request,
+ignoring the two cases where the number is **already published on the post**:
+
+* a **project** — Doc2 §6, a builder's number is always public and the project page
+  shows Call/WhatsApp; and
+* a **listing with `contact_public`** — Doc2 §10.1, "no number-request needed for
+  the poster's number since public" (18 accepted threads in dev).
+
+So the buyer was shown a "Request number" button for a number they could already
+read on the page they arrived from — a control that changed nothing — and Chat
+Details hid its Call button. `getThread` now also seals in the public value
+(`publicContactNumber`) and returns `numberIsPublic`; the thread swaps that dead
+button for a working **Call &lt;number&gt;** row in the same slot. For a listing the
+public value is the LISTING's `contact_number`, never the poster's profile phone,
+which may be a different private number. Regression-verified: a private thread with
+no allowed request still returns **no `otherNumber` key at all**.
+
+All three earlier follow-ups are also **CLOSED** (fixed 6 Aug 2026):
+
+| # | Item | Resolution |
+|---|---|---|
+| **CHAT-1** | **"Price updated" system line** (Doc2 §10.2) — a pinned listing's price change should drop a system message in the thread, not just flash the bar. | ✅ `updateListing` (the one price-edit path) now calls `postListingPriceSystemLine` (`lib/chat/service.ts`), which writes a `system` line into every **accepted** thread on that listing (147 live targets) and pings both sides. Fires on up/down/on-request moves, best-effort (wrapped so a chat write can't fail the edit). The client bar flash stays as the live cue on top. |
+| **CHAT-2** | **Pending-buyer composer** hid queued messages behind the "Waiting to accept" card. | ✅ Composer is now **disabled for both sides while pending** (Rajan's call, 6 Aug), with buyer-specific copy: "You can send more once {name} accepts your inquiry." No message can look lost. |
+| **CHAT-3** | Optimistic **unblock/unarchive** dropped the row with no revert on API failure. | ✅ Both now re-fetch the true list and show an error toast if the server didn't take the change. |
+
 ## Found by Module 11 P3 (31 Jul 2026)
 
 | # | Item | Belongs to | Costs money / breaks a flow? |
@@ -4148,6 +4183,7 @@ type appears on. It is real data and editable by SQL, but the P14 master-data
 screens do not expose the column, so changing the pairing today means a
 migration. The feed reads it live, so an admin edit would take effect with no
 deploy — only the UI is missing.
+
 ---
 
 ## Dashboard hub (seller feed header → grid icon) — 6 Aug 2026
