@@ -742,7 +742,9 @@ export async function searchBrokers(f: SearchFilters, viewerId: string | null, l
     // then rank, then cut (below).
     .limit(SELLER_SCAN);
   if (parsed.text) q = q.ilike("name", `%${parsed.text}%`);
+  // City wins; the state is the widened fallback (profiles.state_id, 0128).
   if (cityId) q = q.eq("city_id", cityId);
+  else if (f.stateId) q = q.eq("state_id", f.stateId);
   if (viewerId) q = q.neq("id", viewerId);
 
   const { data, count } = await q;

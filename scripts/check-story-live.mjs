@@ -78,12 +78,89 @@ if (!client) { console.error(`db connect failed: ${lastErr?.message}`); process.
 const q = async (sql, params = []) => (await client.query(sql, params)).rows;
 
 // ---------------------------------------------------------------------------
+// 0. The precondition this script cannot check without.
+//
+// Stories are DERIVED from `live_at >= now() - 24h`. The seed is older than
+// that within a day of being run, so this script used to open with
+// "0 circle(s)" and then throw on the first segment it inspected — a red run
+// that said nothing about the code. That is a false alarm, and a false alarm
+// nobody trusts is worse than no check.
+//
+// So the window is SEEDED here: the newest live listing is pulled into it, the
+// whole script runs against a real story, and the timestamp is put straight
+// back in the `finally` at the bottom — same discipline as
+// check-requirement-visibility.mjs, which creates the states it needs to look at.
+// ---------------------------------------------------------------------------
+const DAY = "24 hours";
+let seeded = null;
+
+const [fresh] = await q(
+  `select count(*)::int n from listings
+    where status='live' and availability='available' and live_at >= now() - interval '${DAY}'`);
+if (fresh.n === 0) {
+  const [row] = await q(
+    `select id, live_at from listings
+      where status='live' and availability='available'
+      order by live_at desc limit 1`);
+  if (row) {
+    await q(`update listings set live_at = now() - interval '2 hours' where id = $1`, [row.id]);
+    seeded = row;
+    console.log(`seeded the 24h window: listing ${row.id} (live_at will be restored)\n`);
+  }
+}
+
+/**
+ * Put the seeded row back exactly as it was.
+ *
+ * Idempotent, and wired to every way this process can end — not just the happy
+ * one. A crash, a Ctrl-C, or a closed pipe (`| head` is enough) used to leave
+ * the listing sitting inside the 24h window, which then silently suppressed the
+ * NEXT run's seeding and left the original timestamp unrecoverable: nothing in
+ * the schema remembers what `live_at` was.
+ */
+async function restoreSeed() {
+  if (!seeded) return;
+  const original = seeded;
+  seeded = null; // never restore twice
+  await q(`update listings set live_at = $2 where id = $1`, [original.id, original.live_at]);
+  await q(`delete from story_seen where segment_id = $1`, [original.id]);
+  const [back] = await q(`select live_at from listings where id = $1`, [original.id]);
+  check("seeded listing restored to its original live_at",
+    new Date(back.live_at).getTime() === new Date(original.live_at).getTime());
+}
+
+for (const sig of ["SIGINT", "SIGTERM", "SIGHUP"]) {
+  process.on(sig, async () => {
+    await restoreSeed().catch(() => {});
+    try { await client.end(); } catch { /* already closed */ }
+    process.exit(130);
+  });
+}
+process.on("uncaughtException", async (err) => {
+  console.error("\nuncaught:", err?.message ?? err);
+  await restoreSeed().catch(() => {});
+  try { await client.end(); } catch { /* already closed */ }
+  process.exit(1);
+});
+// A closed stdout (`… | head`) raises EPIPE on the next write and would kill the
+// process before the restore. Swallow it — the run is over either way, and
+// leaving the database dirty is the worse outcome.
+process.stdout.on("error", (e) => { if (e.code !== "EPIPE") throw e; });
+
+// ---------------------------------------------------------------------------
 // 1 + 2. Guest payload
 // ---------------------------------------------------------------------------
 const guest = actor("guest");
 const s = await guest.req("/api/v1/stories");
 const circles = s.json?.data?.circles ?? [];
 check("GET /stories (guest)", s.status === 200 && circles.length > 0, `${circles.length} circle(s)`);
+if (!circles.length) {
+  // Nothing to inspect — say so plainly instead of throwing on `undefined.href`.
+  console.log("\nNo story circles even after seeding the window — check the feed's city scope or the seed itself.");
+  await restoreSeed();
+  await client.end();
+  process.exit(1);
+}
 
 const segs = circles.flatMap((c) => c.segments.map((g) => ({ ...g, poster: c.posterName, username: c.posterUsername })));
 console.log("\n--- what the viewer renders, per segment ---");
@@ -168,6 +245,9 @@ if (draft.length) {
   const probe = await guest.req(`/api/v1/stories/${draft[0].id}`);
   check("a non-live listing 404s (no price/cover leak)", probe.json?.ok === false, probe.json?.error?.code);
 }
+
+// Leave the database exactly as it was found.
+await restoreSeed();
 
 console.log(`\n${results.filter((r) => r.p).length}/${results.length} checks passed`);
 await client.end();

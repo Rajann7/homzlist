@@ -34,6 +34,14 @@ export interface SearchFilters {
   areas?: string[];
   /** location id (city). Falls back to the viewer's city, then to none. */
   cityId?: string;
+  /**
+   * location id (state) — used INSTEAD of cityId when the feed has widened
+   * because the viewer's city holds no live inventory (lib/feed/scope). It
+   * exists so the Top Builders / Top Brokers rails follow the same widening as
+   * the cards beside them, rather than dropping the location filter and ranking
+   * over the whole country. Ignored when cityId is present.
+   */
+  stateId?: string;
   /** Budget in RUPEES (not paise) — the slider's unit. Server converts. */
   budgetMin?: number;
   budgetMax?: number;

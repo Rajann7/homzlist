@@ -14,8 +14,12 @@
 /out/
 next-env.d.ts
 
-# production
-/build
+# NOTE: there is deliberately no `/build` rule here.
+# It came from a create-react-app-style template and never applied to this
+# project — Next.js builds into `/.next`, which is ignored above. All it did was
+# hide `build/Doc6-Doc10`, the API list, architecture and security specs that
+# CLAUDE.md points every session at ("APIs: build/Doc7 | Architecture: build/Doc8
+# | Security: build/Doc9"). They are source, and they are now tracked.
 
 # misc
 .DS_Store
