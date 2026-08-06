@@ -216,6 +216,15 @@ export function myPlanDTO(
       else if (p.proposal_quota < 0) lines.push("Unlimited matching requirements");
       const priced = typeof p.terms?.price_paise === "number";
       return {
+        /**
+         * The plan row's own id, carried so the renderer has something unique
+         * to key on. The title is NOT unique: it is price + purchase date, and
+         * buying two ₹999 plans on one day (which the seed data and real
+         * sellers both do) produced two groups with the same title — React
+         * logged "Encountered two children with the same key" and reserves the
+         * right to drop or duplicate one of them.
+         */
+        id: p.id,
         title: priced
           ? `${formatPaise(p.terms.price_paise)} plan · ${ist(p.purchased_at)}`
           : `${p.name} · ${ist(p.purchased_at)}`,

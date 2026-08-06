@@ -75,7 +75,7 @@ export interface MyPlan {
     projectSlotsLeft: number;
     unlimitedProjects: boolean;
   };
-  trace: { title: string; lines: string[] }[];
+  trace: { id: string; title: string; lines: string[] }[];
   /** Persisted preference from `notification_prefs`, not a client default. */
   expiryReminders: boolean;
   trial: { name: string; summary: string; note: string } | null;

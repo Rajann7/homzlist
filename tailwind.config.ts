@@ -87,6 +87,22 @@ const config: Config = {
           soft: v("accent-soft"),
           disabled: v("accent-disabled"),
         },
+        // Foreground for content sitting ON a solid accent fill. Not the same as
+        // ink-inverse: the dark theme's accent is bright enough that white drops
+        // under 3:1, so this token flips while ink-inverse stays white.
+        "on-accent": v("on-accent"),
+        // Categorical tile tones — no status meaning (see globals.css).
+        tone: {
+          green: v("tone-green"),
+          amber: v("tone-amber"),
+          blue: v("tone-blue"),
+          violet: v("tone-violet"),
+          teal: v("tone-teal"),
+          pink: v("tone-pink"),
+          indigo: v("tone-indigo"),
+          cyan: v("tone-cyan"),
+          orange: v("tone-orange"),
+        },
         error: { DEFAULT: v("error"), soft: v("error-soft") },
         warning: { DEFAULT: v("warning"), soft: v("warning-soft") },
         info: { DEFAULT: v("info"), soft: v("info-soft") },

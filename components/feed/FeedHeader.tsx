@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
  * Messages icon in the bottom nav.
  */
 export function FeedHeader({
-  compact, cityName, onCityTap, bellCount = 0, onBell, onSaved,
+  compact, cityName, onCityTap, bellCount = 0, onBell, onSaved, onDashboard,
 }: {
   compact: boolean;
   cityName: string | null;
@@ -22,6 +22,13 @@ export function FeedHeader({
   bellCount?: number;
   onBell?: () => void;
   onSaved?: () => void;
+  /**
+   * Seller feed only. When present, the second header slot becomes the
+   * Dashboard hub instead of Saved (Rajan, 6 Aug 2026). Saved was a DUPLICATE
+   * entry point — it still has its row in the profile sheet — so the slot was
+   * free; the public feed passes nothing and keeps its heart exactly as before.
+   */
+  onDashboard?: () => void;
 }) {
   return (
     <header className="chrome z-header sticky top-0 mx-auto w-full max-w-column border-b border-border bg-surface-1 pt-[env(safe-area-inset-top)]">
@@ -50,15 +57,19 @@ export function FeedHeader({
 
         <div className="ml-auto flex items-center">
           <IconBtn name="bell" count={bellCount} onClick={onBell} label="Notifications" />
-          {/* Saved lives here now (top-right); Messages moved to the bottom nav. */}
-          <IconBtn name="heart" count={0} onClick={onSaved} label="Saved" />
+          {/* Seller: the Dashboard hub. Public/guest: Saved, unchanged. */}
+          {onDashboard ? (
+            <IconBtn name="grid" count={0} onClick={onDashboard} label="Dashboard" />
+          ) : (
+            <IconBtn name="heart" count={0} onClick={onSaved} label="Saved" />
+          )}
         </div>
       </div>
     </header>
   );
 }
 
-function IconBtn({ name, count, onClick, label }: { name: "bell" | "message" | "heart"; count: number; onClick?: () => void; label: string }) {
+function IconBtn({ name, count, onClick, label }: { name: "bell" | "message" | "heart" | "grid"; count: number; onClick?: () => void; label: string }) {
   return (
     <button aria-label={label} onClick={onClick} className="relative grid h-11 w-11 place-items-center">
       <Icon name={name} size={24} className="text-ink-primary" />

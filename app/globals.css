@@ -28,6 +28,26 @@
   --accent-pressed: #0c7c46;
   --accent-soft: #e6f4ec;
   --accent-disabled: #a8d5bd;
+  /* Ink that sits ON a solid accent fill (icon chips, count pills).
+     White clears 3:1 against the light accent, but the dark theme's accent is
+     a much brighter green (#1db868) where white falls to ~2.9:1 — under the
+     WCAG threshold for graphics. So this is a token, not `--ink-inverse`:
+     light keeps white (identical to before), dark flips to a near-black green. */
+  --on-accent: #ffffff;
+  /* Dashboard tile tones (Rajan, 6 Aug 2026 — "icon colour different, not all
+     the same"). Categorical only: these carry NO status meaning, so they are
+     deliberately separate from --error/--warning/--info, which do. Every light
+     value clears 3:1 against white and every dark value clears 3:1 against
+     --on-accent, so the glyph stays legible on both grounds. */
+  --tone-green: #0f9d58;
+  --tone-amber: #b45c07;
+  --tone-blue: #2563eb;
+  --tone-violet: #7c3aed;
+  --tone-teal: #0d7d72;
+  --tone-pink: #c2255c;
+  --tone-indigo: #4f46e5;
+  --tone-cyan: #0e7490;
+  --tone-orange: #c2410c;
   /* Semantic */
   --error: #ed4956;
   --error-soft: #fdecee;
@@ -67,6 +87,16 @@
   --accent-pressed: #17a05a;
   --accent-soft: #0e2b1c;
   --accent-disabled: #a8d5bd;
+  --on-accent: #06180f;
+  --tone-green: #1db868;
+  --tone-amber: #f0a020;
+  --tone-blue: #60a5fa;
+  --tone-violet: #a78bfa;
+  --tone-teal: #2dd4bf;
+  --tone-pink: #f472b6;
+  --tone-indigo: #818cf8;
+  --tone-cyan: #22d3ee;
+  --tone-orange: #fb923c;
   --error: #ff5c6a;
   --error-soft: #2b1214;
   --warning: #ffb74d;
@@ -99,6 +129,16 @@
     --accent-pressed: #17a05a;
     --accent-soft: #0e2b1c;
     --accent-disabled: #a8d5bd;
+    --on-accent: #06180f;
+    --tone-green: #1db868;
+    --tone-amber: #f0a020;
+    --tone-blue: #60a5fa;
+    --tone-violet: #a78bfa;
+    --tone-teal: #2dd4bf;
+    --tone-pink: #f472b6;
+    --tone-indigo: #818cf8;
+    --tone-cyan: #22d3ee;
+    --tone-orange: #fb923c;
     --error: #ff5c6a;
     --error-soft: #2b1214;
     --warning: #ffb74d;

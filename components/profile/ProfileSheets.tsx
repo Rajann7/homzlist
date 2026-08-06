@@ -168,24 +168,22 @@ export function ProfileMenuSheet({
   onAccountStatus: () => void;
   onViewAsVisitor: () => void;
   onPlaceholder: (what: string) => void;
-  /** Route push for the seller destinations below. */
+  /** Route push for the rows below (Settings, Saved, Drafts, Archived…). */
   onNavigate: (href: string) => void;
 }) {
   return (
     <BottomSheet open={open} onClose={onClose} hideHeader>
       <div className="flex flex-col pt-1">
-        {/* Seller destinations — this is where an under-review listing, the
-            plan and payment history live (Doc4 §56/§62). */}
-        <Row icon="home" label="My Listings" onClick={() => onNavigate("/listings")} />
-        <Row icon="search" label="Browse requirements" onClick={() => onNavigate("/requirements")} />
-        <Row icon="file" label="My requirements" onClick={() => onNavigate("/requirements/mine")} />
-        <Row icon="send" label="My proposals" onClick={() => onNavigate("/proposals")} />
-        <Row icon="pin" label="My visits" onClick={() => onNavigate("/visits")} />
-        <Row icon="filter" label="Leads" onClick={() => onNavigate("/leads")} />
-        <Row icon="card" label="My plan" onClick={() => onNavigate("/plans/my")} />
-        <Row icon="receipt" label="Payments" onClick={() => onNavigate("/payments")} />
-        <Row icon="rocket" label="Boosts" onClick={() => onNavigate("/boost")} />
-        <span className="my-1 h-px bg-divider" />
+        {/* The nine seller destinations (My Listings, Browse requirements, My
+            requirements, My proposals, My visits, Leads, My plan, Payments,
+            Boosts) used to head this sheet. They moved OUT to the Dashboard hub
+            — the feed header's grid icon — on 6 Aug 2026, so they are reached
+            from one place instead of two. `lib/dashboard/items` is now their
+            only definition.
+
+            The divider that separated them from this group went with them: it
+            was there to split two blocks, and with the first block gone it
+            would have opened the sheet on a hairline with nothing above it. */}
         <Row icon="settings" label="Settings" onClick={() => onNavigate("/settings")} />
         <Row icon="bookmark" label="Saved" onClick={() => onNavigate("/saved")} />
         <Row icon="clock" label="Your activity" onClick={() => onNavigate("/activity")} />

@@ -4148,3 +4148,48 @@ type appears on. It is real data and editable by SQL, but the P14 master-data
 screens do not expose the column, so changing the pairing today means a
 migration. The feed reads it live, so an admin edit would take effect with no
 deploy — only the UI is missing.
+---
+
+## Dashboard hub (seller feed header → grid icon) — 6 Aug 2026
+
+Found while building the hub. None of these are caused by it; the hub only made
+them easier to see, so they are recorded rather than quietly patched.
+
+**1. "Dashboard" now names two different things for a builder.**
+`components/feed/BuilderDashboard.tsx` is a builder's FEED CONTENT (their own
+project stat cards + matched requirements). The new `/dashboard` is a
+destination menu. A builder therefore has a feed that is a dashboard and a
+header icon labelled Dashboard that opens something else. Nothing breaks, but
+one of the two should be renamed before the word is in front of users.
+
+**2. Role-filtering the nine — RESOLVED, and the answer is "do not".** *(closed
+6 Aug 2026)*
+This was raised as an open decision. It is not one: the server already answers
+it, and `scripts/check-builder-requirements-live.mjs` asserts the answer.
+A builder's requirement access ships WITH the ₹9,999 project plan (migration
+0087), so the check requires that a "builder with ₹9,999 sees UNLOCKED
+requirements", and that a "builder WITH a live project can send a proposal".
+Hiding "Browse requirements" or "My proposals" from builders would hide two
+screens they legitimately use and would break that script. What a builder
+cannot do is BUY the ₹2,999 requirement-only plan — already refused server-side
+(403 on quote and checkout, plan absent from their catalog).
+All nine are gated by ENTITLEMENT (active plan / live project / quota), never by
+role, and each screen renders its own locked state — which is where the upsell
+lives. A hidden tile has no upsell. The reasoning is recorded on `HUB_GROUPS`
+in `lib/dashboard/items.ts` so it is not "rediscovered" and reversed later. Any
+future role rule must be enforced on the server first.
+
+**3. "My visits" counts the viewer as the BUYER.**
+The count reuses `myVisits()`'s own filter (`visits.buyer_id`), so the tile and
+the screen agree — which is the property that matters. Worth knowing that
+neither shows visits booked against a seller's own listings; that is the
+poster-side view and no screen surfaces it yet.
+
+**4. The hub is now the ONLY way into the nine (6 Aug 2026).**
+They were removed from `ProfileMenuSheet` on Rajan's instruction, so the feed
+header's grid icon is the single entry point. Two consequences worth knowing:
+the icon renders only on the FEED, so from any other screen a seller taps Home
+first; and it is seller-gated (`useRole()`), so it never appears on the public
+host — correct today because the public host is the guest surface, but it means
+`/dashboard` has no in-app entry point if a seller ever lands there logged in
+on the public host.

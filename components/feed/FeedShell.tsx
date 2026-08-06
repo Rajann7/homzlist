@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { BottomNav, DEFAULT_NAV } from "@/components/nav/BottomNav";
+import { useRole } from "@/components/nav/RoleContext";
 import { FeedHeader } from "./FeedHeader";
 import { PullSpinner } from "./primitives";
 import { CitySheet, type CityRow } from "./CitySheet";
@@ -30,6 +31,18 @@ export function FeedShell({
   scrollRef?: React.RefObject<HTMLDivElement | null>;
 }) {
   const router = useRouter();
+  /**
+   * FeedHome renders on BOTH hosts — app/(public)/page.tsx and
+   * app/(seller)/seller/page.tsx — so this one shell serves the guest feed and
+   * the seller feed. Only the seller layout mounts a RoleProvider, so a role
+   * here means "this is the seller feed" and the header's second slot becomes
+   * the Dashboard. The public feed keeps Saved, untouched.
+   *
+   * This is a UI-shape hint only, exactly like the bottom nav's use of it:
+   * /dashboard and every route it opens still authorise themselves server-side,
+   * so a forged role buys nothing.
+   */
+  const role = useRole();
   const innerRef = useRef<HTMLDivElement>(null);
   const ref = scrollRef ?? innerRef;
   const [compact, setCompact] = useState(false);
@@ -72,6 +85,7 @@ export function FeedShell({
         bellCount={badges?.notifications ?? 0}
         onBell={() => router.push("/notifications")}
         onSaved={() => router.push("/saved")}
+        onDashboard={role ? () => router.push("/dashboard") : undefined}
       />
       <div
         ref={ref}

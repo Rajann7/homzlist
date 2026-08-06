@@ -171,7 +171,7 @@ export function MyPlan() {
             <div className="rounded-12 bg-surface-1 px-3 py-4 shadow-l1 dark:border dark:border-border dark:shadow-none">
               <div className="flex flex-col">
                 {data.trace.map((g, i) => (
-                  <div key={g.title} className="flex gap-3">
+                  <div key={g.id} className="flex gap-3">
                     <div className="flex w-3 shrink-0 flex-col items-center">
                       <span className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full bg-accent" />
                       {i < data.trace.length - 1 && <span className="my-1 w-0.5 flex-1 bg-divider" />}
@@ -179,7 +179,12 @@ export function MyPlan() {
                     <div className={i < data.trace.length - 1 ? "flex-1 pb-4" : "flex-1"}>
                       <div className="text-13 font-semibold text-ink-primary">{g.title}</div>
                       <div className="mt-1 text-11 leading-[1.5] text-ink-tertiary">
-                        {g.lines.map((l) => <div key={l}>→ {l}</div>)}
+                        {/* Index key: two consumptions of the same kind on one
+                            plan produce the SAME sentence ("1 listing slot
+                            used" twice), so the text is not unique either. The
+                            list is built server-side, is never reordered and
+                            never filtered in place, so position is stable. */}
+                        {g.lines.map((l, li) => <div key={li}>→ {l}</div>)}
                       </div>
                     </div>
                   </div>

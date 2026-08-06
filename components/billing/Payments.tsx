@@ -264,8 +264,13 @@ export function InvoiceSheet({ id, onClose }: { id: string | null; onClose: () =
             <div className="text-13 text-ink-primary">{inv.billedTo?.name} · {inv.billedTo?.phone}</div>
             {inv.gstin && <div className="text-11 text-ink-tertiary">GSTIN: {inv.gstin}</div>}
             <div className="my-3 h-px bg-divider" />
-            {inv.lineItems.map((li: any) => (
-              <div key={li.title}>
+            {/* Index key, not `li.title`: line items come straight from the
+                invoice's `line_items` jsonb, where two rows may legitimately
+                carry the same title (two identical plans on one order). No
+                invoice in the DB does today, but it is the same collision that
+                broke My Plan's trace — and an invoice is never reordered. */}
+            {inv.lineItems.map((li: any, liIdx: number) => (
+              <div key={liIdx}>
                 <div className="flex justify-between py-1">
                   <span className="text-ink-primary">{li.title}</span>
                   <span className="text-ink-primary">{li.amount}</span>
