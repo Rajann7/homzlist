@@ -1,5 +1,6 @@
 import "server-only";
 import { kv } from "@/lib/kv";
+import { devAffordancesAllowed } from "@/lib/env";
 
 /** Redis fixed-window rate limiter (Doc9 §13 — no CAPTCHA; lockout + counters). */
 export interface RateResult {
@@ -14,12 +15,13 @@ export interface RateResult {
  * Browser-driven testing hammers the same IP and the same login over and over,
  * so the per-IP / per-number counters trip long before a test run finishes. With
  * `DISABLE_RATE_LIMIT=1` in .env.local every limiter reports "allowed" and the
- * OTP number-lock is ignored. It refuses to engage when NODE_ENV is production,
- * so this can never disarm the limits on a deployed server even if the env var
- * leaks into that environment.
+ * OTP number-lock is ignored. It refuses to engage in the production band, so
+ * this can never disarm the limits on the real site even if the env var leaks
+ * into that environment — a staging deploy (APP_ENV=staging) is the one place a
+ * deployed server will honour it, which is the environment it exists for.
  */
 export const rateLimitDisabled =
-  process.env.NODE_ENV !== "production" &&
+  devAffordancesAllowed() &&
   (process.env.DISABLE_RATE_LIMIT === "1" || process.env.DISABLE_RATE_LIMIT === "true");
 
 /**

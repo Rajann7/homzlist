@@ -54,9 +54,15 @@ Still ENFORCED (deliberately not touched):
 
 ## SAFETY
 
-`rateLimitDisabled` is `false` whenever `NODE_ENV === "production"`, regardless
-of the env var. So even if `DISABLE_RATE_LIMIT=1` ever leaked into a deployed
-environment, the limits stay armed there. The switch only works on a dev server.
+`rateLimitDisabled` is `false` whenever the environment band is `production`
+(`lib/env` → `envBand()`, driven by `APP_ENV`), regardless of the env var. So
+even if `DISABLE_RATE_LIMIT=1` ever leaked into the real site's environment, the
+limits stay armed there.
+
+It DOES engage on a staging deploy (`APP_ENV=staging`), which is the point —
+browser-driven testing against a deployed test server hits the same counters a
+local run does. An undeclared `APP_ENV` on a deployed build counts as
+production, so this never turns itself on by accident.
 
 Do **not** ship a production deploy relying on this guarantee alone — set the
 env var back to `0` when testing is done, per the steps above.

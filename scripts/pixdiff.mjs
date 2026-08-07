@@ -523,8 +523,9 @@ async function fixtures(sql) {
  *   - next.config.mjs drops 'unsafe-eval' from the CSP in production, and the
  *     unpacked design prototypes need it (Babel + the dc runtime compile JSX in
  *     the page), so every /_dx page renders blank under a production build;
- *   - the dev OTP provider refuses to run with NODE_ENV=production, so no
- *     actor can sign in.
+ *   - the dev OTP provider refuses to run in the production band, so no actor
+ *     can sign in (a production build CAN be signed into with APP_ENV=staging,
+ *     but the CSP reason above still rules production builds out here).
  * Both are correct product behaviour — fail loudly rather than reporting 20
  * mystery diffs.
  */

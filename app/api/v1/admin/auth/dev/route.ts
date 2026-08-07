@@ -2,6 +2,7 @@ import type { NextRequest } from "next/server";
 import { ok, fail } from "@/lib/api";
 import { adminAuthProviderKind, devIdentity } from "@/lib/admin/auth-provider";
 import { signInAdmin } from "@/lib/admin/sign-in";
+import { devAffordancesAllowed } from "@/lib/env";
 
 /**
  * DEV-ONLY admin sign-in — the same shape the OTP layer already uses (fixed
@@ -15,14 +16,19 @@ import { signInAdmin } from "@/lib/admin/sign-in";
  * here is the one that runs in production.
  *
  * Three independent locks:
- *   · `adminAuthProviderKind()` throws in production when credentials are absent
- *   · `devIdentity()` throws in production, always
- *   · this route 404s the moment NODE_ENV is production
+ *   · `adminAuthProviderKind()` answers "unconfigured" in the production band
+ *   · `devIdentity()` throws in the production band, always
+ *   · this route 404s the moment the band is production
+ *
+ * "Band", not NODE_ENV: a staging deploy is a production BUILD, and gating on
+ * the build meant a deployed test server had no way in at all. An undeclared
+ * APP_ENV on a deployed build is still production, so this stays shut unless
+ * APP_ENV=staging was set on purpose.
  */
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
-  if (process.env.NODE_ENV === "production") return fail("NOT_FOUND");
+  if (!devAffordancesAllowed()) return fail("NOT_FOUND");
   if (adminAuthProviderKind() !== "dev") return fail("NOT_FOUND");
 
   const body = (await req.json().catch(() => null)) as { email?: string } | null;

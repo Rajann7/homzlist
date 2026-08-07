@@ -1,5 +1,5 @@
 import "server-only";
-import { serverEnv } from "@/lib/env";
+import { devAffordancesAllowed, serverEnv } from "@/lib/env";
 import { maskPhone } from "./phone";
 
 /**
@@ -41,10 +41,15 @@ const msg91Provider: OtpProvider = {
 export function getOtpProvider(): OtpProvider {
   const provider = serverEnv().otp.provider;
   // Audit M1: the dev provider accepts the fixed code for ANY number and echoes
-  // devCode — it must NEVER run in production. Fail closed (no auth) rather than
-  // ship a "123456-accepts-anyone" bypass.
-  if (provider !== "msg91" && process.env.NODE_ENV === "production") {
-    throw new Error("Dev OTP provider is not allowed in production — set OTP_PROVIDER=msg91.");
+  // devCode — it must NEVER run in the production band. Fail closed (no auth)
+  // rather than ship a "123456-accepts-anyone" bypass. The band, not NODE_ENV:
+  // a staging deploy is a production BUILD and could otherwise never be signed
+  // into, and an undeclared APP_ENV on a deployed build is still "production".
+  if (provider !== "msg91" && !devAffordancesAllowed()) {
+    throw new Error(
+      "Dev OTP provider is not allowed in the production band — set OTP_PROVIDER=msg91 " +
+        "(or APP_ENV=staging on a test deploy).",
+    );
   }
   return provider === "msg91" ? msg91Provider : devProvider;
 }
