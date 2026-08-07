@@ -7,6 +7,7 @@ import { BackButton, OfflineBanner, SheetOption } from "@/components/billing/pri
 import { ConfirmDialog } from "@/components/ui/Dialog";
 import { listingsApi, type MyListing } from "@/lib/listings/client";
 import { cn } from "@/lib/utils";
+import { Img } from "@/components/ui/Img";
 
 /**
  * P6 S6 — My Listings manager (Doc7 §56).
@@ -188,8 +189,7 @@ export function MyListings() {
             <div className="flex gap-3 p-3">
               <button onClick={() => router.push(viewHref(l))} className="h-20 w-20 shrink-0 overflow-hidden rounded-8 bg-surface-3">
                 {l.coverUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={l.coverUrl} alt="" className="h-full w-full object-cover" />
+                  <Img src={l.coverUrl} alt="" className="h-full w-full object-cover" />
                 ) : (
                   <span className="grid h-full place-items-center text-ink-tertiary"><Icon name="image" size={22} /></span>
                 )}

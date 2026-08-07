@@ -14,6 +14,13 @@ interface ToastItem {
   message: string;
   action?: { label: string; onClick: () => void };
   variant?: "default" | "success" | "error";
+  /**
+   * Hold in ms. `null` = stays until its action is used or it is tapped away —
+   * used only by the "New version — Refresh" notice (Doc3 §98), where a 3-second
+   * window to hit Refresh is a dead end rather than a toast. Same pill, same
+   * position, same motion; only the timer differs.
+   */
+  duration?: number | null;
 }
 
 interface ToastCtx {
@@ -48,10 +55,12 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 }
 
 function ToastPill({ item, onDone }: { item: ToastItem; onDone: () => void }) {
+  const hold = item.duration === undefined ? 3000 : item.duration; // 3s (Doc1 §4)
   useEffect(() => {
-    const timer = setTimeout(onDone, 3000); // 3s hold (Doc1 §4)
+    if (hold === null) return;
+    const timer = setTimeout(onDone, hold);
     return () => clearTimeout(timer);
-  }, [onDone]);
+  }, [onDone, hold]);
 
   return (
     <div

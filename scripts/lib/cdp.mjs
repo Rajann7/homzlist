@@ -95,6 +95,9 @@ export class Session {
     await s.send("Console.enable");
     s.consoleErrors = [];
     s.failedRequests = [];
+    // Response statuses, so a check can assert "no 404/5xx on this screen"
+    // rather than only noticing requests that failed at the transport layer.
+    s.responses = [];
     ws._handlers.push((msg) => {
       if (msg.sessionId !== sessionId) return;
       if (msg.method === "Runtime.exceptionThrown")
@@ -102,6 +105,8 @@ export class Session {
       if (msg.method === "Console.messageAdded" && msg.params.message.level === "error")
         s.consoleErrors.push(msg.params.message.text);
       if (msg.method === "Network.loadingFailed") s.failedRequests.push(msg.params.errorText);
+      if (msg.method === "Network.responseReceived")
+        s.responses.push({ status: msg.params.response.status, url: msg.params.response.url });
     });
     return s;
   }
@@ -158,3 +163,49 @@ export class Session {
 }
 
 export { sleep };
+
+/**
+ * Run an async body in the page and return its value.
+ *
+ * `Session.eval` takes a bare expression, but every non-trivial check wants
+ * `await` and `return` inside it — so wrap the body in an async IIFE rather than
+ * each script re-inventing the wrapper.
+ */
+export function ev(session, body) {
+  return session.eval(`(async () => { ${body} })()`);
+}
+
+/**
+ * Dev-mode OTP sign-in (fixed code, no SMS — CLAUDE.md "OTP: DEV MODE now").
+ *
+ * Deliberately step-by-step with short evals rather than one long one: the OTP
+ * submit NAVIGATES, which tears down the JS execution context, and a single
+ * awaiting eval just rejects with "Inspected target navigated or closed".
+ *
+ * `/login` also opens on the onboarding carousel, so it skips through to the
+ * phone screen first. Returns where it landed, so a caller can assert.
+ */
+export async function devLogin(session, { sellerOrigin, phone = "9999000007", otp = "123456" } = {}) {
+  const HELPERS = `
+    const set=(el,v)=>{Object.getOwnPropertyDescriptor(Object.getPrototypeOf(el),'value').set.call(el,v);el.dispatchEvent(new Event('input',{bubbles:true}));};
+    const vis=()=>[...document.querySelectorAll('input')].filter(i=>i.offsetParent!==null&&i.type!=='hidden');
+    const btn=(re)=>[...document.querySelectorAll('button')].find(b=>!b.disabled&&re.test(b.textContent.trim()));`;
+  const safe = async (body, fallback = null) => {
+    try { return await ev(session, body); } catch { return fallback; }
+  };
+
+  await session.goto(`${sellerOrigin}/login`, { waitMs: 5000 });
+  await safe(`${HELPERS} const b=btn(/^Skip$/); if(b)b.click(); return 1`);
+  await sleep(2500);
+  if (!(await safe(`${HELPERS} const i=vis()[0]; if(!i) return 0; set(i,'${phone}'); return 1`, 0))) {
+    return "no phone input";
+  }
+  await sleep(600);
+  await safe(`${HELPERS} const b=btn(/continue|send|next|otp/i); if(b)b.click(); return 1`);
+  await sleep(4000);
+  await safe(`${HELPERS} const ins=vis(); if(ins.length>=6){'${otp}'.split('').forEach((d,i)=>set(ins[i],d));} else if(ins.length){set(ins[ins.length-1],'${otp}');} return 1`);
+  await sleep(1200);
+  await safe(`${HELPERS} const b=btn(/verify|continue|submit/i); if(b)b.click(); return 1`);
+  await sleep(6000);
+  return safe("return location.host + location.pathname", "context lost");
+}

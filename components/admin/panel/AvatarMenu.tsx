@@ -9,7 +9,7 @@
  */
 
 import { useState } from "react";
-import { TopDrop } from "@/components/admin/ds";
+import { TopDrop, useToast } from "@/components/admin/ds";
 
 export function AvatarMenu({
   onClose,
@@ -21,13 +21,26 @@ export function AvatarMenu({
   onSwitchAccount: () => void;
 }) {
   const [signingOut, setSigningOut] = useState(false);
+  const toast = useToast();
 
   async function logOut() {
     if (signingOut) return;
     setSigningOut(true);
-    await fetch("/api/v1/admin/auth/logout", { method: "POST", cache: "no-store" }).catch(
-      () => null,
-    );
+    const res = await fetch("/api/v1/admin/auth/logout", {
+      method: "POST",
+      cache: "no-store",
+    }).catch(() => null);
+
+    // Leaving the page when the request FAILED is the worst of both: the cookie
+    // survives, middleware bounces /login straight back into the panel, and the
+    // admin walks away from a shared machine believing they signed out. Say so
+    // and stay put — the session is still live, which is exactly what the
+    // panel showing is telling them.
+    if (!res?.ok) {
+      setSigningOut(false);
+      toast("Could not log out — you are still signed in");
+      return;
+    }
     // A full navigation, not a router push: every cookie, every cached server
     // payload and every piece of panel state belongs to a session that is gone.
     // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- The session identity changes here, so this has to be a real page load — router.push() would keep the previous user's client cache and rendered tree.

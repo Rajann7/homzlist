@@ -2,6 +2,7 @@
 
 import { Icon } from "@/components/ui/Icon";
 import { cn } from "@/lib/utils";
+import { Img } from "@/components/ui/Img";
 
 /** P2 "New listings" pill — floating, drops in; tap → scroll top + refresh. */
 export function NewListingsPill({ count, onClick }: { count: number; onClick: () => void }) {
@@ -39,7 +40,7 @@ export function CaughtUp({ onNearby }: { onNearby?: () => void }) {
  * gradient with the title (15px/700) + subtitle (11px/85%), exactly as the P2
  * mock shows ("Home loans @ 8.4% / Pre-approved in 24 hours").
  */
-export interface FeedBanner { id: string; title: string; subtitle: string | null; imageUrl: string | null; targetUrl: string | null }
+export interface FeedBanner { id: string; title: string; subtitle: string | null; imageUrl: string | null; targetUrl: string | null; frequencyCap: number }
 
 export function AdminBanner({ banner, onDismiss, onTap }: { banner: FeedBanner; onDismiss: () => void; onTap?: () => void }) {
   const tappable = Boolean(banner.targetUrl);
@@ -55,8 +56,7 @@ export function AdminBanner({ banner, onDismiss, onTap }: { banner: FeedBanner; 
         )}
       >
         {banner.imageUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={banner.imageUrl} alt={banner.title} className="absolute inset-0 h-full w-full object-cover" />
+          <Img src={banner.imageUrl} alt={banner.title} className="absolute inset-0 h-full w-full object-cover" />
         ) : (
           <div>
             <div className="text-15 font-bold text-white">{banner.title}</div>

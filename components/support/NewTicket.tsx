@@ -6,6 +6,7 @@ import { AppShell, Header, Icon, Button, BottomSheet, Skeleton, Spinner, useToas
 import { BackButton } from "@/components/billing/primitives";
 import { supportApi, type TicketCategory } from "@/lib/content/client";
 import { apiFetch } from "@/lib/auth/api-fetch";
+import { Img } from "@/components/ui/Img";
 
 /**
  * P12 S2b — Contact support.
@@ -348,8 +349,7 @@ function AttachmentTile({
   }
   return (
     <span className="relative inline-flex h-[72px] w-[72px]">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={slot.preview} alt="" className="h-[72px] w-[72px] rounded-8 border border-border object-cover" />
+            <Img src={slot.preview} alt="" className="h-[72px] w-[72px] rounded-8 border border-border object-cover" />
       {slot.state === "uploading" && (
         <span className="absolute inset-0 grid place-items-center rounded-8 bg-black/40 text-white">
           <Spinner size={20} />

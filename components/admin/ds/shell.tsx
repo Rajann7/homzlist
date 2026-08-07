@@ -191,10 +191,45 @@ export function AdminShell({
     setDrawer(false);
   }, [pathname]);
 
+  // Escape closes whatever is on top. The drawer had only a scrim tap, which is
+  // no exit at all for a keyboard user and an awkward one on a phone.
+  useEffect(() => {
+    if (!drawer && !overlay) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (drawer) setDrawer(false);
+      else setOverlay(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [drawer, overlay]);
+
   const closeOverlay = useCallback(() => setOverlay(null), []);
+
+  /**
+   * Opening a group while the rail is COLLAPSED has to expand the rail first.
+   *
+   * The children render under `open && !collapsed`, so a collapsed rail turned
+   * all four group headers into dead controls — and with them the only sidebar
+   * route to fifteen screens (six queues, Plans/Coupons/Grants,
+   * Tickets/Disputes, Cron/Settings/Trash/Exports). Collapsed is a sticky
+   * preference, so it was not a transient dead-end: it survived every reload.
+   *
+   * Expanding rather than growing a flyout keeps the design as drawn — this is
+   * the collapsed rail behaving like the rail the design draws, not a new
+   * surface.
+   */
   const toggleGroup = useCallback(
-    (key: string) => setGroups((g) => ({ ...g, [key]: !g[key] })),
-    [],
+    (key: string) => {
+      if (collapsed) {
+        setCollapsed(false);
+        localStorage.setItem(SIDEBAR_PREF, "0");
+        setGroups((g) => ({ ...g, [key]: true }));
+        return;
+      }
+      setGroups((g) => ({ ...g, [key]: !g[key] }));
+    },
+    [collapsed],
   );
 
   const navRows = (onNavigate?: () => void) => (

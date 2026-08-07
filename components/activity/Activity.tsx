@@ -7,6 +7,7 @@ import { BackButton } from "@/components/billing/primitives";
 import { ConfirmDialog } from "@/components/ui/Dialog";
 import { activityApi, type ActivityView } from "@/lib/activity/client";
 import { cn } from "@/lib/utils";
+import { Img } from "@/components/ui/Img";
 
 /**
  * P10 S2 — Your activity (Doc4 §58). A read-only hub over what the user has done.
@@ -81,8 +82,7 @@ export function Activity({ base = "" }: { base?: string }) {
               <button key={r.listingId} onClick={() => go(`/property/${r.listingId}`)} className="w-28 shrink-0 text-left">
                 <span className="block aspect-square overflow-hidden rounded-10 bg-surface-3">
                   {r.coverUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={r.coverUrl} alt="" data-protected="true" className="h-full w-full object-cover" />
+                    <Img src={r.coverUrl} alt="" data-protected="true" className="h-full w-full object-cover" />
                   ) : (
                     <span className="grid h-full place-items-center text-ink-tertiary"><Icon name="home" size={26} /></span>
                   )}
@@ -106,8 +106,7 @@ export function Activity({ base = "" }: { base?: string }) {
             <button key={q.id} onClick={() => go("/messages")} className="flex w-full items-center gap-3 px-4 py-2.5 text-left active:bg-surface-2">
               <span className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-8 bg-surface-3 text-ink-tertiary">
                 {q.coverUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={q.coverUrl} alt="" className="h-full w-full object-cover" />
+                  <Img src={q.coverUrl} alt="" className="h-full w-full object-cover" />
                 ) : (
                   <Icon name="home" size={20} />
                 )}

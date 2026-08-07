@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { Icon } from "@/components/ui/Icon";
+import { Img } from "@/components/ui/Img";
 
 /**
  * P7 full-screen photo viewer (design PHOTO VIEWER — fixed inset-0 dim backdrop).
@@ -22,7 +23,7 @@ export function PhotoViewer({ url, onClose }: { url: string | null; onClose: () 
       <button aria-label="Close" onClick={onClose} className="absolute right-3 top-[calc(env(safe-area-inset-top)+12px)] grid h-11 w-11 place-items-center rounded-full bg-white/10 text-white">
         <Icon name="close" size={24} />
       </button>
-      <img src={url} alt="" onClick={(e) => e.stopPropagation()} className="max-h-[92vh] max-w-full object-contain" />
+      <Img src={url} alt="" onClick={(e) => e.stopPropagation()} className="max-h-[92vh] max-w-full object-contain" />
     </div>
   );
 }

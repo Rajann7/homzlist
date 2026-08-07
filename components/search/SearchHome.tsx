@@ -10,6 +10,7 @@ import { searchApi, type ExploreTile, type RecentRow } from "@/lib/search/client
 import type { AutocompleteResult } from "@/lib/search/types";
 import { interactionsApi } from "@/lib/feed/client";
 import { cn } from "@/lib/utils";
+import { Img } from "@/components/ui/Img";
 
 /**
  * P3 S1 — SEARCH HOME (Explore).
@@ -123,8 +124,10 @@ export function SearchHome({ basePath = "", isGuest = false }: SearchHomeProps) 
   const savePeek = async (t: ExploreTile) => {
     setPeek(null);
     if (isGuest) { router.push(path("/login")); return; }
+    // No `saved` on an explore tile, so no offline optimism here (see client).
     const r = await interactionsApi.toggleSave(t.id);
-    toast.show(r.ok && r.data.saved ? "Saved to your list" : "Removed from saved");
+    if (!r.ok) { toast.show("Couldn't save that", { variant: "error" }); return; }
+    toast.show(r.data.saved ? "Saved to your list" : "Removed from saved");
   };
 
   const loading = tiles === null || recents === null;
@@ -286,8 +289,7 @@ export function SearchHome({ basePath = "", isGuest = false }: SearchHomeProps) 
                   )}
                 >
                   {t.coverUrl && (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={t.coverUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
+                    <Img src={t.coverUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
                   )}
                   {t.promoted && (
                     <span className="absolute left-2 top-2 rounded-4 bg-black/60 px-[7px] py-1 text-11 font-semibold uppercase tracking-[0.3px] text-white">
@@ -324,8 +326,7 @@ export function SearchHome({ basePath = "", isGuest = false }: SearchHomeProps) 
                 property never appears in two different crops. */}
             <div className="aspect-[16/9] bg-surface-2">
               {peek.coverUrl && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={peek.coverUrl} alt="" className="h-full w-full object-cover" />
+                <Img src={peek.coverUrl} alt="" className="h-full w-full object-cover" />
               )}
             </div>
             <div className="p-3.5">

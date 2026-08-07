@@ -27,7 +27,7 @@ import {
   Thumb,
   useToast,
 } from "@/components/admin/ds";
-import { Pager, useAdminList } from "@/components/admin/list";
+import { Pager, useAdminList, ListError } from "@/components/admin/list";
 import { QueueTabs, ageOf, initialsOf } from "./shared";
 
 type Row = {
@@ -92,7 +92,9 @@ export function AppealsQueue() {
       <PageHead title="Appeals queue" />
       <QueueTabs tabs={TABS} active={tab} counts={list.data?.tabCounts ?? {}} onPick={list.setTab} />
 
-      {list.loading ? (
+      {list.error ? (
+        <ListError code={list.error} onRetry={list.reload} />
+      ) : list.loading ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           {Array.from({ length: 2 }).map((_, i) => (
             <Shimmer key={i} h={180} />

@@ -38,7 +38,22 @@ export async function POST(req: NextRequest) {
   // the thing it was about.
   clearLoginOutcome();
 
-  if (adminAuthProviderKind() === "google") {
+  const provider = adminAuthProviderKind();
+
+  // Production with no Google credentials: nobody can sign in, and the operator
+  // needs to be told which two variables are missing rather than reading a 500
+  // out of a log. Same shape as the ADMIN_DEV_EMAIL branch below — a known
+  // refusal, answered as one.
+  if (provider === "unconfigured") {
+    console.error(
+      "[admin] GOOGLE_OAUTH_CLIENT_ID / GOOGLE_OAUTH_CLIENT_SECRET are not set — " +
+        "admin sign-in is impossible in production. The dev provider is deliberately " +
+        "unavailable here; set both variables on the host.",
+    );
+    return fail("SERVER_ERROR");
+  }
+
+  if (provider === "google") {
     const state = newOauthState();
     (await cookies()).set(OAUTH_STATE_COOKIE, state, {
       httpOnly: true,

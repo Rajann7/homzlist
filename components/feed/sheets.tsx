@@ -11,6 +11,7 @@ import { SheetOption } from "@/components/billing/primitives";
 import { interactionsApi, type FeedCard } from "@/lib/feed/client";
 import { listingsApi } from "@/lib/listings/client";
 import { cn } from "@/lib/utils";
+import { Img } from "@/components/ui/Img";
 
 // ---- Sort sheet (P2 S1) ----------------------------------------------------
 const SORTS = [
@@ -78,7 +79,7 @@ export function ShareSheet({ open, onClose, card }: { open: boolean; onClose: ()
       {card && (
         <div className="flex flex-col gap-4 pb-2">
           <div className="flex items-center gap-3 rounded-8 bg-surface-2 p-3">
-            <span className="h-12 w-12 overflow-hidden rounded-8 bg-surface-3">{card.coverUrl && <img src={card.coverUrl} alt="" className="h-full w-full object-cover" />}</span>
+            <span className="h-12 w-12 overflow-hidden rounded-8 bg-surface-3">{card.coverUrl && <Img src={card.coverUrl} alt="" className="h-full w-full object-cover" />}</span>
             <div className="min-w-0">
               <div className="truncate text-13 font-semibold text-ink-primary">{card.title ?? `${card.meta ?? ""}`}</div>
               <div className="text-11 text-ink-tertiary">{card.price ?? card.priceBand ?? card.priceFrom}</div>

@@ -30,7 +30,7 @@ import {
   useAdmin,
   useToast,
 } from "@/components/admin/ds";
-import { Pager, useAdminList } from "@/components/admin/list";
+import { Pager, useAdminList, ListError } from "@/components/admin/list";
 import { ageOf } from "./shared";
 import { ROLE_RANK } from "@/components/admin/ds/screens";
 
@@ -118,7 +118,9 @@ export function ReportsQueue() {
         ))}
       </div>
 
-      {list.loading ? (
+      {list.error ? (
+        <ListError code={list.error} onRetry={list.reload} />
+      ) : list.loading ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           {Array.from({ length: 3 }).map((_, i) => (
             <Shimmer key={i} h={200} />

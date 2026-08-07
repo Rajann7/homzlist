@@ -10,6 +10,7 @@ import { InquirySheet, MoreSheet, ShareSheet, ReportSheet, LoginSheet } from "@/
 import { interactionsApi, type FeedCard } from "@/lib/feed/client";
 import { DETAIL_PAD, DetailHero, DetailRow, DetailSection, DetailSeparator, PropertyDetailBody } from "./detailBody";
 import { cn } from "@/lib/utils";
+import { Img } from "@/components/ui/Img";
 
 /**
  * P4 — Property detail (redesigned, Rajan 28 Jul 2026).
@@ -66,7 +67,7 @@ export function ListingDetail({ id, isGuest = false }: { id: string; isGuest?: b
   const toggleSave = async () => {
     if (isGuest) { setSheet("login"); return; }
     setSaved((s) => !s); // optimistic
-    const res = await interactionsApi.toggleSave(id);
+    const res = await interactionsApi.toggleSave(id, saved);
     if (res.ok) { setSaved(res.data.saved); toast.show(res.data.saved ? "Saved" : "Removed from saved"); }
     else { setSaved((s) => !s); toast.show("Couldn't save that"); }
   };
@@ -255,8 +256,7 @@ export function ListingDetail({ id, isGuest = false }: { id: string; isGuest?: b
                     >
                       <span className="block aspect-[4/3] bg-surface-3">
                         {s.coverUrl ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img src={s.coverUrl} alt="" data-protected="true" className="h-full w-full object-cover" />
+                          <Img src={s.coverUrl} alt="" data-protected="true" className="h-full w-full object-cover" />
                         ) : (
                           <span className="grid h-full place-items-center text-ink-tertiary"><Icon name="image" size={22} /></span>
                         )}
@@ -732,8 +732,7 @@ export function PhotoViewer({
           </button>
         )}
 
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
+                <Img
           src={photo?.url ?? ""}
           alt={photo?.altText ?? ""}
           data-protected="true"
@@ -770,8 +769,7 @@ export function PhotoViewer({
                 i === index ? "border-white" : "border-transparent opacity-60",
               )}
             >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={p.url ?? ""} alt="" data-protected="true" className="h-full w-full object-cover" />
+                            <Img src={p.url ?? ""} alt="" data-protected="true" className="h-full w-full object-cover" />
             </button>
           ))}
         </div>

@@ -4,6 +4,7 @@ import { BlogPost } from "@/components/blog/BlogPost";
 import { getBlogPost, allBlogSlugs } from "@/lib/blog/service";
 import { toPlainText } from "@/lib/content/markdown";
 import { siteUrl } from "@/lib/seo/schema";
+import { flagEnabled } from "@/lib/system/flags";
 
 /**
  * /blog/:slug — one post. Carries full Article structured data, because a blog
@@ -48,6 +49,8 @@ export async function generateMetadata(props: { params: Promise<{ slug: string }
 
 export default async function PublicBlogPostPage(props: { params: Promise<{ slug: string }> }) {
   const params = await props.params;
+  // A22 Feature flags → Blog. Off = individual posts 404 too, matching the index.
+  if (!(await flagEnabled("blog"))) notFound();
   const post = await getBlogPost(params.slug);
   if (!post) notFound();
 

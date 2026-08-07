@@ -9,6 +9,7 @@ import { RequirementFeed } from "./RequirementFeed";
 import { feedApi } from "@/lib/feed/client";
 import type { BrowseCard } from "@/lib/listings/client";
 import { cn } from "@/lib/utils";
+import { Img } from "@/components/ui/Img";
 
 /**
  * Builder dashboard feed (Doc7 §80, Doc2 §9.1) — own project stat cards +
@@ -88,7 +89,7 @@ export function BuilderDashboard({ cityName, cityId = null }: { cityName?: strin
           <div className="flex gap-3 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {data.projects.map((p) => (
               <button key={p.id} onClick={() => router.push(`/project/${p.id}`)} className="flex w-[220px] shrink-0 flex-col overflow-hidden rounded-12 border border-border bg-surface-1 text-left">
-                <div className="h-24 w-full bg-surface-3">{p.coverUrl && <img src={p.coverUrl} alt="" className="h-full w-full object-cover" />}</div>
+                <div className="h-24 w-full bg-surface-3">{p.coverUrl && <Img src={p.coverUrl} alt="" className="h-full w-full object-cover" />}</div>
                 <div className="flex flex-col gap-1 p-3">
                   <div className="truncate text-15 font-semibold text-ink-primary">{p.name}</div>
                   <div className="text-11 text-ink-tertiary">{p.statLine}</div>

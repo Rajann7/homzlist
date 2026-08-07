@@ -2,8 +2,15 @@ import type { NextRequest } from "next/server";
 import { ok, fail } from "@/lib/api";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { rateLimit } from "@/lib/auth/rate-limit";
-import { isStaff, moderate, moderationHistory, type ModerationSubject } from "@/lib/listings/moderation";
+import {
+  moderate,
+  moderationHistory,
+  staffIdentity,
+  type ModeratingStaff,
+  type ModerationSubject,
+} from "@/lib/listings/moderation";
 import { approveBoost, rejectBoost, stopBoost, pauseBoost, resumeBoost, boostReviewHistory } from "@/lib/billing/boost";
+import { writeAudit } from "@/lib/admin/audit";
 
 /**
  * POST /api/v1/admin/moderate/:subject/:id — Approve / Request changes / Reject.
@@ -30,12 +37,42 @@ const SUBJECTS = ["listing", "requirement", "project", "boost"];
  */
 const BOOST_ACTIONS = ["approve", "reject", "stop", "pause", "resume"] as const;
 
+/**
+ * The gate now answers WHO, not just whether — `staffIdentity` checks
+ * `is_active` AND `state = 'active'` (the panel's own two conditions) and hands
+ * back the level, so a decision taken here can be audited and level-gated
+ * exactly like the same decision taken in the panel.
+ *
+ * Still 404 and not 403 for a non-staff caller: the endpoint's existence must
+ * not be confirmable by probing (Doc9 §API1).
+ */
 async function gate(subject: string, id: string) {
   const claims = await getCurrentUser();
   if (!claims) return { err: fail("NOT_FOUND") };
   if (!SUBJECTS.includes(subject) || !UUID_RE.test(id)) return { err: fail("NOT_FOUND") };
-  if (!(await isStaff(claims.sub))) return { err: fail("NOT_FOUND") };
-  return { actorId: claims.sub };
+  const staff = await staffIdentity(claims.sub);
+  if (!staff) return { err: fail("NOT_FOUND") };
+  return { staff };
+}
+
+/** The trail these endpoints never wrote — same table A26 reads. */
+async function auditModeration(
+  staff: ModeratingStaff,
+  subject: string,
+  id: string,
+  action: string,
+  summary: string,
+) {
+  await writeAudit(
+    { id: staff.profileId, name: staff.name, role: staff.level },
+    {
+      action,
+      entityType: subject,
+      entityId: id,
+      entityLabel: `${subject} ${id.slice(0, 8)}`,
+      summary,
+    },
+  );
 }
 
 export async function POST(
@@ -45,8 +82,9 @@ export async function POST(
   const params = await props.params;
   const g = await gate(params.subject, params.id);
   if (g.err) return g.err;
+  const staff = g.staff!;
 
-  const limited = await rateLimit(`moderate:${g.actorId}`, 600, 3600);
+  const limited = await rateLimit(`moderate:${staff.profileId}`, 600, 3600);
   if (!limited.allowed) return fail("RATE_LIMITED");
 
   let body: Record<string, unknown>;
@@ -65,11 +103,11 @@ export async function POST(
     const reason = typeof body.reason === "string" ? body.reason : "";
 
     const res =
-      act === "approve" ? await approveBoost(params.id, g.actorId!)
-      : act === "reject" ? await rejectBoost(params.id, g.actorId!, reason)
-      : act === "stop" ? await stopBoost(params.id, g.actorId!, reason)
-      : act === "pause" ? await pauseBoost(params.id, g.actorId!, reason || null)
-      : await resumeBoost(params.id, g.actorId!);
+      act === "approve" ? await approveBoost(params.id, staff.profileId)
+      : act === "reject" ? await rejectBoost(params.id, staff.profileId, reason)
+      : act === "stop" ? await stopBoost(params.id, staff.profileId, reason)
+      : act === "pause" ? await pauseBoost(params.id, staff.profileId, reason || null)
+      : await resumeBoost(params.id, staff.profileId);
 
     if (!res.ok) {
       if (res.reason === "not_found") return fail("NOT_FOUND");
@@ -83,6 +121,7 @@ export async function POST(
       if (res.reason === "city_cap") return fail("LISTING_STATE_LOCKED", { cityCapReached: true });
       return fail("LISTING_STATE_LOCKED", { alreadyDecided: true });
     }
+    await auditModeration(staff, "boost", params.id, `boost_${act}`, `Boost ${act}`);
     return ok(res);
   }
 
@@ -102,7 +141,7 @@ export async function POST(
         )
       : null;
 
-  const res = await moderate(params.subject as ModerationSubject, params.id, g.actorId!, {
+  const res = await moderate(params.subject as ModerationSubject, params.id, staff.profileId, {
     action,
     notes,
     reason: typeof body.reason === "string" ? body.reason.slice(0, 300) : null,
@@ -116,6 +155,13 @@ export async function POST(
     return fail("VALIDATION_ERROR");
   }
 
+  await auditModeration(
+    staff,
+    params.subject,
+    params.id,
+    action,
+    `${action} → ${res.status}${res.locked ? " (locked)" : ""}`,
+  );
   return ok({ status: res.status, locked: res.locked, rejectCount: res.rejectCount });
 }
 

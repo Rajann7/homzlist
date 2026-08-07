@@ -8,6 +8,7 @@ import { useToast } from "@/components/ui/Toast";
 import { storiesApi, interactionsApi, type StoryCircle } from "@/lib/feed/client";
 import { readGuestCity } from "@/lib/feed/guest-city";
 import { cn } from "@/lib/utils";
+import { Img } from "@/components/ui/Img";
 
 /**
  * P2 Story viewer (designs/P2A, Doc2 §9.3) — fullscreen black, 5s segments
@@ -138,7 +139,7 @@ export function StoryViewer({ posterId }: { posterId: string }) {
     if (!segment || segment.kind !== "property") return;
     const next = !saved[segment.id];
     setSaved((s) => ({ ...s, [segment.id]: next }));           // optimistic
-    const r = await interactionsApi.toggleSave(segment.id);
+    const r = await interactionsApi.toggleSave(segment.id, !next);
     if (!r.ok) {
       setSaved((s) => ({ ...s, [segment.id]: !next }));        // server said no
       toast.show(r.error.code === "UNAUTHORIZED" ? "Sign in to save" : "Couldn't save");
@@ -191,8 +192,7 @@ export function StoryViewer({ posterId }: { posterId: string }) {
             style={{ backgroundImage: `url(${segment.cover})` }}
           />
           <div className="absolute inset-0 flex items-center justify-center">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
+                        <Img
               src={segment.cover}
               alt=""
               draggable={false}

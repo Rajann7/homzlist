@@ -14,6 +14,7 @@ import { FeaturedCollectionSheet } from "./ProfileSheets";
 import { CardList, ListingCard, ProjectCard, TabCount } from "./ProfileRows";
 import { profileApi, type FeaturedCollection, type FeaturedItem, type PublicProject } from "@/lib/profile/client";
 import { cn } from "@/lib/utils";
+import { Img } from "@/components/ui/Img";
 
 /**
  * S2 Other User Profile (P9). PUBLIC only — no Views/Leads (server-stripped).
@@ -252,8 +253,7 @@ export function OtherProfile({ username, isGuest = false }: { username: string; 
             <button key={c.id} onClick={() => void openCollection(c)} className="flex w-[76px] shrink-0 flex-col items-center gap-1.5">
               <span className="grid h-[68px] w-[68px] place-items-center overflow-hidden rounded-full border border-border bg-surface-2 text-ink-tertiary">
                 {c.coverUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={c.coverUrl} alt="" className="h-full w-full object-cover" />
+                  <Img src={c.coverUrl} alt="" className="h-full w-full object-cover" />
                 ) : (
                   <Icon name="home" size={24} strokeWidth={1.7} />
                 )}

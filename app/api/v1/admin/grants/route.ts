@@ -21,7 +21,9 @@ export async function GET(req: NextRequest) {
   try {
     await requireAdmin("admin");
     const id = new URL(req.url).searchParams.get("id");
-    if (!id || !UUID_RE.test(id)) return fail("NOT_FOUND");
+    // Bad request, not missing resource — same contract as the other admin
+    // detail endpoints. See the note in app/api/v1/admin/coupons/route.ts.
+    if (!id || !UUID_RE.test(id)) return fail("VALIDATION_ERROR", { field: "id" });
     const detail = await grantDetail(id);
     return detail ? ok(detail) : fail("NOT_FOUND");
   } catch (e) {

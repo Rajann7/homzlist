@@ -6,6 +6,7 @@ import { AppShell, Header, Icon, Avatar, VerifiedBadge, ConfirmDialog, Skeleton,
 import { Glyph } from "./glyphs";
 import { chatApi } from "@/lib/chat/client";
 import { cn } from "@/lib/utils";
+import { Img } from "@/components/ui/Img";
 
 /**
  * P7 S2 — Message Requests. Preview-before-accept (the sender never learns you
@@ -156,7 +157,7 @@ function RichCard({ card, project = false }: { card: any; project?: boolean }) {
   if (!card) return null;
   return (
     <div className="mt-3 flex items-center gap-3 rounded-8 bg-surface-2 px-3 py-2">
-      {card.cover ? <img src={card.cover} alt="" className="h-12 w-12 rounded-4 object-cover" /> : <span className="grid h-12 w-12 place-items-center rounded-4 bg-surface-3"><Icon name={project ? "building" : "home"} size={18} className="text-ink-tertiary" /></span>}
+      {card.cover ? <Img src={card.cover} alt="" className="h-12 w-12 rounded-4 object-cover" /> : <span className="grid h-12 w-12 place-items-center rounded-4 bg-surface-3"><Icon name={project ? "building" : "home"} size={18} className="text-ink-tertiary" /></span>}
       <div className="min-w-0 flex-1">
         {/* The subject's name wraps rather than being cut — on a request card it
             is the whole reason the person is writing. */}

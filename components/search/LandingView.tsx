@@ -6,6 +6,7 @@ import type { LandingPage } from "@/lib/seo/landing";
 import { breadcrumbSchema, faqSchema, itemListSchema, jsonLd } from "@/lib/seo/schema";
 import { FaqAccordion } from "./FaqAccordion";
 import { ShareAreaButton } from "./ShareAreaButton";
+import { Img } from "@/components/ui/Img";
 
 /**
  * P3 S4 — AREA PAGE, which doubles as the SEO landing page (Doc3 §4, Doc4 §14).
@@ -146,12 +147,11 @@ export function LandingView({ page, basePath = "" }: { page: LandingPage; basePa
         ) : (
           <div className="mb-4">
             {page.cards.map((c) => (
-              <article key={c.id} className="mb-4 overflow-hidden rounded-12 border border-border bg-surface-1 shadow-l1">
+              <article key={c.id} className="chrome mb-4 overflow-hidden rounded-12 border border-border bg-surface-1 shadow-l1">
                 <Link href={`/property/${c.id}`} className="block">
                   <div className="relative aspect-[16/9] bg-surface-2">
                     {c.coverUrl && (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={c.coverUrl} alt={c.title ?? page.h1} className="h-full w-full object-cover" loading="lazy" />
+                      <Img src={c.coverUrl} alt={c.title ?? page.h1} className="h-full w-full object-cover" loading="lazy" />
                     )}
                     {c.photos.length > 1 && (
                       <span className="absolute right-2.5 top-2.5 rounded-full bg-black/55 px-2 py-1 text-11 font-semibold text-white">
@@ -201,8 +201,7 @@ export function LandingView({ page, basePath = "" }: { page: LandingPage; basePa
               <Link key={p.id} href={`/project/${p.id}`} className="mb-2 flex items-center gap-3 rounded-12 border border-border bg-surface-1 p-3">
                 <span className="h-14 w-14 shrink-0 overflow-hidden rounded-8 bg-surface-2">
                   {p.coverUrl && (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={p.coverUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
+                    <Img src={p.coverUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
                   )}
                 </span>
                 <span className="min-w-0 flex-1">

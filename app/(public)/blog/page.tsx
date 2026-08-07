@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 import { BlogList } from "@/components/blog/BlogList";
 import { listBlog } from "@/lib/blog/service";
 import { siteUrl } from "@/lib/seo/schema";
+import { flagEnabled } from "@/lib/system/flags";
 
 /**
  * /blog — the public blog index. SSR so the crawler and the human see the same
@@ -19,6 +21,9 @@ export const metadata: Metadata = {
 };
 
 export default async function PublicBlogPage() {
+  // A22 Feature flags → Blog. Off = the section is retired (404), matching the
+  // API gate. Default-on, so nothing changes while the flag is enabled.
+  if (!(await flagEnabled("blog"))) notFound();
   const view = await listBlog();
   return (
     <BlogList

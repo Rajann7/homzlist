@@ -17,20 +17,26 @@ import { serverEnv } from "@/lib/env";
  * Google credentials are configured.
  */
 
-export type AdminAuthProviderKind = "google" | "dev";
+export type AdminAuthProviderKind = "google" | "dev" | "unconfigured";
 
 const GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
 
+/**
+ * `unconfigured` is the third answer, and it is why this returns a value where
+ * it used to throw.
+ *
+ * The dev provider must never ship — that part was right. But throwing made the
+ * MISCONFIGURATION indistinguishable from a crash: `POST /auth/start` had no
+ * catch, so a production deploy without Google credentials answered the A1
+ * button with a raw 500 and no log anyone would look for. The refusal is a
+ * known state, so it is now a value the caller handles, exactly as the sibling
+ * "ADMIN_DEV_EMAIL is not set" branch already did.
+ */
 export function adminAuthProviderKind(): AdminAuthProviderKind {
   const { clientId, clientSecret } = serverEnv().googleOauth;
   if (clientId && clientSecret) return "google";
-  if (process.env.NODE_ENV === "production") {
-    throw new Error(
-      "GOOGLE_OAUTH_CLIENT_ID / GOOGLE_OAUTH_CLIENT_SECRET are required in production — " +
-        "the dev admin sign-in provider must never ship.",
-    );
-  }
+  if (process.env.NODE_ENV === "production") return "unconfigured";
   return "dev";
 }
 

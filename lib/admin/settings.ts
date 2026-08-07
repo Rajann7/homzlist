@@ -1,6 +1,7 @@
 import "server-only";
 import { createServiceClient } from "@/lib/supabase/server";
 import { invalidateRateRules } from "@/lib/auth/rate-limit";
+import { invalidateFlags } from "@/lib/system/flags";
 import { writeAudit } from "./audit";
 import type { AdminIdentity } from "./guard";
 
@@ -52,6 +53,7 @@ export async function toggleFlag(
     .update({ enabled, updated_by: me.id, updated_at: new Date().toISOString() })
     .eq("key", key);
   if (error) return { ok: false, message: error.message };
+  invalidateFlags();
 
   // The design's own toast, and it is not an exaggeration: the public site
   // reads these on every render.
@@ -91,6 +93,7 @@ export async function setFlagScope(
     .from("feature_flags")
     .update({ scope, scope_value: scopeValue, updated_by: me.id, updated_at: new Date().toISOString() })
     .eq("key", key);
+  invalidateFlags();
 
   await writeAudit(me, {
     action: "flag_change",

@@ -33,7 +33,7 @@ import {
   usePanels,
   type Col,
 } from "@/components/admin/ds";
-import { Pager, useAdminList } from "@/components/admin/list";
+import { Pager, useAdminList, ListError } from "@/components/admin/list";
 
 type Tab = "pages" | "blog" | "faqs" | "banners" | "broadcasts";
 
@@ -169,7 +169,9 @@ function PagesTab() {
 
   return (
     <div>
-      {list.loading ? (
+      {list.error ? (
+        <ListError code={list.error} onRetry={list.reload} />
+      ) : list.loading ? (
         <Shimmer h={240} />
       ) : (
         <>
@@ -292,7 +294,9 @@ function BlogTab() {
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
         <Btn label="+ New post" kind="primary" onClick={() => pushPanel("blogEdit", {})} />
       </div>
-      {list.loading ? (
+      {list.error ? (
+        <ListError code={list.error} onRetry={list.reload} />
+      ) : list.loading ? (
         <Shimmer h={240} />
       ) : (
         <>
@@ -438,7 +442,9 @@ function FaqsTab() {
           <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
             <Btn label="+ New FAQ" kind="primary" onClick={() => setAdding(true)} />
           </div>
-          {list.loading ? (
+          {list.error ? (
+        <ListError code={list.error} onRetry={list.reload} />
+      ) : list.loading ? (
             <Shimmer h={240} />
           ) : (
             <>
@@ -588,7 +594,9 @@ function BannersTab() {
         <Btn label="+ New banner" kind="primary" onClick={() => pushPanel("bannerEdit", {})} />
       </div>
 
-      {list.loading ? (
+      {list.error ? (
+        <ListError code={list.error} onRetry={list.reload} />
+      ) : list.loading ? (
         <Shimmer h={240} />
       ) : (
         // template 2212: `mobile?'1fr':'repeat(2,1fr)'` — two columns from tablet
@@ -795,7 +803,9 @@ function BroadcastsTab() {
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
         <Btn label="+ New broadcast" kind="primary" onClick={() => pushPanel("broadcastEdit", {})} />
       </div>
-      {list.loading ? (
+      {list.error ? (
+        <ListError code={list.error} onRetry={list.reload} />
+      ) : list.loading ? (
         <Shimmer h={240} />
       ) : (
         <>

@@ -104,7 +104,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
   const profile = await getProfileById(claims.sub);
   if (!profile || profile.state !== "active") return fail("FORBIDDEN");
 
-  const limited = await rateLimit(`proposal-send:${claims.sub}`, 60, 3600);
+  const limited = await rateLimit(`proposal-send:${claims.sub}`, 60, 3600, "proposal_send");
   if (!limited.allowed) return fail("RATE_LIMITED");
 
   let body: Record<string, unknown>;

@@ -18,6 +18,25 @@ import { useNow } from "@/lib/hooks/useNow";
 // hold it) — shared with the story viewer so the two agree on scope.
 import { readGuestCity, writeGuestCity } from "@/lib/feed/guest-city";
 
+/** Admin-banner frequency cap (0 every visit · 1 once/day · 2 once/session). */
+function bannerAlreadyShown(id: string, cap: number): boolean {
+  try {
+    if (cap === 1) return localStorage.getItem(`hz_banner_day_${id}`) === new Date().toISOString().slice(0, 10);
+    if (cap === 2) return sessionStorage.getItem(`hz_banner_session_${id}`) === "1";
+    return false;
+  } catch {
+    return false;
+  }
+}
+function recordBannerShown(id: string, cap: number): void {
+  try {
+    if (cap === 1) localStorage.setItem(`hz_banner_day_${id}`, new Date().toISOString().slice(0, 10));
+    else if (cap === 2) sessionStorage.setItem(`hz_banner_session_${id}`, "1");
+  } catch {
+    /* storage disabled — fall back to showing it */
+  }
+}
+
 /**
  * The P2 feed home — the app's main screen. Orchestrates the shell (header +
  * story row + mode toggle + bottom nav), the city switch (persists to the
@@ -85,8 +104,19 @@ export function FeedHome() {
 
   useEffect(() => { void loadMe(); void loadStories(); }, [loadMe, loadStories]);
 
-  // Admin banner (P2 slot) — DB-driven; renders only when a row is active.
-  useEffect(() => { feedApi.banner().then((r) => { if (r.ok) setBanner(r.data.banner); }); }, []);
+  // Admin banner (P2 slot) — DB-driven; renders only when a row is active AND
+  // this viewer hasn't already met its frequency cap (0 = every visit, 1 = once
+  // per day, 2 = once per session). The cap is a display preference, so it lives
+  // in local/session storage (CLAUDE.md rule 3), never on the server.
+  useEffect(() => {
+    feedApi.banner().then((r) => {
+      if (!r.ok || !r.data.banner) return;
+      const b = r.data.banner;
+      if (bannerAlreadyShown(b.id, b.frequencyCap)) return;
+      recordBannerShown(b.id, b.frequencyCap);
+      setBanner(b);
+    });
+  }, []);
 
   // Header badge counts — both are real server counts now (Module 10 owns the
   // notifications one). Re-read on focus so the bell clears after the user has

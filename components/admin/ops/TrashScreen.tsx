@@ -31,7 +31,7 @@ import {
   useToast,
   type Col,
 } from "@/components/admin/ds";
-import { Pager, useAdminList } from "@/components/admin/list";
+import { Pager, useAdminList, ListError } from "@/components/admin/list";
 
 type Row = {
   id: string;
@@ -224,7 +224,9 @@ export function TrashScreen() {
         onSelect={list.setTab}
       />
 
-      {list.loading ? (
+      {list.error ? (
+        <ListError code={list.error} onRetry={list.reload} />
+      ) : list.loading ? (
         <Shimmer h={280} />
       ) : rows.length === 0 ? (
         <div style={{ textAlign: "center", padding: 70, color: "var(--ink3)" }}>

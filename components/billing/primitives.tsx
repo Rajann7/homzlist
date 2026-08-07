@@ -226,15 +226,11 @@ export function CouponRow({
   );
 }
 
-/* ---- Offline strip (every screen has one — CLAUDE.md rule 10) ----------- */
-export function OfflineBanner() {
-  return (
-    <div className="flex items-center justify-center gap-2 bg-ink-primary px-2 py-2 text-[12px] text-page">
-      <Icon name="wifi-off" size={16} />
-      You&apos;re offline — showing last saved data
-    </div>
-  );
-}
+/* ---- Offline strip (every screen has one — CLAUDE.md rule 10) -----------
+ * Re-exported from the canonical P12 banner. This file used to draw its own with
+ * different copy ("last saved data") and a 12px size; two banners meant the
+ * string drifted the moment either was touched. Same import site, one source. */
+export { OfflineBanner } from "@/components/system/OfflineBanner";
 
 /* ---- Success check-draw (600ms stroke draw) ----------------------------- */
 export function CheckDraw({ size = 72 }: { size?: number }) {

@@ -38,7 +38,7 @@ import {
   usePanels,
   type Col,
 } from "@/components/admin/ds";
-import { FilterBar, FilterSheet, Pager, useAdminList, type FilterGroup } from "@/components/admin/list";
+import { FilterBar, FilterSheet, Pager, useAdminList, type FilterGroup, ListError } from "@/components/admin/list";
 
 type Tab = "locations" | "amenities" | "types" | "blocklist" | "patterns" | "requests";
 
@@ -849,7 +849,9 @@ function AmenitiesTab() {
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
         <Btn label="+ Add amenity" kind="primary" onClick={() => setAdding(true)} />
       </div>
-      {list.loading ? (
+      {list.error ? (
+        <ListError code={list.error} onRetry={list.reload} />
+      ) : list.loading ? (
         <Shimmer h={240} />
       ) : (
         <>
@@ -1035,6 +1037,9 @@ function TypesTab() {
   const toast = useToast();
   const list = useAdminList<TypeRow>("property-types", ["category"]);
   const { pushPanel, changed } = usePanels();
+  const [adding, setAdding] = useState(false);
+  const [newLabel, setNewLabel] = useState("");
+  const [newCat, setNewCat] = useState("residential");
 
   // A config saved in the panel changes the field COUNT this table prints, so
   // the list under it has to reload when the panel reports a change.
@@ -1107,7 +1112,66 @@ function TypesTab() {
 
   return (
     <div>
-      {list.loading ? (
+      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
+        {adding ? null : <Btn label="+ Add type" kind="outline" onClick={() => setAdding(true)} />}
+      </div>
+      {adding ? (
+        <div
+          style={{
+            border: "1px solid var(--border)",
+            borderRadius: 12,
+            padding: 14,
+            marginBottom: 14,
+            display: "flex",
+            flexDirection: "column",
+            gap: 10,
+            background: "var(--s1)",
+          }}
+        >
+          <FField label="Type name">
+            <input
+              value={newLabel}
+              onChange={(e) => setNewLabel(e.target.value)}
+              placeholder="e.g. Penthouse"
+              style={F_INPUT_STYLE}
+            />
+          </FField>
+          <FField label="Category">
+            <select value={newCat} onChange={(e) => setNewCat(e.target.value)} style={F_INPUT_STYLE}>
+              <option value="residential">Residential</option>
+              <option value="commercial">Commercial</option>
+              <option value="plot">Plot</option>
+              <option value="pg">PG</option>
+            </select>
+          </FField>
+          <div style={{ display: "flex", gap: 8 }}>
+            <Btn
+              label="Cancel"
+              kind="outline"
+              style={{ flex: 1 }}
+              onClick={() => {
+                setAdding(false);
+                setNewLabel("");
+              }}
+            />
+            <Btn
+              label="Create"
+              kind="primary"
+              style={{ flex: 1 }}
+              onClick={async () => {
+                if (!newLabel.trim()) return;
+                await act({ action: "type_add", label: newLabel.trim(), category: newCat });
+                setAdding(false);
+                setNewLabel("");
+                setNewCat("residential");
+              }}
+            />
+          </div>
+        </div>
+      ) : null}
+      {list.error ? (
+        <ListError code={list.error} onRetry={list.reload} />
+      ) : list.loading ? (
         <Shimmer h={240} />
       ) : (
         <DTable cols={cols} rows={list.data?.rows ?? []} />
@@ -1239,7 +1303,9 @@ function BlocklistTab() {
         onSelect={list.setTab}
       />
 
-      {list.loading ? (
+      {list.error ? (
+        <ListError code={list.error} onRetry={list.reload} />
+      ) : list.loading ? (
         <Shimmer h={240} />
       ) : (list.data?.rows ?? []).length === 0 ? (
         <div style={{ textAlign: "center", padding: 60, color: "var(--ink3)", fontSize: 13 }}>
@@ -1601,7 +1667,7 @@ function PatternsTab() {
         <Btn label="+ Add pattern" kind="primary" onClick={() => setAdding(true)} />
       </div>
 
-      {list.loading ? <Shimmer h={240} /> : <DTable cols={cols} rows={list.data?.rows ?? []} />}
+      {list.error ? <ListError code={list.error} onRetry={list.reload} /> : list.loading ? <Shimmer h={240} /> : <DTable cols={cols} rows={list.data?.rows ?? []} />}
 
       {adding || editing ? (
         <PatternEditor
@@ -1808,7 +1874,9 @@ function RequestsTab() {
         active={list.tab ?? "pending"}
         onSelect={list.setTab}
       />
-      {list.loading ? (
+      {list.error ? (
+        <ListError code={list.error} onRetry={list.reload} />
+      ) : list.loading ? (
         <Shimmer h={240} />
       ) : (list.data?.rows ?? []).length === 0 ? (
         <div style={{ textAlign: "center", padding: 60, color: "var(--ink3)", fontSize: 13 }}>

@@ -3,19 +3,28 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
-import { Wordmark } from "@/components/nav/Header";
 
 /**
- * Install prompts (Doc6 §8):
- *  - Android/Chromium: captures `beforeinstallprompt` → shows an install CARD.
- *  - iOS Safari (no prompt API): shows an "Add to Home Screen" GUIDE.
- * Dismissal is remembered locally (a UI preference, not business data).
- * Full design polish arrives in Module 13; this is the wired foundation.
+ * Install prompts — P12 gallery ("Install prompt — Android", "iOS install guide
+ * overlay"), rules from Doc3 §98: *Android card weekly if not installed; iOS
+ * manual guide overlay.*
+ *
+ *  - Android/Chromium: `beforeinstallprompt` is captured and re-offered at most
+ *    once a week. It used to be dismissed FOREVER on the first tap of the X,
+ *    which is not what "weekly" means — one accidental dismissal and the user
+ *    could never install again.
+ *  - iOS Safari has no prompt API, so it gets the manual guide overlay, on the
+ *    same weekly cadence.
+ *
+ * The snooze timestamp is a UI preference (Doc: localStorage is for UI-only
+ * prefs) — nothing business-related is decided here, and `appinstalled` /
+ * display-mode are the real signals for "already installed".
  */
 
 type BIPEvent = Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: string }> };
 
-const DISMISS_KEY = "hz-install-dismissed";
+const SNOOZE_KEY = "hz-install-snoozed-at";
+const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
 function isIos() {
   if (typeof navigator === "undefined") return false;
@@ -28,6 +37,14 @@ function isStandalone() {
     // @ts-expect-error iOS Safari non-standard flag
     window.navigator.standalone === true
   );
+}
+function snoozed() {
+  try {
+    const at = Number(localStorage.getItem(SNOOZE_KEY) || 0);
+    return at > 0 && Date.now() - at < WEEK_MS;
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -45,64 +62,107 @@ function isAdminHost() {
 export function InstallPrompt() {
   const [deferred, setDeferred] = useState<BIPEvent | null>(null);
   const [showIosGuide, setShowIosGuide] = useState(false);
-  const [dismissed, setDismissed] = useState(true);
+  const [hidden, setHidden] = useState(true);
 
   useEffect(() => {
-    if (isAdminHost()) return;
-    if (isStandalone()) return;
-    if (localStorage.getItem(DISMISS_KEY)) return;
-    setDismissed(false);
+    if (isAdminHost() || isStandalone() || snoozed()) return;
+    setHidden(false);
+
+    // Installing from the browser menu (rather than our card) fires this — take
+    // the card down instead of leaving it advertising an app they now have.
+    const onInstalled = () => { setHidden(true); setDeferred(null); setShowIosGuide(false); };
+    window.addEventListener("appinstalled", onInstalled);
 
     if (isIos()) {
       setShowIosGuide(true);
-      return;
+      return () => window.removeEventListener("appinstalled", onInstalled);
     }
     const onBIP = (e: Event) => {
       e.preventDefault();
       setDeferred(e as BIPEvent);
     };
     window.addEventListener("beforeinstallprompt", onBIP);
-    return () => window.removeEventListener("beforeinstallprompt", onBIP);
+    return () => {
+      window.removeEventListener("beforeinstallprompt", onBIP);
+      window.removeEventListener("appinstalled", onInstalled);
+    };
   }, []);
 
+  /** Snooze for a week (Doc3 §98) — not "never again". */
   const dismiss = () => {
-    localStorage.setItem(DISMISS_KEY, "1");
-    setDismissed(true);
+    try { localStorage.setItem(SNOOZE_KEY, String(Date.now())); } catch { /* private mode */ }
+    setHidden(true);
   };
 
-  if (dismissed) return null;
+  if (hidden) return null;
   if (!deferred && !showIosGuide) return null;
 
-  return (
-    <div className="fixed inset-x-0 bottom-[calc(52px+env(safe-area-inset-bottom)+8px)] z-dropdown mx-auto w-full max-w-column px-4">
-      <div className="flex items-center gap-3 rounded-12 border border-border bg-surface-1 p-3 shadow-l3">
-        <div className="grid h-10 w-10 shrink-0 place-items-center rounded-8 bg-accent-soft">
-          <Icon name="home" size={22} className="text-accent" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="text-13 font-semibold text-ink-primary">
-            Install <Wordmark className="text-13" />
-          </p>
-          <p className="truncate text-11 text-ink-tertiary">
-            {showIosGuide ? "Tap Share, then “Add to Home Screen”." : "Add to your home screen for a faster, app-like experience."}
-          </p>
-        </div>
-        {deferred ? (
-          <Button
-            size="small"
-            onClick={async () => {
-              await deferred.prompt();
-              await deferred.userChoice;
-              dismiss();
-            }}
+  // Both sit above the bottom nav (52px + safe area), which is where the P12
+  // gallery places them relative to the shell.
+  const wrap = "fixed inset-x-0 bottom-[calc(52px+env(safe-area-inset-bottom)+8px)] z-dropdown mx-auto w-full max-w-column px-4";
+
+  if (showIosGuide) {
+    return (
+      <div className={wrap}>
+        {/* iOS install guide overlay — ink-primary card with the arrow pointing
+            down at Safari's Share button. */}
+        <div className="chrome relative rounded-12 bg-ink-primary p-4 text-page shadow-l3">
+          <button
+            aria-label="Dismiss"
+            onClick={dismiss}
+            className="absolute right-2 top-2 grid h-9 w-9 place-items-center text-page/70"
           >
-            Install
-          </Button>
-        ) : (
-          <Icon name="share" size={20} className="text-accent" />
-        )}
-        <button aria-label="Dismiss" onClick={dismiss} className="grid h-9 w-9 place-items-center text-ink-tertiary">
-          <Icon name="close" size={18} strokeWidth={1.7} />
+            <Icon name="close" size={18} strokeWidth={1.7} />
+          </button>
+          <p className="pr-8 text-15 font-semibold">Add HomzList to your Home Screen</p>
+          <p className="mt-1 text-13 opacity-75">
+            Tap the <Icon name="share" size={16} className="inline-block -mb-0.5 text-page" /> Share button, then
+            &ldquo;Add to Home Screen&rdquo;.
+          </p>
+          <span
+            aria-hidden
+            className="mx-auto mt-2.5 -mb-6 block h-0 w-0"
+            style={{
+              borderLeft: "8px solid transparent",
+              borderRight: "8px solid transparent",
+              borderTop: "10px solid var(--ink-primary)",
+            }}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={wrap}>
+      {/* Install prompt — Android */}
+      <div className="chrome flex items-center gap-3 rounded-12 border border-border bg-surface-1 px-4 py-3 shadow-l3">
+        <span className="grid h-11 w-11 shrink-0 place-items-center rounded-[10px] bg-accent text-20 font-bold text-white">
+          H
+        </span>
+        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <span className="text-15 font-semibold text-ink-primary">Install HomzList</span>
+          <span className="truncate text-11 text-ink-tertiary">Fast, light, works offline</span>
+        </div>
+        <Button
+          size="small"
+          onClick={async () => {
+            const e = deferred!;
+            setDeferred(null);
+            await e.prompt();
+            const choice = await e.userChoice;
+            // "dismissed" in the OS sheet is still a dismissal — snooze a week,
+            // same as tapping our X, so we don't re-ask on the next screen.
+            dismiss();
+            if (choice.outcome === "accepted") {
+              try { localStorage.removeItem(SNOOZE_KEY); } catch { /* private mode */ }
+            }
+          }}
+        >
+          Install
+        </Button>
+        <button aria-label="Dismiss" onClick={dismiss} className="grid h-9 w-9 -mr-2 place-items-center text-ink-tertiary">
+          <Icon name="close" size={20} strokeWidth={1.7} />
         </button>
       </div>
     </div>

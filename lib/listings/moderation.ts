@@ -45,15 +45,44 @@ export type ModerationResult =
   | { ok: true; status: string; locked: boolean; rejectCount: number }
   | { ok: false; reason: "not_found" | "bad_state" | "locked" | "validation" };
 
-/** Is this profile allowed to moderate? Server-only, table-driven. */
-export async function isStaff(profileId: string): Promise<boolean> {
+/**
+ * The moderating staff member, or null — server-only, table-driven.
+ *
+ * This is the gate for the Module 4/6/9 endpoints, which are driven by an
+ * ORDINARY user session rather than the admin panel's isolated one. It has to
+ * ask the same three questions `lib/admin/guard.ts` asks, or the panel's
+ * guarantees stop at the panel door:
+ *
+ *   · `is_active` AND `state = 'active'` — the panel refuses a row that is
+ *     merely pending or suspended; a row it refuses must not moderate here.
+ *   · the LEVEL comes back with the answer, so a caller can require the same
+ *     minimum the panel's screen does. Without it every one of these endpoints
+ *     was open to `staff` level, including the ones the panel gates at `admin`.
+ *
+ * The name is returned too, because every decision taken through here now
+ * writes an audit row and a trail with no actor is not a trail.
+ */
+export type StaffLevel = "staff" | "admin" | "super";
+export const STAFF_RANK: Record<StaffLevel, number> = { staff: 1, admin: 2, super: 3 };
+
+export type ModeratingStaff = { profileId: string; level: StaffLevel; name: string };
+
+export async function staffIdentity(profileId: string): Promise<ModeratingStaff | null> {
   const { data } = await db()
     .from("staff")
-    .select("profile_id")
+    .select("profile_id, level, display_name")
     .eq("profile_id", profileId)
     .eq("is_active", true)
+    .eq("state", "active")
     .maybeSingle();
-  return Boolean(data);
+  const level = data?.level;
+  if (!data || (level !== "staff" && level !== "admin" && level !== "super")) return null;
+  return { profileId: data.profile_id, level, name: data.display_name ?? "Staff" };
+}
+
+/** Is this profile allowed to moderate at all? */
+export async function isStaff(profileId: string): Promise<boolean> {
+  return (await staffIdentity(profileId)) !== null;
 }
 
 /** Which statuses a moderator may act on. Anything else is a no-op, not an error path. */

@@ -8,6 +8,7 @@ import { ConfirmDialog } from "@/components/ui/Dialog";
 import { StatusBadge, type BadgeKind } from "@/components/ui/StatusBadge";
 import { listingsApi, type MyListing } from "@/lib/listings/client";
 import { cn } from "@/lib/utils";
+import { Img } from "@/components/ui/Img";
 
 type ArchivedListing = MyListing & { archivedAt: string | null };
 
@@ -92,8 +93,7 @@ export function Archived({ base = "" }: { base?: string }) {
           {items.map((l) => (
             <button key={l.id} onClick={() => router.push(`${base}/listings/${l.id}/insights`)} className="relative aspect-square overflow-hidden bg-surface-3 active:opacity-80">
               {l.coverUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={l.coverUrl} alt="" data-protected="true" className="h-full w-full object-cover opacity-70" />
+                <Img src={l.coverUrl} alt="" data-protected="true" className="h-full w-full object-cover opacity-70" />
               ) : (
                 <span className="grid h-full place-items-center text-ink-tertiary"><Icon name="home" size={30} /></span>
               )}
@@ -108,8 +108,7 @@ export function Archived({ base = "" }: { base?: string }) {
             <div key={l.id} className="flex items-start gap-3 px-4 py-3">
               <button onClick={() => router.push(`${base}/listings/${l.id}/insights`)} className="grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-8 bg-surface-3 text-ink-tertiary">
                 {l.coverUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={l.coverUrl} alt="" data-protected="true" className="h-full w-full object-cover opacity-60" />
+                  <Img src={l.coverUrl} alt="" data-protected="true" className="h-full w-full object-cover opacity-60" />
                 ) : (
                   <Icon name="home" size={22} />
                 )}

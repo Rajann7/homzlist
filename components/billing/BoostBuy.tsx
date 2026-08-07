@@ -6,6 +6,7 @@ import { AppShell, BottomSheet, Button, EmptyState, Header, Icon, Skeleton, useT
 import { billingApi } from "@/lib/billing/client";
 import { BackButton, Checklist, MicroBadge, Radio, SectionLabel } from "./primitives";
 import { cn } from "@/lib/utils";
+import { Img } from "@/components/ui/Img";
 
 /**
  * P11 S4 — Boost purchase.
@@ -213,8 +214,7 @@ export function BoostBuy() {
                   `aspect-square w-full` tracks the content box instead. */}
               <span className="grid aspect-square w-full place-items-center overflow-hidden bg-surface-3 text-ink-tertiary">
                 {l.coverUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={l.coverUrl} alt="" className="h-full w-full object-cover" />
+                  <Img src={l.coverUrl} alt="" className="h-full w-full object-cover" />
                 ) : (
                   <Icon name="image" size={36} />
                 )}

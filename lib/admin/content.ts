@@ -415,27 +415,32 @@ export async function saveBanner(
   if (starts && ends && new Date(ends) <= new Date(starts))
     return { ok: false, message: "The end date must be after the start date" };
 
-  const patch = {
-    title,
-    subtitle: typeof body.subtitle === "string" ? body.subtitle.slice(0, 200) : null,
-    placement: typeof body.placement === "string" ? body.placement : "feed",
-    image_url: typeof body.image_url === "string" ? body.image_url : null,
-    target_url: typeof body.target_url === "string" ? body.target_url : null,
-    target_cities: Array.isArray(body.target_cities) ? body.target_cities.filter(isUuid) : [],
-    target_roles: Array.isArray(body.target_roles)
-      ? body.target_roles.filter((r): r is string =>
-          ["owner", "broker", "builder"].includes(r as string),
-        )
-      : [],
-    target_plan_status:
-      typeof body.target_plan_status === "string" ? body.target_plan_status : null,
-    starts_at: starts,
-    ends_at: ends,
-    frequency_cap: typeof body.frequency_cap === "number" ? body.frequency_cap : null,
-    is_active: typeof body.is_active === "boolean" ? body.is_active : true,
-    sort_order: typeof body.sort_order === "number" ? body.sort_order : 100,
-    updated_at: new Date().toISOString(),
-  };
+  // Build the patch from ONLY the fields the caller actually sent. Two reasons:
+  //  1. every NOT-NULL column in feed_banners carries a DB default (frequency_cap
+  //     0, placement 'feed', is_active true, target_roles/cities '{}', sort_order
+  //     0), so an INSERT that omits them is filled correctly — this is what fixes
+  //     the "frequency_cap null violates not-null" 422 the old unconditional patch
+  //     produced on every save.
+  //  2. an UPDATE must not wipe a field the form did not send (image_url,
+  //     target_url, sort_order were being reset to null/default on every edit).
+  const patch: Record<string, unknown> = { title, updated_at: new Date().toISOString() };
+  patch.starts_at = starts; // always meaningful — null clears the window
+  patch.ends_at = ends;
+  if (typeof body.subtitle === "string") patch.subtitle = body.subtitle.slice(0, 200) || null;
+  if (typeof body.image_url === "string") patch.image_url = body.image_url.trim() || null;
+  if (typeof body.target_url === "string") patch.target_url = body.target_url.trim() || null;
+  if (Array.isArray(body.target_cities)) patch.target_cities = body.target_cities.filter(isUuid);
+  if (Array.isArray(body.target_roles))
+    patch.target_roles = body.target_roles.filter((r): r is string =>
+      ["owner", "broker", "builder"].includes(r as string),
+    );
+  if (typeof body.target_plan_status === "string")
+    patch.target_plan_status = body.target_plan_status || null;
+  if (typeof body.frequency_cap === "number" && Number.isFinite(body.frequency_cap))
+    patch.frequency_cap = Math.max(0, Math.trunc(body.frequency_cap));
+  if (typeof body.is_active === "boolean") patch.is_active = body.is_active;
+  if (typeof body.sort_order === "number") patch.sort_order = body.sort_order;
+  if (typeof body.placement === "string") patch.placement = body.placement;
 
   const { data, error } = id
     ? await db().from("feed_banners").update(patch).eq("id", id).select("id").single()

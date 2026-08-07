@@ -37,7 +37,7 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
 
       <div className="mb-2 flex justify-center gap-2">
         {SLIDES.map((_, idx) => (
-          <span key={idx} className={cn("h-[6px] rounded-full transition-all", idx === i ? "w-2 bg-accent" : "w-[6px] bg-surface-3")} />
+          <span key={idx} className={cn("h-[6px] rounded-full transition-[width] duration-150 ease-out-quart", idx === i ? "w-2 bg-accent" : "w-[6px] bg-surface-3")} />
         ))}
       </div>
 

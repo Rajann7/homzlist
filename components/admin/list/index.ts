@@ -8,6 +8,7 @@
  */
 
 export * from "./use-admin-list";
+export * from "./ListError";
 export * from "./FilterBar";
 export * from "./FilterSheet";
 export * from "./ColumnsSheet";

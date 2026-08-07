@@ -133,12 +133,25 @@ export function FilterBar({
           part of the bar, not a state of it. Hiding it until a filter is set
           made the bar shift sideways the moment you picked one. */}
       {countLabel !== undefined ? (
-        <span
+        // A button, like the filter chips above it — this was the one `span` in
+        // a bar of real controls, so on all 21 list screens the filters could
+        // be set from the keyboard and never cleared.
+        <button
+          type="button"
           onClick={onClear}
-          style={{ fontSize: 13, color: "var(--accent)", fontWeight: 600, cursor: "pointer" }}
+          style={{
+            border: 0,
+            background: "none",
+            padding: 0,
+            font: "inherit",
+            fontSize: 13,
+            color: "var(--accent)",
+            fontWeight: 600,
+            cursor: "pointer",
+          }}
         >
           Clear all
-        </span>
+        </button>
       ) : null}
       {countLabel !== undefined ? (
         <span style={{ fontSize: 13, color: "var(--ink3)", marginLeft: "auto" }}>{countLabel}</span>

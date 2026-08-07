@@ -1,6 +1,8 @@
 import { cn } from "@/lib/utils";
 import { BottomNav, type NavItem } from "./BottomNav";
 import { KeyboardInset } from "./KeyboardInset";
+import { NetworkStatus } from "@/components/pwa/NetworkStatus";
+import { ScrollRestore } from "./ScrollRestore";
 
 /**
  * AppShell — the global mobile shell (pulled from P2/P3): centred 470px column.
@@ -39,12 +41,19 @@ export function AppShell({ children, header, showNav = true, navItems, className
     >
       <KeyboardInset />
       {header}
+      {/* P12 offline strip — sits under the header, above the scroll area, so it
+          is visible on every screen the shell owns (Doc3 §98). */}
+      <NetworkStatus />
       <main
         className={cn(
           scroll ? "flex-1 overflow-y-auto overscroll-contain" : "flex min-h-0 flex-1 flex-col overflow-hidden",
           className,
         )}
       >
+        {/* Restores this screen's scroll offset on Back (Doc8 §193). Only on
+            shells that own the scroll — when `scroll` is false the child is the
+            scroller and manages its own position (the chat thread does). */}
+        {scroll && <ScrollRestore />}
         {children}
       </main>
       {showNav && <BottomNav items={navItems} />}

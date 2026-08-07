@@ -41,6 +41,7 @@ import {
   SavedViewsMenu,
   useAdminList,
   type FilterGroup,
+  ListError,
 } from "@/components/admin/list";
 import { statusChip } from "../users/UserPanel";
 
@@ -313,7 +314,9 @@ export function ListingsMaster({
         />
       ) : null}
 
-      {list.loading ? (
+      {list.error ? (
+        <ListError code={list.error} onRetry={list.reload} />
+      ) : list.loading ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {[0, 1, 2, 3, 4].map((i) => (
             <Shimmer key={i} h={56} />

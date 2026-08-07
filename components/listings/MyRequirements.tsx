@@ -7,6 +7,7 @@ import { BackButton, OfflineBanner, SheetOption } from "@/components/billing/pri
 import { ConfirmDialog } from "@/components/ui/Dialog";
 import { listingsApi, requirementsApi, type RequirementCard } from "@/lib/listings/client";
 import { cn } from "@/lib/utils";
+import { Img } from "@/components/ui/Img";
 
 /**
  * P8 S4 — My Requirements (Doc7 §65).
@@ -267,7 +268,7 @@ function RequirementCardView({
           <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {matches.map((m) => (
               <button key={m.id} onClick={() => onOpenMatch(m.id)} className="flex w-[128px] shrink-0 flex-col overflow-hidden rounded-8 border border-border bg-surface-1 text-left">
-                <div className="h-[76px] w-full bg-surface-3">{m.coverUrl && <img src={m.coverUrl} alt="" className="h-full w-full object-cover" />}</div>
+                <div className="h-[76px] w-full bg-surface-3">{m.coverUrl && <Img src={m.coverUrl} alt="" className="h-full w-full object-cover" />}</div>
                 <div className="p-2">
                   <div className="text-11 font-semibold text-ink-primary">{m.priceLabel}</div>
                   <div className="truncate text-11 text-ink-tertiary">{m.areaLabel ?? ""}</div>

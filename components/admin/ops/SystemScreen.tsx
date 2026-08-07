@@ -88,6 +88,8 @@ export function SystemScreen() {
   const toast = useToast();
   const [data, setData] = useState<Record<string, unknown> | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  /** Has a first attempt finished? Separate from `data` — see `load` below. */
+  const [settled, setSettled] = useState(false);
 
   const load = useCallback(async () => {
     const res = await fetch("/api/v1/admin/system?what=status", { cache: "no-store" }).catch(
@@ -96,7 +98,20 @@ export function SystemScreen() {
     const json = (await res?.json().catch(() => null)) as
       | { ok?: boolean; data?: Record<string, unknown> }
       | null;
-    setData(json?.ok ? (json.data ?? null) : null);
+    setSettled(true);
+    // A failed REFRESH must not wipe the screen. This used to `setData(null)`
+    // on every non-ok reply, and `!data` renders the shimmer — so one hiccup on
+    // the 30s poll replaced the whole of System status with a loading skeleton,
+    // taking the readings and the action buttons with it. On the screen an
+    // admin opens BECAUSE something is wrong, a transient error is the most
+    // likely moment for it to happen.
+    //
+    // Keeping the last good snapshot is safe here precisely because this screen
+    // dates every reading: each card carries its own "last checked" time and
+    // flips to STALE past ten minutes (see the note at the top of this file), so
+    // a stuck poll shows up as ageing cards rather than as health it hasn't
+    // measured. Only when there has never been a snapshot do we say so.
+    if (json?.ok && json.data) setData(json.data);
   }, []);
 
   useEffect(() => {
@@ -114,11 +129,26 @@ export function SystemScreen() {
     if (json?.ok) void load();
   };
 
-  if (!data) {
+  // Shimmer only while the FIRST attempt is still in flight.
+  if (!settled && !data) {
     return (
       <div>
         <PageHead title="System status" />
         <Shimmer h={320} />
+      </div>
+    );
+  }
+
+  // Never loaded at all: say so and offer a retry, rather than shimmering
+  // forever (CLAUDE.md rule 10 — no dead ends).
+  if (!data) {
+    return (
+      <div>
+        <PageHead title="System status" />
+        <NoteStrip tone="warn">Couldn&apos;t load system status.</NoteStrip>
+        <div style={{ marginTop: 12 }}>
+          <Btn label="Retry" onClick={() => void load()} />
+        </div>
       </div>
     );
   }

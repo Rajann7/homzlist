@@ -8,6 +8,7 @@ import { ConfirmDialog } from "@/components/ui/Dialog";
 import { listingsApi, type ProjectInsights as Insights } from "@/lib/listings/client";
 import type { BadgeKind } from "@/components/ui/StatusBadge";
 import { cn } from "@/lib/utils";
+import { Img } from "@/components/ui/Img";
 
 /**
  * Project insights — the builder's equivalent of the P9 S5 listing screen,
@@ -114,8 +115,7 @@ export function ProjectInsights({ id }: { id: string }) {
           <div className="flex gap-3">
             <span className="grid h-[72px] w-[72px] shrink-0 place-items-center overflow-hidden rounded-8 bg-surface-3 text-ink-tertiary">
               {p.coverUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={p.coverUrl} alt="" data-protected="true" className="h-full w-full object-cover" />
+                <Img src={p.coverUrl} alt="" data-protected="true" className="h-full w-full object-cover" />
               ) : (
                 <Icon name="building" size={22} />
               )}

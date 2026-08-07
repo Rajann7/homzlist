@@ -23,7 +23,7 @@ import {
   RoleChip,
   Shimmer,
 } from "@/components/admin/ds";
-import { ExportModal, FilterBar, FilterSheet, Pager, useAdminList, type FilterGroup } from "@/components/admin/list";
+import { ExportModal, FilterBar, FilterSheet, Pager, useAdminList, type FilterGroup, ListError } from "@/components/admin/list";
 
 type Row = {
   id: string;
@@ -136,7 +136,9 @@ export function AuditScreen({
         countLabel={`${(list.data?.total ?? 0).toLocaleString("en-IN")} entries`}
       />
 
-      {list.loading ? (
+      {list.error ? (
+        <ListError code={list.error} onRetry={list.reload} />
+      ) : list.loading ? (
         <Shimmer h={320} />
       ) : rows.length === 0 ? (
         <div style={{ textAlign: "center", padding: 60, color: "var(--ink3)", fontSize: 13 }}>

@@ -8,6 +8,7 @@ import { chatApi, type InboxSection } from "@/lib/chat/client";
 import { subscribeChat } from "@/lib/chat/realtime-client";
 import { inboxTopic } from "@/lib/chat/realtime-topics";
 import { cn } from "@/lib/utils";
+import { Img } from "@/components/ui/Img";
 
 /**
  * P7 S1 — Messages Home, rebuilt as a list of SUBJECTS rather than of people.
@@ -278,7 +279,7 @@ function SubjectCard({ g, typing, onOpenSubject, onOpenChat, onLongPress }: {
   const hidden = g.rows.length - rows.length;
 
   return (
-    <article className="relative mx-3 mb-3 overflow-hidden rounded-16 bg-surface-1 shadow-l1">
+    <article className="chrome relative mx-3 mb-3 overflow-hidden rounded-16 bg-surface-1 shadow-l1">
       {/* colour spine = what kind of post this is */}
       <span aria-hidden className={cn("absolute inset-y-0 left-0 w-1", k.spine)} />
 
@@ -338,7 +339,7 @@ function SubjectCard({ g, typing, onOpenSubject, onOpenChat, onLongPress }: {
 /** The subject's own photo. A requirement has none by nature — it gets a pin. */
 function Thumb({ subject, kind }: { subject: any; kind: (typeof KIND)[Kind] }) {
   if (subject.cover) {
-    return <img src={subject.cover} alt="" className="h-16 w-16 shrink-0 rounded-12 bg-surface-2 object-cover" />;
+    return <Img src={subject.cover} alt="" className="h-16 w-16 shrink-0 rounded-12 bg-surface-2 object-cover" />;
   }
   if (subject.kind === "requirement") {
     return (

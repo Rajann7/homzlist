@@ -227,7 +227,26 @@ export function AdminNav({
 
     const open = !!openGroups[n.key];
     rows.push(
-      <div key={`g${i}`} onClick={() => onToggleGroup(n.key)} style={rowStyle(false, collapsed)}>
+      // A disclosure, not a div: this was a `<div onClick>`, so Tab skipped
+      // every group and the screens inside a closed group were unreachable
+      // without a mouse. `rowStyle` already supplies the design's padding,
+      // colours and layout; the reset below only removes what a <button> adds
+      // of its own, so it renders identically.
+      <button
+        type="button"
+        key={`g${i}`}
+        onClick={() => onToggleGroup(n.key)}
+        aria-expanded={collapsed ? false : open}
+        style={{
+          ...rowStyle(false, collapsed),
+          width: "100%",
+          border: 0,
+          font: "inherit",
+          fontSize: 15,
+          textAlign: "left",
+          appearance: "none",
+        }}
+      >
         <span style={{ flex: "none", display: "flex" }}>
           <AdminIcon name={n.icon} />
         </span>
@@ -244,7 +263,7 @@ export function AdminNav({
             <AdminIcon name="chevD" size={16} />
           </span>
         )}
-      </div>,
+      </button>,
     );
 
     if (open && !collapsed) {

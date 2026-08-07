@@ -6,6 +6,7 @@ import { AppShell, Button, Header, Icon, Spinner, useToast } from "@/components/
 import { listingsApi, uploadPhotos, type Photo } from "@/lib/listings/client";
 import { PhotoEditorSheet, PhotoTileSheet } from "./PhotoEditor";
 import { cn } from "@/lib/utils";
+import { Img } from "@/components/ui/Img";
 
 /**
  * P5 S5 — Photos, for a listing (`?listing=`) or a project (`?project=`).
@@ -237,8 +238,7 @@ export function Photos() {
               )}
             >
               {p.url && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={p.url} alt={p.altText ?? ""} className="h-full w-full object-cover" />
+                <Img src={p.url} alt={p.altText ?? ""} className="h-full w-full object-cover" />
               )}
 
               {p.status === "processing" && (

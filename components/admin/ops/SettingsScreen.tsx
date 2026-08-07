@@ -31,7 +31,7 @@ import {
   useToast,
   type Col,
 } from "@/components/admin/ds";
-import { useAdminList } from "@/components/admin/list";
+import { useAdminList, ListError } from "@/components/admin/list";
 
 type Tab = "flags" | "branding" | "boost" | "limits" | "retention" | "maint" | "actions";
 
@@ -160,7 +160,7 @@ function FlagsTab() {
 
   return (
     <div>
-      {list.loading ? <Shimmer h={280} /> : <DTable cols={cols} rows={list.data?.rows ?? []} />}
+      {list.error ? <ListError code={list.error} onRetry={list.reload} /> : list.loading ? <Shimmer h={280} /> : <DTable cols={cols} rows={list.data?.rows ?? []} />}
       <div style={{ marginTop: 16 }}>
         <NoteStrip tone="warn">
           Turning a feature off hides it for everyone immediately. Use for incidents.

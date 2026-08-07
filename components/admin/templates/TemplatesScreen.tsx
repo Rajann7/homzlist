@@ -30,7 +30,7 @@ import {
   useToast,
   type Col,
 } from "@/components/admin/ds";
-import { FilterBar, Pager, useAdminList } from "@/components/admin/list";
+import { FilterBar, Pager, useAdminList, ListError } from "@/components/admin/list";
 
 type Tab = "email" | "sms" | "whatsapp" | "push" | "uistrings";
 
@@ -198,7 +198,9 @@ function ChannelTab({ channel }: { channel: string }) {
 
   return (
     <div>
-      {list.loading ? (
+      {list.error ? (
+        <ListError code={list.error} onRetry={list.reload} />
+      ) : list.loading ? (
         <Shimmer h={240} />
       ) : (list.data?.rows ?? []).length === 0 ? (
         <div style={{ textAlign: "center", padding: 60, color: "var(--ink3)", fontSize: 13 }}>
@@ -342,7 +344,9 @@ function StringsTab() {
         Only the interface is translated. User content (listings, chats) is never translated.
       </NoteStrip>
 
-      {list.loading ? (
+      {list.error ? (
+        <ListError code={list.error} onRetry={list.reload} />
+      ) : list.loading ? (
         <Shimmer h={240} />
       ) : (
         <>

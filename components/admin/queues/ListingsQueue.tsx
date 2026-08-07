@@ -38,6 +38,7 @@ import {
   SavedViewsMenu,
   useAdminList,
   type FilterGroup,
+  ListError,
 } from "@/components/admin/list";
 import type { QueueFilterOptions } from "@/lib/admin/filter-options";
 
@@ -245,7 +246,9 @@ export function ListingsQueue({ options }: { options: QueueFilterOptions }) {
         ]}
       />
 
-      {list.loading ? (
+      {list.error ? (
+        <ListError code={list.error} onRetry={list.reload} />
+      ) : list.loading ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {Array.from({ length: 6 }).map((_, i) => (
             <Shimmer key={i} h={56} />

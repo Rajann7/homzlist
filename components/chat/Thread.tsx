@@ -5,10 +5,12 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { AppShell, Header, Icon, Avatar, VerifiedBadge, BottomSheet, ConfirmDialog, Skeleton, useToast } from "@/components";
 import { Glyph } from "./glyphs";
 import { chatApi } from "@/lib/chat/client";
+import { enqueue, drain } from "@/lib/pwa/offline-queue";
 import { PhotoViewer } from "./PhotoViewer";
 import { subscribeChat, broadcastTyping } from "@/lib/chat/realtime-client";
 import { threadTopic, inboxTopic } from "@/lib/chat/realtime-topics";
 import { cn } from "@/lib/utils";
+import { Img } from "@/components/ui/Img";
 
 /**
  * P7 S3 — Chat Thread (the full behaviour set). Every bubble, card and state is
@@ -63,7 +65,6 @@ export function Thread({ threadId, base = "/messages" }: { threadId: string; bas
   const rtRef = useRef<{ unsubscribe: () => void; sendTyping: (p?: any) => void } | null>(null);
   const lastTypingSent = useRef(0);
   const [offline, setOffline] = useState(false);
-  const queueRef = useRef<{ text: string; replyTo: string | null }[]>([]);
   const [priceFlash, setPriceFlash] = useState(false);
   const prevPrice = useRef<string | null>(null);
   // Older history paged in on up-scroll (Doc4 §36 "50-pagination"). Kept in its
@@ -119,17 +120,21 @@ export function Thread({ threadId, base = "/messages" }: { threadId: string; bas
     return () => clearInterval(t);
   }, [load]);
 
-  // Offline queue: retry queued sends when the connection returns (Doc4 §37).
+  // Offline queue: send what was queued when the connection returns (Doc4 §37).
+  // The queue is the shared durable one, so this also flushes messages typed in
+  // this thread during an earlier visit, and the drain is idempotent across the
+  // service worker doing the same thing.
   useEffect(() => {
     const onOnline = async () => {
-      if (!queueRef.current.length) return;
-      const items = queueRef.current; queueRef.current = [];
-      for (const it of items) await chatApi.send(threadId, { text: it.text, replyTo: it.replyTo });
-      setOffline(false); toast.show("Messages sent", { variant: "success" }); load(false);
+      const { sent } = await drain();
+      if (!sent) return;
+      setOffline(false);
+      toast.show("Messages sent", { variant: "success" });
+      load(false);
     };
     window.addEventListener("online", onOnline);
     return () => window.removeEventListener("online", onOnline);
-  }, [threadId, load, toast]);
+  }, [load, toast]);
 
   // Pinned-listing price change between loads → brief flash on the bar (Doc4 §36).
   useEffect(() => {
@@ -215,8 +220,20 @@ export function Thread({ threadId, base = "/messages" }: { threadId: string; bas
     const res = await chatApi.send(threadId, { text: t, replyTo: replyId });
     setSending(false);
     if (!res.ok) {
-      // Keep the pending bubble (clock) + queue it; it auto-sends on reconnect.
-      queueRef.current.push({ text: t, replyTo: replyId });
+      // Only a genuine network failure is queueable. A REJECTED send (blocked,
+      // rate-limited, thread closed) used to be queued too, so the bubble sat on
+      // a clock forever and re-sent on every reconnect against a server that had
+      // already said no. That one surfaces its error and drops the bubble.
+      if (res.error.code !== "OFFLINE") {
+        setView((v: any) => ({ ...v, messages: v.messages.filter((m: any) => m.id !== optimistic.id) }));
+        setText(t);
+        toast.show("Couldn't send that message", { variant: "error" });
+        return;
+      }
+      // Keep the pending bubble (clock) + queue it durably: IndexedDB, so it
+      // still goes out if the thread — or the whole tab — is closed before the
+      // connection returns (Doc3 §98 offline action queue).
+      await enqueue({ kind: "message", path: `/api/v1/chat/threads/${threadId}/message`, method: "POST", body: { text: t, replyTo: replyId } });
       setOffline(true);
       return;
     }
@@ -309,7 +326,7 @@ export function Thread({ threadId, base = "/messages" }: { threadId: string; bas
             className="flex w-full items-start gap-3 px-3 py-2.5 text-left active:bg-surface-3"
           >
             {view.pinned.cover ? (
-              <img src={view.pinned.cover} alt="" className="h-12 w-12 shrink-0 rounded-8 bg-surface-3 object-cover" />
+              <Img src={view.pinned.cover} alt="" className="h-12 w-12 shrink-0 rounded-8 bg-surface-3 object-cover" />
             ) : (
               <span className={cn("grid h-12 w-12 shrink-0 place-items-center rounded-8", S.chip)}>
                 <Icon name={view.pinned.type === "project" ? "building" : view.pinned.type === "requirement" ? "search-list" : "home"} size={22} />
@@ -718,7 +735,7 @@ function MessageItem({ m, prev, all, view, isDivider, dividerRef, onLong, onAllo
         {m.deleted ? (
           <span className="text-13 italic text-ink-tertiary">This message was deleted</span>
         ) : m.kind === "photo" && m.photo ? (
-          <img src={m.photo} alt="" onClick={() => onViewPhoto?.(m.photo)} className="max-h-64 cursor-pointer rounded-12 object-cover" />
+          <Img src={m.photo} alt="" onClick={() => onViewPhoto?.(m.photo)} className="max-h-64 cursor-pointer rounded-12 object-cover" />
         ) : m.kind === "link" ? (
           <div>
             {/* Rich card for our own property/project links (title + live price
@@ -729,7 +746,7 @@ function MessageItem({ m, prev, all, view, isDivider, dividerRef, onLong, onAllo
                 className="mb-1 block w-[220px] overflow-hidden rounded-8 bg-surface-1 text-left"
               >
                 {m.meta.cover
-                  ? <img src={m.meta.cover} alt="" className="h-[110px] w-full object-cover" />
+                  ? <Img src={m.meta.cover} alt="" className="h-[110px] w-full object-cover" />
                   : <span className="block h-[110px] w-full bg-surface-3" />}
                 <span className="block p-2">
                   <span className="block text-13 font-semibold text-ink-primary">{m.meta.title}</span>

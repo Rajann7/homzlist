@@ -19,6 +19,9 @@ import { authApi, type DeviceAccount } from "@/lib/auth/client";
 // type is aliased rather than shadowed.
 import { listingsApi, type MyListing, type MyProject, type RequirementCard as RequirementCardT } from "@/lib/listings/client";
 import { cn } from "@/lib/utils";
+import { Img } from "@/components/ui/Img";
+import { NetworkStatus } from "@/components/pwa/NetworkStatus";
+import { ScrollRestore } from "@/components/nav/ScrollRestore";
 
 /**
  * S1 Own Profile (P9, redesigned — designs/_samples/P9-profile-redesign-sample.html).
@@ -261,9 +264,14 @@ export function OwnProfile() {
         </div>
       )}
 
+      {/* Own profile is the third shell (AppShell / FeedShell / here), so it
+          needs the shell-level pieces mounted too — Doc3 §98 / Doc8 §193. */}
+      <NetworkStatus />
+
       {/* Scroll area — header + tabs stick inside it; the bottom nav (in-flow
           below) never scrolls, so it stays pinned on every device. */}
       <div className="flex-1 overflow-y-auto overscroll-contain">
+      <ScrollRestore />
       {/* Header */}
       <header className="chrome sticky top-0 z-header flex h-header items-center justify-between border-b border-border bg-surface-1 px-4">
         <button onClick={() => !viewAs && void openSwitchSheet()} className="flex items-center gap-1">
@@ -802,7 +810,7 @@ function projectSpecs(p: MyProject) {
 function Thumb({ url, className }: { url: string | null; className?: string }) {
   if (!url) return <div className={cn("bg-surface-3", className)} />;
   // eslint-disable-next-line @next/next/no-img-element
-  return <img src={url} alt="" className={cn("object-cover", className)} />;
+  return <Img src={url} alt="" className={cn("object-cover", className)} />;
 }
 
 function Empty({

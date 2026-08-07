@@ -5,6 +5,7 @@ import { Icon } from "@/components/ui/Icon";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { feedApi, type FeedCard as Card, type FeedPerson, type FeedSectionMeta } from "@/lib/feed/client";
 import { TYPE_ICON } from "@/lib/listings/type-icon";
+import { prefetchImages } from "@/lib/pwa/prefetch";
 
 /**
  * One horizontal rail on the carousel home feed (P2, 5 Aug 2026 — Rajan).
@@ -67,6 +68,9 @@ export function SectionRail({
       setItems(res.data.items);
       setPeople(res.data.people);
       setCursor(res.data.nextCursor);
+      // Warm the covers just past the first screenful so the rail doesn't fill
+      // in grey-then-photo as it is swiped (Doc8 §173).
+      prefetchImages(res.data.items.slice(2, 6).map((i) => i.coverUrl));
     } else {
       // Offline or a server error: keep the heading and offer a retry rather
       // than silently collapsing a rail the server said has rows.

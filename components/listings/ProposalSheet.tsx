@@ -5,6 +5,7 @@ import { BottomSheet, Button, Icon, Skeleton, useToast } from "@/components/bill
 import { TopupSheet } from "@/components/billing/TopupSheet";
 import { proposalsApi } from "@/lib/listings/client";
 import { cn } from "@/lib/utils";
+import { Img } from "@/components/ui/Img";
 
 /**
  * P8 S3 — Send Proposal sheet (Doc7 §70).
@@ -141,7 +142,7 @@ export function ProposalSheet({
                         )}
                       >
                         <div className="relative h-20 w-full bg-surface-3">
-                          {l.coverUrl && <img src={l.coverUrl} alt="" className="h-full w-full object-cover" />}
+                          {l.coverUrl && <Img src={l.coverUrl} alt="" className="h-full w-full object-cover" />}
                           {pickedListing === l.id && (
                             <span className="absolute right-1.5 top-1.5 grid h-5 w-5 place-items-center rounded-full bg-accent text-white">
                               <Icon name="check" size={12} />

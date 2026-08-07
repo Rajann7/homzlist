@@ -6,6 +6,7 @@ import { Icon } from "@/components/ui/Icon";
 import { FactsStrip, MetaChip, OverlayChip } from "./cardChrome";
 import type { FeedCard as Card } from "@/lib/feed/client";
 import { cn } from "@/lib/utils";
+import { Img } from "@/components/ui/Img";
 
 /**
  * The PROJECT card in the home feed.
@@ -46,7 +47,8 @@ export function ProjectCard({
   return (
     <article
       className={cn(
-        "bg-surface-1 pb-3",
+        // Same reason as FeedCard: a card is chrome, not prose.
+        "chrome bg-surface-1 pb-3",
         rail ? "flex h-full flex-col overflow-hidden rounded-8 border border-border" : "border-b border-divider",
       )}
     >
@@ -54,8 +56,7 @@ export function ProjectCard({
       <button type="button" onClick={onOpen} className="relative block w-full" aria-label={`Open ${card.title ?? "project"}`}>
         <div className="aspect-[16/9] w-full overflow-hidden">
           {card.coverUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={card.coverUrl} alt="" className="h-full w-full object-cover" />
+            <Img src={card.coverUrl} alt="" className="h-full w-full object-cover" />
           ) : (
             <div className="grid h-full w-full place-items-center bg-surface-3 text-ink-tertiary">
               <Icon name="image" size={40} />

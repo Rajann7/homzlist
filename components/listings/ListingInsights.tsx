@@ -10,6 +10,7 @@ import type { FeedCard } from "@/lib/feed/client";
 import { listingsApi, type ListingInsights as Insights } from "@/lib/listings/client";
 import type { BadgeKind } from "@/components/ui/StatusBadge";
 import { cn } from "@/lib/utils";
+import { Img } from "@/components/ui/Img";
 
 /**
  * P9 S5 — Listing insights.
@@ -460,8 +461,7 @@ function Thumb({ url, size }: { url: string | null; size: number }) {
       className="grid shrink-0 place-items-center overflow-hidden rounded-8 bg-surface-3 text-ink-tertiary"
     >
       {url ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={url} alt="" data-protected="true" className="h-full w-full object-cover" />
+        <Img src={url} alt="" data-protected="true" className="h-full w-full object-cover" />
       ) : (
         <Icon name="image" size={22} />
       )}

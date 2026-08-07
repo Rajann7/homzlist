@@ -13,6 +13,7 @@ import { CaughtUp } from "./primitives";
 import { InquirySheet, MoreSheet, ReportSheet, ShareSheet, LoginSheet } from "./sheets";
 import { feedApi, interactionsApi, type FeedCard as Card, type FeedPerson, type FeedSectionMeta } from "@/lib/feed/client";
 import { contactBuilder } from "./contactBuilder";
+import { Img } from "@/components/ui/Img";
 
 export interface PropertyFeedHandle { refresh: () => void; }
 
@@ -94,7 +95,7 @@ export const PropertyFeed = forwardRef<
     };
 
     const save = async (card: Card) => {
-      const res = await interactionsApi.toggleSave(card.id);
+      const res = await interactionsApi.toggleSave(card.id, card.saved);
       if (res.ok) {
         setSavedOverride((s) => ({ ...s, [card.id]: res.data.saved }));
         toast.show(res.data.saved ? "Saved to wishlist" : "Removed from wishlist");
@@ -177,7 +178,7 @@ export const PropertyFeed = forwardRef<
                   {suggested.map((s2) => (
                     <button key={s2.id} onClick={() => router.push(`/property/${s2.id}`)} className="flex w-[104px] shrink-0 flex-col overflow-hidden rounded-8 border border-border bg-surface-1 text-left">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <div className="aspect-square w-full bg-surface-3">{s2.coverUrl && <img src={s2.coverUrl} alt="" className="h-full w-full object-cover" />}</div>
+                      <div className="aspect-square w-full bg-surface-3">{s2.coverUrl && <Img src={s2.coverUrl} alt="" className="h-full w-full object-cover" />}</div>
                       <div className="p-1.5"><div className="text-13 font-semibold text-ink-primary">{s2.price}</div><div className="truncate text-11 text-ink-tertiary">{s2.areaLabel ?? ""}</div></div>
                     </button>
                   ))}

@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
   if (!item) return fail("NOT_FOUND");
 
   const scope = item.kind === "boost" ? "boosts" : "plans";
-  const res = await validateCoupon(claims.sub, code, item.price_paise, scope);
+  const res = await validateCoupon(claims.sub, code, item.price_paise, scope, item.code);
 
   if (!res.ok) {
     // One message for every failure mode — no enumeration signal (Doc9 §7).

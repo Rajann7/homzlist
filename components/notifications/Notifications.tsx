@@ -8,6 +8,7 @@ import { notificationsApi, boldSegments, type Inbox, type NotificationRow, type 
 import { pushState } from "@/lib/notifications/push-client";
 import { EnableSheet } from "./EnableSheet";
 import { cn } from "@/lib/utils";
+import { Img } from "@/components/ui/Img";
 
 /**
  * P11 S7 — Notifications (Doc4 §61).
@@ -452,8 +453,7 @@ function NotifRow({
           )}
         </div>
         {row.thumbUrl && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={row.thumbUrl} alt="" className="h-10 w-10 flex-none rounded-8 bg-surface-3 object-cover" />
+          <Img src={row.thumbUrl} alt="" className="h-10 w-10 flex-none rounded-8 bg-surface-3 object-cover" />
         )}
       </div>
     </div>

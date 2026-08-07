@@ -359,6 +359,9 @@ export function BannerEditPanelBody({ panel }: { panel: PanelEntry }) {
   const row = panel.data?.id ? (panel.data as unknown as BannerRow) : null;
   const [title, setTitle] = useState(row?.title ?? "");
   const [subtitle, setSubtitle] = useState(row?.subtitle ?? "");
+  const [imageUrl, setImageUrl] = useState((row as { image_url?: string | null } | null)?.image_url ?? "");
+  const [targetUrl, setTargetUrl] = useState((row as { target_url?: string | null } | null)?.target_url ?? "");
+  const [frequency, setFrequency] = useState<number>((row as { frequency_cap?: number } | null)?.frequency_cap ?? 0);
   const [roles, setRoles] = useState<string[]>(row?.target_roles ?? []);
   const [starts, setStarts] = useState(row?.starts_at?.slice(0, 10) ?? "");
   const [ends, setEnds] = useState(row?.ends_at?.slice(0, 10) ?? "");
@@ -389,6 +392,9 @@ export function BannerEditPanelBody({ panel }: { panel: PanelEntry }) {
                 id: row?.id,
                 title,
                 subtitle,
+                image_url: imageUrl,
+                target_url: targetUrl,
+                frequency_cap: frequency,
                 target_roles: roles,
                 starts_at: starts ? new Date(starts).toISOString() : null,
                 ends_at: ends ? new Date(ends).toISOString() : null,
@@ -413,6 +419,19 @@ export function BannerEditPanelBody({ panel }: { panel: PanelEntry }) {
       </FField>
       <FField label="Subtitle">
         <input value={subtitle} onChange={(e) => setSubtitle(e.target.value)} style={F_INPUT_STYLE} />
+      </FField>
+      <FField label="Banner image URL" helper="Shown as the banner background. Left empty, the green gradient is used.">
+        <input value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="https://…" style={F_INPUT_STYLE} />
+      </FField>
+      <FField label="Link" helper="Where the banner opens when tapped. Left empty, the banner is not tappable.">
+        <input value={targetUrl} onChange={(e) => setTargetUrl(e.target.value)} placeholder="https://… or /path" style={F_INPUT_STYLE} />
+      </FField>
+      <FField label="Frequency" helper="How often one person sees it.">
+        <select value={frequency} onChange={(e) => setFrequency(Number(e.target.value))} style={F_INPUT_STYLE}>
+          <option value={0}>Every visit</option>
+          <option value={1}>Once per day</option>
+          <option value={2}>Once per session</option>
+        </select>
       </FField>
       <FField label="Show to" helper="Leave all unticked to show it to everyone">
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>

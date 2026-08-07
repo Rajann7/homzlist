@@ -29,7 +29,7 @@ import {
   useToast,
   type Col,
 } from "@/components/admin/ds";
-import { FilterBar, FilterSheet, Pager, useAdminList, type FilterGroup } from "@/components/admin/list";
+import { FilterBar, FilterSheet, Pager, useAdminList, type FilterGroup, ListError } from "@/components/admin/list";
 import { QueueTabs, ageOf, initialsOf } from "./shared";
 import { EmptyQueue, SheetRow, SheetSection } from "./RequirementsQueue";
 
@@ -168,7 +168,9 @@ export function VerificationsQueue({ options }: { options: { roles: { value: str
         countLabel={`${list.data?.total ?? 0} verifications`}
       />
 
-      {list.loading ? (
+      {list.error ? (
+        <ListError code={list.error} onRetry={list.reload} />
+      ) : list.loading ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {Array.from({ length: 5 }).map((_, i) => (
             <Shimmer key={i} h={56} />

@@ -6,6 +6,7 @@ import { AppShell, Header, Icon, Avatar, VerifiedBadge, Toggle, BottomSheet, Con
 import { PhotoViewer } from "./PhotoViewer";
 import { chatApi } from "@/lib/chat/client";
 import { cn } from "@/lib/utils";
+import { Img } from "@/components/ui/Img";
 
 const REPORT_REASONS = ["Spam", "Abusive language", "Fraud attempt", "Asking for payment off-platform", "Fake identity"];
 
@@ -58,7 +59,7 @@ export function Details({ threadId, base = "/messages" }: { threadId: string; ba
             disabled={!d.pinnedCard.href}
             className="flex w-full items-center gap-3 rounded-12 border border-border bg-surface-1 p-3 text-left disabled:active:bg-transparent"
           >
-            {d.pinnedCard.cover ? <img src={d.pinnedCard.cover} alt="" className="h-14 w-14 rounded-8 object-cover" /> : <span className="grid h-14 w-14 place-items-center rounded-8 bg-surface-2"><Icon name={d.pinnedCard.type === "project" ? "building" : d.pinnedCard.type === "requirement" ? "search-list" : "home"} size={20} className="text-ink-tertiary" /></span>}
+            {d.pinnedCard.cover ? <Img src={d.pinnedCard.cover} alt="" className="h-14 w-14 rounded-8 object-cover" /> : <span className="grid h-14 w-14 place-items-center rounded-8 bg-surface-2"><Icon name={d.pinnedCard.type === "project" ? "building" : d.pinnedCard.type === "requirement" ? "search-list" : "home"} size={20} className="text-ink-tertiary" /></span>}
             <span className="min-w-0 flex-1">
               <span className="block truncate text-15 font-semibold text-ink-primary">{d.pinnedCard.title}</span>
               {d.pinnedCard.priceLabel && <span className="block text-13 text-ink-tertiary">{d.pinnedCard.priceLabel}</span>}
@@ -73,7 +74,7 @@ export function Details({ threadId, base = "/messages" }: { threadId: string; ba
           {d.sharedPhotos.length === 0 ? (
             <p className="text-13 text-ink-tertiary">No photos shared yet.</p>
           ) : (
-            <div className="grid grid-cols-3 gap-0.5">{d.sharedPhotos.slice(0, 6).map((ph: any) => <img key={ph.id} src={ph.url} alt="" onClick={() => setViewPhoto(ph.url)} className="aspect-square w-full cursor-pointer rounded-4 object-cover" />)}</div>
+            <div className="grid grid-cols-3 gap-0.5">{d.sharedPhotos.slice(0, 6).map((ph: any) => <Img key={ph.id} src={ph.url} alt="" onClick={() => setViewPhoto(ph.url)} className="aspect-square w-full cursor-pointer rounded-4 object-cover" />)}</div>
           )}
         </div>
 
@@ -84,7 +85,7 @@ export function Details({ threadId, base = "/messages" }: { threadId: string; ba
             <div className="space-y-2">
               {d.sharedListings.map((l: any) => (
                 <button key={l.id} onClick={() => router.push(`/property/${l.id}`)} className="flex w-full items-center gap-3 rounded-8 bg-surface-2 px-3 py-2 text-left">
-                  {l.cover ? <img src={l.cover} alt="" className="h-10 w-10 rounded-4 object-cover" /> : <span className="grid h-10 w-10 place-items-center rounded-4 bg-surface-3"><Icon name="home" size={18} className="text-ink-tertiary" /></span>}
+                  {l.cover ? <Img src={l.cover} alt="" className="h-10 w-10 rounded-4 object-cover" /> : <span className="grid h-10 w-10 place-items-center rounded-4 bg-surface-3"><Icon name="home" size={18} className="text-ink-tertiary" /></span>}
                   <span className="min-w-0 flex-1"><span className="block truncate text-13 font-semibold text-ink-primary">{l.title}</span><span className="block text-11 text-ink-tertiary">{l.priceLabel}</span></span>
                   <Icon name="chevron-right" size={18} className="text-ink-tertiary" />
                 </button>

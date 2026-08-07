@@ -166,7 +166,11 @@ export function SettingsHome({ base = "" }: { base?: string }) {
 
       <div className="px-4 pb-[calc(28px+env(safe-area-inset-bottom))] pt-7 text-center">
         <div className="text-17 font-bold text-ink-primary">Homz<span className="text-accent">List</span></div>
-        <div className="mt-1.5 text-11 text-ink-tertiary">Version 1.0.2 (build 148)</div>
+        {/* Real build identity (Doc3 §98) — package version + the commit this
+            bundle was built from, injected at build time. */}
+        <div className="mt-1.5 text-11 text-ink-tertiary">
+          Version {process.env.NEXT_PUBLIC_APP_VERSION} (build {process.env.NEXT_PUBLIC_APP_BUILD})
+        </div>
         <div className="mt-0.5 text-11 text-ink-tertiary">Made in Rajkot</div>
       </div>
 

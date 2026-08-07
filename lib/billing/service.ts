@@ -177,6 +177,8 @@ export async function validateCoupon(
   rawCode: string,
   basePaise: number,
   scope: "plans" | "boosts",
+  /** The catalog code being bought, so a coupon restricted via `catalog_codes` applies only to it. */
+  catalogCode?: string | null,
 ): Promise<CouponResult> {
   const code = rawCode.trim().toUpperCase();
   if (!COUPON_RE.test(code)) return { ok: false, error: "INVALID" };
@@ -197,8 +199,19 @@ export async function validateCoupon(
     per_user_limit: number;
     usage_cap: number | null;
     used_count: number;
+    starts_at: string | null;
     expires_at: string | null;
+    catalog_codes: string[] | null;
   };
+
+  // A scheduled coupon is not usable before its window opens. Generic INVALID
+  // (not a distinct "not started") so the endpoint can't be used to probe when a
+  // code goes live (Doc9 §7 enumeration).
+  if (c.starts_at && new Date(c.starts_at) > new Date()) return { ok: false, error: "INVALID" };
+  // Restricted to specific catalog items → it must be one of them. SCOPE is the
+  // same "this coupon doesn't apply here" signal `applies_to` already uses.
+  if (c.catalog_codes?.length && (!catalogCode || !c.catalog_codes.includes(catalogCode)))
+    return { ok: false, error: "SCOPE" };
 
   if (c.expires_at && new Date(c.expires_at) < new Date()) return { ok: false, error: "EXPIRED" };
   if (c.usage_cap !== null && c.used_count >= c.usage_cap) return { ok: false, error: "USED" };
@@ -263,7 +276,7 @@ export async function quote(input: QuoteInput): Promise<Quote> {
 
   if (input.couponCode) {
     const scope = input.item.kind === "boost" ? "boosts" : "plans";
-    const res = await validateCoupon(input.profileId, input.couponCode, base, scope);
+    const res = await validateCoupon(input.profileId, input.couponCode, base, scope, input.item.code);
     if (res.ok) {
       couponId = res.couponId!;
       couponCode = res.code!;

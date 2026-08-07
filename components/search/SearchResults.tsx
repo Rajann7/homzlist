@@ -149,7 +149,7 @@ export function SearchResults({ basePath = "", isGuest = false }: { basePath?: s
     gate(() => contactBuilder(c, via, toast.show))();
 
   const onSave = (c: CardData) => gate(async () => {
-    const r = await interactionsApi.toggleSave(c.id);
+    const r = await interactionsApi.toggleSave(c.id, c.saved);
     if (r.ok) {
       toast.show(r.data.saved ? "Saved to your list" : "Removed from saved");
       setProps((p) => p && ({

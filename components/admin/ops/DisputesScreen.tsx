@@ -34,7 +34,7 @@ import {
   usePanels,
   type Col,
 } from "@/components/admin/ds";
-import { Pager, useAdminList } from "@/components/admin/list";
+import { Pager, useAdminList, ListError } from "@/components/admin/list";
 
 type Row = {
   id: string;
@@ -178,7 +178,9 @@ export function DisputesScreen() {
         onSelect={list.setTab}
       />
 
-      {list.loading ? (
+      {list.error ? (
+        <ListError code={list.error} onRetry={list.reload} />
+      ) : list.loading ? (
         <Shimmer h={280} />
       ) : (list.data?.rows ?? []).length === 0 ? (
         <div style={{ textAlign: "center", padding: 60, color: "var(--ink3)", fontSize: 13 }}>

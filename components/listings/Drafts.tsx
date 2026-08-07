@@ -7,6 +7,7 @@ import { BackButton } from "@/components/billing/primitives";
 import { listingsApi } from "@/lib/listings/client";
 import { cn } from "@/lib/utils";
 import { useNow } from "@/lib/hooks/useNow";
+import { Img } from "@/components/ui/Img";
 
 /**
  * P6 S5 — Drafts (Doc2 §5.3): max 3, 90-day expiry, resume or delete.
@@ -64,8 +65,7 @@ export function Drafts() {
             >
               <span className="grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-8 bg-surface-2 text-ink-tertiary">
                 {d.coverUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={d.coverUrl} alt="" data-protected="true" className="h-full w-full object-cover" />
+                  <Img src={d.coverUrl} alt="" data-protected="true" className="h-full w-full object-cover" />
                 ) : (
                   <Icon name="image" size={22} />
                 )}

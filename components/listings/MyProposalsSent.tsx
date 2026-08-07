@@ -7,6 +7,7 @@ import { BackButton, OfflineBanner } from "@/components/billing/primitives";
 import { TopupSheet } from "@/components/billing/TopupSheet";
 import { proposalsApi, type SentProposal } from "@/lib/listings/client";
 import { cn } from "@/lib/utils";
+import { Img } from "@/components/ui/Img";
 
 /**
  * P8 S6 — My Proposals Sent (Doc7 §72).
@@ -104,7 +105,7 @@ function SentRow({ p, onOpenReq, onOpenChat }: { p: SentProposal; onOpenReq: () 
       {/* Attached listing / chat-only */}
       {p.listing ? (
         <div className="flex items-center gap-2 rounded-8 bg-surface-2 p-2">
-          <span className="h-10 w-10 shrink-0 overflow-hidden rounded-8 bg-surface-3">{p.listing.coverUrl && <img src={p.listing.coverUrl} alt="" className="h-full w-full object-cover" />}</span>
+          <span className="h-10 w-10 shrink-0 overflow-hidden rounded-8 bg-surface-3">{p.listing.coverUrl && <Img src={p.listing.coverUrl} alt="" className="h-full w-full object-cover" />}</span>
           <span className="truncate text-11 text-ink-secondary">{[p.listing.title, p.listing.priceLabel].filter(Boolean).join(" — ")}</span>
         </div>
       ) : (

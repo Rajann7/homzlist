@@ -6,7 +6,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { COOKIE, signAccess, signRegisterToken, createRefreshSession, setSessionCookies, setRegisterCookie } from "@/lib/auth/session";
 import { absorbOutgoingSession } from "@/lib/auth/account-pool";
 import { cookies } from "next/headers";
-import { clientIp, hashIp } from "@/lib/auth/rate-limit";
+import { rateLimit, clientIp, hashIp } from "@/lib/auth/rate-limit";
 import { toUserDTO } from "@/lib/auth/dto";
 
 /**
@@ -23,6 +23,12 @@ export async function POST(req: NextRequest) {
     return fail("VALIDATION_ERROR");
   }
   if (!body.otpSession || !/^\d{6}$/.test(body.code ?? "")) return fail("VALIDATION_ERROR");
+
+  // Coarse per-IP throttle governed by the admin `otp_verify` rule (A22 Limits &
+  // velocity). Defense-in-depth on top of the per-session attempt lock in
+  // verifyOtp; the hardcoded numbers are the fallback when the rule is unreachable.
+  const limited = await rateLimit(`otp-verify:${clientIp(req.headers)}`, 10, 600, "otp_verify");
+  if (!limited.allowed) return fail("RATE_LIMITED", { retryAfterSec: limited.retryAfterSec });
 
   const result = await verifyOtp(body.otpSession, body.code!);
 

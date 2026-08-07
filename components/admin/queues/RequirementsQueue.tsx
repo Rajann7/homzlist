@@ -27,7 +27,7 @@ import {
   useToast,
   type Col,
 } from "@/components/admin/ds";
-import { FilterBar, FilterSheet, Pager, useAdminList, type FilterGroup } from "@/components/admin/list";
+import { FilterBar, FilterSheet, Pager, useAdminList, type FilterGroup, ListError } from "@/components/admin/list";
 import type { QueueFilterOptions } from "@/lib/admin/filter-options";
 import { QueueTabs, initialsOf, ageOf, budgetLabel } from "./shared";
 
@@ -177,7 +177,9 @@ export function RequirementsQueue({ options }: { options: QueueFilterOptions }) 
         countLabel={`${list.data?.total ?? 0} requirements`}
       />
 
-      {list.loading ? (
+      {list.error ? (
+        <ListError code={list.error} onRetry={list.reload} />
+      ) : list.loading ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {Array.from({ length: 5 }).map((_, i) => (
             <Shimmer key={i} h={56} />
