@@ -1,6 +1,6 @@
 import "server-only";
 import { randomBytes } from "node:crypto";
-import { serverEnv } from "@/lib/env";
+import { devAffordancesAllowed, serverEnv } from "@/lib/env";
 
 /**
  * Where the admin's EMAIL comes from — and nothing else.
@@ -13,8 +13,9 @@ import { serverEnv } from "@/lib/env";
  * google changes how we learn the email and nothing else, so the authorization
  * path proven in dev is the one that runs in production.
  *
- * The dev provider REFUSES to run in production, and is only selected when no
- * Google credentials are configured.
+ * The dev provider REFUSES to run in the production band (lib/env → envBand:
+ * NODE_ENV is the build type, APP_ENV is the environment), and is only selected
+ * when no Google credentials are configured.
  */
 
 export type AdminAuthProviderKind = "google" | "dev" | "unconfigured";
@@ -36,7 +37,7 @@ const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
 export function adminAuthProviderKind(): AdminAuthProviderKind {
   const { clientId, clientSecret } = serverEnv().googleOauth;
   if (clientId && clientSecret) return "google";
-  if (process.env.NODE_ENV === "production") return "unconfigured";
+  if (!devAffordancesAllowed()) return "unconfigured";
   return "dev";
 }
 
@@ -113,8 +114,8 @@ export async function googleIdentityFromCode(
  * in, which is exactly the check Google's answer would face.
  */
 export function devIdentity(email: string): ProviderIdentity {
-  if (process.env.NODE_ENV === "production") {
-    throw new Error("the dev admin sign-in provider is not allowed in production");
+  if (!devAffordancesAllowed()) {
+    throw new Error("the dev admin sign-in provider is not allowed in the production band");
   }
   return { email: email.trim().toLowerCase(), name: null, emailVerified: true };
 }

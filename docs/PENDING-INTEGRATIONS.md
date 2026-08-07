@@ -39,8 +39,8 @@ which are optional, which is mandatory, and the exact env switch for each. Every
 
 | Key | Skippable? | How it degrades / what to set | Verified at |
 |---|---|---|---|
-| **MSG91** | 🔴 **NO — required for prod** | OTP login. In production the dev OTP provider **throws** — with no MSG91, nobody can sign in. Set `OTP_PROVIDER=msg91` + its keys. | `lib/auth/otp-provider.ts:34,47` |
-| **Google OAuth (admin)** | 🔴 **NO — required for prod** | ADMIN panel sign-in. The dev admin provider 404s under `NODE_ENV=production` by design, so without `GOOGLE_OAUTH_CLIENT_ID` + `GOOGLE_OAUTH_CLIENT_SECRET` **no staff member can enter the panel at all** — `POST /api/v1/admin/auth/start` refuses and logs which variables are missing. Set both on the host, with the callback at `https://account.homzlist.com/api/v1/admin/auth/google/callback`. | `lib/admin/auth-provider.ts:36-45`, `app/api/v1/admin/auth/start/route.ts` |
+| **MSG91** | 🔴 **NO — required for prod** | OTP login. In the production band the dev OTP provider **throws** — with no MSG91, nobody can sign in. Set `OTP_PROVIDER=msg91` + its keys. A test deploy runs on the fixed code instead by declaring `APP_ENV=staging`. | `lib/auth/otp-provider.ts:34,47`, `lib/env.ts` → `envBand()` |
+| **Google OAuth (admin)** | 🔴 **NO — required for prod** | ADMIN panel sign-in. The dev admin provider 404s in the production band (`APP_ENV=production`, and that is the default for any deploy that does not declare otherwise) by design, so without `GOOGLE_OAUTH_CLIENT_ID` + `GOOGLE_OAUTH_CLIENT_SECRET` **no staff member can enter the panel at all** — `POST /api/v1/admin/auth/start` refuses and logs which variables are missing. Set both on the host, with the callback at `https://account.homzlist.com/api/v1/admin/auth/google/callback`. | `lib/admin/auth-provider.ts:36-45`, `app/api/v1/admin/auth/start/route.ts` |
 | **R2** | ✅ yes | Media already lives in Supabase Storage. Leave `STORAGE_DRIVER=supabase` (the default). Switching to R2 later is a config change + object migration, no code change. | `lib/storage.ts:12-18,89` |
 | **Resend** | ✅ yes | Email send is guarded: `if (!resendApiKey) return { sent:false, reason:"no_credentials" }`. Emails are **recorded** in `notification_deliveries`, just not delivered. | `lib/notifications/email.ts:58` |
 | **FCM** | ✅ yes | Push is guarded the same way — notifications are recorded, not pushed to the device. | `lib/notifications/push-client.ts:46` |
@@ -3760,8 +3760,10 @@ What is NOT deferred: the whitelist check against `staff`, the active/revoked
 branch, the role, the `staff_sessions` row, the rotating refresh token, the
 `admin_login_attempts` log and the per-request re-verification are all real and
 identical in both providers. Only "which Google account is this?" is stubbed,
-and only outside production — `adminAuthProviderKind()`, `devIdentity()` and the
-`/api/v1/admin/auth/dev` route each refuse to run with `NODE_ENV=production`.
+and only outside the production band — `adminAuthProviderKind()`, `devIdentity()`
+and the `/api/v1/admin/auth/dev` route each refuse to run unless
+`lib/env` → `devAffordancesAllowed()` is true, i.e. `APP_ENV` is `staging`/`dev`.
+A deploy that declares nothing counts as production and stays shut.
 
 **To finish:** put the two credentials in the environment. The provider flips to
 Google automatically; `googleAuthorizeUrl()` / `googleIdentityFromCode()` are

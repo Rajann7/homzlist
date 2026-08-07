@@ -11,7 +11,46 @@
  */
 
 const isServer = typeof window === "undefined";
-const isProd = process.env.NODE_ENV === "production";
+
+/**
+ * The ENVIRONMENT BAND — the single answer to "may dev affordances run here?".
+ *
+ * Every dev affordance (the fixed OTP code, the dev admin sign-in, the
+ * rate-limit kill switch) used to gate on `NODE_ENV === "production"`. That is
+ * the BUILD type, not the environment: a staging deploy is a production build,
+ * so a deployed test server could never be signed into at all. `APP_ENV` is the
+ * declaration, and it is server-only by design — nothing here is inlined into
+ * the client bundle.
+ *
+ * It fails CLOSED in every direction:
+ *   · a production build with no `APP_ENV` is "production" (locked) — the only
+ *     way to unlock a deploy is to declare `APP_ENV=staging` on purpose;
+ *   · anything unrecognised is "production";
+ *   · called from the browser it answers "production", so a client can never
+ *     talk itself into a band (the gates are all server-side regardless).
+ * `assertProdSecrets()` still refuses to let a real production band boot with
+ * the dev OTP provider, so the launch mistake is caught rather than shipped.
+ */
+export type EnvBand = "production" | "staging" | "dev";
+
+export function envBand(): EnvBand {
+  if (!isServer) return "production";
+  const declared = (process.env.APP_ENV ?? "").trim().toLowerCase();
+  if (declared === "staging") return "staging";
+  if (declared === "dev") return "dev";
+  if (declared === "production") return "production";
+  return process.env.NODE_ENV === "production" ? "production" : "dev";
+}
+
+/** True only in the REAL production band — where dev affordances stay banned. */
+export const isProductionBand = () => envBand() === "production";
+
+/**
+ * The one gate for "fixed OTP / dev admin sign-in / rate-limit switch may run".
+ * Read it instead of `NODE_ENV` so staging and dev behave identically and
+ * production stays exactly as locked as it was.
+ */
+export const devAffordancesAllowed = () => !isProductionBand();
 
 /** Public config — safe to reference from client components. */
 export const publicEnv = {
@@ -86,16 +125,29 @@ export function serverEnv() {
 /** True when OTP runs in DEV mode (fixed code, no SMS) — CLAUDE.md stack rule. */
 export const otpDevMode = () => serverEnv().otp.provider === "dev";
 
-/** Assert critical secrets exist in production; call from a startup/health path. */
+/**
+ * Assert critical secrets exist on a DEPLOYED build; call from a startup/health path.
+ *
+ * Two different questions, deliberately gated differently:
+ *   · the secrets themselves are required on any deployed build — a staging
+ *     server with no Supabase key or no JWT secret is broken, not "relaxed";
+ *   · the MSG91 requirement is a PRODUCTION-BAND rule. Staging is the one place
+ *     the dev OTP provider is allowed, so demanding msg91 there would report the
+ *     intended configuration as a failure.
+ */
 export function assertProdSecrets(): string[] {
-  if (!isProd) return [];
+  const deployed = isServer && process.env.NODE_ENV === "production";
+  if (!deployed) return [];
   const e = serverEnv();
   const missing: string[] = [];
   if (!publicEnv.supabaseUrl) missing.push("NEXT_PUBLIC_SUPABASE_URL");
   if (!publicEnv.supabaseAnonKey) missing.push("NEXT_PUBLIC_SUPABASE_ANON_KEY");
   if (!e.supabaseServiceRoleKey) missing.push("SUPABASE_SERVICE_ROLE_KEY");
   if (!e.jwt.accessSecret) missing.push("JWT_ACCESS_SECRET");
-  // Audit M1: the dev OTP provider must never ship to production.
-  if (e.otp.provider !== "msg91") missing.push("OTP_PROVIDER=msg91 (dev OTP provider is not allowed in production)");
+  // Audit M1: the dev OTP provider must never ship to the production band. This
+  // is also the catch for the launch mistake — going live with APP_ENV=staging
+  // still fails here, because the provider was never switched to msg91.
+  if (isProductionBand() && e.otp.provider !== "msg91")
+    missing.push("OTP_PROVIDER=msg91 (dev OTP provider is not allowed in production)");
   return missing;
 }

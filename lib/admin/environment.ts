@@ -1,5 +1,6 @@
 import "server-only";
 import { createServiceClient } from "@/lib/supabase/server";
+import { isProductionBand } from "@/lib/env";
 
 /**
  * The STAGING ribbon (template 420 / 514) and the support address the login
@@ -11,11 +12,15 @@ import { createServiceClient } from "@/lib/supabase/server";
  * declaration; without it, anything that is not a production build is treated
  * as staging, which fails in the safe direction (a stray ribbon, never a
  * missing one).
+ *
+ * The band itself now lives in lib/env (`envBand`), because the same
+ * declaration also decides whether the dev sign-in and the fixed OTP code may
+ * run. One source: the ribbon is on for exactly the environments where those
+ * are unlocked, so the screen cannot say "production" while the back door is
+ * open.
  */
 export function isStagingEnv(): boolean {
-  const declared = process.env.APP_ENV;
-  if (declared) return declared !== "production";
-  return process.env.NODE_ENV !== "production";
+  return !isProductionBand();
 }
 
 /**
