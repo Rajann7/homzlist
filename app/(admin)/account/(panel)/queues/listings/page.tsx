@@ -1,5 +1,5 @@
 import { ListingsQueue } from "@/components/admin/queues/ListingsQueue";
-import { requireAdmin } from "@/lib/admin/guard";
+import { screenGate } from "@/lib/admin/screen-gate";
 import { queueFilterOptions } from "@/lib/admin/filter-options";
 
 /**
@@ -15,6 +15,7 @@ export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
 
 export default async function ListingsQueuePage() {
-  await requireAdmin("staff");
+  const gate = await screenGate("staff");
+  if (!gate.ok) return gate.lock;
   return <ListingsQueue options={await queueFilterOptions()} />;
 }

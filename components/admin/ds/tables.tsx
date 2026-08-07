@@ -94,6 +94,21 @@ export function QueueTable<R>({
           {rows.map((r, i) => (
             <tr
               key={i}
+              // A row that opens a panel on click was reachable by mouse only.
+              // Focusable + Enter/Space when the row ITSELF has focus (the
+              // guard keeps a button inside the row from double-firing).
+              tabIndex={onRow ? 0 : undefined}
+              onKeyDown={
+                onRow
+                  ? (e) => {
+                      if (e.target !== e.currentTarget) return;
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        onRow(r);
+                      }
+                    }
+                  : undefined
+              }
               onClick={() => onRow?.(r)}
               style={{
                 borderTop: "1px solid var(--divider)",
@@ -156,6 +171,21 @@ export function DTable<R>({
           {rows.map((r, i) => (
             <tr
               key={i}
+              // A row that opens a panel on click was reachable by mouse only.
+              // Focusable + Enter/Space when the row ITSELF has focus (the
+              // guard keeps a button inside the row from double-firing).
+              tabIndex={onRow ? 0 : undefined}
+              onKeyDown={
+                onRow
+                  ? (e) => {
+                      if (e.target !== e.currentTarget) return;
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        onRow(r);
+                      }
+                    }
+                  : undefined
+              }
               onClick={() => onRow?.(r)}
               style={{
                 borderTop: "1px solid var(--divider)",

@@ -1,5 +1,5 @@
 import { Dashboard } from "@/components/admin/dashboard/Dashboard";
-import { requireAdmin } from "@/lib/admin/guard";
+import { screenGate } from "@/lib/admin/screen-gate";
 import {
   anomalyBanners,
   overdueReviews,
@@ -25,7 +25,8 @@ export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
 
 export default async function AdminDashboardPage() {
-  await requireAdmin("staff");
+  const gate = await screenGate("staff");
+  if (!gate.ok) return gate.lock;
 
   const [tiles, stats, banners, revenue, overdue, strips] = await Promise.all([
     queueTiles(),

@@ -626,10 +626,17 @@ export function AdminShell({
         ) : null}
 
         <main style={{ flex: 1, overflowY: "auto", background: "var(--page)" }}>
-          <div
-            className="p-4 md:p-6"
-            style={{ maxWidth: 1200, margin: "0 auto", width: "100%" }}
-          >
+          {/*
+            The design's `mainPadStyle` (template 445) is
+            `padding:16/24px;max-width:1200px;margin:0 auto`. The 1200 cap never
+            showed in the prototype because everything there is drawn inside a
+            fixed device frame — but a real browser window is wider than 1200,
+            and the cap turned into an empty gutter down both sides of EVERY
+            screen while the tables inside were scrolling sideways for room.
+            Rajan asked for the gutter gone (6 Aug 2026): the padding is the
+            design's, the cap is not applied.
+          */}
+          <div className="p-4 md:p-6" style={{ width: "100%" }}>
             {children}
           </div>
         </main>

@@ -20,6 +20,7 @@ import {
   Badge,
   Chip,
   PageHead,
+  RowCheck,
   SheetMenu,
   Shimmer,
   StatusBadge,
@@ -411,15 +412,10 @@ export function ListingsMaster({
                       }}
                     >
                       <Td>
-                        <input
-                          type="checkbox"
+                        <RowCheck
                           checked={isSel}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toggle(r.id);
-                          }}
-                          onChange={() => undefined}
-                          style={{ width: 16, height: 16, accentColor: "var(--accent)", cursor: "pointer" }}
+                          onToggle={() => toggle(r.id)}
+                          label={`Select ${r.title ?? "listing"}`}
                         />
                       </Td>
                       {shows("listing") ? (
