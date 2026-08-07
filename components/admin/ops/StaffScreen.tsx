@@ -29,7 +29,7 @@ import {
   useToast,
   type Col,
 } from "@/components/admin/ds";
-import { Pager, useAdminList } from "@/components/admin/list";
+import { Pager, useAdminList, ListError } from "@/components/admin/list";
 
 type Row = {
   id: string;
@@ -221,7 +221,9 @@ export function StaffScreen({ meId }: { meId: string }) {
         email revokes access instantly.
       </NoteStrip>
 
-      {list.loading ? (
+      {list.error ? (
+        <ListError code={list.error} onRetry={list.reload} />
+      ) : list.loading ? (
         <Shimmer h={240} />
       ) : (
         <>

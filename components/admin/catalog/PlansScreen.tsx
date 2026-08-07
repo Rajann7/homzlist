@@ -32,6 +32,7 @@ export type PlanRow = {
   kind: string;
   name: string;
   sub_label: string | null;
+  features: string[];
   price_paise: number;
   period_days: number | null;
   roles: string[];

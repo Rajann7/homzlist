@@ -22,10 +22,15 @@ export default function manifest(): MetadataRoute.Manifest {
       { src: "/icons/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
       { src: "/icons/maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
     ],
+    // Doc3 §98 names these exactly: New listing / Messages / Search. "Saved" was
+    // here instead of Messages, so the one shortcut a seller actually needs from
+    // the home screen — an unread conversation — wasn't reachable.
+    // Every entry carries an icon; Android drops icon-less shortcuts from the
+    // long-press menu on some launchers.
     shortcuts: [
-      { name: "Search", short_name: "Search", url: "/search" },
-      { name: "Create listing", short_name: "Create", url: "/create" },
-      { name: "Saved", short_name: "Saved", url: "/saved" },
+      { name: "New listing", short_name: "New listing", url: "/create", icons: [{ src: "/icons/icon-192.png", sizes: "192x192", type: "image/png" }] },
+      { name: "Messages", short_name: "Messages", url: "/messages", icons: [{ src: "/icons/icon-192.png", sizes: "192x192", type: "image/png" }] },
+      { name: "Search", short_name: "Search", url: "/search", icons: [{ src: "/icons/icon-192.png", sizes: "192x192", type: "image/png" }] },
     ],
   };
 }

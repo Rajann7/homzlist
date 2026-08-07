@@ -3,6 +3,7 @@ import { ok, fail } from "@/lib/api";
 import { rateLimit } from "@/lib/auth/rate-limit";
 import { requireActive, UUID_RE } from "@/lib/chat/guard";
 import { proposeVisit, visitAction } from "@/lib/chat/thread";
+import { flagEnabled } from "@/lib/system/flags";
 
 /**
  * POST /api/v1/chat/threads/:id/visit (Doc7 §100-101) — the in-chat visit.
@@ -32,6 +33,10 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
 
   const action = typeof body.action === "string" ? body.action : "propose";
   if (action === "propose") {
+    // A22 Feature flags → Visit scheduler. Off = no NEW visits proposed; existing
+    // ones can still be confirmed/cancelled below, so nothing in flight is stranded.
+    if (!(await flagEnabled("visits", { userId: auth.id })))
+      return fail("FORBIDDEN");
     const res = await proposeVisit(params.id, auth.id, typeof body.scheduledAt === "string" ? body.scheduledAt : "");
     if (!res.ok) return res.reason === "not_found" ? fail("NOT_FOUND") : fail("VALIDATION_ERROR", { reason: res.reason });
     return ok({ proposed: true });

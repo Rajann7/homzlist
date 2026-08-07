@@ -46,6 +46,7 @@ export default async function AdminDashboardPage() {
       revenue={revenue}
       overdue={overdue}
       strips={strips}
+      role={gate.me.role}
     />
   );
 }

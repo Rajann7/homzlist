@@ -7,6 +7,7 @@ import { BackButton } from "@/components/billing/primitives";
 import { ConfirmDialog } from "@/components/ui/Dialog";
 import { savedApi, type SavedView, type SavedTile, type SavedCollection } from "@/lib/saved/client";
 import { cn } from "@/lib/utils";
+import { Img } from "@/components/ui/Img";
 
 /**
  * P10 S1 — Saved (Doc4 §57). The feed heart's wishlist, with private collection
@@ -285,8 +286,7 @@ function SavedTileView({ tile, onOpen, onLong }: { tile: SavedTile; onOpen: () =
       className="relative aspect-square overflow-hidden bg-surface-3 active:opacity-80"
     >
       {tile.coverUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={tile.coverUrl} alt="" data-protected="true" className={cn("h-full w-full object-cover", ribbon && "opacity-70")} />
+        <Img src={tile.coverUrl} alt="" data-protected="true" className={cn("h-full w-full object-cover", ribbon && "opacity-70")} />
       ) : (
         <span className="grid h-full place-items-center text-ink-tertiary"><Icon name="home" size={30} /></span>
       )}

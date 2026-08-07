@@ -570,9 +570,13 @@ const LISTING_FIELDS: [key: string, label: string, kind: "text" | "money" | "are
   ["title", "Title", "text"],
   ["description", "Description", "text"],
   ["price_paise", "Price", "money"],
+  ["deposit_paise", "Deposit", "money"],
+  ["maintenance_paise", "Maintenance", "money"],
   ["area_label", "Location", "text"],
   ["pincode", "Pincode", "text"],
   ["area_sqft", "Area (sqft)", "area"],
+  ["contact_number", "Contact number", "text"],
+  ["alt_number", "Alternate number", "text"],
 ];
 const PROJECT_FIELDS: [key: string, label: string, kind: "text" | "money" | "area"][] = [
   ["name", "Name", "text"],

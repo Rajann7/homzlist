@@ -231,9 +231,14 @@ export function AdminLoginScreen({
                     </div>
                   ) : null}
                   <div style={{ display: "flex", gap: 12, marginTop: 8 }}>
-                    <span
+                    <button
+                      type="button"
                       onClick={() => setDismissed(true)}
                       style={{
+                        border: 0,
+                        background: "none",
+                        padding: 0,
+                        font: "inherit",
                         fontSize: 11,
                         fontWeight: 600,
                         color: "var(--accent)",
@@ -241,7 +246,7 @@ export function AdminLoginScreen({
                       }}
                     >
                       Use a different account
-                    </span>
+                    </button>
                     {/* The design draws this as a link with no destination. The
                         destination is the support address in branding_settings —
                         read server-side, never a constant in the bundle. */}

@@ -15,7 +15,11 @@ export async function GET(req: NextRequest) {
   try {
     await requireAdmin("admin");
     const id = new URL(req.url).searchParams.get("id");
-    if (!id || !UUID_RE.test(id)) return fail("NOT_FOUND");
+    // A missing or malformed `id` is a bad REQUEST, not a missing coupon — the
+    // sibling detail endpoints (content, support, system, templates) all answer
+    // VALIDATION_ERROR here, and a caller cannot act on "not found" when the
+    // truth is "you didn't say which one".
+    if (!id || !UUID_RE.test(id)) return fail("VALIDATION_ERROR", { field: "id" });
     const detail = await couponDetail(id);
     return detail ? ok(detail) : fail("NOT_FOUND");
   } catch (e) {

@@ -12,6 +12,11 @@ export const metadata: Metadata = {
   description: "HomzList staff panel.",
   manifest: undefined,
   robots: { index: false, follow: false },
+  // Named explicitly because this layout overrides the root metadata: without
+  // it the panel advertised no icon and every admin page load ended in a
+  // `GET /favicon.ico 404` (~2.5s of application code, twice a session, for a
+  // tab with no icon). Same asset the rest of the site uses.
+  icons: { icon: "/icon.svg" },
 };
 
 /**

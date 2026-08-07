@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
+import { useBackClose } from "@/lib/hooks/use-back-close";
 import { Icon } from "./Icon";
 
 /**
@@ -26,6 +27,9 @@ export function BottomSheet({ open, onClose, title, children, hideHeader, classN
   const startY = useRef<number | null>(null);
   const dragY = useRef(0);
   const panelRef = useRef<HTMLDivElement>(null);
+
+  // Android Back closes the sheet instead of leaving the screen (Doc3 §98).
+  useBackClose(open, onClose);
 
   // Esc to close + lock body scroll while open.
   useEffect(() => {

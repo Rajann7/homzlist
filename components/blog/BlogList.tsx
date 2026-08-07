@@ -7,6 +7,7 @@ import { Icon, Button, StatusBadge, Skeleton, useToast } from "@/components";
 import { Header, Wordmark } from "@/components/nav/Header";
 import { BackButton } from "@/components/billing/primitives";
 import { blogApi, type BlogCard } from "@/lib/content/client";
+import { Img } from "@/components/ui/Img";
 
 /**
  * P12 S4a — the blog list: a full-bleed hero card for the featured post, the
@@ -177,7 +178,7 @@ export function BlogList({
 export function Cover({ post, className, iconSize }: { post: BlogCard; className?: string; iconSize: number }) {
   if (post.coverUrl) {
     // eslint-disable-next-line @next/next/no-img-element
-    return <img src={post.coverUrl} alt="" className={`object-cover ${className ?? ""}`} loading="lazy" />;
+    return <Img src={post.coverUrl} alt="" className={`object-cover ${className ?? ""}`} loading="lazy" />;
   }
   const tints = [
     "from-[#B9CCC1] to-[#7E9C8B]", "from-[#C9C2B4] to-[#948A74]", "from-[#B7C3CE] to-[#71838F]",

@@ -1,5 +1,6 @@
 import { cn } from "@/lib/utils";
 import { Icon } from "./Icon";
+import { Img } from "@/components/ui/Img";
 
 /**
  * Avatar — Doc1 Component 32. Sizes 24/32/48/64/84; image or initials on
@@ -62,8 +63,7 @@ export function Avatar({ src, name, size = 48, ring = "none", className, alt }: 
       style={dim}
     >
       {src ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={src} alt={alt ?? name ?? ""} width={size} height={size} className="h-full w-full object-cover" />
+        <Img src={src} alt={alt ?? name ?? ""} width={size} height={size} className="h-full w-full object-cover" />
       ) : name ? (
         <span
           className={cn("font-semibold", tint.fg)}

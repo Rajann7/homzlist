@@ -6,6 +6,7 @@ import { listSaved, saveSearch, setAlerts, deleteSaved } from "@/lib/search/rece
 import { countProperties } from "@/lib/search/service";
 import { paramsToFilters } from "@/lib/search/filters";
 import type { SearchFilters } from "@/lib/search/types";
+import { flagEnabled } from "@/lib/system/flags";
 
 /**
  * Saved searches + new-match alerts (Doc7 §112 POST, §113 GET, §114 PATCH/DELETE).
@@ -29,6 +30,10 @@ export async function POST(req: NextRequest) {
 
   const claims = await getCurrentUser();
   if (!claims) return fail("UNAUTHORIZED");
+
+  // A22 Feature flags → Saved searches. Off = no new saved searches/alerts.
+  if (!(await flagEnabled("saved_searches", { role: claims.role, userId: claims.sub })))
+    return fail("FORBIDDEN");
 
   let body: { label?: string; params?: unknown; query?: string; mode?: string };
   try { body = await req.json(); } catch { return fail("VALIDATION_ERROR"); }

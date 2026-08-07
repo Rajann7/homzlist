@@ -27,7 +27,7 @@ import {
   useToast,
   type Col,
 } from "@/components/admin/ds";
-import { FilterBar, FilterSheet, Pager, useAdminList, type FilterGroup } from "@/components/admin/list";
+import { FilterBar, FilterSheet, Pager, useAdminList, type FilterGroup, ListError } from "@/components/admin/list";
 
 type Row = {
   id: string;
@@ -197,7 +197,9 @@ export function ExportsScreen({ entities }: { entities: { value: string; label: 
         countLabel={`${(list.data?.total ?? 0).toLocaleString("en-IN")} exports`}
       />
 
-      {list.loading ? (
+      {list.error ? (
+        <ListError code={list.error} onRetry={list.reload} />
+      ) : list.loading ? (
         <Shimmer h={280} />
       ) : (list.data?.rows ?? []).length === 0 ? (
         <div style={{ textAlign: "center", padding: 70, color: "var(--ink3)" }}>

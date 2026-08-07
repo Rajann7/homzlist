@@ -75,8 +75,33 @@ async function moderationDecision(
 
   if (!res.ok) {
     if (res.reason === "not_found") return fail("NOT_FOUND");
-    if (res.reason === "locked") return fail("LISTING_STATE_LOCKED", { locked: true });
-    if (res.reason === "bad_state") return fail("LISTING_STATE_LOCKED", { alreadyDecided: true });
+    /**
+     * Both refusals below used to reach the reviewer as one sentence —
+     * "Someone else already decided this one" — which is a guess, and in the
+     * commonest case a wrong one: approving a row and then trying to reject it
+     * lands here, and the person being told a colleague got there first IS the
+     * colleague. Worse, neither sentence said what to do instead.
+     *
+     * The remedy belongs on the server because it is the same remedy wherever
+     * the decision is made from (A4's panel, A3's bulk bar, a keyboard shortcut).
+     */
+    if (res.reason === "locked") {
+      return fail("LISTING_STATE_LOCKED", {
+        locked: true,
+        message:
+          "This listing is locked after three rejections. It can only be reopened from Appeals.",
+      });
+    }
+    if (res.reason === "bad_state") {
+      return fail("LISTING_STATE_LOCKED", {
+        alreadyDecided: true,
+        // The queue is a one-way door by design — approve/reject are review
+        // decisions, not a toggle. The way back exists on A12, so say so
+        // rather than leaving the reviewer to find it.
+        message:
+          "This one has already been decided, so the review queue can't change it. Open it under Listings to hide or restore it.",
+      });
+    }
     return fail("VALIDATION_ERROR");
   }
 

@@ -2,6 +2,7 @@
 
 import { Icon } from "@/components/ui/Icon";
 import { cn } from "@/lib/utils";
+import { Img } from "@/components/ui/Img";
 
 /**
  * The profile card family (designs/_samples/P9-profile-redesign-sample.html).
@@ -115,8 +116,7 @@ function Cover({ url, className, icon = "home" }: { url: string | null; classNam
     );
   }
   return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img src={url} alt="" data-protected="true" className={cn("object-cover", className)} />
+    <Img src={url} alt="" data-protected="true" className={cn("object-cover", className)} />
   );
 }
 

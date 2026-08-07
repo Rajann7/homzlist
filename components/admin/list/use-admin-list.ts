@@ -105,15 +105,21 @@ export function useAdminList<R = Record<string, unknown>>(
     // from the browser cache.
     fetch(`/api/v1/admin/list/${resource}?${query}`, { cache: "no-store" })
       .then(async (res) => {
-        const body = await res.json();
+        // The status is read BEFORE the body. A 5xx comes back as Next's HTML
+        // error page, so `res.json()` threw and landed in the `.catch` below —
+        // which reported a server fault as "OFFLINE", the one explanation that
+        // was certainly wrong.
+        const body = (await res.json().catch(() => null)) as
+          | { ok?: boolean; error?: { code?: string }; data?: ListState<R> }
+          | null;
         if (cancelled) return;
-        if (!body.ok) {
-          setError(body.error?.code ?? "SERVER_ERROR");
+        if (!res.ok || !body?.ok || !body.data) {
+          setError(body?.error?.code ?? (res.status >= 500 ? "SERVER_ERROR" : `HTTP_${res.status}`));
           setData(null);
-        } else {
-          setError(null);
-          setData(body.data as ListState<R>);
+          return;
         }
+        setError(null);
+        setData(body.data);
       })
       .catch(() => {
         if (!cancelled) setError("OFFLINE");

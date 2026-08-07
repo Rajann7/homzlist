@@ -26,7 +26,7 @@ import {
   useToast,
   usePanels,
 } from "@/components/admin/ds";
-import { FilterBar, FilterSheet, Pager, useAdminList, type FilterGroup } from "@/components/admin/list";
+import { FilterBar, FilterSheet, Pager, useAdminList, type FilterGroup, ListError } from "@/components/admin/list";
 
 type Row = {
   id: string;
@@ -241,7 +241,9 @@ export function PaymentsScreen({
             />
           </div>
 
-          {list.loading ? (
+          {list.error ? (
+        <ListError code={list.error} onRetry={list.reload} />
+      ) : list.loading ? (
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {[0, 1, 2, 3, 4].map((i) => (
                 <Shimmer key={i} h={56} />

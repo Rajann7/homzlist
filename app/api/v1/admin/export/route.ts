@@ -5,6 +5,7 @@ import { adminErrorResponse } from "@/lib/admin/respond";
 import { resourceByName } from "@/lib/admin/resources";
 import { parseListParams } from "@/lib/admin/list-query";
 import { runExport, type ExportFormat } from "@/lib/admin/export";
+import { rateLimit } from "@/lib/auth/rate-limit";
 
 /**
  * POST /api/v1/admin/export
@@ -35,6 +36,10 @@ export async function POST(req: NextRequest) {
 
   try {
     const me = await requireAdmin(resource.minRole);
+    // Governed by the admin `admin_export` rule (A22). Exports are sensitive and
+    // heavy; the numbers here are the fallback if the rule is unreachable.
+    const limited = await rateLimit(`admin-export:${me.id}`, 20, 86_400, "admin_export");
+    if (!limited.allowed) return fail("RATE_LIMITED", { retryAfterSec: limited.retryAfterSec });
     const url = new URL(`http://x/?${body.query ?? ""}`);
     const params = parseListParams(url, resource);
     const outcome = await runExport(me, resource, params, {

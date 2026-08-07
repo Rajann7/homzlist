@@ -6,6 +6,7 @@ import { AppShell, BottomSheet, Button, EmptyState, Header, Icon, Skeleton, useT
 import { BackButton, OfflineBanner, SheetOption } from "@/components/billing/primitives";
 import { leadsApi, type LeadView } from "@/lib/listings/client";
 import { cn } from "@/lib/utils";
+import { Img } from "@/components/ui/Img";
 
 /**
  * P8 S2 — Leads Pipeline (Doc7 §103-105).
@@ -238,7 +239,7 @@ function LeadCard({ l, onMessage, onMove, onMore, onOpenProperty }: {
 
       {l.property && (
         <button onClick={onOpenProperty} className="flex items-center gap-2 rounded-8 bg-surface-2 p-2 text-left">
-          <span className="h-12 w-12 shrink-0 overflow-hidden rounded-8 bg-surface-3">{l.property.coverUrl && <img src={l.property.coverUrl} alt="" className="h-full w-full object-cover" />}</span>
+          <span className="h-12 w-12 shrink-0 overflow-hidden rounded-8 bg-surface-3">{l.property.coverUrl && <Img src={l.property.coverUrl} alt="" className="h-full w-full object-cover" />}</span>
           <span className="min-w-0 flex-1">
             <span className="block truncate text-13 font-semibold text-ink-primary">{l.property.title ?? "Listing"}</span>
             <span className="block truncate text-11 text-ink-tertiary">{[l.property.priceLabel, l.property.areaLabel].filter(Boolean).join(" · ")}</span>

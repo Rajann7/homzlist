@@ -5,6 +5,7 @@ import { getProfileById } from "@/lib/profile/service";
 import { rateLimit } from "@/lib/auth/rate-limit";
 import { createProject, listMyProjects, getProjectType, sanitizeProjectAttributes, NoProjectSlotError } from "@/lib/listings/projects";
 import { getFieldDefinitions, activeBoostsFor } from "@/lib/listings/service";
+import { flagEnabled } from "@/lib/system/flags";
 
 /**
  * The exemption reasons and the build statuses are `field_definitions` option
@@ -58,6 +59,9 @@ export async function POST(req: NextRequest) {
   if (!profile || profile.state !== "active") return fail("FORBIDDEN");
   // Projects are a Builder-only product (Doc2 §6).
   if (profile.role !== "builder") return fail("FORBIDDEN");
+  // A22 Feature flags → Builder projects. Off = the product is closed. Default-on.
+  if (!(await flagEnabled("projects", { role: profile.role, userId: claims.sub })))
+    return fail("FORBIDDEN");
 
   const limited = await rateLimit(`project-create:${claims.sub}`, 20, 3600);
   if (!limited.allowed) return fail("RATE_LIMITED");

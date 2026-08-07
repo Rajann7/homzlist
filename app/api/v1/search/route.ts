@@ -27,7 +27,7 @@ const SORTS: SearchSort[] = ["latest", "nearby", "price_asc", "price_desc"];
 
 export async function GET(req: NextRequest) {
   // Doc3 §3.3 per-endpoint rate limits: "search medium".
-  const limited = await rateLimit(`search:${clientIp(req.headers)}`, 120, 60);
+  const limited = await rateLimit(`search:${clientIp(req.headers)}`, 120, 60, "search");
   if (!limited.allowed) return fail("RATE_LIMITED");
 
   const claims = await getCurrentUser();

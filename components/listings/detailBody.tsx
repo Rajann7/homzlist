@@ -5,6 +5,7 @@ import { Icon } from "@/components/billing/ui";
 import type { IconName } from "@/components/ui/Icon";
 import type { Photo } from "@/lib/listings/client";
 import { cn } from "@/lib/utils";
+import { Img } from "@/components/ui/Img";
 
 /**
  * The shared BODIES of the property and project detail screens.
@@ -395,8 +396,7 @@ export function PosterCard({
         >
           <span className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-8 bg-surface-2 text-ink-tertiary">
             {poster.avatarUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={poster.avatarUrl} alt="" data-protected="true" className="h-full w-full object-cover" />
+              <Img src={poster.avatarUrl} alt="" data-protected="true" className="h-full w-full object-cover" />
             ) : (
               <Icon name="user" size={22} />
             )}
@@ -481,8 +481,7 @@ export function DetailHero({
           className="hz-x flex h-full w-full snap-x snap-mandatory overflow-x-auto overscroll-x-contain"
         >
           {items.map((p) => (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
+            <Img
               key={p.id}
               src={p.url ?? ""}
               alt={p.altText ?? alt ?? ""}
@@ -844,8 +843,7 @@ export function ProjectDetailBody({
                       className={cn("flex w-full items-center gap-3 py-3 text-left", PAD, soldOut && "opacity-65")}
                     >
                       {u.floorPlanUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
+                        <Img
                           src={u.floorPlanUrl}
                           alt=""
                           data-protected="true"

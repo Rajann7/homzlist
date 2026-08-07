@@ -457,6 +457,54 @@ export async function togglePropertyType(
   return { ok: true, label: data.label, summary: `${data.label} turned ${active ? "on" : "off"}` };
 }
 
+const TYPE_CATEGORIES = ["residential", "commercial", "plot", "pg"] as const;
+
+/**
+ * Create a NEW property type (A18 Types tab → "Add"). The design's Types tab
+ * offers an add; there was no `type_add` action behind it, so `savePropertyType`
+ * (edit-only) answered NOT_FOUND. Required columns are code/label/category; the
+ * rest (roles, kinds, field_config, sort_order, is_active) take their DB defaults.
+ */
+export async function addPropertyType(
+  body: Record<string, unknown>,
+  me: AdminIdentity,
+): Promise<ActionResult> {
+  const label = typeof body.label === "string" ? body.label.trim().slice(0, 60) : "";
+  if (!label) return { ok: false, message: "Give the type a name" };
+  const rawCode =
+    typeof body.code === "string" && body.code.trim() ? body.code : label;
+  const code = rawCode.trim().toLowerCase().replace(/[^a-z0-9_]/g, "_").replace(/^_|_$/g, "").slice(0, 40);
+  if (!code) return { ok: false, message: "Give the type a code" };
+  const category =
+    typeof body.category === "string" && (TYPE_CATEGORIES as readonly string[]).includes(body.category)
+      ? body.category
+      : "residential";
+  const roles = Array.isArray(body.roles)
+    ? body.roles.filter((r): r is string => ["owner", "broker", "builder"].includes(r as string))
+    : [];
+  const kinds = Array.isArray(body.kinds)
+    ? body.kinds.filter((k): k is string => ["sell", "rent"].includes(k as string))
+    : [];
+
+  const { data: existing } = await db().from("property_types").select("code").eq("code", code).maybeSingle();
+  if (existing) return { ok: false, message: "A type with that code already exists" };
+
+  const insert: Record<string, unknown> = { code, label, category };
+  if (roles.length) insert.roles = roles;
+  if (kinds.length) insert.kinds = kinds;
+  const { error } = await db().from("property_types").insert(insert);
+  if (error) return { ok: false, message: error.message };
+
+  await writeAudit(me, {
+    action: "master_data_add",
+    entityType: "property_type",
+    entityLabel: label,
+    summary: `Property type added — ${label}`,
+    diff: { code, label, category },
+  });
+  return { ok: true, label, summary: `${label} added` };
+}
+
 export async function savePropertyType(
   body: Record<string, unknown>,
   me: AdminIdentity,

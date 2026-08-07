@@ -6,6 +6,7 @@ import { BackButton } from "@/components/billing/primitives";
 import { ConfirmDialog } from "@/components/ui/Dialog";
 import { listingsApi, type MyListing } from "@/lib/listings/client";
 import { cn } from "@/lib/utils";
+import { Img } from "@/components/ui/Img";
 
 type TrashItem = MyListing & { daysLeft: number };
 
@@ -97,8 +98,7 @@ export function Trash() {
               <div className="flex gap-3">
                 <span className="h-14 w-14 shrink-0 overflow-hidden rounded-8 bg-surface-2">
                   {item.coverUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
+                    <Img
                       src={item.coverUrl}
                       alt=""
                       data-protected="true"

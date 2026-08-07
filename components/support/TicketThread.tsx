@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { AppShell, Header, Icon, Button, Skeleton, StatusBadge, useToast } from "@/components";
 import { BackButton } from "@/components/billing/primitives";
 import { supportApi, type TicketThread as Thread } from "@/lib/content/client";
+import { Img } from "@/components/ui/Img";
 
 /**
  * P12 S2c/S2d — the ticket thread, and the "Ticket created" success screen that
@@ -175,8 +176,7 @@ export function TicketThread({ id, base = "" }: { id: string; base?: string }) {
                     {m.attachments.map((key) => (
                       // Streamed through the authenticated route, never a signed
                       // storage URL — the ownership check runs on each read.
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
+                      <Img
                         key={key}
                         src={`/api/v1/support/tickets/${thread.id}/attachment?key=${encodeURIComponent(key)}`}
                         alt="Attached screenshot"

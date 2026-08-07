@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/Skeleton";
 import type { DeviceAccount } from "@/lib/auth/client";
 import type { FeaturedItem } from "@/lib/profile/client";
 import { cn } from "@/lib/utils";
+import { Img } from "@/components/ui/Img";
 
 /**
  * Account-switch sheet (P9 S1). Every account signed in on this device, the
@@ -281,8 +282,7 @@ export function CreateFeaturedSheet({
                   )}
                 >
                   {l.coverUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={l.coverUrl} alt="" className="h-full w-full object-cover" />
+                    <Img src={l.coverUrl} alt="" className="h-full w-full object-cover" />
                   ) : (
                     <span className="grid h-full w-full place-items-center text-ink-tertiary">
                       <Icon name="home" size={26} strokeWidth={1.6} />
@@ -356,8 +356,7 @@ export function FeaturedCollectionSheet({
                 className="relative aspect-square overflow-hidden rounded-8 bg-surface-3"
               >
                 {l.coverUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={l.coverUrl} alt="" className="h-full w-full object-cover" />
+                  <Img src={l.coverUrl} alt="" className="h-full w-full object-cover" />
                 ) : (
                   <span className="grid h-full w-full place-items-center text-ink-tertiary">
                     <Icon name="home" size={26} strokeWidth={1.6} />

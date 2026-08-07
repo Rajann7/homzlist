@@ -136,8 +136,27 @@ async function open(s, path, ready) {
   // polls for what the screen renders rather than sleeping a flat 2 s — and
   // says so when a screen never gets there, instead of silently measuring an
   // empty page.
+  // `ready` alone is not enough. `router.push` changes location.pathname
+  // SYNCHRONOUSLY, but React paints the new screen a beat later — so for that
+  // beat the PREVIOUS screen is still in <main>, and if it happens to satisfy
+  // this screen's `ready` selector the probe passes against the wrong screen.
+  // The measurement then runs, the real screen mounts underneath it, and a
+  // client-fetched screen is caught in its skeleton: that is exactly how /cron
+  // reported "0 card columns" while rendering 4 perfectly well on its own.
+  //
+  // So also require that nothing is still loading. `aria-busy` is what the
+  // admin Shimmer sets, and what scripts/pixdiff.mjs already waits on — same
+  // signal, same discipline.
+  const settled = `location.pathname === ${JSON.stringify(path)}
+    && document.querySelectorAll('main .animate-shimmer, main [aria-busy="true"]').length === 0
+    && (${ready})`;
   for (let i = 0; i < 250; i++) {
-    if (await s.eval(`location.pathname === ${JSON.stringify(path)} && (${ready})`)) return true;
+    // Twice in a row, 100ms apart: one true reading can still be the old screen
+    // in the frame before the new one replaces it.
+    if (await s.eval(settled)) {
+      await sleep(100);
+      if (await s.eval(settled)) return true;
+    }
     await sleep(100);
   }
   return false;

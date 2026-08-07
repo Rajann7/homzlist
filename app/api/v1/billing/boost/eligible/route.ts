@@ -3,6 +3,7 @@ import { getCurrentUser } from "@/lib/auth/current-user";
 import { getCatalog, getSettings } from "@/lib/billing/service";
 import { listBoostSubjects, resolveTarget, TARGETINGS, type BoostTargeting } from "@/lib/billing/boost";
 import { getProfileById } from "@/lib/profile/service";
+import { flagEnabled } from "@/lib/system/flags";
 
 /**
  * GET /api/v1/billing/boost/eligible (Doc7 §38) — the boost purchase screen's
@@ -28,6 +29,11 @@ export async function GET() {
 
   const profile = await getProfileById(claims.sub);
   if (!profile) return fail("UNAUTHORIZED");
+
+  // A22 Feature flags → Boost. Off = nothing is boostable (the purchase screen is
+  // empty); existing boosts keep running. Default-on, so no change while enabled.
+  if (!(await flagEnabled("boost", { role: profile.role, userId: claims.sub })))
+    return ok({ listings: [], durations: [], targets: [], targetLabels: {} });
 
   const [subjects, rates, settings] = await Promise.all([
     listBoostSubjects(claims.sub),

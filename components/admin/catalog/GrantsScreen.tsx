@@ -31,7 +31,7 @@ import {
   useToast,
   usePanels,
 } from "@/components/admin/ds";
-import { Pager, useAdminList } from "@/components/admin/list";
+import { Pager, useAdminList, ListError } from "@/components/admin/list";
 import { GrantTrialOverlay, makeRunner } from "../users/overlays";
 
 export type GrantRow = {
@@ -180,7 +180,9 @@ export function GrantsScreen() {
           saved link or an export URL narrows exactly as it always did; what is
           gone is a control the design never had. Same miss as A12's mobile. */}
 
-      {list.loading ? (
+      {list.error ? (
+        <ListError code={list.error} onRetry={list.reload} />
+      ) : list.loading ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {[0, 1, 2, 3].map((i) => (
             <Shimmer key={i} h={56} />

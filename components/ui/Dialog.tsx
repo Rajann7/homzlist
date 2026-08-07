@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
+import { useBackClose } from "@/lib/hooks/use-back-close";
 import { Button } from "./Button";
 
 /**
@@ -54,6 +55,9 @@ export function ConfirmDialog({
     setWasOpen(open);
     setTyped("");
   }
+
+  // Android Back dismisses the dialog rather than the screen behind it (Doc3 §98).
+  useBackClose(open, onClose);
 
   useEffect(() => {
     if (!open) return;

@@ -11,6 +11,7 @@ import { uploadProfileMedia, removeProfilePhoto } from "@/lib/profile/client";
 import { useToast } from "@/components/ui/Toast";
 import { Spinner } from "@/components/ui/Spinner";
 import { cn } from "@/lib/utils";
+import { Img } from "@/components/ui/Img";
 
 /**
  * S7 Basic Details (P1, pixel-exact). Title 24/700 · avatar 84px dashed circle
@@ -85,8 +86,7 @@ export function Details({ role, onBack, onDone }: { role: string; onBack: () => 
             {uploading ? (
               <Spinner size={22} className="text-accent" />
             ) : photoUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={photoUrl} alt="" className="h-full w-full object-cover" />
+              <Img src={photoUrl} alt="" className="h-full w-full object-cover" />
             ) : (
               <Icon name="camera" size={26} className="text-ink-tertiary" strokeWidth={1.7} />
             )}

@@ -7,6 +7,7 @@ import { BackButton, OfflineBanner } from "@/components/billing/primitives";
 import { ConfirmDialog } from "@/components/ui/Dialog";
 import { proposalsApi, type ReceivedProposal } from "@/lib/listings/client";
 import { cn } from "@/lib/utils";
+import { Img } from "@/components/ui/Img";
 
 /**
  * P8 S5 — Proposals Received (Doc7 §71).
@@ -188,7 +189,7 @@ function ProposalCard({
       {/* Attached listing rich card */}
       {p.listing && (
         <button onClick={() => p.listing && onOpenListing(p.listing.id)} className="flex items-center gap-3 rounded-8 bg-surface-2 p-3 text-left">
-          <span className="h-14 w-14 shrink-0 overflow-hidden rounded-8 bg-surface-3">{p.listing.coverUrl && <img src={p.listing.coverUrl} alt="" className="h-full w-full object-cover" />}</span>
+          <span className="h-14 w-14 shrink-0 overflow-hidden rounded-8 bg-surface-3">{p.listing.coverUrl && <Img src={p.listing.coverUrl} alt="" className="h-full w-full object-cover" />}</span>
           <span className="min-w-0 flex-1">
             <span className="block truncate text-13 font-semibold text-ink-primary">{p.listing.title ?? "Listing"}</span>
             <span className="block truncate text-11 text-ink-tertiary">{[p.listing.priceLabel, p.listing.areaLabel].filter(Boolean).join(" · ")}</span>

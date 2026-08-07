@@ -93,6 +93,7 @@ const BILLING: [label: string, days: number | null][] = [
 type Draft = {
   name: string;
   sub_label: string;
+  features: string[];
   price: string;
   period_days: number | null;
   roles: string[];
@@ -122,6 +123,7 @@ export function PlanEditPanelBody({ panel }: { panel: PanelEntry }) {
       const blank: Draft = {
         name: "",
         sub_label: "",
+        features: [],
         price: "0",
         period_days: null,
         roles: [...ROLES],
@@ -147,6 +149,7 @@ export function PlanEditPanelBody({ panel }: { panel: PanelEntry }) {
     const d: Draft = {
       name: p.name,
       sub_label: p.sub_label ?? "",
+      features: p.features ?? [],
       price: String(Math.round(p.price_paise / 100)),
       period_days: p.period_days,
       roles: p.roles,
@@ -191,6 +194,7 @@ export function PlanEditPanelBody({ panel }: { panel: PanelEntry }) {
     if (draft[k] !== original[k]) changes.push(`${label} ${original[k]} → ${draft[k]}`);
   }
   if (JSON.stringify(draft.roles) !== JSON.stringify(original.roles)) changes.push("Roles changed");
+  if (JSON.stringify(draft.features) !== JSON.stringify(original.features)) changes.push("Features changed");
   if (draft.requirement_access !== original.requirement_access)
     changes.push(`Requirement access ${draft.requirement_access ? "on" : "off"}`);
   if (draft.is_active !== original.is_active)
@@ -205,6 +209,7 @@ export function PlanEditPanelBody({ panel }: { panel: PanelEntry }) {
           changes: {
             name: draft!.name,
             sub_label: draft!.sub_label || null,
+            features: draft!.features,
             price_paise: Math.round(Number(draft!.price) * 100),
             period_days: draft!.period_days,
             roles: draft!.roles,
@@ -222,6 +227,7 @@ export function PlanEditPanelBody({ panel }: { panel: PanelEntry }) {
           code: newCode,
           name: draft!.name,
           sub_label: draft!.sub_label || null,
+          features: draft!.features,
           price_paise: Math.round(Number(draft!.price) * 100),
           period_days: draft!.period_days,
           roles: draft!.roles,
@@ -370,6 +376,21 @@ export function PlanEditPanelBody({ panel }: { panel: PanelEntry }) {
             onChange={(e) => set("sub_label", e.target.value)}
             placeholder="Best for individual owners"
             style={inputStyle}
+          />
+        </Field>
+
+        <Field label="Features (one per line)">
+          <textarea
+            value={draft.features.join("\n")}
+            onChange={(e) =>
+              set(
+                "features",
+                e.target.value.split("\n").map((s) => s.trim()).filter(Boolean),
+              )
+            }
+            placeholder={"1 property listing\nUnlimited photos\nPriority support"}
+            rows={4}
+            style={{ ...inputStyle, height: "auto", resize: "vertical", fontFamily: "inherit" }}
           />
         </Field>
 

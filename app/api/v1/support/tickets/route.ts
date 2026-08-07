@@ -3,6 +3,7 @@ import { ok, fail } from "@/lib/api";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { listMyTickets, createTicket } from "@/lib/support/service";
 import { createServiceClient } from "@/lib/supabase/server";
+import { rateLimit } from "@/lib/auth/rate-limit";
 
 /**
  * GET  /api/v1/support/tickets — my tickets + the three tab counts.
@@ -26,6 +27,12 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   const claims = await getCurrentUser();
   if (!claims) return fail("UNAUTHORIZED");
+
+  // Governed by the admin `support_ticket` rule (A22 Limits & velocity), so the
+  // panel's value actually caps how many tickets one account opens; the numbers
+  // here are the fallback if the rule is unreachable.
+  const limited = await rateLimit(`support-ticket:${claims.sub}`, 5, 86_400, "support_ticket");
+  if (!limited.allowed) return fail("RATE_LIMITED", { retryAfterSec: limited.retryAfterSec });
 
   let body: Record<string, string | string[] | undefined>;
   try { body = await req.json(); } catch { return fail("VALIDATION_ERROR"); }

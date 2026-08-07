@@ -26,7 +26,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
   if (!claims) return fail("UNAUTHORIZED");
   if (!UUID_RE.test(params.id)) return fail("NOT_FOUND");
 
-  const limited = await rateLimit(`photo-presign:${claims.sub}`, 200, 3600);
+  const limited = await rateLimit(`photo-presign:${claims.sub}`, 200, 3600, "photo_upload");
   if (!limited.allowed) return fail("RATE_LIMITED");
 
   // Ownership: you may only add photos to your OWN listing.

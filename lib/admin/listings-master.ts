@@ -291,6 +291,10 @@ const EDITABLE: Record<MasterKind, Set<string>> = {
     "is_negotiable",
     "deposit_paise",
     "maintenance_paise",
+    // Compliance edits — a wrong or abusive contact number is exactly what an
+    // admin needs to be able to correct (every change is logged with the old value).
+    "contact_number",
+    "alt_number",
   ]),
   project: new Set([
     "name",

@@ -7,6 +7,8 @@ import { Icon } from "@/components/ui/Icon";
 import { FactsStrip, MetaChip, OverlayChip } from "./cardChrome";
 import type { FeedCard as Card } from "@/lib/feed/client";
 import { cn } from "@/lib/utils";
+import { Img } from "@/components/ui/Img";
+import { prefetchImages } from "@/lib/pwa/prefetch";
 
 /**
  * The PROPERTY card in the home feed (P2), redesigned 28 Jul 2026 (Rajan) to
@@ -80,7 +82,10 @@ export function FeedCard({
   return (
     <article
       className={cn(
-        "bg-surface-1 pb-3",
+        // `chrome`: a card is UI, not prose. Without it the global `article`
+        // rule made the whole card selectable, so a slow swipe on the photo
+        // started a text selection instead of paging the carousel.
+        "chrome bg-surface-1 pb-3",
         rail ? "flex h-full flex-col overflow-hidden rounded-8 border border-border" : "border-b border-divider",
       )}
     >
@@ -90,7 +95,14 @@ export function FeedCard({
           onScroll={(e) => {
             const el = e.target as HTMLDivElement;
             scrolledAt.current = Date.now();
-            setIdx(Math.round(el.scrollLeft / el.clientWidth));
+            const next = Math.round(el.scrollLeft / el.clientWidth);
+            // Only on a real page change. This used to setState on EVERY scroll
+            // event, so a single swipe re-rendered the whole card 20–30 times —
+            // the dots and the counter never changed on most of them.
+            if (next === idx) return;
+            setIdx(next);
+            // Warm the photo after the one being swiped to (Doc8 §173).
+            prefetchImages([photos[next + 1]], 1);
           }}
           onClick={onPhotoTap}
           // 16/9 — Rajan's call (24 Jul 2026), overriding designs/P2's 4/5. The
@@ -100,8 +112,7 @@ export function FeedCard({
         >
           {photos.length ? (
             photos.map((p, i) => (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img key={i} src={p} alt="" className="h-full w-full shrink-0 snap-center object-cover" />
+              <Img key={i} src={p} alt="" className="h-full w-full shrink-0 snap-center object-cover" />
             ))
           ) : (
             <div className="grid h-full w-full place-items-center bg-surface-3 text-ink-tertiary">
@@ -134,7 +145,7 @@ export function FeedCard({
           {photos.length > 1 && (
             <span className="ml-auto flex shrink-0 items-center gap-1">
               {photos.map((_, i) => (
-                <span key={i} className={cn("rounded-full transition-all", i === idx ? "h-1.5 w-1.5 bg-white" : "h-1 w-1 bg-white/50")} />
+                <span key={i} className={cn("rounded-full transition-[width,height] duration-150 ease-out-quart", i === idx ? "h-1.5 w-1.5 bg-white" : "h-1 w-1 bg-white/50")} />
               ))}
             </span>
           )}

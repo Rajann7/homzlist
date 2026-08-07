@@ -16,6 +16,7 @@ Status as of **2 Aug 2026**.
 
 | # | Item | Blocked on | Costs money / breaks a flow? |
 |---|---|---|---|
+| **B0** | Admin Google OAuth credentials | 🔑 Rajan (Google Cloud console) | 🔴 YES — **nobody can sign into the admin panel in production**. Found by the 7 Aug 2026 admin audit; the endpoint now refuses with a logged reason instead of a raw 500. |
 | **B1** | Razorpay webhook secret | 🔑 Rajan (Razorpay dashboard) | 🔴 YES — late payments never settle |
 | **B2** | Cron not scheduled in prod | 🚀 Deploy step (`CRON_SECRET` on host) | 🔴 YES — expiry/refund/reminders/anomalies never run |
 | **B3** | Reminder delivery (push/email) | 🔑 FCM + Resend keys | No — reminders are recorded, not delivered |
@@ -39,15 +40,20 @@ which are optional, which is mandatory, and the exact env switch for each. Every
 | Key | Skippable? | How it degrades / what to set | Verified at |
 |---|---|---|---|
 | **MSG91** | 🔴 **NO — required for prod** | OTP login. In production the dev OTP provider **throws** — with no MSG91, nobody can sign in. Set `OTP_PROVIDER=msg91` + its keys. | `lib/auth/otp-provider.ts:34,47` |
+| **Google OAuth (admin)** | 🔴 **NO — required for prod** | ADMIN panel sign-in. The dev admin provider 404s under `NODE_ENV=production` by design, so without `GOOGLE_OAUTH_CLIENT_ID` + `GOOGLE_OAUTH_CLIENT_SECRET` **no staff member can enter the panel at all** — `POST /api/v1/admin/auth/start` refuses and logs which variables are missing. Set both on the host, with the callback at `https://account.homzlist.com/api/v1/admin/auth/google/callback`. | `lib/admin/auth-provider.ts:36-45`, `app/api/v1/admin/auth/start/route.ts` |
 | **R2** | ✅ yes | Media already lives in Supabase Storage. Leave `STORAGE_DRIVER=supabase` (the default). Switching to R2 later is a config change + object migration, no code change. | `lib/storage.ts:12-18,89` |
 | **Resend** | ✅ yes | Email send is guarded: `if (!resendApiKey) return { sent:false, reason:"no_credentials" }`. Emails are **recorded** in `notification_deliveries`, just not delivered. | `lib/notifications/email.ts:58` |
 | **FCM** | ✅ yes | Push is guarded the same way — notifications are recorded, not pushed to the device. | `lib/notifications/push-client.ts:46` |
 | **Redis** | ⚠️ partial | Cache runs without it: `KV_DRIVER=memory`. But that store is **per-process**, so it only holds on a SINGLE server, and the BullMQ crons (boost expiry, refund, reminders, anomalies — see **B2**) need a real Redis. | `lib/kv.ts:151-152` |
 
-**Short version:** only **MSG91** is a hard blocker. R2 / Resend / FCM can all be
-skipped and turned on later; the app runs and records the work. Redis can be
-skipped for a single-server launch with `KV_DRIVER=memory`, but the scheduled
-jobs need a real one.
+**Short version:** there are **two** hard blockers, one per door — **MSG91** for
+the USER login and **Google OAuth** for the ADMIN login. Miss either and that
+side of the product cannot be signed into at all. (This list said "only MSG91"
+until the 7 Aug 2026 admin audit: Google OAuth was documented further down but
+absent from this table, which is the one a launch actually reads.)
+R2 / Resend / FCM can all be skipped and turned on later; the app runs and
+records the work. Redis can be skipped for a single-server launch with
+`KV_DRIVER=memory`, but the scheduled jobs need a real one.
 
 ## Closed by Module 11
 
@@ -2024,14 +2030,24 @@ the transitions themselves did not exist. Module 10 built them —
 fires. What is still missing is the P13-15 dashboard UI that calls them. Same
 shape as M9.6: an API + payload that works, waiting on a rendering job.
 
-## M10.5 — 🟡 Appeals: the user's half is real, the resolution half is Module 13-15
+## M10.5 — ✅ RESOLVED (Module 11) — appeals can be resolved
 
 The design's rejected-listing row carries an "Appeal" button that, in the
-prototype, only toasted. It now writes a real `moderation_appeals` row (0044,
-one open appeal per item per user). **Nobody can resolve it yet** — there is no
-admin appeals queue, so `status` stays `'open'` forever. Doc7 §137
-(`POST /admin/appeal/:id/resolve`) is the missing half. Flagging it rather than
-leaving a button that silently files into a void.
+prototype, only toasted. It writes a real `moderation_appeals` row (0044, one
+open appeal per item per user). It was flagged here because nothing could ever
+resolve one, so `status` stayed `'open'` forever.
+
+Module 11 built the missing half: `components/admin/queues/AppealsQueue.tsx`
+against `app/api/v1/admin/queues/[queue]/[id]/route.ts` (the `appeals` branch,
+audited as `appeal_upheld` / `appeal_rejected`). Verified from the DB during the
+Module 13 sweep — the state machine is genuinely exercised, not just wired:
+
+    status     count
+    upheld       59
+    open          2
+    rejected      3
+
+Closing the entry: the dead-end this recorded no longer exists.
 
 ## M10.6 — 🟡 Cron dependency (inherits B2)
 

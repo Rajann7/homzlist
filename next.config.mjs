@@ -1,5 +1,30 @@
 /** @type {import('next').NextConfig} */
 import os from "node:os";
+import { execSync } from "node:child_process";
+import { readFileSync } from "node:fs";
+
+// App version shown in Settings (Doc3 §98 "version in settings"). Read from the
+// package + the commit being built, so it can never be a number someone typed
+// into a component and forgot — the screen used to read "Version 1.0.2 (build
+// 148)" on every build, which told support nothing about what the user is on.
+const pkgVersion = (() => {
+  try {
+    return JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf8")).version || "0.0.0";
+  } catch {
+    return "0.0.0";
+  }
+})();
+const buildRef = (() => {
+  // Vercel/CI expose the SHA; a local build asks git; neither = the build date,
+  // which is still a real fact about this bundle.
+  const ci = process.env.VERCEL_GIT_COMMIT_SHA || process.env.GITHUB_SHA;
+  if (ci) return ci.slice(0, 7);
+  try {
+    return execSync("git rev-parse --short HEAD", { stdio: ["ignore", "pipe", "ignore"] }).toString().trim();
+  } catch {
+    return new Date().toISOString().slice(0, 10).replace(/-/g, "");
+  }
+})();
 
 // Doc9 §14 — HTTP security headers applied at the app layer (Cloudflare adds edge layer too).
 const isProd = process.env.NODE_ENV === "production";
@@ -100,6 +125,10 @@ const devOrigins = isProd
 
 const nextConfig = {
   reactStrictMode: true,
+  env: {
+    NEXT_PUBLIC_APP_VERSION: pkgVersion,
+    NEXT_PUBLIC_APP_BUILD: buildRef,
+  },
   ...(devOrigins ? { allowedDevOrigins: devOrigins } : {}),
   // Next 15 walks up looking for a lockfile to decide what to trace into the
   // standalone output. A stray package-lock.json in the home directory made it

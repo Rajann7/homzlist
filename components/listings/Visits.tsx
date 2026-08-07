@@ -7,6 +7,7 @@ import { BackButton, OfflineBanner } from "@/components/billing/primitives";
 import { ConfirmDialog } from "@/components/ui/Dialog";
 import { visitsApi, type VisitView } from "@/lib/listings/client";
 import { cn } from "@/lib/utils";
+import { Img } from "@/components/ui/Img";
 
 /**
  * P8 S1 — My Visits (Doc7 §102).
@@ -161,7 +162,7 @@ function VisitCard({ v, onReschedule, onCancel, onOutcome, onMessage }: {
   return (
     <div className={cn("flex flex-col gap-3 rounded-12 border border-border bg-surface-1 p-3", (v.status === "completed" || v.status === "cancelled") && "opacity-60")}>
       <div className="flex gap-3">
-        <span className="h-14 w-14 shrink-0 overflow-hidden rounded-8 bg-surface-3">{v.listing?.coverUrl && <img src={v.listing.coverUrl} alt="" className="h-full w-full object-cover" />}</span>
+        <span className="h-14 w-14 shrink-0 overflow-hidden rounded-8 bg-surface-3">{v.listing?.coverUrl && <Img src={v.listing.coverUrl} alt="" className="h-full w-full object-cover" />}</span>
         <div className="min-w-0 flex-1">
           <div className="truncate text-15 font-semibold text-ink-primary">{v.listing?.title ?? "Property visit"}</div>
           <div className="truncate text-11 text-ink-tertiary">{[v.listing?.priceLabel, v.listing?.areaLabel].filter(Boolean).join(" · ")}</div>

@@ -171,17 +171,17 @@ export function ReviewDetail({
         body: JSON.stringify(body),
       }).catch(() => null);
       const json = (await res?.json().catch(() => null)) as
-        | { ok: boolean; data?: { locked?: boolean }; error?: { code: string } }
+        | { ok: boolean; data?: { locked?: boolean }; error?: { code: string; message?: string } }
         | null;
       setBusy(false);
       setOverlay(null);
 
       if (!json?.ok) {
-        toast(
-          json?.error?.code === "LISTING_STATE_LOCKED"
-            ? "Someone else already decided this one"
-            : "That didn't go through — try again",
-        );
+        // The server knows WHY it refused and what to do about it — a listing
+        // already decided, or locked after three rejections, are different
+        // situations with different remedies. Guessing "someone else already
+        // decided this one" for both was wrong whenever the someone was you.
+        toast(json?.error?.message ?? "That didn't go through — try again");
         return;
       }
       toast(json.data?.locked ? `${done} · listing is now locked` : `${done} · next in queue`);

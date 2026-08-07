@@ -1,6 +1,8 @@
 "use client";
 
 import { apiFetch } from "@/lib/auth/api-fetch";
+import { enqueue } from "@/lib/pwa/offline-queue";
+import { syncAppBadge } from "@/lib/pwa/app-badge";
 
 /**
  * Client-side feed API. Same discipline as the rest: asks the server questions,
@@ -104,8 +106,17 @@ export const feedApi = {
     req<{ items: { id: string; coverUrl: string | null; price: string; areaLabel: string | null }[] }>(`/feed/suggested?${new URLSearchParams(city(cityId)).toString()}`),
   newCount: (since: string, cityId?: string | null) =>
     req<{ count: number }>(`/feed/new-count?${new URLSearchParams({ since, ...city(cityId) }).toString()}`),
-  banner: () => req<{ banner: { id: string; title: string; subtitle: string | null; imageUrl: string | null; targetUrl: string | null } | null }>("/feed/banner"),
-  badges: () => req<{ messages: number; notifications: number | null }>("/feed/badges"),
+  banner: () => req<{ banner: { id: string; title: string; subtitle: string | null; imageUrl: string | null; targetUrl: string | null; frequencyCap: number } | null }>("/feed/banner"),
+  /**
+   * The header bell + Messages counts. Also the ONE place the installed app's
+   * icon badge is set from (Doc3 §98) — so the OS number is always the server's
+   * number, and every screen that already reads this keeps it current.
+   */
+  badges: async () => {
+    const res = await req<{ messages: number; notifications: number | null }>("/feed/badges");
+    if (res.ok) syncAppBadge(res.data);
+    return res;
+  },
   notInterested: (target: { typeCode?: string; areaId?: string }) => req<{ ok: boolean }>("/feed/not-interested", "POST", target),
 };
 
@@ -116,7 +127,23 @@ export const storiesApi = {
 };
 
 export const interactionsApi = {
-  toggleSave: (listingId: string) => req<{ saved: boolean }>("/saves", "POST", { listingId }),
+  /**
+   * `currentlySaved` is only read when the request cannot leave the device: the
+   * queued toggle's outcome is the opposite of what the card shows right now, so
+   * the heart can settle immediately and still be correct when it replays
+   * (Doc3 §98 offline action queue). Online, the server's answer wins as before.
+   */
+  toggleSave: async (listingId: string, currentlySaved?: boolean) => {
+    const res = await req<{ saved: boolean }>("/saves", "POST", { listingId });
+    if (res.ok || res.error.code !== "OFFLINE") return res as ApiResult<{ saved: boolean; queued?: boolean }>;
+    // A caller that doesn't know the current state (the explore peek) can't be
+    // given an optimistic answer — a queued TOGGLE would land on the opposite of
+    // whatever we guessed. It gets the honest offline error instead.
+    if (currentlySaved === undefined) return res as ApiResult<{ saved: boolean; queued?: boolean }>;
+    const queued = await enqueue({ kind: currentlySaved ? "unsave" : "save", path: "/api/v1/saves", method: "POST", body: { listingId } });
+    if (!queued) return res as ApiResult<{ saved: boolean; queued?: boolean }>;
+    return { ok: true as const, data: { saved: !currentlySaved, queued: true } };
+  },
   inquiry: (listingId: string, body: { message: string; intents?: string[]; shareNumber?: boolean }) =>
     req<{ sent: boolean; alreadySent: boolean }>("/inquiries", "POST", { listingId, ...body }),
   /**

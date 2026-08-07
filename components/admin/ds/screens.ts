@@ -102,6 +102,12 @@ export const SCREEN_MIN_ROLE: Record<string, AdminRole> = {
   masterData: "admin",
   cms: "admin",
   templates: "admin",
+  // A23 Tickets gates at Admin on the page (`screenGate("admin")`). Missing
+  // here, the sidebar offered Staff a Support ▸ Tickets row WITH a badge count
+  // and the dashboard offered them a Tickets tile — both landing on the lock
+  // gate. The table is what `canSee` reads, so an entry missing from it is a
+  // screen advertised to a role that cannot open it.
+  tickets: "admin",
   disputes: "admin",
   cron: "admin",
   trash: "admin",

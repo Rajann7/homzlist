@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { BottomNav, DEFAULT_NAV } from "@/components/nav/BottomNav";
 import { useRole } from "@/components/nav/RoleContext";
+import { NetworkStatus } from "@/components/pwa/NetworkStatus";
+import { ScrollRestore } from "@/components/nav/ScrollRestore";
 import { FeedHeader } from "./FeedHeader";
 import { PullSpinner } from "./primitives";
 import { CitySheet, type CityRow } from "./CitySheet";
@@ -99,6 +101,11 @@ export function FeedShell({
         onSaved={() => router.push("/saved")}
         onDashboard={role ? () => router.push("/dashboard") : undefined}
       />
+      {/* The feed does NOT go through AppShell — it has its own header, scroller
+          and nav — so the shell-level pieces have to be mounted here too, or the
+          app's most-used screen is the one screen with no offline banner and no
+          scroll restore (Doc3 §98 / Doc8 §193). */}
+      <NetworkStatus />
       <div
         ref={ref}
         // Design P2 threshold: scrollTop > 60 (was 80 — the header morphed late).
@@ -108,6 +115,7 @@ export function FeedShell({
         onTouchEnd={onTouchEnd}
         className={cn("flex-1 overflow-y-auto overscroll-contain")}
       >
+        <ScrollRestore />
         <PullSpinner active={refreshing} distance={pull} />
         {children}
       </div>

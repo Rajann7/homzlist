@@ -18,6 +18,7 @@ import {
   saveBlocklistWord,
   saveLocation,
   savePattern,
+  addPropertyType,
   savePropertyType,
   savePropertyTypeConfig,
   searchLocations,
@@ -89,6 +90,7 @@ export async function POST(req: NextRequest) {
       case "amenity_merge":   result = await mergeAmenity(id, String(body.into ?? ""), me); break;
       case "amenity_delete":  result = await deleteAmenity(id, me); break;
       // property types
+      case "type_add":        result = await addPropertyType(body, me); break;
       case "type_toggle":     result = await togglePropertyType(id, on, me); break;
       case "type_save":       result = await savePropertyType({ ...body, code: id }, me); break;
       case "type_config":     result = await savePropertyTypeConfig(id, body.config, me); break;

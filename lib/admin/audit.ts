@@ -25,7 +25,15 @@ export type AuditEntry = {
   caseRef?: string | null;
 };
 
-export async function writeAudit(me: AdminIdentity, entry: AuditEntry): Promise<void> {
+/**
+ * `Pick` rather than the whole identity: the Module 4/6/9 moderation endpoints
+ * are driven by an ordinary user session and have no `staff_sessions` row to
+ * name, but their decisions still belong in the trail. Widening the parameter
+ * is what lets them write one without inventing a session id.
+ */
+export type AuditActor = Pick<AdminIdentity, "id" | "name" | "role">;
+
+export async function writeAudit(me: AuditActor, entry: AuditEntry): Promise<void> {
   const { ip, device } = await requestContext();
   const db = createServiceClient();
   const { error } = await db.from("admin_audit_log").insert({

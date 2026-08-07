@@ -29,7 +29,9 @@ import {
   Thumb,
   useToast,
   SCREEN_ROUTES,
+  canSee,
   type AdminIconName,
+  type AdminRole,
 } from "@/components/admin/ds";
 import type {
   AnomalyBanner,
@@ -48,6 +50,27 @@ export type DashboardProps = {
   revenue: RevenueSeries;
   overdue: { total: number; items: OverdueItem[] };
   strips: SystemStrip[];
+  /** Whose dashboard this is — decides which deep links are offered. */
+  role: AdminRole;
+};
+
+/**
+ * Every clickable surface on this screen was a `div`/`span` with an `onClick`:
+ * the seven tiles, the banner link, the overdue rows and the three system
+ * strips. That is the whole of the dashboard's navigation, and none of it was
+ * reachable by keyboard or announced as a control.
+ *
+ * They are `<button>` now. This is the reset that keeps them looking EXACTLY as
+ * drawn — a button brings its own font, alignment, width and appearance, and
+ * the design lock says the fix must not change a pixel.
+ */
+const BARE_BUTTON = {
+  font: "inherit",
+  color: "inherit",
+  textAlign: "left" as const,
+  width: "100%",
+  appearance: "none" as const,
+  margin: 0,
 };
 
 const GRID = {
@@ -69,6 +92,7 @@ export function Dashboard({
   revenue,
   overdue,
   strips,
+  role,
 }: DashboardProps) {
   const router = useRouter();
   const toast = useToast();
@@ -125,6 +149,23 @@ export function Dashboard({
     if (href) router.push(href);
   };
 
+  /**
+   * The same predicate the sidebar uses — one source of truth for "may this
+   * role open that screen".
+   *
+   * Without it the dashboard was the sidebar's loophole: a Staff admin was
+   * shown a Tickets tile with a live count, three system strips linking to the
+   * Admin-only System status screen, and anomaly banners linking wherever the
+   * detector pointed — every one of them landing on the lock gate.
+   *
+   * Tiles are DROPPED (a tile is nothing but a link, and the sidebar's own rule
+   * is to drop what the role cannot see). Banners and strips KEEP their text —
+   * an anomaly and a failing backup are worth knowing about either way — and
+   * lose only the link.
+   */
+  const canOpen = (screen: string) => canSee(role, screen);
+  const visibleTiles = tiles.filter((t) => canOpen(t.screen));
+
   const maxTotal = Math.max(...series.bars.map((b) => b.total), 1);
 
   return (
@@ -174,11 +215,13 @@ export function Dashboard({
 
       {/* ── row 1 · queue tiles (template 529-533) ───────────────────────── */}
       <div className={GRID.tiles}>
-        {tiles.map((t) => (
-          <div
+        {visibleTiles.map((t) => (
+          <button
+            type="button"
             key={t.label}
             onClick={() => go(t.screen)}
             style={{
+              ...BARE_BUTTON,
               background: "var(--s1)",
               border: "1px solid var(--border)",
               borderRadius: 12,
@@ -206,7 +249,7 @@ export function Dashboard({
             >
               {t.age}
             </div>
-          </div>
+          </button>
         ))}
       </div>
 
@@ -294,26 +337,44 @@ export function Dashboard({
             <span style={{ fontSize: 13, fontWeight: 600, color: "var(--ink1)", flex: 1 }}>
               {b.text}
             </span>
-            <span
-              onClick={() => go(b.screen)}
+            {canOpen(b.screen) ? (
+              <button
+                type="button"
+                onClick={() => go(b.screen)}
+                style={{
+                  ...BARE_BUTTON,
+                  width: "auto",
+                  background: "none",
+                  border: 0,
+                  padding: 0,
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: "var(--accent)",
+                  cursor: "pointer",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {b.linkLabel}
+              </button>
+            ) : null}
+            <button
+              type="button"
+              onClick={() => dismiss(b.id)}
+              aria-label="Dismiss"
               style={{
-                fontSize: 13,
-                fontWeight: 600,
-                color: "var(--accent)",
+                ...BARE_BUTTON,
+                width: "auto",
+                background: "none",
+                border: 0,
+                padding: 0,
+                color: "var(--ink3)",
                 cursor: "pointer",
-                whiteSpace: "nowrap",
+                flex: "none",
+                display: "flex",
               }}
             >
-              {b.linkLabel}
-            </span>
-            <span
-              onClick={() => dismiss(b.id)}
-              role="button"
-              aria-label="Dismiss"
-              style={{ color: "var(--ink3)", cursor: "pointer", flex: "none", display: "flex" }}
-            >
               <AdminIcon name="x" size={16} />
-            </span>
+            </button>
           </div>
         ))}
 
@@ -422,10 +483,14 @@ export function Dashboard({
             </div>
           ) : (
             overdue.items.map((o, i) => (
-              <div
+              <button
+                type="button"
                 key={o.id}
                 onClick={() => router.push(`${SCREEN_ROUTES.listings}/${o.id}`)}
                 style={{
+                  ...BARE_BUTTON,
+                  background: "none",
+                  border: 0,
                   display: "flex",
                   alignItems: "center",
                   gap: 10,
@@ -455,7 +520,7 @@ export function Dashboard({
                 <span style={{ color: "var(--ink3)" }}>
                   <AdminIcon name="chevR" size={16} />
                 </span>
-              </div>
+              </button>
             ))
           )}
         </Card>
@@ -465,33 +530,49 @@ export function Dashboard({
 
       {/* ── row 5 · system strips (template 592-594) ─────────────────────── */}
       <div className={GRID.strips}>
-        {strips.map((st) => (
-          <div
-            key={st.title}
-            onClick={() => go("cron")}
-            style={{
-              background: "var(--s1)",
-              border: "1px solid var(--border)",
-              borderRadius: 12,
-              boxShadow: "var(--L1)",
-              padding: 14,
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
-              cursor: "pointer",
-            }}
-          >
-            <span style={{ color: st.tone, flex: "none", display: "flex" }}>
-              <AdminIcon name={st.icon} size={20} />
-            </span>
-            <div>
-              <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink1)" }}>
-                {st.title}
+        {strips.map((st) => {
+          // Every strip opens System status, which is an Admin screen. A Staff
+          // admin still needs to SEE that a backup failed — they just cannot
+          // open the screen, so the card stays and the click goes.
+          const opens = canOpen("cron");
+          const body = (
+            <>
+              <span style={{ color: st.tone, flex: "none", display: "flex" }}>
+                <AdminIcon name={st.icon} size={20} />
+              </span>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink1)" }}>
+                  {st.title}
+                </div>
+                <div style={{ fontSize: 12, color: "var(--ink2)", marginTop: 2 }}>{st.detail}</div>
               </div>
-              <div style={{ fontSize: 12, color: "var(--ink2)", marginTop: 2 }}>{st.detail}</div>
+            </>
+          );
+          const shell = {
+            background: "var(--s1)",
+            border: "1px solid var(--border)",
+            borderRadius: 12,
+            boxShadow: "var(--L1)",
+            padding: 14,
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+          } as const;
+          return opens ? (
+            <button
+              type="button"
+              key={st.title}
+              onClick={() => go("cron")}
+              style={{ ...BARE_BUTTON, ...shell, cursor: "pointer" }}
+            >
+              {body}
+            </button>
+          ) : (
+            <div key={st.title} style={shell}>
+              {body}
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

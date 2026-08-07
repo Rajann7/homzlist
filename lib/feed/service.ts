@@ -995,31 +995,63 @@ export interface FeedBanner {
   subtitle: string | null;
   imageUrl: string | null;
   targetUrl: string | null;
+  /** 0 = show every visit · 1 = once per day · 2 = once per session. Enforced client-side. */
+  frequencyCap: number;
+}
+
+/** Who is asking, so a role/city-targeted banner reaches only its audience. */
+export interface BannerViewer {
+  role?: string | null;
+  cityId?: string | null;
 }
 
 /**
  * The active admin banner for the feed slot (P2 "admin banner"; Doc2 §9).
  *
- * Server-decided, DB-driven (migration 0027): the single highest-priority active
- * banner whose schedule window (if any) is open right now. NULL → the slot
- * simply doesn't render. The P15 admin CMS edits these rows; nothing about the
- * banner is hardcoded in the component (CLAUDE.md rule 12).
+ * Server-decided, DB-driven (migration 0027): the highest-priority active banner
+ * whose schedule window is open AND whose targeting matches the viewer. NULL →
+ * the slot doesn't render. The P15 admin CMS edits these rows.
+ *
+ * Targeting (`target_roles`, `target_cities`) is applied HERE — an empty array
+ * means "everyone", otherwise the viewer's role/city must be in it. Guests (no
+ * role/city) therefore see only untargeted banners, never one aimed at a role or
+ * city they don't have. This is what stops an admin's "Builders in Rajkot only"
+ * banner from being shown to everyone.
  */
-export async function activeFeedBanner(): Promise<FeedBanner | null> {
+export async function activeFeedBanner(viewer: BannerViewer = {}): Promise<FeedBanner | null> {
   const nowIso = new Date().toISOString();
   const { data } = await db()
     .from("feed_banners")
-    .select("id,title,subtitle,image_url,target_url,starts_at,ends_at")
+    .select("id,title,subtitle,image_url,target_url,frequency_cap,target_roles,target_cities,starts_at,ends_at")
     .eq("placement", "feed")
     .eq("is_active", true)
     .or(`starts_at.is.null,starts_at.lte.${nowIso}`)
     .or(`ends_at.is.null,ends_at.gte.${nowIso}`)
     .order("sort_order", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (!data) return null;
-  const b = data as { id: string; title: string; subtitle: string | null; image_url: string | null; target_url: string | null };
-  return { id: b.id, title: b.title, subtitle: b.subtitle, imageUrl: b.image_url, targetUrl: b.target_url };
+    .limit(20);
+
+  const rows = (data ?? []) as {
+    id: string; title: string; subtitle: string | null; image_url: string | null;
+    target_url: string | null; frequency_cap: number | null;
+    target_roles: string[] | null; target_cities: string[] | null;
+  }[];
+
+  const match = rows.find((b) => {
+    const roles = b.target_roles ?? [];
+    const cities = b.target_cities ?? [];
+    if (roles.length && !(viewer.role && roles.includes(viewer.role))) return false;
+    if (cities.length && !(viewer.cityId && cities.includes(viewer.cityId))) return false;
+    return true;
+  });
+  if (!match) return null;
+  return {
+    id: match.id,
+    title: match.title,
+    subtitle: match.subtitle,
+    imageUrl: match.image_url,
+    targetUrl: match.target_url,
+    frequencyCap: match.frequency_cap ?? 0,
+  };
 }
 
 /** "Suggested for you" strip (Doc7 §81) — a small area/recency set, mini cards. */

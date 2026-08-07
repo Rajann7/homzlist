@@ -1,6 +1,7 @@
 "use client";
 
 import { apiFetch } from "@/lib/auth/api-fetch";
+import { enqueue } from "@/lib/pwa/offline-queue";
 
 /**
  * Client-side Saved API (P10 S1). Asks the server; renders answers. No counts,
@@ -47,5 +48,16 @@ export const savedApi = {
   renameCollection: (id: string, name: string) => req<{ renamed: boolean }>(`/saved/collections/${id}`, "PATCH", { name }),
   deleteCollection: (id: string) => req<{ deleted: boolean }>(`/saved/collections/${id}`, "DELETE"),
   assign: (saveId: string, collectionId: string | null) => req<{ assigned: boolean }>(`/saved/items/${saveId}`, "PATCH", { collectionId }),
-  remove: (saveId: string) => req<{ removed: boolean }>(`/saved/items/${saveId}`, "DELETE"),
+  /**
+   * Queued when offline (Doc3 §98). A DELETE of one of MY save rows is
+   * idempotent, so replaying it minutes later can only reach the same end state
+   * — the reason this one is queueable and, say, a payment is not.
+   */
+  remove: async (saveId: string) => {
+    const res = await req<{ removed: boolean }>(`/saved/items/${saveId}`, "DELETE");
+    if (res.ok || res.error.code !== "OFFLINE") return res as ApiResult<{ removed: boolean; queued?: boolean }>;
+    const queued = await enqueue({ kind: "unsave", path: `/api/v1/saved/items/${saveId}`, method: "DELETE" });
+    if (!queued) return res as ApiResult<{ removed: boolean; queued?: boolean }>;
+    return { ok: true as const, data: { removed: true, queued: true } };
+  },
 };

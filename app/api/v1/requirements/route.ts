@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
   // Requirements are an Owner/Broker product — a Builder posts projects only.
   if (!canPostRequirement(profile.role)) return fail("FORBIDDEN");
 
-  const limited = await rateLimit(`requirement-post:${claims.sub}`, 20, 3600);
+  const limited = await rateLimit(`requirement-post:${claims.sub}`, 20, 3600, "requirement_create");
   if (!limited.allowed) return fail("RATE_LIMITED");
 
   let body: Record<string, unknown>;

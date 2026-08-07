@@ -48,9 +48,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <ToastProvider>
             {children}
             <InstallPrompt />
+            {/* Inside the provider: the registrar raises the "New version —
+                Refresh" toast (Doc3 §98), so it needs useToast. */}
+            <ServiceWorkerRegistrar />
           </ToastProvider>
         </ThemeProvider>
-        <ServiceWorkerRegistrar />
       </body>
     </html>
   );
