@@ -1,4 +1,18 @@
+import type { Metadata } from "next";
 import "../admin.css";
+
+/**
+ * The panel inherits the root layout, so every admin tab read "HomzList —
+ * Properties without spam calls" and carried the consumer app's marketing
+ * description and PWA manifest. account.* is a separate, non-indexed internal
+ * tool (Doc6 §4): it names itself, and it tells crawlers to stay out.
+ */
+export const metadata: Metadata = {
+  title: { default: "HomzList Admin", template: "%s · HomzList Admin" },
+  description: "HomzList staff panel.",
+  manifest: undefined,
+  robots: { index: false, follow: false },
+};
 
 /**
  * (admin) — account.homzlist.com. Fully isolated (separate cookie scope,

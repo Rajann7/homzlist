@@ -1,6 +1,6 @@
 import { AuditScreen } from "@/components/admin/ops/AuditScreen";
 import { AdminPanels } from "@/components/admin/panels/registry";
-import { requireAdmin } from "@/lib/admin/guard";
+import { screenGate } from "@/lib/admin/screen-gate";
 import { createServiceClient } from "@/lib/supabase/server";
 
 /** A26 — Audit log (Doc5 A26, template 2565-2601). Super only. */
@@ -8,7 +8,8 @@ export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
 
 export default async function AuditPage() {
-  await requireAdmin("super");
+  const gate = await screenGate("super");
+  if (!gate.ok) return gate.lock;
   const db = createServiceClient();
 
   // Every filter option is a DISTINCT over what the log actually contains, so

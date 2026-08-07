@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { ReviewDetail } from "@/components/admin/queues/ReviewDetail";
-import { requireAdmin } from "@/lib/admin/guard";
+import { screenGate } from "@/lib/admin/screen-gate";
 import { reviewPayload } from "@/lib/admin/review";
 import { claimReviewLock } from "@/lib/admin/review-lock";
 
@@ -25,7 +25,9 @@ export default async function ReviewPage(
 ) {
   const searchParams = await props.searchParams;
   const params = await props.params;
-  const me = await requireAdmin("staff");
+  const gate = await screenGate("staff");
+  if (!gate.ok) return gate.lock;
+  const me = gate.me;
   const tab = searchParams.tab ?? "pending";
 
   const [data, lock] = await Promise.all([

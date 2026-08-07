@@ -22,6 +22,7 @@ import {
   CopyBtn,
   PageHead,
   RoleChip,
+  RowCheck,
   SheetMenu,
   Shimmer,
   StatusBadge,
@@ -409,16 +410,11 @@ export function UsersScreen({
                       }}
                     >
                       <Td>
-                        <input
-                          type="checkbox"
+                        <RowCheck
                           checked={isSel}
                           disabled={deleted}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toggle(r.id);
-                          }}
-                          onChange={() => undefined}
-                          style={{ width: 16, height: 16, accentColor: "var(--accent)", cursor: "pointer" }}
+                          onToggle={() => toggle(r.id)}
+                          label={`Select ${r.name ?? "user"}`}
                         />
                       </Td>
                       {shows("user") ? (

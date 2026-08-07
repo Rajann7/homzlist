@@ -30,12 +30,25 @@ function isStandalone() {
   );
 }
 
+/**
+ * account.* is the admin panel — a different product on a different host
+ * (Doc6 §4). It inherits the root layout, so the consumer "Install HomzList"
+ * card was drawing itself over the admin dashboard, offering staff a home-screen
+ * shortcut to a tool that is not a PWA. Kept as a host check rather than a
+ * layout change so no route has to opt out.
+ */
+function isAdminHost() {
+  if (typeof window === "undefined") return false;
+  return window.location.hostname.split(".")[0].toLowerCase() === "account";
+}
+
 export function InstallPrompt() {
   const [deferred, setDeferred] = useState<BIPEvent | null>(null);
   const [showIosGuide, setShowIosGuide] = useState(false);
   const [dismissed, setDismissed] = useState(true);
 
   useEffect(() => {
+    if (isAdminHost()) return;
     if (isStandalone()) return;
     if (localStorage.getItem(DISMISS_KEY)) return;
     setDismissed(false);

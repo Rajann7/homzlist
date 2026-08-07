@@ -51,6 +51,34 @@ export async function onlineStaff(): Promise<OnlineStaff[]> {
   return out;
 }
 
+/**
+ * Who a locked-out admin is told to ask (template 1997 — "Ask <name> (Super
+ * Admin) for access"). A real row, never a hardcoded name: the copy has to
+ * survive the day that person leaves. The viewer themselves is excluded, and
+ * the longest-standing active Super Admin wins so everyone is pointed at the
+ * same person.
+ */
+export async function superAdminContact(exceptProfileId?: string): Promise<string> {
+  const db = createServiceClient();
+  const { data } = await db
+    .from("staff")
+    .select("profile_id, display_name, email, created_at")
+    .eq("level", "super")
+    .eq("is_active", true)
+    .eq("state", "active")
+    .order("created_at", { ascending: true });
+
+  const rows = (data ?? []) as {
+    profile_id: string;
+    display_name: string | null;
+    email: string | null;
+  }[];
+  const pick = rows.find((r) => r.profile_id !== exceptProfileId) ?? rows[0];
+  // No super admin at all is a broken install, not a screen state — but the
+  // copy still has to read as a sentence.
+  return pick?.display_name ?? pick?.email ?? "a Super Admin";
+}
+
 export type MaintenanceState = { on: boolean; since: string } | null;
 
 export async function maintenanceState(): Promise<MaintenanceState> {

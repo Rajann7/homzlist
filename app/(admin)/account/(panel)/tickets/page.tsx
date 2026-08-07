@@ -1,6 +1,6 @@
 import { TicketsScreen } from "@/components/admin/ops/TicketsScreen";
 import { AdminPanels } from "@/components/admin/panels/registry";
-import { requireAdmin } from "@/lib/admin/guard";
+import { screenGate } from "@/lib/admin/screen-gate";
 import { createServiceClient } from "@/lib/supabase/server";
 
 /** A23 — Tickets (Doc5 A23, template 2427-2483). */
@@ -18,7 +18,8 @@ const CATEGORY_LABEL: Record<string, string> = {
 };
 
 export default async function TicketsPage() {
-  await requireAdmin("admin");
+  const gate = await screenGate("admin");
+  if (!gate.ok) return gate.lock;
   const db = createServiceClient();
 
   // The filter options are the values the table ACTUALLY holds, not a

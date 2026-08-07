@@ -19,6 +19,7 @@ import {
   Badge,
   PageHead,
   RiskBadge,
+  RowCheck,
   StatusBadge,
   Shimmer,
   Thumb,
@@ -373,17 +374,15 @@ export function ListingsQueue({ options }: { options: QueueFilterOptions }) {
                         }}
                       >
                         <Td>
-                          <input
-                            type="checkbox"
+                          <RowCheck
                             checked={isSel}
                             disabled={locked}
-                            onClick={(e) => e.stopPropagation()}
-                            onChange={() =>
+                            onToggle={() =>
                               setSelected((s) =>
                                 s.includes(r.id) ? s.filter((x) => x !== r.id) : [...s, r.id],
                               )
                             }
-                            style={{ width: 16, height: 16, accentColor: "var(--accent)", cursor: "pointer" }}
+                            label={`Select ${r.title ?? "listing"}`}
                           />
                         </Td>
                         {shows("listing") ? (

@@ -685,7 +685,24 @@ export function Switch({
     <span
       role="switch"
       aria-checked={on}
+      aria-disabled={disabled || undefined}
+      // `role="switch"` without a tab stop is a lie: the control announced
+      // itself as a switch but no keyboard could ever reach or flip it, which
+      // made every toggle in Settings, Master data and CMS mouse-only.
+      // Focusable + Space/Enter, exactly as a native switch behaves. Nothing
+      // is drawn differently; the focus ring only appears for :focus-visible.
+      tabIndex={onClick && !disabled ? 0 : undefined}
       onClick={disabled ? undefined : onClick}
+      onKeyDown={
+        disabled || !onClick
+          ? undefined
+          : (e) => {
+              if (e.key === " " || e.key === "Enter") {
+                e.preventDefault();
+                onClick();
+              }
+            }
+      }
       style={{
         width: 40,
         height: 24,
@@ -820,8 +837,14 @@ export function ModTabs({
   active: string;
   onSelect: (key: string) => void;
 }) {
+  const move = (from: number, delta: number) => {
+    const next = (from + delta + tabs.length) % tabs.length;
+    onSelect(tabs[next][0]);
+  };
+
   return (
     <div
+      role="tablist"
       style={{
         display: "flex",
         gap: 4,
@@ -830,9 +853,26 @@ export function ModTabs({
         overflowX: "auto",
       }}
     >
-      {tabs.map(([key, label, count]) => (
+      {tabs.map(([key, label, count], idx) => (
         <div
           key={key}
+          // A plain click-handling div is unreachable by keyboard and
+          // announced as nothing — which is what every tab strip in the panel
+          // (Trash's eight, Appeals' three, Finance's four, the queues) was.
+          // Real tab semantics + a roving tab stop; the drawn result is
+          // identical, and the focus ring only shows for :focus-visible.
+          role="tab"
+          aria-selected={active === key}
+          tabIndex={active === key ? 0 : -1}
+          onKeyDown={(e) => {
+            if (e.key === " " || e.key === "Enter") {
+              e.preventDefault();
+              onSelect(key);
+            } else if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+              e.preventDefault();
+              move(idx, e.key === "ArrowRight" ? 1 : -1);
+            }
+          }}
           onClick={() => onSelect(key)}
           style={{
             padding: "10px 12px",
@@ -952,13 +992,19 @@ export function SlaText({ sla, age }: { sla: "ok" | "warn" | "over"; age: string
 export function RowDots({
   onOpen,
   size = 18,
+  label = "More actions",
 }: {
   onOpen: () => void;
   size?: number;
+  /** Accessible name. The button draws an icon only, so without one a screen
+   *  reader announces a nameless "button" on every row of /staff, /cms,
+   *  /templates and /master-data. Not rendered — appearance is unchanged. */
+  label?: string;
 }) {
   return (
     <button
       type="button"
+      aria-label={label}
       onClick={(e) => {
         e.stopPropagation();
         onOpen();
@@ -974,6 +1020,45 @@ export function RowDots({
     >
       <AdminIcon name="dots" size={size} />
     </button>
+  );
+}
+
+/**
+ * The row-selection checkbox every bulk-action list draws in its first column.
+ *
+ * It was the same inline `<input type="checkbox">` copy-pasted into Users,
+ * Listings and the listings queue — and none of the three had an accessible
+ * name, so a screen reader announced fifty nameless checkboxes per page. One
+ * component now, with the design's exact 16px box and accent colour: the
+ * appearance is byte-for-byte what it was, the name is new.
+ */
+export function RowCheck({
+  checked,
+  onToggle,
+  disabled,
+  label,
+}: {
+  checked: boolean;
+  onToggle: () => void;
+  disabled?: boolean;
+  /** What this row is, e.g. "Select Priya Shah". */
+  label: string;
+}) {
+  return (
+    <input
+      type="checkbox"
+      aria-label={label}
+      checked={checked}
+      disabled={disabled}
+      // Click, not change: these sit inside a row whose own onClick opens the
+      // detail panel, so the event must stop here.
+      onClick={(e) => {
+        e.stopPropagation();
+        onToggle();
+      }}
+      onChange={() => undefined}
+      style={{ width: 16, height: 16, accentColor: "var(--accent)", cursor: "pointer" }}
+    />
   );
 }
 
@@ -998,6 +1083,10 @@ export function IconBtn({
       type="button"
       onClick={onClick}
       title={title}
+      // Icon-only button: `title` alone is a tooltip, not a reliable
+      // accessible name. Falling back to the icon's own name keeps every
+      // instance announced even where a caller passed no title.
+      aria-label={title ?? icon}
       disabled={disabled}
       style={{
         width: box,

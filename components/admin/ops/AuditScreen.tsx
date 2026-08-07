@@ -105,6 +105,7 @@ export function AuditScreen({
         right={
           <button
             type="button"
+            aria-label="Export audit log"
             onClick={() => setExportOpen(true)}
             style={{
               width: 36,
