@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { navigateAfterClose } from "@/lib/hooks/use-back-close";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
@@ -499,7 +500,10 @@ export function OwnProfile() {
         onClose={() => setMenuSheet(false)}
         onNavigate={(href) => {
           setMenuSheet(false);
-          router.push(href);
+          // Not a bare router.push: closing the sheet pops its throwaway history
+          // entry, and that pop swallows a push made in the same tick — every row
+          // in this sheet went nowhere. See lib/hooks/use-back-close.
+          navigateAfterClose(() => router.push(href));
         }}
         onAccountStatus={() => {
           setMenuSheet(false);
@@ -509,7 +513,6 @@ export function OwnProfile() {
           setMenuSheet(false);
           setViewAs(true);
         }}
-        onPlaceholder={(what) => show(`${what} — coming in a later module`)}
       />
       {/* Featured collections (P9 S1): create, open, remove. */}
       <CreateFeaturedSheet

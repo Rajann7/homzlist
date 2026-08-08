@@ -32,10 +32,13 @@ const twMerge = extendTailwindMerge({
  * the browser — a hydration mismatch. These are plain <a> tags either way, so
  * an absolute same-origin URL costs nothing.
  */
-export function legalHref(path: string): string {
+export function publicHref(path: string): string {
   const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000").replace(/\/$/, "");
   return `${appUrl}${path}`;
 }
+
+/** The same thing, named for its first caller. Kept so existing call sites read well. */
+export const legalHref = publicHref;
 
 /** Merge conditional class names, de-duplicating conflicting Tailwind classes. */
 export function cn(...inputs: ClassValue[]): string {

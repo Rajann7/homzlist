@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { navigateAfterClose } from "@/lib/hooks/use-back-close";
 import { AppShell, Header, Icon, Avatar, VerifiedBadge, BottomSheet, ConfirmDialog, Skeleton, useToast } from "@/components";
 import { Glyph } from "./glyphs";
 import { chatApi, type InboxSection } from "@/lib/chat/client";
@@ -239,8 +240,8 @@ export function Messages({ base = "/messages", meId, seller = false }: { base?: 
       <BottomSheet open={menu} onClose={() => setMenu(false)} title="Messages">
         <div className="pb-2">
           <SheetRow label="Mark all as read" onClick={async () => { setMenu(false); await chatApi.readAll(); toast.show("All marked as read"); load(); }} />
-          <SheetRow label="Archived chats" onClick={() => { setMenu(false); router.push(`${base}/archived`); }} />
-          <SheetRow label="Blocked users" onClick={() => { setMenu(false); router.push(`${base}/blocked`); }} />
+          <SheetRow label="Archived chats" onClick={() => { setMenu(false); navigateAfterClose(() => router.push(`${base}/archived`)); }} />
+          <SheetRow label="Blocked users" onClick={() => { setMenu(false); navigateAfterClose(() => router.push(`${base}/blocked`)); }} />
         </div>
       </BottomSheet>
 

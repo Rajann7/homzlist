@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { navigateAfterClose } from "@/lib/hooks/use-back-close";
 import { AppShell, BottomSheet, Button, Chip, EmptyState, Header, Icon, Skeleton, Spinner, Wordmark, useToast } from "./ui";
 import { billingApi, type PaymentRow } from "@/lib/billing/client";
 import { BackButton, OfflineBanner, SectionLabel, SheetOption } from "./primitives";
@@ -151,7 +152,7 @@ export function Payments() {
                     <Button size="small" disabled={!r.catalogCode} onClick={() => router.push(`/checkout?plan=${r.catalogCode}`)}>
                       Retry payment
                     </Button>
-                    <button onClick={() => toast.show("Support opens in the settings module")} className="text-13 font-semibold text-accent">
+                    <button onClick={() => router.push("/help/contact")} className="text-13 font-semibold text-accent">
                       Contact support
                     </button>
                   </div>
@@ -340,6 +341,7 @@ function InvRow({ k, v, accent }: { k: string; v: string; accent?: boolean }) {
 /* ---- Payment details sheet ---------------------------------------------- */
 
 export function DetailsSheet({ id, onClose }: { id: string | null; onClose: () => void }) {
+  const router = useRouter();
   const toast = useToast();
   const [d, setD] = useState<Record<string, string | null> | null>(null);
 
@@ -392,7 +394,10 @@ export function DetailsSheet({ id, onClose }: { id: string | null; onClose: () =
               </div>
             ))}
           </div>
-          <button onClick={() => { onClose(); toast.show("Support opens in the settings module"); }} className="tap44 self-start text-13 font-semibold text-error">
+          {/* Was a "Support opens in the settings module" toast. navigateAfterClose
+              because closing this sheet pops its history entry, and that pop eats a
+              push made in the same tick (lib/hooks/use-back-close). */}
+          <button onClick={() => { onClose(); navigateAfterClose(() => router.push("/help/contact")); }} className="tap44 self-start text-13 font-semibold text-error">
             Report a problem with this payment
           </button>
         </div>

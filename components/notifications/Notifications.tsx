@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { navigateAfterClose } from "@/lib/hooks/use-back-close";
 import { AppShell, Header, Icon, Avatar, BottomSheet, ConfirmDialog, Button, Skeleton, useToast, type IconName } from "@/components";
 import { SheetOption, BackButton } from "@/components/billing/primitives";
 import { notificationsApi, boldSegments, type Inbox, type NotificationRow, type NotificationAction } from "@/lib/notifications/client";
@@ -264,7 +265,7 @@ export function Notifications({ base = "" }: { base?: string }) {
         <SheetOption
           label="Notification settings"
           icon={<Icon name="bell" size={20} />}
-          onClick={() => { setMenu(false); router.push(`${base}/settings/notifications`); }}
+          onClick={() => { setMenu(false); navigateAfterClose(() => router.push(`${base}/settings/notifications`)); }}
         />
         <SheetOption
           label="Clear all"

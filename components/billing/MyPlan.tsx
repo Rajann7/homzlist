@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { navigateAfterClose } from "@/lib/hooks/use-back-close";
 import { AppShell, BottomSheet, Button, EmptyState, Header, Icon, Skeleton, Toggle, useToast } from "./ui";
 import { billingApi, type MyPlan as MyPlanData } from "@/lib/billing/client";
 import { BackButton, Banner, OfflineBanner, SectionLabel, SheetOption, UsageBar } from "./primitives";
@@ -251,9 +252,11 @@ export function MyPlan() {
       <TopupSheet open={topupOpen} onClose={() => setTopupOpen(false)} onDone={() => void load()} />
 
       <BottomSheet open={menuOpen} onClose={() => setMenuOpen(false)} title="Options">
-        <SheetOption label="Payment history" icon={<Icon name="receipt" size={20} />} onClick={() => { setMenuOpen(false); router.push("/payments"); }} />
-        <SheetOption label="Download invoices" icon={<Icon name="download" size={20} />} onClick={() => { setMenuOpen(false); router.push("/payments"); }} />
-        <SheetOption label="Contact support" icon={<Icon name="message" size={20} />} onClick={() => { setMenuOpen(false); toast.show("Support opens in the settings module"); }} />
+        <SheetOption label="Payment history" icon={<Icon name="receipt" size={20} />} onClick={() => { setMenuOpen(false); navigateAfterClose(() => router.push("/payments")); }} />
+        <SheetOption label="Download invoices" icon={<Icon name="download" size={20} />} onClick={() => { setMenuOpen(false); navigateAfterClose(() => router.push("/payments")); }} />
+        {/* Was a "Support opens in the settings module" toast; P12 shipped the
+            Help Centre, so this opens the real contact form. */}
+        <SheetOption label="Contact support" icon={<Icon name="message" size={20} />} onClick={() => { setMenuOpen(false); navigateAfterClose(() => router.push("/help/contact")); }} />
       </BottomSheet>
     </AppShell>
   );
