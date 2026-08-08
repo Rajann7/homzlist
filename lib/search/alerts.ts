@@ -71,7 +71,9 @@ export async function runSavedSearchAlerts(now = new Date()): Promise<AlertRepor
           href: `/search/results?${searchQuery(row.params)}`,
           groupKey: `saved-search:${row.id}`,
           entityKind: "saved_search", entityId: row.id,
-          data: { savedSearchId: row.id, fresh, total },
+          // `count`/`search` also feed A20's "saved_match" push template
+          // ("{{count}} new properties match {{search}}").
+          data: { savedSearchId: row.id, fresh, total, count: fresh, search: row.label },
         });
         report.notified++;
       } else {

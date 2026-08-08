@@ -25,7 +25,12 @@ export interface FlagContext {
 interface FlagRow {
   enabled: boolean;
   scope: string;
-  scope_value: string | null;
+  /**
+   * JSONB (migration seed): `{}` for scope 'all', `{ roles: string[] }` for
+   * 'role', `{ cities: string[] }` for 'city', `{ percent: number }` for
+   * 'percentage', `{ staff_only: true }` for 'staff'.
+   */
+  scope_value: Record<string, unknown> | null;
 }
 
 let cache: { at: number; map: Map<string, FlagRow> } | null = null;
@@ -66,18 +71,28 @@ export async function flagEnabled(key: string, ctx: FlagContext = {}): Promise<b
   const f = (await loadFlags()).get(key);
   if (!f) return true; // unknown key → never hide a working feature
   if (!f.enabled) return false;
+  const sv = (f.scope_value ?? {}) as Record<string, unknown>;
   switch (f.scope) {
     case "all":
       return true;
     case "staff":
       return ctx.isStaff === true;
-    case "role":
-      return !f.scope_value || f.scope_value === ctx.role;
-    case "city":
-      return !f.scope_value || f.scope_value === ctx.cityId;
-    case "percent": {
-      const pct = Number(f.scope_value ?? "100");
+    case "role": {
+      // `{ roles: string[] }` — the feature is enabled FOR these roles. An empty
+      // list means everyone (don't accidentally lock a feature to nobody).
+      const roles = Array.isArray(sv.roles) ? (sv.roles as unknown[]).map(String) : [];
+      return roles.length === 0 || (ctx.role != null && roles.includes(ctx.role));
+    }
+    case "city": {
+      const cities = Array.isArray(sv.cities) ? (sv.cities as unknown[]).map(String) : [];
+      return cities.length === 0 || (ctx.cityId != null && cities.includes(ctx.cityId));
+    }
+    case "percent":
+    case "percentage": {
+      const pct = Number(sv.percent ?? 100);
       if (!Number.isFinite(pct)) return true;
+      if (pct >= 100) return true;
+      if (pct <= 0) return false;
       return bucket(ctx.userId ?? "anon") < pct;
     }
     default:

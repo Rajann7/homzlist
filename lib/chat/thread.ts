@@ -356,7 +356,8 @@ export async function sendMessage(
         groupKey: `thread:${threadId}`,
         title: `**${who}:** ${text.slice(0, 90)}`,
         body: text.slice(0, 120),
-        data: { threadId },
+        // `preview` also feeds A20's "new_message" push template ("{{preview}}").
+        data: { threadId, preview: `${who}: ${text.slice(0, 90)}` },
       });
       if (first.grouped && first.groupCount > 1 && first.id) {
         await db().from("notifications")
@@ -521,7 +522,8 @@ export async function requestNumber(threadId: string, me: string): Promise<{ ok:
     profileId: t.poster_id, type: "number_requested", actorId: me, threadId,
     title: `**${await nameOf(me)}** requested your phone number`,
     body: `${await nameOf(me)} requested your phone number`,
-    data: { threadId },
+    // `buyer` also feeds A20's "number_requested" push ("{{buyer}} asked for your number").
+    data: { threadId, buyer: await nameOf(me) },
   });
   await pingThread(threadId);
   return { ok: true };
@@ -549,7 +551,11 @@ export async function numberResponse(threadId: string, me: string, allow: boolea
       profileId: t.buyer_id, type: "number_shared", actorId: t.poster_id, threadId,
       title: `**${await nameOf(t.poster_id)}** shared their number with you`,
       body: `${await nameOf(t.poster_id)} shared their number`,
-      data: { threadId },
+      // NOTE: A20's "number_allowed" push reads "{{name}} shared their number with
+      // you" — here {{name}} is the SHARER, but the dispatcher supplies {{name}}
+      // centrally as the RECIPIENT. Passing it explicitly overrides that, so the
+      // template says who actually shared.
+      data: { threadId, name: await nameOf(t.poster_id) },
     });
   }
   await pingThread(threadId);

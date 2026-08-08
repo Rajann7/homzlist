@@ -2,6 +2,7 @@ import "server-only";
 import { createServiceClient } from "@/lib/supabase/server";
 import { sendPushToProfile } from "./push";
 import { sendEmail, renderEmail } from "./email";
+import { renderTemplate } from "./templates";
 import { getPrefs, globalSettings, quietHold, type Prefs } from "./prefs";
 import { typeConfig, resolveHref, type NotificationType, type NotificationAction } from "./catalog";
 
@@ -153,6 +154,7 @@ export async function notify(input: NotifyInput): Promise<NotifyResult> {
       body: input.body ?? "",
       href,
       type: input.type,
+      data: input.data ?? {},
       threadId: input.threadId ?? null,
       wantPush: cfg.defaultPush,
       wantEmail: cfg.defaultEmail,
@@ -187,6 +189,7 @@ interface DeliverArgs {
   body: string;
   href: string | null;
   type: string;
+  data: Record<string, unknown>;
   threadId: string | null;
   wantPush: boolean;
   wantEmail: boolean;
@@ -209,9 +212,16 @@ async function deliverChannels(a: DeliverArgs): Promise<Record<string, string>> 
     out.push = "skipped";
     await recordDelivery(a.notificationId, a.profileId, "push", "skipped", "push_off");
   } else {
+    // Prefer the admin-managed A20 PUSH template for this type when every {{var}}
+    // it needs is present; otherwise keep the built-in copy (renderTemplate
+    // returns null). Same contract as the email path above.
+    const pushVars: Record<string, string | number> = {};
+    for (const [k, v] of Object.entries(a.data ?? {}))
+      if (typeof v === "string" || typeof v === "number") pushVars[k] = v;
+    const pushTpl = await renderTemplate(a.type, "push", pushVars);
     const res = await sendPushToProfile(a.profileId, {
       title: a.title,
-      body: a.body,
+      body: pushTpl?.body ?? a.body,
       data: { type: a.type, notificationId: a.notificationId, threadId: a.threadId ?? "", href: a.href ?? "" },
     });
     pushed = res.sent;
@@ -235,7 +245,7 @@ async function deliverChannels(a: DeliverArgs): Promise<Record<string, string>> 
     out.email = "held";
     await recordDelivery(a.notificationId, a.profileId, "email", "held", "awaiting_push_seen");
   } else {
-    const r = await emailNotification(a.profileId, a.title, a.body, a.href);
+    const r = await emailNotification(a.profileId, a.title, a.body, a.href, a.type, a.data);
     const status = r.sent ? "sent" : NOT_ATTEMPTED.has(r.reason ?? "") ? "skipped" : "failed";
     out.email = status;
     await recordDelivery(a.notificationId, a.profileId, "email", status, r.reason, r.providerId);
@@ -244,11 +254,41 @@ async function deliverChannels(a: DeliverArgs): Promise<Record<string, string>> 
   return out;
 }
 
-async function emailNotification(profileId: string, title: string, body: string, href: string | null) {
-  const { data } = await db().from("profiles").select("email").eq("id", profileId).maybeSingle();
-  const to = (data as { email?: string | null } | null)?.email ?? "";
+async function emailNotification(
+  profileId: string,
+  title: string,
+  body: string,
+  href: string | null,
+  type?: string,
+  vars?: Record<string, unknown>,
+) {
+  const { data } = await db().from("profiles").select("email, name").eq("id", profileId).maybeSingle();
+  const profile = data as { email?: string | null; name?: string | null } | null;
+  const to = profile?.email ?? "";
   if (!to) return { sent: false, reason: "no_address" as const };
-  return sendEmail({ to, subject: title, html: renderEmail({ title, body, href }) });
+
+  // Prefer the admin-managed A20 email template for this notification type, when
+  // one exists AND every {{var}} it needs is present in `vars` (renderTemplate
+  // returns null otherwise). Falls back to the built-in copy — strictly no worse
+  // than before (memory: message_templates was read by nothing).
+  let subject = title;
+  let html = renderEmail({ title, body, href });
+  if (type) {
+    const flat: Record<string, string | number> = {};
+    // `{{name}}` and `{{link}}` are needed by nearly every template and are known
+    // HERE, so they are supplied centrally — a call site only has to pass the
+    // variables that are specific to its own message.
+    if (profile?.name) flat.name = profile.name;
+    if (href) flat.link = href;
+    for (const [k, v] of Object.entries(vars ?? {}))
+      if (typeof v === "string" || typeof v === "number") flat[k] = v;
+    const tpl = await renderTemplate(type, "email", flat);
+    if (tpl) {
+      subject = tpl.subject ?? title;
+      html = renderEmail({ title: subject, body: tpl.body, href });
+    }
+  }
+  return sendEmail({ to, subject, html });
 }
 
 async function recordDelivery(
@@ -295,7 +335,7 @@ async function releaseQuietHolds(): Promise<number> {
   const now = new Date().toISOString();
   const { data } = await db()
     .from("notifications")
-    .select("id,profile_id,type,title,body,href,thread_id,read_at")
+    .select("id,profile_id,type,title,body,href,thread_id,read_at,data")
     .not("hold_until", "is", null)
     .lte("hold_until", now)
     .limit(500);
@@ -314,6 +354,7 @@ async function releaseQuietHolds(): Promise<number> {
         body: r.body ?? "",
         href: r.href,
         type: r.type,
+        data: (r.data ?? {}) as Record<string, unknown>,
         threadId: r.thread_id,
         wantPush: cfg?.defaultPush ?? true,
         wantEmail: cfg?.defaultEmail ?? false,

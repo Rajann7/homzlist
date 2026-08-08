@@ -5,11 +5,13 @@ import { adminErrorResponse } from "@/lib/admin/respond";
 import { createServiceClient } from "@/lib/supabase/server";
 import {
   brandingSettings,
+  durationsList,
   maintenanceState,
   runSystemAction,
   saveBoostRate,
   saveBranding,
   saveCityCap,
+  saveDuration,
   saveRateLimit,
   saveRetention,
   saveVelocityRule,
@@ -38,8 +40,14 @@ export async function GET(req: NextRequest) {
     if (what === "branding") return ok(await brandingSettings());
     if (what === "maintenance") return ok(await maintenanceState());
     if (what === "boost") {
-      const [{ data: rates }, { data: caps }, { data: topup }] = await Promise.all([
-        db.from("boost_rates").select("*").order("days"),
+      // Boost prices are the plan_catalog `boost` rows (boost7/boost30) — the SAME
+      // rows the purchase screen and checkout use. The old `boost_rates` table
+      // (area/city × 7/14/30) had diverged from the shipped flat-price product and
+      // was read by nobody, so admin edits there never reached a buyer. Reading
+      // plan_catalog here is what makes the screen edit the real prices; it also
+      // fixes sales_30d, which joins on orders.catalog_code (boost7/boost30).
+      const [{ data: boostPlans }, { data: caps }, { data: topup }] = await Promise.all([
+        db.from("plan_catalog").select("code, name, price_paise, is_active, period_days").eq("kind", "boost").order("period_days"),
         db
           .from("city_caps")
           .select("city_id, max_active_boosts, is_launched, locations(name)")
@@ -67,8 +75,17 @@ export async function GET(req: NextRequest) {
       for (const s of (sales ?? []) as { catalog_code: string }[]) {
         salesBy.set(s.catalog_code, (salesBy.get(s.catalog_code) ?? 0) + 1);
       }
+      // Map plan_catalog boost rows to the shape the Boost-rates table renders
+      // (code · label · price_paise · is_active · days).
+      const rates = ((boostPlans ?? []) as { code: string; name: string; price_paise: number; is_active: boolean; period_days: number | null }[]).map((p) => ({
+        code: p.code,
+        label: p.name,
+        price_paise: p.price_paise,
+        is_active: p.is_active,
+        days: p.period_days ?? 0,
+      }));
       return ok({
-        rates: ((rates ?? []) as Record<string, unknown>[]).map((r) => ({
+        rates: rates.map((r) => ({
           ...r,
           sales_30d: salesBy.get(String(r.code)) ?? 0,
         })),
@@ -82,6 +99,9 @@ export async function GET(req: NextRequest) {
     if (what === "retention") {
       const { data } = await db.from("retention_settings").select("*").order("label");
       return ok({ rows: data ?? [] });
+    }
+    if (what === "durations") {
+      return ok({ rows: await durationsList() });
     }
     return fail("VALIDATION_ERROR", { field: "what" });
   } catch (e) {
@@ -113,6 +133,7 @@ export async function POST(req: NextRequest) {
       case "limit_save":    result = await saveRateLimit(id, body, me); break;
       case "velocity_save": result = await saveVelocityRule(id, body, me); break;
       case "retention_save":result = await saveRetention(id, Number(body.days), me); break;
+      case "duration_save": result = await saveDuration(id, Number(body.seconds), me); break;
       case "maintenance":   result = await setMaintenance(body.enabled === true, body, me); break;
       case "system_action": result = await runSystemAction(String(body.op ?? ""), me); break;
       default:

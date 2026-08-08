@@ -4,11 +4,16 @@ import { randomUUID, createHash, randomBytes } from "node:crypto";
 import { cookies } from "next/headers";
 import { kv } from "@/lib/kv";
 import { serverEnv } from "@/lib/env";
+import { sessionTtlSec } from "@/lib/system/config";
 
 /**
  * Session layer (Doc2 §3.1 / Doc9 §2, §15).
  *  - Access: JWT (15 min), HS256 (JWT_ACCESS_SECRET), verified every request.
- *  - Refresh: opaque random (30 days), hashed in KV, ROTATED every use.
+ *  - Refresh: opaque random, hashed in KV, ROTATED every use. Its lifetime — how
+ *    long a user stays logged in — is the admin-tunable "Session length"
+ *    (system_durations.session_ttl, default 7 days; lib/system/config.ts). Only
+ *    the refresh window is tunable: the access token stays 15 min so a revoke
+ *    still takes hold within 15 min.
  *  - Register: short-lived JWT for the OTP-verified-but-not-registered window.
  * Cookies are host-only (no Domain) → per-subdomain isolation. httpOnly +
  * Secure(prod) + SameSite=Lax. No token in localStorage.
@@ -16,7 +21,6 @@ import { serverEnv } from "@/lib/env";
 export const COOKIE = { ACCESS: "hz_at", REFRESH: "hz_rt", REGISTER: "hz_reg" } as const;
 
 const ACCESS_TTL_SEC = 15 * 60;
-const REFRESH_TTL_SEC = 30 * 24 * 60 * 60;
 const REGISTER_TTL_SEC = 15 * 60;
 
 const accessSecret = () => new TextEncoder().encode(serverEnv().jwt.accessSecret);
@@ -121,7 +125,7 @@ export async function createRefreshSession(profileId: string, meta: Omit<Session
   // the very first login on an account isn't reported as a suspicious device.
   const known = await knownDevice(profileId, meta.ua);
 
-  await kv.set(refreshKey(profileId, sid), JSON.stringify(record), REFRESH_TTL_SEC);
+  await kv.set(refreshKey(profileId, sid), JSON.stringify(record), await sessionTtlSec());
   await kv.sadd(sessionSetKey(profileId), sid);
 
   if (!known.first && !known.seen) await notifyNewDevice(profileId, meta.ua);
@@ -191,7 +195,10 @@ export async function rotateRefreshSession(cookieValue: string): Promise<{ profi
   const newSecret = randomBytes(32).toString("base64url");
   rec.secretHash = hashSecret(newSecret);
   rec.lastUsedAt = Date.now();
-  await kv.set(refreshKey(profileId, sid), JSON.stringify(rec), REFRESH_TTL_SEC);
+  // Each rotation re-stamps the full session window, so an actively-used login
+  // slides forward and only truly idle sessions expire (same behaviour as
+  // before, now with an admin-tunable window).
+  await kv.set(refreshKey(profileId, sid), JSON.stringify(rec), await sessionTtlSec());
   return { profileId, newCookie: `${profileId}.${sid}.${newSecret}` };
 }
 
@@ -219,7 +226,15 @@ export async function listSessions(profileId: string): Promise<Array<{ sid: stri
   return out.sort((a, b) => b.lastUsedAt - a.lastUsedAt);
 }
 
-export const REFRESH_MAX_AGE_SEC = REFRESH_TTL_SEC;
+/**
+ * The refresh cookie's max-age = the admin "Session length". A getter, not a
+ * constant, because the value now lives in the DB (system_durations). Callers
+ * that park a token (the account pool) use this so a parked cookie never
+ * outlives its KV entry.
+ */
+export async function refreshMaxAgeSec(): Promise<number> {
+  return sessionTtlSec();
+}
 
 export function cookieOpts(maxAge: number) {
   return {
@@ -233,8 +248,9 @@ export function cookieOpts(maxAge: number) {
 
 export async function setSessionCookies(access: string, refresh: string) {
   const jar = await cookies();
+  const refreshTtl = await sessionTtlSec();
   jar.set(COOKIE.ACCESS, access, cookieOpts(ACCESS_TTL_SEC));
-  jar.set(COOKIE.REFRESH, refresh, cookieOpts(REFRESH_TTL_SEC));
+  jar.set(COOKIE.REFRESH, refresh, cookieOpts(refreshTtl));
   jar.delete(COOKIE.REGISTER);
 }
 

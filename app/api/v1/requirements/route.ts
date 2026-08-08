@@ -6,6 +6,7 @@ import { rateLimit } from "@/lib/auth/rate-limit";
 import { createRequirement, MAX_AREAS } from "@/lib/listings/requirements";
 import { canPostRequirement } from "@/lib/listings/capabilities";
 import { requirementDTO } from "@/lib/listings/dto";
+import { flagEnabled } from "@/lib/system/flags";
 
 /**
  * POST /api/v1/requirements (Doc7 §62) — post a requirement.
@@ -35,6 +36,9 @@ export async function POST(req: NextRequest) {
   if (!profile || profile.state !== "active") return fail("FORBIDDEN");
   // Requirements are an Owner/Broker product — a Builder posts projects only.
   if (!canPostRequirement(profile.role)) return fail("FORBIDDEN");
+  // A22 Feature flags → Requirements. Off = no new requirements posted. Default-on.
+  if (!(await flagEnabled("requirements", { role: profile.role, userId: claims.sub })))
+    return fail("FORBIDDEN");
 
   const limited = await rateLimit(`requirement-post:${claims.sub}`, 20, 3600, "requirement_create");
   if (!limited.allowed) return fail("RATE_LIMITED");

@@ -14,6 +14,8 @@ const db = () => createServiceClient();
 export interface SubjectBrief {
   title: string;
   thumbUrl: string | null;
+  /** The area on its own — A20's templates take `{{area}}` separately from `{{title}}`. */
+  area?: string | null;
 }
 
 export async function listingBrief(listingId: string | null | undefined): Promise<SubjectBrief> {
@@ -22,7 +24,7 @@ export async function listingBrief(listingId: string | null | undefined): Promis
   const r = data as { title?: string; area_label?: string; cover_url?: string } | null;
   if (!r) return { title: "your listing", thumbUrl: null };
   const title = [r.title, r.area_label].filter(Boolean).join(", ") || "your listing";
-  return { title, thumbUrl: r.cover_url ?? null };
+  return { title, thumbUrl: r.cover_url ?? null, area: r.area_label ?? null };
 }
 
 export async function projectBrief(projectId: string | null | undefined): Promise<SubjectBrief> {
@@ -43,7 +45,7 @@ export async function requirementBrief(requirementId: string | null | undefined)
   const r = data as any;
   if (!r) return { title: "your requirement", thumbUrl: null };
   const bits = [r.bhk ? `${r.bhk} BHK` : null, r.area_label, budgetLabel(r.budget_min_paise, r.budget_max_paise)].filter(Boolean);
-  return { title: bits.join(", ") || "your requirement", thumbUrl: null };
+  return { title: bits.join(", ") || "your requirement", thumbUrl: null, area: r.area_label ?? null };
 }
 
 /**

@@ -33,7 +33,7 @@ import {
 } from "@/components/admin/ds";
 import { useAdminList, ListError } from "@/components/admin/list";
 
-type Tab = "flags" | "branding" | "boost" | "limits" | "retention" | "maint" | "actions";
+type Tab = "flags" | "branding" | "boost" | "limits" | "retention" | "durations" | "maint" | "actions";
 
 const TABS: [Tab, string][] = [
   ["flags", "Feature flags"],
@@ -41,6 +41,7 @@ const TABS: [Tab, string][] = [
   ["boost", "Boost & pricing"],
   ["limits", "Limits & velocity"],
   ["retention", "Retention"],
+  ["durations", "Sessions & content"],
   ["maint", "Maintenance"],
   ["actions", "System actions"],
 ];
@@ -86,6 +87,8 @@ export function SettingsScreen() {
         <LimitsTab />
       ) : tab === "retention" ? (
         <RetentionTab />
+      ) : tab === "durations" ? (
+        <DurationsTab />
       ) : tab === "maint" ? (
         <MaintenanceTab />
       ) : (
@@ -741,6 +744,170 @@ function RetentionTab() {
         </Modal>
       ) : null}
     </div>
+  );
+}
+
+/* ═══════════════════════════════ tab · sessions & content (durations) ════ */
+
+const UNIT_SECONDS: Record<string, number> = { minutes: 60, hours: 3_600, days: 86_400 };
+
+/** "7 days" / "30 minutes" — the largest whole unit that fits (matches server). */
+function humanDuration(seconds: number): string {
+  const plural = (n: number, u: string) => `${n} ${u}${n === 1 ? "" : "s"}`;
+  if (seconds % 86_400 === 0) return plural(seconds / 86_400, "day");
+  if (seconds % 3_600 === 0) return plural(seconds / 3_600, "hour");
+  if (seconds % 60 === 0) return plural(seconds / 60, "minute");
+  return plural(seconds, "second");
+}
+
+/** The natural (value, unit) to seed the editor from a seconds value. */
+function splitDuration(seconds: number): { value: number; unit: string } {
+  if (seconds % 86_400 === 0) return { value: seconds / 86_400, unit: "days" };
+  if (seconds % 3_600 === 0) return { value: seconds / 3_600, unit: "hours" };
+  return { value: Math.max(1, Math.round(seconds / 60)), unit: "minutes" };
+}
+
+type DurationRow = {
+  key: string;
+  label: string;
+  seconds: number;
+  min_seconds: number;
+  max_seconds: number;
+  note: string | null;
+};
+
+function DurationsTab() {
+  const toast = useToast();
+  const [rows, setRows] = useState<DurationRow[] | null>(null);
+  const [editing, setEditing] = useState<DurationRow | null>(null);
+
+  const load = useCallback(async () => {
+    const d = await get("durations");
+    setRows(((d?.rows ?? []) as DurationRow[]) ?? []);
+  }, []);
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  if (!rows) return <Shimmer h={240} />;
+
+  return (
+    <div>
+      <NoteStrip tone="info">
+        These change how the live app behaves on the next request — no deploy needed.
+      </NoteStrip>
+      <div style={{ marginTop: 12 }}>
+        <DTable
+          cols={[
+            { label: "Setting", cell: (r: DurationRow) => <span style={{ fontWeight: 600 }}>{r.label}</span> },
+            {
+              label: "Value",
+              cell: (r: DurationRow) => (
+                <span
+                  onClick={() => setEditing(r)}
+                  style={{ color: "var(--accent)", fontWeight: 600, cursor: "pointer" }}
+                >
+                  {humanDuration(r.seconds)}
+                </span>
+              ),
+            },
+            {
+              label: "What it controls",
+              cell: (r: DurationRow) => <span style={{ fontSize: 11, color: "var(--ink3)" }}>{r.note ?? "—"}</span>,
+            },
+          ]}
+          rows={rows}
+        />
+      </div>
+      <div style={{ marginTop: 16 }}>
+        <NoteStrip tone="neutral">
+          Session length is the refresh window — the access token still rotates every 15 minutes, so a
+          sign-out still takes hold quickly.
+        </NoteStrip>
+      </div>
+
+      {editing ? (
+        <DurationEditor
+          row={editing}
+          onClose={() => setEditing(null)}
+          onDone={(msg) => {
+            toast(msg);
+            setEditing(null);
+            void load();
+          }}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function DurationEditor({
+  row,
+  onClose,
+  onDone,
+}: {
+  row: DurationRow;
+  onClose: () => void;
+  onDone: (msg: string) => void;
+}) {
+  const initial = splitDuration(row.seconds);
+  const [value, setValue] = useState(String(initial.value));
+  const [unit, setUnit] = useState(initial.unit);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  const seconds = Math.round((Number(value) || 0) * (UNIT_SECONDS[unit] ?? 1));
+
+  return (
+    <Modal
+      title={row.label}
+      onClose={onClose}
+      footer={
+        <>
+          <Btn label="Cancel" kind="outline" onClick={onClose} style={{ flex: 1 }} />
+          <Btn
+            label={busy ? "Saving…" : "Save"}
+            kind="primary"
+            style={{ flex: 1 }}
+            onClick={async () => {
+              setBusy(true);
+              setError("");
+              const json = await post({ action: "duration_save", id: row.key, seconds });
+              setBusy(false);
+              if (json?.ok) onDone(String(json.data?.summary ?? "Saved"));
+              else setError(json?.error?.message ?? "That didn't work");
+            }}
+          />
+        </>
+      }
+    >
+      <NoteStrip tone="warn">
+        Allowed range: {humanDuration(row.min_seconds)} – {humanDuration(row.max_seconds)}. This is live.
+      </NoteStrip>
+      <div style={{ display: "flex", gap: 8 }}>
+        <div style={{ flex: 1 }}>
+          <FField label="Value">
+            <input
+              value={value}
+              onChange={(e) => setValue(e.target.value.replace(/[^0-9]/g, "").slice(0, 6))}
+              style={F_INPUT_STYLE}
+              inputMode="numeric"
+            />
+          </FField>
+        </div>
+        <div style={{ flex: 1 }}>
+          <FField label="Unit">
+            <select value={unit} onChange={(e) => setUnit(e.target.value)} style={F_INPUT_STYLE}>
+              <option value="minutes">Minutes</option>
+              <option value="hours">Hours</option>
+              <option value="days">Days</option>
+            </select>
+          </FField>
+        </div>
+      </div>
+      <div style={{ fontSize: 12, color: "var(--ink3)", marginTop: 4 }}>= {humanDuration(seconds)}</div>
+      {error ? <NoteStrip tone="warn">{error}</NoteStrip> : null}
+    </Modal>
   );
 }
 

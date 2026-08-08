@@ -221,7 +221,14 @@ export async function ensureInquiryThread(inquiry: {
     body: `${await nameOf(inquiry.profile_id)} sent you an inquiry`,
     thumbUrl: brief.thumbUrl,
     entityKind: "listing", entityId: inquiry.listing_id,
-    data: { threadId, listingId: inquiry.listing_id },
+    // `buyer`/`title` also feed A20's "inquiry_push" push and "inquiry_received"
+    // whatsapp templates ("{{buyer}} is interested in {{title}}").
+    data: {
+      threadId,
+      listingId: inquiry.listing_id,
+      buyer: await nameOf(inquiry.profile_id),
+      title: brief.title,
+    },
   });
   await pingInbox(inquiry.poster_id);
   return threadId;

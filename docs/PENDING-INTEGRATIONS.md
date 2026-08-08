@@ -26,10 +26,22 @@ Status as of **2 Aug 2026**.
 | **M6.3** | Story media never expires (public bucket, so signing is a no-op) | **B4** (R2 / private bucket) | No — anti-scrape only |
 | **M11.6** | Sentry / provider-billing cards on A27 | 🔑 Sentry DSN + provider billing APIs | No — the cards say "not connected" rather than showing zeros |
 | **M11.7** | Three of A22's six system actions have no worker | 🔵 Decide whether we want them | No — the endpoint refuses honestly instead of faking success |
+| **A13.1** | 10 SMS + WhatsApp message templates have no sender to reach | 🔑 MSG91/DLT (**B5**) — the notification dispatcher delivers push + email only; WhatsApp is used solely by the admin "send message" path | No — the 15 email/push templates ARE live; these 10 are editable copy for channels that cannot send yet |
+| **A13.2** | 3 email templates have no send path at all: `invoice`, `plan_expired_email`, `grievance_ack` | 🔵 Build the sends. `POST /billing/invoice/:id/email` only marks the invoice emailed; there is no `plan_expired` notify and no grievance flow | No — but the A20 screen offers copy for messages nobody sends |
+| **A13.3** | **`ui_strings` is seeded with fake data** — 190 of 221 rows are auto-generated `*.auto_NNN` whose gu/hi contradict their en (`boost.auto_117`: en "Clear all 117" / hi "Apply filter 117") | 🔵 Rajan's OK to **purge the 190 fake rows** (destructive, so not done unilaterally). The resolver + the 31 real keys work today | No — but A20 presents 190 fake editable strings, and mass-wiring them would inject garbage into the UI. Violates CLAUDE.md rule 7 |
+| **A13.4** | Multi-language (gu/hi) not launched | **A13.3** (the translations are untrustworthy) + the `multi_language` flag | No — `t()` always prefers `en` and only honours a translation once the flag is on and the column is genuinely filled |
+| **A13.5** | **Disputes can never be created** — 0 rows, no insert path anywhere; only `resolveDispute` exists | 🔵 Build the open-a-dispute flow (who opens it, from where) | No — the A24 Disputes screen is permanently empty, and the seller has no dispute surface |
+| **A13.6** | 6 feature flags gate features that are not built: `auction`, `home_loans`, `referrals`, `multi_language`, `number_masking`, `featured_collections` | 🔵 Build the feature, or retire the flag | No — the other 12 flags are wired and enforced |
+| **A13.7** | `boost_rates` table is now unread (retired) | 🔵 Drop it in a later migration | No — the A22 Boost screen reads/writes `plan_catalog` boost rows, which is what checkout charges |
 
 **Nothing on that list is a half-built feature.** Each is either a key we do not
 have, a deploy step, or a decision — and in every case the code refuses honestly
 rather than pretending.
+
+### One behaviour change to review (Aug 2026 admin-wiring pass)
+`pwa_prompt` is configured `scope=percentage, percent=10`. Now that the flag is
+actually enforced, the install prompt reaches ~10% of users instead of everyone.
+Set that rollout to 100 in A22 if every user should be prompted.
 
 ## KEYS AT LAUNCH — what each one needs, verified from the code (5 Aug 2026)
 

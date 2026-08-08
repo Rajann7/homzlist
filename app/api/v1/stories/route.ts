@@ -7,7 +7,8 @@ import { flagEnabled } from "@/lib/system/flags";
 
 /**
  * GET /api/v1/stories (Doc7 §84) — the auto-generated story row: approved
- * listings/projects from the last 24h in the viewer's city, cascade order,
+ * listings/projects live within the story window (admin-tunable, default 30
+ * days; system_durations.story_window) in the viewer's city, cascade order,
  * boosted first, one poster/day = one multi-segment circle. NO add-story.
  * Guest-readable.
  */
