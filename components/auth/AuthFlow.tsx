@@ -8,7 +8,8 @@ import { Otp } from "./screens/Otp";
 import { Role } from "./screens/Role";
 import { Details } from "./screens/Details";
 import { Coach } from "./screens/Coach";
-import { BrowserUnsupported, Placeholder, OfflineBanner, SavedAccounts } from "./screens/Misc";
+import { BrowserUnsupported, OfflineBanner, SavedAccounts } from "./screens/Misc";
+import { publicHref } from "@/lib/utils";
 import { authApi } from "@/lib/auth/client";
 import { getSavedAccounts, rememberAccount, type SavedAccountHint } from "@/lib/auth/saved-accounts";
 
@@ -18,7 +19,22 @@ import { getSavedAccounts, rememberAccount, type SavedAccountHint } from "@/lib/
  * session? home : (onboarding first-run) → Login. New user OTP → Role → Details
  * → Coach → home.
  */
-type Screen = "splash" | "onboarding" | "savedAccounts" | "login" | "otp" | "role" | "details" | "coach" | "browserUnsupported" | "guest" | "legal";
+type Screen = "splash" | "onboarding" | "savedAccounts" | "login" | "otp" | "role" | "details" | "coach" | "browserUnsupported";
+
+/**
+ * "Browse as Guest" and the Terms / Privacy links leave the auth flow for real
+ * pages, so they are plain navigations rather than screens in the stack.
+ *
+ * They must go to the PUBLIC host, absolutely. Login runs on seller.<host>
+ * (middleware redirects public /login there), and on the seller host every
+ * route except /login bounces an anonymous visitor back to /login — a bare
+ * "/legal/terms" from this screen would have looped straight back here. The
+ * prototype parked all three on a "coming in Batch P2 / P12" placeholder; P2
+ * (feed) and P12 (legal reader) both ship now, so they point at the real thing.
+ */
+function leaveTo(path: string) {
+  window.location.href = publicHref(path);
+}
 
 /** Best-effort hint from a verified user DTO (server stays the source of truth). */
 function hintFromUser(phone: string, user: unknown): SavedAccountHint | null {
@@ -39,10 +55,6 @@ export function AuthFlow() {
   const [offline, setOffline] = useState(false);
   const [flow, setFlow] = useState<{ phone: string; otpSession: string; devCode?: string; role?: string }>({ phone: "", otpSession: "" });
   const [saved, setSaved] = useState<SavedAccountHint[]>([]);
-  // State, not a ref: the render below chooses its title from this. A ref read
-  // during render is not tracked, so the screen would only happen to update
-  // because go() re-renders at the same moment.
-  const [legalDoc, setLegalDoc] = useState<"terms" | "privacy">("terms");
   // /login?add=1 — arriving from the P9 switch sheet to sign a SECOND account
   // into this device. The server keeps both sessions (lib/auth/account-pool).
   // Read on every render, NOT via useState: this component is server-rendered
@@ -150,11 +162,8 @@ export function AuthFlow() {
             setFlow((f) => ({ ...f, phone, otpSession, devCode }));
             go("otp");
           }}
-          onGuest={() => go("guest")}
-          onLegal={(which) => {
-            setLegalDoc(which);
-            go("legal");
-          }}
+          onGuest={() => leaveTo("/")}
+          onLegal={(which) => leaveTo(`/legal/${which}`)}
         />
       )}
       {screen === "otp" && (
@@ -194,8 +203,6 @@ export function AuthFlow() {
       )}
       {screen === "coach" && <Coach onDone={goHome} />}
       {screen === "browserUnsupported" && <BrowserUnsupported />}
-      {screen === "guest" && <Placeholder title="Feed — coming in Batch P2" onBack={back} />}
-      {screen === "legal" && <Placeholder title={`${legalDoc === "terms" ? "Terms" : "Privacy Policy"} — coming in Batch P12`} onBack={back} />}
     </div>
   );
 }

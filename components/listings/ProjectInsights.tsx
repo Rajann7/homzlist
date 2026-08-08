@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { navigateAfterClose } from "@/lib/hooks/use-back-close";
 import { AppShell, BottomSheet, Button, Header, Icon, Skeleton, StatusBadge, useToast } from "@/components/billing/ui";
 import { BackButton, OfflineBanner, SheetOption } from "@/components/billing/primitives";
 import { ConfirmDialog } from "@/components/ui/Dialog";
@@ -233,13 +234,13 @@ export function ProjectInsights({ id }: { id: string }) {
           <SheetOption
             label="Edit project"
             icon={<Icon name="edit" size={20} />}
-            onClick={() => { setMenu(false); router.push(`/projects/${p.id}`); }}
+            onClick={() => { setMenu(false); navigateAfterClose(() => router.push(`/projects/${p.id}`)); }}
           />
           {(p.canBoost || p.promoted) && (
             <SheetOption
               label={p.promoted ? "View boost status" : "Boost project"}
               icon={<Icon name="rocket" size={20} />}
-              onClick={() => { setMenu(false); router.push(p.promoted ? "/boost" : `/boost/new?listing=${p.id}&kind=project`); }}
+              onClick={() => { setMenu(false); navigateAfterClose(() => router.push(p.promoted ? "/boost" : `/boost/new?listing=${p.id}&kind=project`)); }}
             />
           )}
           {/* Only a live project has a link a visitor can open. */}
@@ -249,7 +250,7 @@ export function ProjectInsights({ id }: { id: string }) {
               <SheetOption
                 label="View public page"
                 icon={<Icon name="building" size={20} />}
-                onClick={() => { setMenu(false); router.push(`/project/${p.id}`); }}
+                onClick={() => { setMenu(false); navigateAfterClose(() => router.push(`/project/${p.id}`)); }}
               />
             </>
           )}

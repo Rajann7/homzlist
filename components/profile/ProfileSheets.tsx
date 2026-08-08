@@ -161,14 +161,12 @@ export function ProfileMenuSheet({
   onClose,
   onAccountStatus,
   onViewAsVisitor,
-  onPlaceholder,
   onNavigate,
 }: {
   open: boolean;
   onClose: () => void;
   onAccountStatus: () => void;
   onViewAsVisitor: () => void;
-  onPlaceholder: (what: string) => void;
   /** Route push for the rows below (Settings, Saved, Drafts, Archived…). */
   onNavigate: (href: string) => void;
 }) {
@@ -195,7 +193,9 @@ export function ProfileMenuSheet({
         {/* "QR code" was here. QR is gone from the profile entirely (Rajan,
             29 Jul 2026) — and what it opened was a decorative pattern, never a
             scannable code. Share profile copies the same link. */}
-        <Row icon="help-circle" label="Help" onClick={() => onPlaceholder("Help")} />
+        {/* Help was a "coming in a later module" toast until P12 shipped the
+            Help Centre (/help, seller-host only — that is where this sheet is). */}
+        <Row icon="help-circle" label="Help" onClick={() => onNavigate("/help")} />
       </div>
     </BottomSheet>
   );

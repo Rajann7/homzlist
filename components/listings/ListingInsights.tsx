@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { navigateAfterClose } from "@/lib/hooks/use-back-close";
 import { AppShell, BottomSheet, Button, Header, Icon, Skeleton, StatusBadge, useToast } from "@/components/billing/ui";
 import { BackButton, OfflineBanner, SheetOption } from "@/components/billing/primitives";
 import { ConfirmDialog } from "@/components/ui/Dialog";
@@ -283,13 +284,13 @@ export function ListingInsights({ id }: { id: string }) {
           <SheetOption
             label="Edit listing"
             icon={<Icon name="edit" size={20} />}
-            onClick={() => { setMenu(false); router.push(editHref); }}
+            onClick={() => { setMenu(false); navigateAfterClose(() => router.push(editHref)); }}
           />
           {(l.canBoost || l.promoted) && (
             <SheetOption
               label={l.promoted ? "View boost status" : "Boost listing"}
               icon={<Icon name="rocket" size={20} />}
-              onClick={() => { setMenu(false); router.push(l.promoted ? "/boost" : `/boost/new?listing=${l.id}`); }}
+              onClick={() => { setMenu(false); navigateAfterClose(() => router.push(l.promoted ? "/boost" : `/boost/new?listing=${l.id}`)); }}
             />
           )}
           {/* Only a live listing has a public link. Sharing a hidden, sold or
@@ -304,7 +305,7 @@ export function ListingInsights({ id }: { id: string }) {
               <SheetOption
                 label="View public page"
                 icon={<Icon name="home" size={20} />}
-                onClick={() => { setMenu(false); router.push(`/property/${l.id}`); }}
+                onClick={() => { setMenu(false); navigateAfterClose(() => router.push(`/property/${l.id}`)); }}
               />
             </>
           )}

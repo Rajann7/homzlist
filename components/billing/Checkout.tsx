@@ -265,7 +265,10 @@ export function Checkout() {
           >
             Retry Payment
           </Button>
-          <button onClick={() => toast.show("Support opens in the settings module")} className="tap44 mt-3.5 text-15 font-semibold text-accent">
+          {/* Was a "Support opens in the settings module" toast — a dead button
+              on the one screen where a user has just lost a payment. P12 shipped
+              the Help Centre, so it opens the real contact form. */}
+          <button onClick={() => router.push("/help/contact")} className="tap44 mt-3.5 text-15 font-semibold text-accent">
             Contact Support
           </button>
           <div className="mt-3.5 text-11 text-ink-tertiary">Your listing is saved as a draft.</div>

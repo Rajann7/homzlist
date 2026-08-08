@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { navigateAfterClose } from "@/lib/hooks/use-back-close";
 import { AppShell, Header, Icon, Avatar, VerifiedBadge, BottomSheet, ConfirmDialog, Skeleton, useToast } from "@/components";
 import { Glyph } from "./glyphs";
 import { chatApi } from "@/lib/chat/client";
@@ -486,7 +487,7 @@ export function Thread({ threadId, base = "/messages" }: { threadId: string; bas
           blocks someone they don't also want reported. */}
       <BottomSheet open={menu} onClose={() => setMenu(false)} title={p.name}>
         <div className="pb-2">
-          <MenuRow label="View profile" onClick={() => { setMenu(false); router.push(`/profile/${p.id}`); }} />
+          <MenuRow label="View profile" onClick={() => { setMenu(false); navigateAfterClose(() => router.push(`/profile/${p.id}`)); }} />
           <MenuRow label="Search in this chat" onClick={() => { setMenu(false); setChatSearch(true); setChatSearchQuery(""); setSearchIdx(0); }} />
           <MenuRow label={view.myState.muted ? "Unmute notifications" : "Mute notifications"} onClick={async () => { setMenu(false); await chatApi.setState(threadId, { muted: !view.myState.muted }); toast.show(view.myState.muted ? "Unmuted" : "Muted"); load(false); }} />
           {/* The poster's own lead lives on this thread; closing it must stay

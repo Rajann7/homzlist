@@ -24,6 +24,39 @@ let seq = 0;
 /** Read by components/nav/ScrollRestore — a pop this hook caused, not the user. */
 export const SYNTHETIC_POP = "hz-nav-synthetic";
 
+/**
+ * Navigate OUT of an open sheet/dialog. Use this instead of calling the router
+ * straight after closing the layer.
+ *
+ * Closing a layer runs the cleanup below, which calls `history.back()` to drop
+ * the throwaway entry. That pop is ASYNCHRONOUS, and the App Router treats it as
+ * a navigation of its own — so a `router.push()` issued in the same tick is
+ * thrown away and the screen just sits there. Every navigating row in every
+ * sheet was dead this way: the profile menu (Settings / Saved / Activity /
+ * Drafts / Archived / Help), the Messages menu, both insights menus, the plan
+ * and payment menus, the notifications menu.
+ *
+ * So run the navigation ON that pop. The timer is the fallback for a caller
+ * whose layer had no entry to drop — then there is no pop coming at all.
+ */
+export function navigateAfterClose(go: () => void) {
+  if (typeof window === "undefined") {
+    go();
+    return;
+  }
+  let done = false;
+  let timer: ReturnType<typeof setTimeout>;
+  const run = () => {
+    if (done) return;
+    done = true;
+    window.removeEventListener("popstate", run);
+    clearTimeout(timer);
+    go();
+  };
+  window.addEventListener("popstate", run);
+  timer = setTimeout(run, 150);
+}
+
 export function useBackClose(open: boolean, onClose: () => void) {
   // Held in a ref so a caller passing an inline arrow doesn't re-run the effect
   // on every render — that would push a history entry per render.

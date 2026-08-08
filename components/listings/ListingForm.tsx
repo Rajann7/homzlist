@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { navigateAfterClose } from "@/lib/hooks/use-back-close";
 import { AppShell, BottomSheet, Button, Header, Icon, Skeleton, useToast } from "@/components/billing/ui";
 import { SectionLabel } from "@/components/billing/primitives";
 import { ConfirmDialog } from "@/components/ui/Dialog";
@@ -418,7 +419,7 @@ export function ListingForm() {
       <ConfirmDialog
         open={unsavedOpen}
         onClose={() => setUnsavedOpen(false)}
-        onConfirm={async () => { await saveDraft(false); setUnsavedOpen(false); router.push("/create"); }}
+        onConfirm={async () => { await saveDraft(false); setUnsavedOpen(false); navigateAfterClose(() => router.push("/create")); }}
         title="Save as draft?"
         body="Your progress will be kept for 90 days."
         confirmLabel="Save draft"

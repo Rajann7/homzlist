@@ -67,21 +67,9 @@ export function BrowserUnsupported() {
   );
 }
 
-/** Placeholder for links into future batches (guest feed, legal). */
-export function Placeholder({ title, onBack }: { title: string; onBack: () => void }) {
-  return (
-    <div className="flex min-h-[100dvh] flex-col bg-page px-4">
-      <div className="flex h-header items-center">
-        <button aria-label="Back" onClick={onBack} className="grid h-11 w-11 -ml-2 place-items-center text-ink-primary">
-          <Icon name="arrow-left" size={24} strokeWidth={1.7} />
-        </button>
-      </div>
-      <div className="flex flex-1 items-center justify-center">
-        <p className="text-13 text-ink-tertiary">{title}</p>
-      </div>
-    </div>
-  );
-}
+/* The "coming in Batch P2 / P12" placeholder that used to live here is gone:
+   "Browse as Guest" and the Terms / Privacy links now leave for the real feed
+   and legal reader (see AuthFlow's `leaveTo`). */
 
 /** Offline banner — warning strip, toggled by connectivity. */
 export function OfflineBanner({ onRetry }: { onRetry: () => void }) {

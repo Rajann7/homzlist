@@ -157,10 +157,16 @@ export async function middleware(request: NextRequest) {
       res.cookies.delete(POOL_COOKIE);
       return res;
     }
-    // /messages and /notifications are seller-only authenticated surfaces — they
-    // must not render their shell for an anonymous visitor on the public host
-    // (Doc9 §28 guest gate).
-    if (!user && (pathname.startsWith("/messages") || pathname.startsWith("/notifications"))) {
+    // /messages, /notifications and /saved are seller-only authenticated
+    // surfaces — they must not render their shell for an anonymous visitor on
+    // the public host (Doc9 §28 guest gate).
+    //
+    // /saved was the one missing from this list, and the public host answered it
+    // with a "Saved is coming" placeholder from before P10 shipped — so the feed
+    // header's bookmark icon, which renders for guests, opened a screen that
+    // lied about a feature that exists. It goes through the same gate now and
+    // the stale placeholder page is gone.
+    if (!user && (pathname.startsWith("/messages") || pathname.startsWith("/notifications") || pathname.startsWith("/saved"))) {
       const to = new URL(request.url);
       to.host = `seller.${host}`;
       to.pathname = "/login";
