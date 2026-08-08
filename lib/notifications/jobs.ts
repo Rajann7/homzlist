@@ -2,6 +2,7 @@ import "server-only";
 import { createServiceClient } from "@/lib/supabase/server";
 import { notify } from "./service";
 import { requirementBrief, requirementBriefPreview, listingBrief, rupeesExact } from "./subjects";
+import { flagEnabled } from "@/lib/system/flags";
 
 /**
  * The scheduled half of the Doc2 §14 event catalog — the events that are a JOB,
@@ -76,7 +77,14 @@ async function requirementExpiryReminders(): Promise<number> {
         title: `Your **requirement expires in ${days} day${days === 1 ? "" : "s"}**`,
         body: `${(await requirementBrief(r.id)).title} — reopen it to keep receiving proposals.`,
         entityKind: "requirement", entityId: r.id,
-        data: { requirementId: r.id, milestone: days },
+        // `area`/`days` also feed A20's "requirement_expiring" push template
+        // ("Your requirement in {{area}} expires in {{days}} days").
+        data: {
+          requirementId: r.id,
+          milestone: days,
+          days,
+          area: (await requirementBrief(r.id)).area ?? (await requirementBrief(r.id)).title,
+        },
       });
       sent++;
     }
@@ -200,6 +208,8 @@ function isoWeek(d = new Date()): string {
 }
 
 async function weeklyDigests(): Promise<number> {
+  // A22 Feature flags → Weekly digest. Off = the digest run is skipped entirely.
+  if (!(await flagEnabled("weekly_digest"))) return 0;
   const week = isoWeek();
   const since = new Date(Date.now() - 7 * DAY).toISOString();
   let sent = 0;
@@ -231,7 +241,9 @@ async function weeklyDigests(): Promise<number> {
       type: "weekly_digest",
       title: `Your week: **${views ?? 0} view${views === 1 ? "" : "s"}, ${leads ?? 0} lead${leads === 1 ? "" : "s"}**`,
       body: "Across all your live listings in the last 7 days.",
-      data: { views: views ?? 0, leads: leads ?? 0, week },
+      // A20's "weekly_digest" email template takes {{views}}, {{leads}} AND
+      // {{matches}} — all three must be present or the admin copy is skipped.
+      data: { views: views ?? 0, leads: leads ?? 0, matches: 0, week },
     });
     sent++;
   }
@@ -260,7 +272,9 @@ async function weeklyDigests(): Promise<number> {
       title: `**${e.total} propert${e.total === 1 ? "y" : "ies"}** match your saved searches this week`,
       body: e.labels.join(" · "),
       href: "/saved",
-      data: { week, total: e.total },
+      // Same three variables as the seller digest above (this reader has matches,
+      // not views/leads — but the template needs all three to render).
+      data: { week, total: e.total, views: 0, leads: 0, matches: e.total },
     });
     sent++;
   }

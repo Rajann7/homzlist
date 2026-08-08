@@ -27,10 +27,16 @@
   exposed deposit/maintenance/contact/alt in the panel. Live: admin edited contact + deposit on a
   real listing (`2 field(s) edited`) → verified in DB → restored. (attributes/type_code/kind stay
   out — structured/schema-risky, noted.)
-- **#15 Boost geo-pricing — SCOPED (clean wiring pending):** `boost_rates` is keyed by
-  (targeting, days) — exactly the boost's own shape — but purchase prices from `plan_catalog`
-  boost7/boost30 (flat). Fix = price boosts from `boost_rates`; must also update the credit/renew
-  paths that hardcode boost7/boost30. In progress.
+- **#15 Boost geo-pricing — NEEDS A PRICING DECISION (not a clean wiring):** on inspection,
+  `boost_rates` has DIVERGED from the shipped product. It stores area/city × 7/14/30, but the
+  live product sells **city/state/india** targeting at **flat** per-duration prices from
+  `plan_catalog` (boost7 ₹499 / boost30 ₹1499); area targeting and the 14-day tier were removed,
+  and there are no state/india rows. So "wiring" it isn't neutral — it would change what
+  customers pay (geography-differentiated pricing). That's a pricing/product call, not a bug fix.
+  RECOMMENDATION: either (a) point the admin boost-rate screen at `plan_catalog` boost rows (the
+  real prices) and retire `boost_rates`, or (b) decide to sell geo-differentiated boosts and
+  rebuild `boost_rates` to the sold scopes, then wire it. Not changed unilaterally — pricing is
+  outward-facing and hard to reverse.
 - **#19 Disputes — RE-CLASSIFIED:** not "seller can't see it" — **disputes have NO creation path
   anywhere** (0 rows; only `resolveDispute` exists). The admin Disputes screen can never populate.
   This is an unbuilt feature (needs an open-dispute flow), larger than a wiring. Flagged.
@@ -61,15 +67,109 @@ missing. Item **#5 (banner CTA)** is design-only with no column and is not rende
 - **Gated (typecheck-clean, same helper):** `stories` (feed story API → empty), `projects`
   (builder project create → closed), `saved_searches` (save-search create → closed), `visits`
   (propose-visit → closed, in-flight visits untouched), `boost` (eligibility screen → empty;
-  NOTE: boost checkout endpoint still needs the same gate for full enforcement).
+  NOTE: boost checkout endpoint still needs the same gate for full enforcement),
+  `requirements` (create → closed), `proposals` (send → closed).
+  **8 of 18 flags now gated; blog fully browser-verified.**
 - Remaining flags to gate: requirements, proposals, chat_photos, number_masking, price_drop_alerts,
   weekly_digest, featured_collections, pwa_prompt (+ auction/home_loans/referrals/multi_language,
   which gate features that are not built yet).
 - LESSON APPLIED: every flag must gate ALL its surfaces (SSR page + API + nav), per CHANGE-PROTOCOL.
+- **12 of 18 flags now gated to real features** (typecheck-clean): blog, stories, projects,
+  saved_searches, visits, boost, requirements, proposals, chat_photos, weekly_digest,
+  price_drop_alerts, pwa_prompt. New client endpoint `/api/v1/config/flags` for client gates.
+- **REGRESSION CAUGHT + FIXED (verification working):** `feature_flags.scope_value` is JSONB
+  (`{roles:[]}` / `{cities:[]}` / `{percent:N}` / `{staff_only:true}`), not a string, and the
+  scope is `percentage` not `percent`. My first `flagEnabled` compared an object to a string, so
+  the role-scoped `projects` flag resolved FALSE for builders too — which would have broken
+  builder project creation. Fixed the reader; re-verified live: a builder session now gets
+  `projects:true`, a guest/broker gets `projects:false`.
+- **BEHAVIOR NOTE for review:** `pwa_prompt` is enabled at `percentage:10`. Wiring it means the
+  install prompt now shows to ~10% (its configured rollout) instead of everyone. If you want all
+  users prompted, set that flag's rollout to 100 in A22.
+- Remaining flags: `number_masking` (no implementation to gate — privacy is handled by the
+  number-request flow, so the flag is currently inert), `featured_collections` (ambiguous — maps
+  to profile-featured vs a home collection; needs a decision), and `auction`/`home_loans`/
+  `referrals`/`multi_language` (features not built yet — the flags stay inert until they are).
 
-**STILL AHEAD (feature-scale, greenlit "wire for real"):** 16 more flag gates, message_templates
-(28 — re-plumb `notify()`/email to interpolate DB templates with fallback), ui_strings (221 —
-i18n resolver), boost geo-pricing (#15), disputes creation flow (#19).
+**#15 Boost pricing — FIXED & live-verified (decision: keep flat pricing):** the admin
+Boost-rates screen now reads/writes `plan_catalog` boost7/boost30 (the rows the buyer + checkout
+actually use), instead of the stale `boost_rates` table. Live proof: admin set boost7 → seller
+`/billing/boost/eligible` showed the new price (₹555), then restored. `sales_30d` attribution is
+fixed too (joins on the real catalog_code). `boost_rates` is now unread (retired de facto).
+
+**message_templates (28) — architecture note before wiring:** `notify()`/email/push receive final
+interpolated `title`/`body`, while templates carry `{{variables}}` and callers pass only deep-link
+`data`. Genuinely wiring = re-plumbing each of the 28 call sites to pass its template's variables,
+with fallback (rendering a template without its vars would print literal `{{name}}` — a regression).
+So this is 28 individual, per-type changes, each verified — a multi-batch build, in progress.
+
+**message_templates — ENGINE BUILT, INTEGRATED & PROVEN (items 59–86):**
+- New `lib/notifications/templates.ts` — `renderTemplate(code, channel, vars)` with a strict
+  safety contract: unknown/inactive template → null; **any unfilled `{{var}}` → null** (a real
+  email can never ship literal `{{name}}`); DB error → null. Callers use
+  `renderTemplate(...) ?? theirOwnCopy`, so adoption is strictly no-worse-than-before.
+  `invalidateTemplates()` hooked into A20's save + toggle, so an admin edit is live next send.
+- **Integrated into the real email dispatch** (`emailNotification` in notifications/service.ts):
+  every notification email now PREFERS the admin template for its type. `data` is threaded
+  through `deliverChannels` (both call sites) as the variable source, and **`{{name}}` +
+  `{{link}}` are supplied centrally** from the recipient profile + href — they are needed by
+  nearly every template, so a call site only has to add its own specific variables.
+- **PROVEN against the real DB rows** (4/4 contract cases): `welcome` renders from admin copy with
+  the central `{{name}}` ("Welcome to HomzList, Rajan"); with no vars → null (built-in copy used);
+  `invoice` missing `{{amount}}/{{date}}` → null (no literal placeholders shipped); `invoice`
+  fully supplied → renders. So **`welcome` is live from admin copy now**, and each remaining
+  template goes live as its call site passes its specific vars (invoice: amount/date; refund:
+  amount/item; listing_*: title/area/notes; weekly_digest: views/leads/matches; suspension:
+  date/reason/until; grievance_ack: ticket).
+
+**message_templates — 15 of 28 NOW LIVE (call sites wired + proven):**
+- Added `CODE_ALIASES`: the app's `NotificationType` and A20's template codes are DIFFERENT
+  vocabularies (`refund_processed`→`refund`, `saved_search_match`→`saved_match`, and
+  `listing_approved` means `listing_approved_email` on email but `listing_live` on push).
+  Without this every lookup missed and the admin's edit silently did nothing.
+- **Push channel wired too** (same fallback contract as email).
+- **Call sites now pass their template variables:** listing_approved (title/area) ·
+  listing_changes_requested (title/notes) · refund_processed (amount/item) · account_suspended
+  (date/reason/until) · weekly_digest (views/leads/matches) · price_drop (title/price) ·
+  new_message (preview) · inquiry_received (buyer/title) · boost_approved (title/days) ·
+  number_requested (buyer) · number_shared (name) · requirement_expiring (area/days) ·
+  saved_search_match (count/search). Plus `welcome` via the central `{{name}}`.
+- **PROVEN — 14/14** rendered real admin copy against the live DB templates using the exact vars
+  each call site now emits (e.g. "3 BHK, Mavdi is boosted for 7 days", "12 new properties match
+  3 BHK · Mavdi"). **Live end-to-end:** a real admin listing-approval wrote `title` + `area` into
+  the notification row's data, then the listing was restored to `pending_review`.
+
+**The remaining 13 templates are blocked on MISSING SENDERS, not on this work:**
+- **10 sms + whatsapp templates have no dispatcher at all.** The notification dispatcher delivers
+  only push + email; WhatsApp is used solely by the admin's "send message" path; SMS is dev-mode
+  (MSG91/DLT is a pending credential in PENDING-INTEGRATIONS). Nothing to wire them into yet.
+- **3 email templates have no notify call site:** `invoice` (the invoice-email endpoint only marks
+  it emailed — the send was never built), `plan_expired_email` (no `plan_expired` notify exists),
+  `grievance_ack` (no grievance flow). These are unbuilt paths, recorded rather than faked.
+
+**ui_strings — resolver BUILT + PROVEN, but the DATA is the real bug:**
+- New `lib/system/strings.ts` — `t(key, fallback)` / `tMany()` with a hard safety contract
+  (unknown key, empty value or DB error → the caller's hardcoded default, so a string edit can
+  never blank the UI). `invalidateStrings()` hooked into A20's save + CSV import.
+- New `/api/v1/config/strings?keys=key|fallback,…` for client components.
+- **PROVEN live end-to-end:** admin edited `search.no_results` in A20 → the site immediately
+  served "AUDIT: nothing found here" → restored to "Nothing matched your filters". The editor is
+  no longer dead. Also proven: an unknown key returns its fallback, and a DB value overrides the
+  caller's fallback.
+- **NEW BUG FOUND (#101) — `ui_strings` is seeded with fake data, and it violates CLAUDE.md rule 7
+  ("mock/sample data shipped as if it were real"):** 190 of the 221 rows are auto-generated
+  (`*.auto_NNN`) with nonsense English AND translations that contradict it — e.g.
+  `boost.auto_117` is en "Clear all 117" but hi "फ़िल्टर लागू करें 117" (= "Apply filter 117");
+  `boost.auto_105` is en "Next 105" but gu "બધું જુઓ 105" (= "See all 105"). The numeric suffixes
+  are generator artifacts.
+  **So mass-wiring all 221 keys into the UI would inject garbage** — that is why only the resolver
+  (with fallbacks) was built and no component was blind-migrated. The 31 real keys
+  (`common.save`, `error.generic`, `search.no_results`, `listing.sold`, …) work through it today.
+  **RECOMMENDATION (needs your OK — deleting data is not reversible):** purge the 190 `*.auto_NNN`
+  rows so the A20 screen stops presenting 190 fake editable strings, keep the 31 real ones, and
+  extract real keys from the UI as components adopt `t()`. Not deleted unilaterally.
+- Multi-language stays OFF: the gu/hi columns are untrustworthy (above), so `t()` always prefers
+  `en` and only honours a translation once the flag is on and the column is genuinely filled.
 
 **IN PROGRESS — the larger Pattern-B wiring** (each an admin-editable table nothing reads): items
 13–15 (property-type create, listing-edit fields, boost geo-pricing), 19 (disputes→seller), and

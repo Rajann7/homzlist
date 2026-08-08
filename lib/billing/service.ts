@@ -887,7 +887,14 @@ export async function refundAndRevoke(args: {
       title: `**${rupeeLabel(p.amount_paise)} refunded** — it will reach your account in 5–7 days`,
       body: args.reason.slice(0, 160),
       entityKind: "order", entityId: args.orderId,
-      data: { orderId: args.orderId, paymentId: args.paymentId },
+      // `amount`/`item` also feed A20's "refund" email template
+      // ("We have refunded {{amount}} for {{item}}").
+      data: {
+        orderId: args.orderId,
+        paymentId: args.paymentId,
+        amount: rupeeLabel(p.amount_paise),
+        item: args.reason.slice(0, 80) || "your purchase",
+      },
     });
   }
   return (data ?? []) as string[]; // listing ids to unpublish

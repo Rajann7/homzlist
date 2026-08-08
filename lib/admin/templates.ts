@@ -2,6 +2,8 @@ import "server-only";
 import { createServiceClient } from "@/lib/supabase/server";
 import { writeAudit } from "./audit";
 import { sendAdminMessage } from "./users";
+import { invalidateTemplates } from "@/lib/notifications/templates";
+import { invalidateStrings } from "@/lib/system/strings";
 import type { AdminIdentity } from "./guard";
 
 /**
@@ -122,6 +124,7 @@ export async function saveTemplate(
     patch.subject = subject;
   }
   await db().from("message_templates").update(patch).eq("id", id);
+  invalidateTemplates();
 
   await writeAudit(me, {
     action: "template_edit",
@@ -165,6 +168,7 @@ export async function toggleTemplate(
     return { ok: false, message: "Authentication templates cannot be disabled" };
 
   await db().from("message_templates").update({ is_active: active }).eq("id", id);
+  invalidateTemplates();
   await writeAudit(me, {
     action: "template_edit",
     entityType: "message_template",
@@ -260,6 +264,7 @@ export async function saveString(
 
   const { error } = await db().from("ui_strings").update(patch).eq("key", key);
   if (error) return { ok: false, message: error.message };
+  invalidateStrings();
 
   await writeAudit(me, {
     action: "string_edit",
@@ -334,6 +339,7 @@ export async function importStrings(csv: string, me: AdminIdentity): Promise<Act
       updated++;
     }
   }
+  invalidateStrings();
 
   await writeAudit(me, {
     action: "string_import",

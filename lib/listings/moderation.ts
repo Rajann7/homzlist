@@ -318,7 +318,10 @@ async function notifyModerationDecision(
       groupKey: `approved:${subject}`,
       href: ownerHref(subject, id),
       entityKind: subject, entityId: id,
-      data: { listingId: id, subject },
+      // `title`/`area` also feed A20's "listing_approved_email" ({{title}},
+      // {{area}}, {{name}}, {{link}}) and the "listing_live" push ({{title}});
+      // {{name}} and {{link}} are supplied centrally by the dispatcher.
+      data: { listingId: id, subject, title: brief.title, area: brief.area ?? "" },
     });
     if (res.grouped && res.groupCount > 1 && res.id) {
       await db().from("notifications")
@@ -341,7 +344,14 @@ async function notifyModerationDecision(
       // requirement forms take ?edit= too, on their own routes.
       href: editHref(subject, id),
       entityKind: subject, entityId: id,
-      data: { listingId: id, subject },
+      // `title`/`notes` also feed A20's "listing_changes" email template
+      // ({{title}}, {{notes}}, {{name}}, {{link}}).
+      data: {
+        listingId: id,
+        subject,
+        title: brief.title,
+        notes: notes || "Open the listing to see what needs changing.",
+      },
     });
     return;
   }

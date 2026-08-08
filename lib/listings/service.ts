@@ -7,6 +7,7 @@ import { keysForKind, visibleKeys, type ShowIf } from "./visibility";
 import { pgrstSafe } from "@/lib/search/parse";
 import { notify } from "@/lib/notifications/service";
 import { rupees } from "@/lib/notifications/subjects";
+import { flagEnabled } from "@/lib/system/flags";
 
 /**
  * Listings persistence + state machine (Doc2 §5, Doc7 §4, Doc9 §11).
@@ -1557,6 +1558,8 @@ async function saversOf(listingId: string, ownerId: string): Promise<string[]> {
 }
 
 async function notifySaversOfPriceDrop(listingId: string, oldPaise: number, newPaise: number) {
+  // A22 Feature flags → Price-drop alerts. Off = no price-drop notifications fan out.
+  if (!(await flagEnabled("price_drop_alerts"))) return;
   const { data } = await db()
     .from("listings").select("id,profile_id,title,area_label,cover_url").eq("id", listingId).maybeSingle();
   const l = data as { id: string; profile_id: string; title: string; area_label: string; cover_url: string | null } | null;
@@ -1573,7 +1576,9 @@ async function notifySaversOfPriceDrop(listingId: string, oldPaise: number, newP
       body: `Now ${rupees(newPaise)}.`,
       thumbUrl: l.cover_url,
       entityKind: "listing", entityId: l.id,
-      data: { listingId: l.id },
+      // `title` + `price` also feed the A20 "price_drop" push template
+      // ("{{title}} is now {{price}}") — admin copy renders only when both are here.
+      data: { listingId: l.id, title: name, price: rupees(newPaise) },
     });
   }
 }

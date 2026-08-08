@@ -66,25 +66,42 @@ export function InstallPrompt() {
 
   useEffect(() => {
     if (isAdminHost() || isStandalone() || snoozed()) return;
-    setHidden(false);
 
-    // Installing from the browser menu (rather than our card) fires this — take
-    // the card down instead of leaving it advertising an app they now have.
-    const onInstalled = () => { setHidden(true); setDeferred(null); setShowIosGuide(false); };
-    window.addEventListener("appinstalled", onInstalled);
+    let onInstalled: (() => void) | undefined;
+    let onBIP: ((e: Event) => void) | undefined;
+    let cancelled = false;
 
-    if (isIos()) {
-      setShowIosGuide(true);
-      return () => window.removeEventListener("appinstalled", onInstalled);
-    }
-    const onBIP = (e: Event) => {
-      e.preventDefault();
-      setDeferred(e as BIPEvent);
-    };
-    window.addEventListener("beforeinstallprompt", onBIP);
+    (async () => {
+      // A22 Feature flags → PWA install prompt. Off = the card is never offered.
+      // Default-on: any fetch failure or missing flag proceeds as before.
+      try {
+        const r = await fetch("/api/v1/config/flags", { cache: "no-store" });
+        const j = (await r.json()) as { data?: { flags?: Record<string, boolean> } };
+        if (j?.data?.flags?.pwa_prompt === false) return;
+      } catch {
+        /* default-on */
+      }
+      if (cancelled) return;
+      setHidden(false);
+
+      onInstalled = () => { setHidden(true); setDeferred(null); setShowIosGuide(false); };
+      window.addEventListener("appinstalled", onInstalled);
+
+      if (isIos()) {
+        setShowIosGuide(true);
+        return;
+      }
+      onBIP = (e: Event) => {
+        e.preventDefault();
+        setDeferred(e as BIPEvent);
+      };
+      window.addEventListener("beforeinstallprompt", onBIP);
+    })();
+
     return () => {
-      window.removeEventListener("beforeinstallprompt", onBIP);
-      window.removeEventListener("appinstalled", onInstalled);
+      cancelled = true;
+      if (onBIP) window.removeEventListener("beforeinstallprompt", onBIP);
+      if (onInstalled) window.removeEventListener("appinstalled", onInstalled);
     };
   }, []);
 

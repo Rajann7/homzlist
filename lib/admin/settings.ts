@@ -2,6 +2,7 @@ import "server-only";
 import { createServiceClient } from "@/lib/supabase/server";
 import { invalidateRateRules } from "@/lib/auth/rate-limit";
 import { invalidateFlags } from "@/lib/system/flags";
+import { invalidateDurations } from "@/lib/system/config";
 import { writeAudit } from "./audit";
 import type { AdminIdentity } from "./guard";
 
@@ -153,12 +154,15 @@ export async function saveBoostRate(
   body: Record<string, unknown>,
   me: AdminIdentity,
 ): Promise<ActionResult> {
+  // Boost prices live in plan_catalog (kind='boost': boost7/boost30) — the rows
+  // the buyer and checkout actually use. (Was `boost_rates`, which nothing read.)
   const { data } = await db()
-    .from("boost_rates")
-    .select("code, label, price_paise, is_active")
+    .from("plan_catalog")
+    .select("code, name, price_paise, is_active")
     .eq("code", code)
+    .eq("kind", "boost")
     .maybeSingle();
-  const rate = data as { code: string; label: string; price_paise: number; is_active: boolean } | null;
+  const rate = data as { code: string; name: string; price_paise: number; is_active: boolean } | null;
   if (!rate) return { ok: false, message: "Not found" };
 
   const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
@@ -168,19 +172,19 @@ export async function saveBoostRate(
   }
   if (typeof body.is_active === "boolean") patch.is_active = body.is_active;
 
-  await db().from("boost_rates").update(patch).eq("code", code);
+  await db().from("plan_catalog").update(patch).eq("code", code).eq("kind", "boost");
   await writeAudit(me, {
     action: "pricing_change",
     entityType: "boost_rate",
-    entityLabel: rate.label,
+    entityLabel: rate.name,
     // The design's note says price changes apply to new purchases only. That is
     // true because a purchase copies its price onto the order at checkout, so
     // this update cannot reach a boost someone already bought.
-    summary: `${rate.label} updated — applies to new purchases only`,
+    summary: `${rate.name} updated — applies to new purchases only`,
     diff: { before: rate, after: patch },
     sensitive: true,
   });
-  return { ok: true, label: rate.label, summary: `${rate.label} updated` };
+  return { ok: true, label: rate.name, summary: `${rate.name} updated` };
 }
 
 export async function saveCityCap(
@@ -339,6 +343,68 @@ export async function saveRetention(
     sensitive: true,
   });
   return { ok: true, label: row.label, summary: `${row.label} retention updated · logged` };
+}
+
+/* ═══════════════════════════════════════ tab · sessions & content (durations) */
+
+/** "7 days" / "30 minutes" / "12 hours" — the largest whole unit that fits. */
+function durationWords(seconds: number): string {
+  const plural = (n: number, u: string) => `${n} ${u}${n === 1 ? "" : "s"}`;
+  if (seconds % 86_400 === 0) return plural(seconds / 86_400, "day");
+  if (seconds % 3_600 === 0) return plural(seconds / 3_600, "hour");
+  if (seconds % 60 === 0) return plural(seconds / 60, "minute");
+  return plural(seconds, "second");
+}
+
+export async function durationsList() {
+  const { data } = await db()
+    .from("system_durations")
+    .select("key, label, seconds, min_seconds, max_seconds, note, updated_at")
+    .order("label");
+  return data ?? [];
+}
+
+export async function saveDuration(
+  key: string,
+  seconds: number,
+  me: AdminIdentity,
+): Promise<ActionResult> {
+  const { data } = await db()
+    .from("system_durations")
+    .select("key, label, seconds, min_seconds, max_seconds")
+    .eq("key", key)
+    .maybeSingle();
+  const row = data as
+    | { key: string; label: string; seconds: number; min_seconds: number; max_seconds: number }
+    | null;
+  if (!row) return { ok: false, message: "Not found" };
+
+  if (!Number.isFinite(seconds)) return { ok: false, message: "Enter a valid duration" };
+  const s = Math.trunc(seconds);
+  // The band is the control, not the padlock the UI draws — a crafted POST can
+  // set neither a one-second session nor an unbounded one.
+  if (s < row.min_seconds)
+    return { ok: false, message: `${row.label} can't be shorter than ${durationWords(row.min_seconds)}` };
+  if (s > row.max_seconds)
+    return { ok: false, message: `${row.label} can't be longer than ${durationWords(row.max_seconds)}` };
+
+  await db()
+    .from("system_durations")
+    .update({ seconds: s, updated_at: new Date().toISOString() })
+    .eq("key", key);
+  // Without this the edit does nothing for up to 30s (the config cache), which
+  // reads exactly like the setting not working.
+  invalidateDurations();
+
+  await writeAudit(me, {
+    action: "limit_change",
+    entityType: "settings",
+    entityLabel: row.label,
+    summary: `${row.label} set to ${durationWords(s)} (was ${durationWords(row.seconds)})`,
+    diff: { before: row.seconds, after: s },
+    sensitive: true,
+  });
+  return { ok: true, label: row.label, summary: `${row.label} → ${durationWords(s)} · logged` };
 }
 
 /* ═════════════════════════════════════════════════ tab 6 · maintenance ═══ */

@@ -734,6 +734,16 @@ export async function suspendUser(
     title: days ? `Your account is suspended for ${days} days` : "Your account is suspended",
     body: reason.trim(),
     actorId: me.id,
+    // `date`/`reason`/`until` also feed A20's "suspension" email template.
+    data: {
+      date: new Date(hiddenAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }),
+      reason: reason.trim(),
+      until: days
+        ? new Date(new Date(hiddenAt).getTime() + days * 86_400_000).toLocaleDateString("en-IN", {
+            day: "numeric", month: "short", year: "numeric",
+          })
+        : "review",
+    },
   });
 
   return {

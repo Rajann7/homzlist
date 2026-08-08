@@ -2,6 +2,7 @@ import type { NextRequest } from "next/server";
 import { ok, fail } from "@/lib/api";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { getProfileById } from "@/lib/profile/service";
+import { flagEnabled } from "@/lib/system/flags";
 import { rateLimit } from "@/lib/auth/rate-limit";
 import { createServiceClient } from "@/lib/supabase/server";
 import {
@@ -103,6 +104,9 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
 
   const profile = await getProfileById(claims.sub);
   if (!profile || profile.state !== "active") return fail("FORBIDDEN");
+  // A22 Feature flags → Proposals. Off = no new proposals sent. Default-on.
+  if (!(await flagEnabled("proposals", { role: profile.role, userId: claims.sub })))
+    return fail("FORBIDDEN");
 
   const limited = await rateLimit(`proposal-send:${claims.sub}`, 60, 3600, "proposal_send");
   if (!limited.allowed) return fail("RATE_LIMITED");

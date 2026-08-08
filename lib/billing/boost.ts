@@ -570,7 +570,15 @@ export async function approveBoost(boostId: string, actorId: string): Promise<Bo
     body: queued
       ? `It starts when your current boost ends, and runs till ${dateLabel(endsAt)}.`
       : `Running till ${dateLabel(endsAt)} · ${boost.target_label}`,
-    data: { boostId, subjectKind: boost.subject_kind, subjectId: boost.listing_id, deepLink: "/boost" },
+    // `title`/`days` also feed A20's "boost_approved" push template.
+    data: {
+      boostId,
+      subjectKind: boost.subject_kind,
+      subjectId: boost.listing_id,
+      deepLink: "/boost",
+      title: (await subjectBrief(boost.subject_kind, boost.listing_id)).title,
+      days: boost.duration_days,
+    },
   });
 
   return { ok: true, status: "active", startsAt, endsAt, queuedAfter: queued ? startsAt : null };
@@ -642,7 +650,15 @@ export async function startBoostNow(boostId: string): Promise<"active" | "pendin
     body: queued
       ? `It starts when your current boost ends, and runs till ${dateLabel(endsAt)}.`
       : `Running till ${dateLabel(endsAt)} · ${boost.target_label}`,
-    data: { boostId, subjectKind: boost.subject_kind, subjectId: boost.listing_id, deepLink: "/boost" },
+    // `title`/`days` also feed A20's "boost_approved" push template.
+    data: {
+      boostId,
+      subjectKind: boost.subject_kind,
+      subjectId: boost.listing_id,
+      deepLink: "/boost",
+      title: brief.title,
+      days: boost.duration_days,
+    },
   });
   return "active";
 }
