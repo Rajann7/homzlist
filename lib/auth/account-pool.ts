@@ -1,6 +1,6 @@
 import "server-only";
 import { cookies } from "next/headers";
-import { cookieOpts, REFRESH_MAX_AGE_SEC, revokeSession, peekRefreshSession } from "./session";
+import { cookieOpts, refreshMaxAgeSec, revokeSession, peekRefreshSession } from "./session";
 
 /**
  * Multi-account pool (P9 S1 "Switch account", Doc2 §3.1 "Account switch —
@@ -55,7 +55,7 @@ export async function writePool(entries: PoolEntry[]): Promise<void> {
     jar.delete(COOKIE_POOL);
     return;
   }
-  jar.set(COOKIE_POOL, serialize(entries.slice(0, MAX_BACKGROUND)), cookieOpts(REFRESH_MAX_AGE_SEC));
+  jar.set(COOKIE_POOL, serialize(entries.slice(0, MAX_BACKGROUND)), cookieOpts(await refreshMaxAgeSec()));
 }
 
 /**

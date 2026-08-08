@@ -4,7 +4,7 @@
     {
       "name": "homzlist-dev",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeArgs": ["run", "dev:warm"],
       "port": 3000,
       "autoPort": true,
       "env": { "NEXT_DIST_DIR": ".next-claude" }

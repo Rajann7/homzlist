@@ -6,12 +6,16 @@ import { feedScope, applyFeedScope } from "./scope";
 import { getFieldDefinitions, getFieldGroups, type FieldDefinitionRow, type FieldGroupRow, type PropertyTypeRow } from "@/lib/listings/service";
 import { attributeRows, resolveKeySpecs, topUpSpecs, type KeySpecCandidate } from "@/lib/listings/dto";
 import { timeAgo } from "@/lib/listings/matching";
+import { storyWindowMs } from "@/lib/system/config";
 
 /**
  * Stories (Doc7 §84-86, Doc2 §9.3) — AUTO-GENERATED ONLY.
  *
- * Source: every approved listing/project that went live in the last 24h in the
- * viewer's city. One poster/day = ONE circle with multiple segments. Order:
+ * Source: every approved listing/project that went live within the story window
+ * in the viewer's city. That window is the admin-tunable "Story window"
+ * (system_durations.story_window, default 30 days; lib/system/config.ts) — it
+ * was a hard-coded 24h. One poster/day = ONE circle with multiple segments.
+ * Order:
  * boosted first → recency (cascade order). NO cap. NO add-story anywhere — the
  * client never renders a "your story" circle and there is no create path.
  *
@@ -75,8 +79,6 @@ export interface StoryCircle {
   isProject: boolean;
   segments: StorySegment[];
 }
-
-const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** A type's label + its whole `field_config` (key-spec candidates, field order). */
 interface TypeConfig { label: string; row: PropertyTypeRow }
@@ -243,9 +245,9 @@ export async function getStories(viewerId: string | null, pickedCityId?: string 
   // Story SEEN state is keyed by the viewer's real city, not the widened one —
   // otherwise widening would reset every ring the viewer had already watched.
   const cityId = scope.cityId;
-  const since = new Date(Date.now() - DAY_MS).toISOString();
+  const since = new Date(Date.now() - (await storyWindowMs())).toISOString();
 
-  // Approved-in-last-24h listings + projects in the city.
+  // Approved-within-the-window listings + projects in the city.
   let lq = db()
     .from("listings")
     .select("id,profile_id,cover_url,title,type_code,kind,is_negotiable,price_paise,price_on_request,area_label,area_id,attributes,area_sqft,live_at")
@@ -373,12 +375,13 @@ export async function markSeen(viewerId: string, cityId: string, segmentId: stri
 }
 
 /**
- * One segment's media + overlay data (Doc7 §86). Mid-24h the listing may have
- * sold/hidden → `available:false` drives the viewer's "no longer available"
- * state. The cover is the (currently public) photo URL; a private story bucket
- * with signed 24h URLs is a later hardening (PENDING).
+ * One segment's media + overlay data (Doc7 §86). Mid-window the listing may
+ * have sold/hidden → `available:false` drives the viewer's "no longer
+ * available" state. The cover is the (currently public) photo URL; a private
+ * story bucket with signed URLs is a later hardening (PENDING).
  */
 export async function storySegment(segmentId: string, viewerId: string | null = null): Promise<StorySegment | null> {
+  const windowMs = await storyWindowMs();
   const { data: l } = await db()
     .from("listings")
     .select("id,cover_url,title,type_code,kind,is_negotiable,price_paise,price_on_request,area_label,attributes,area_sqft,status,availability,live_at,story_suppressed_at")
@@ -386,11 +389,12 @@ export async function storySegment(segmentId: string, viewerId: string | null = 
   if (l) {
     const row = l as any;
     // GATE (Doc9 IDOR + Doc2 §9.3): a segment is only exposed if the listing was
-    // GENUINELY a story — approved and live within the last 24h. A draft/rejected
-    // listing (live_at null / not fresh) was never a story → 404, so its
-    // price/cover/area never leak. A listing that went sold/hidden mid-window
-    // still has a fresh live_at → `available:false` drives "no longer available".
-    const fresh = row.live_at && Date.now() - new Date(row.live_at).getTime() < DAY_MS;
+    // GENUINELY a story — approved and live within the story window. A
+    // draft/rejected listing (live_at null / not fresh) was never a story → 404,
+    // so its price/cover/area never leak. A listing that went sold/hidden
+    // mid-window still has a fresh live_at → `available:false` drives "no longer
+    // available".
+    const fresh = row.live_at && Date.now() - new Date(row.live_at).getTime() < windowMs;
     if (!fresh || row.story_suppressed_at) return null;
     const available = row.status === "live" && row.availability === "available";
     return propertySegment(row, await segCtx(viewerId, [row.id], []), available);
@@ -401,7 +405,7 @@ export async function storySegment(segmentId: string, viewerId: string | null = 
     .eq("id", segmentId).maybeSingle();
   if (p) {
     const row = p as any;
-    const fresh = row.live_at && Date.now() - new Date(row.live_at).getTime() < DAY_MS;
+    const fresh = row.live_at && Date.now() - new Date(row.live_at).getTime() < windowMs;
     if (!fresh || row.story_suppressed_at) return null; // never a story → 404 (no leak)
     return projectSegment(row, await segCtx(viewerId, [], [row.id]), row.status === "live");
   }
