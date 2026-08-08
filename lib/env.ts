@@ -52,11 +52,22 @@ export const isProductionBand = () => envBand() === "production";
  */
 export const devAffordancesAllowed = () => !isProductionBand();
 
-/** Public config — safe to reference from client components. */
+/**
+ * Public config — safe to reference from client components.
+ *
+ * The three host URLs default to the PRODUCTION domains, not to localhost.
+ * Next inlines `NEXT_PUBLIC_*` at build time, so a localhost default is not a
+ * harmless dev convenience: on any deployment that does not set these, it is
+ * baked into the shipped bundle and users are sent to their own machine. Local
+ * development sets all three in .env.local anyway, so the localhost values were
+ * never actually load-bearing there. Anything with a live request should prefer
+ * lib/hosts (server) or `publicOrigin()` in lib/utils (client), which derive the
+ * origin from the request instead of trusting configuration at all.
+ */
 export const publicEnv = {
-  appUrl: process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000",
-  sellerUrl: process.env.NEXT_PUBLIC_SELLER_URL ?? "http://seller.localhost:3000",
-  adminUrl: process.env.NEXT_PUBLIC_ADMIN_URL ?? "http://account.localhost:3000",
+  appUrl: process.env.NEXT_PUBLIC_APP_URL ?? "https://homzlist.com",
+  sellerUrl: process.env.NEXT_PUBLIC_SELLER_URL ?? "https://seller.homzlist.com",
+  adminUrl: process.env.NEXT_PUBLIC_ADMIN_URL ?? "https://account.homzlist.com",
   supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL ?? "",
   supabaseAnonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "",
   fcmVapidKey: process.env.NEXT_PUBLIC_FCM_VAPID_KEY ?? "",

@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { AppShell, BottomSheet, Button, Header, Icon, Skeleton } from "./ui";
 import { billingApi, type PlanCard } from "@/lib/billing/client";
 import { BackButton, CouponRow, MicroBadge } from "./primitives";
-import { cn, legalHref } from "@/lib/utils";
+import { cn } from "@/lib/utils";
+import { usePublicOrigin } from "@/lib/hooks/use-public-href";
 
 /**
  * P5 S1 — Plan wall ("Choose a plan"), the PAYMENT-FIRST gate.
@@ -35,6 +36,8 @@ export function PlanWall({
   onBack?: () => void;
 }) {
   const router = useRouter();
+  // The Refund Policy link leaves for the public host — see lib/utils `publicOrigin`.
+  const publicBase = usePublicOrigin();
 
   const [data, setData] = useState<Awaited<ReturnType<typeof billingApi.plans>> | null>(null);
   const [coupon, setCoupon] = useState<"closed" | "open" | "applied" | "invalid">("closed");
@@ -150,7 +153,7 @@ export function PlanWall({
         </button>
 
         <div className="mt-4 text-center text-11 leading-[1.4] text-ink-tertiary">
-          No refunds after purchase. See <a href={legalHref("/legal/refund")} className="text-accent">Refund Policy</a>.
+          No refunds after purchase. See <a href={`${publicBase}/legal/refund`} className="text-accent">Refund Policy</a>.
         </div>
       </div>
 
