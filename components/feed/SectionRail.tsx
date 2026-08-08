@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Icon } from "@/components/ui/Icon";
-import { Skeleton } from "@/components/ui/Skeleton";
-import { feedApi, type FeedCard as Card, type FeedPerson, type FeedSectionMeta } from "@/lib/feed/client";
+import { RailCardSkeleton, RailPersonSkeleton } from "./skeletons";
+import { feedApi, type FeedCard as Card, type FeedPerson, type FeedSectionMeta, type FeedSectionPage } from "@/lib/feed/client";
 import { TYPE_ICON } from "@/lib/listings/type-icon";
 import { prefetchImages } from "@/lib/pwa/prefetch";
 
@@ -37,26 +37,36 @@ function dedupe<T>(prev: T[], next: T[], key: (x: T) => string): T[] {
 }
 
 export function SectionRail({
-  section, filter, sort, cityId = null, renderCard, renderPerson, onViewAll,
+  section, filter, sort, cityId = null, initial = null, renderCard, renderPerson, onViewAll,
 }: {
   section: FeedSectionMeta;
   filter: string;
   sort: string;
   /** Guest's city, so a rail's pages stay in the same scope as its heading. */
   cityId?: string | null;
+  /**
+   * This rail's first page, already fetched ON THE SERVER and shipped with the
+   * page (lib/feed/initial). When it is here the rail skips its own first
+   * request entirely — that request was the second of two round trips the user
+   * had to wait through before the first card existed. Paging, retry and every
+   * later state are unchanged: `cursor` continues from where the server left
+   * off.
+   */
+  initial?: FeedSectionPage | null;
   renderCard: (card: Card) => React.ReactNode;
   renderPerson: (person: FeedPerson) => React.ReactNode;
   onViewAll: (href: string) => void;
 }) {
-  const [items, setItems] = useState<Card[] | null>(null);
-  const [people, setPeople] = useState<FeedPerson[]>([]);
-  const [cursor, setCursor] = useState<string | null>(null);
+  const [items, setItems] = useState<Card[] | null>(initial?.items ?? null);
+  const [people, setPeople] = useState<FeedPerson[]>(initial?.people ?? []);
+  const [cursor, setCursor] = useState<string | null>(initial?.nextCursor ?? null);
   const [failed, setFailed] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
 
   const rootRef = useRef<HTMLElement>(null);
   const railRef = useRef<HTMLDivElement>(null);
-  const started = useRef(false);
+  // A primed rail has already "started" — its first page came with the HTML.
+  const started = useRef(initial !== null);
 
   const isPeople = section.kind === "builders" || section.kind === "brokers";
   const icon = section.kind === "property_type" ? TYPE_ICON[section.key.slice(5)] : undefined;
@@ -77,7 +87,11 @@ export function SectionRail({
       setItems([]);
       setFailed(true);
     }
-  }, [section.key, filter, sort]);
+    // `cityId` belongs here: it is in the query these build. The rail is keyed
+    // by it too, so it has never actually gone stale — but a callback that
+    // silently reads a prop it does not depend on is one refactor away from
+    // fetching the previous city's cards.
+  }, [section.key, filter, sort, cityId]);
 
   // Arm the lazy load. There is deliberately no state reset here: a Buy/Rent
   // chip tap or a city switch REMOUNTS this rail (the feed keys it by
@@ -85,7 +99,21 @@ export function SectionRail({
   // change — resetting inside the effect would just cascade an extra render.
   useEffect(() => {
     const el = rootRef.current;
-    if (!el) return;
+    if (!el || started.current) return;
+
+    // Already on screen at mount → fetch now, without waiting for the observer.
+    // Two reasons this is not just an optimisation: the observer's first
+    // callback costs a frame the top rails do not need to pay, and a document
+    // that is HIDDEN (a background tab, a page restored behind another) does not
+    // report intersections at all — the feed would sit on skeletons until it was
+    // looked at. Everything below the fold still waits, exactly as before.
+    const box = el.getBoundingClientRect();
+    if (box.top < window.innerHeight + 400 && box.bottom > -400) {
+      started.current = true;
+      void loadFirst();
+      return;
+    }
+
     const io = new IntersectionObserver(
       (entries) => {
         if (!entries.some((e) => e.isIntersecting) || started.current) return;
@@ -112,7 +140,7 @@ export function SectionRail({
     setItems((c) => dedupe(c ?? [], res.data.items, (x) => `${x.kind}-${x.id}`));
     setPeople((p) => dedupe(p, res.data.people, (x) => x.id));
     setCursor(res.data.nextCursor);
-  }, [cursor, loadingMore, section.key, filter, sort]);
+  }, [cursor, loadingMore, section.key, filter, sort, cityId]);
 
   const onRailScroll = () => {
     const el = railRef.current;
@@ -154,9 +182,10 @@ export function SectionRail({
         className="flex snap-x snap-mandatory items-stretch gap-3 overflow-x-auto scroll-px-4 px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {items === null ? (
-          [0, 1].map((i) => (
-            <Skeleton key={i} className={isPeople ? "h-[196px] w-[156px] shrink-0 rounded-8" : "h-[380px] w-[86vw] max-w-[320px] shrink-0 rounded-8"} />
-          ))
+          // The card's own shape in grey — not a block the size of a card.
+          isPeople
+            ? [0, 1, 2].map((i) => <RailPersonSkeleton key={i} />)
+            : [0, 1].map((i) => <RailCardSkeleton key={i} />)
         ) : failed ? (
           <button
             type="button"
@@ -189,7 +218,7 @@ export function SectionRail({
               <span className="text-11 font-semibold text-ink-tertiary">{section.total} total</span>
             </button>
 
-            {loadingMore && <Skeleton className={isPeople ? "h-[196px] w-[156px] shrink-0 rounded-8" : "h-[380px] w-[86vw] max-w-[320px] shrink-0 rounded-8"} />}
+            {loadingMore && (isPeople ? <RailPersonSkeleton /> : <RailCardSkeleton />)}
           </>
         )}
       </div>

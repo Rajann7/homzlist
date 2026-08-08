@@ -134,6 +134,32 @@ try {
     await sess.eval(`window.__open = []; window.open = (u) => { window.__open.push(u); return null; }; true`);
     net.length = 0;
   };
+
+  /**
+   * Scroll the feed until a foreign PROPERTY card is actually mounted.
+   *
+   * The rails are project-first inside a type rail, so the first screenful is
+   * routinely all projects and the first property can be three rails down —
+   * every rail below the fold only loads when it is scrolled to. `openFeed`
+   * waits for "a card", which is the right wait for the project section above
+   * and the wrong one here (and since the first paint is server-rendered, a card
+   * now exists before anything else has loaded at all).
+   */
+  const scrollToPropertyCard = async () => {
+    for (let i = 0; i < 40; i++) {
+      const found = await sess.eval(`(() => {
+        const has = [...document.querySelectorAll('article')].some(x =>
+          !x.innerText.startsWith('NEW PROJECT') && x.querySelector('button[aria-label="Save"], button[aria-label="Saved"]'));
+        if (has) return true;
+        const sc = document.querySelector('.overflow-y-auto');
+        if (sc) sc.scrollTop += 500;
+        return false;
+      })()`);
+      if (found) return true;
+      await sleep(500);
+    }
+    return false;
+  };
   /**
    * Requests are collected from CDP, NOT by monkey-patching window.fetch. The
    * patch version wrapped every call in an extra clone()/text() and any throw
@@ -149,6 +175,14 @@ try {
    */
   const clickAndLand = async (cardSel, pick) => {
     await openFeed();
+    // The pinned card may live in a rail that has not been scrolled to yet —
+    // rails below the fold load on demand. Walk down until it is mounted before
+    // deciding a button is dead.
+    for (let i = 0; i < 40; i++) {
+      if (await sess.eval(`Boolean(${cardSel})`)) break;
+      await sess.eval(`(() => { const sc = document.querySelector('.overflow-y-auto'); if (sc) sc.scrollTop += 500; return true; })()`);
+      await sleep(500);
+    }
     const res = await sess.eval(`(() => {
       const a = ${cardSel};
       if (!a) return 'no-card';
@@ -248,6 +282,7 @@ try {
   section("2 · Property card — every control");
 
   await openFeed();
+  await scrollToPropertyCard();
   // Pin ONE card by its title for the whole section. `PROPERTY_CARD` re-resolves
   // on every eval, and the feed's first property card is not always the same
   // one (a boost can be injected between reloads) — so a Save could be clicked
@@ -271,6 +306,7 @@ try {
   await q("delete from saves where listing_id = $1 and profile_id = $2", [lid, me.id]);
   await q("delete from inquiries where listing_id = $1 and profile_id = $2", [lid, me.id]);
   await openFeed();
+  await scrollToPropertyCard();
 
   // Clicked twice if need be: a click that lands before React has hydrated the
   // card does nothing at all, and that is a property of the harness, not of the
