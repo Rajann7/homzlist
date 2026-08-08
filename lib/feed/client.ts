@@ -3,6 +3,7 @@
 import { apiFetch } from "@/lib/auth/api-fetch";
 import { enqueue } from "@/lib/pwa/offline-queue";
 import { syncAppBadge } from "@/lib/pwa/app-badge";
+import type { BlogCard } from "@/lib/content/client";
 
 /**
  * Client-side feed API. Same discipline as the rest: asks the server questions,
@@ -60,21 +61,24 @@ export interface StoryCircle { posterId: string; posterName: string; posterUsern
 /** One rail on the carousel feed — see lib/feed/sections.ts. */
 export interface FeedSectionMeta {
   key: string;
-  kind: "projects" | "builders" | "brokers" | "property_type" | "project_type";
+  kind: "projects" | "newly_added" | "builders" | "brokers" | "featured" | "sell_cta" | "news";
   title: string;
   subtitle: string;
   total: number;
   viewAll: string;
 }
-/** A seller on a Top Builders / Top Brokers rail (search's BrokerResult). */
+/** A seller on a Featured Developers / Featured Brokers rail (search's BrokerResult). */
 export interface FeedPerson {
   id: string; name: string; username: string | null; role: string | null;
   verified: boolean; avatarUrl: string | null; stats: string; listingCount: number;
 }
-export interface FeedSectionPage { items: FeedCard[]; people: FeedPerson[]; nextCursor: string | null }
-
-/** One of the mini cards in the "Suggested for you" strip (Doc7 §81). */
-export interface SuggestedItem { id: string; coverUrl: string | null; price: string; areaLabel: string | null }
+/**
+ * One card on the "News and Articles" rail. Deliberately the SAME type the blog
+ * screen uses rather than a copy of its fields — the rail renders the blog's own
+ * cover/date components, so a field added there must not need adding here too.
+ */
+export type FeedPost = BlogCard;
+export interface FeedSectionPage { items: FeedCard[]; people: FeedPerson[]; posts: FeedPost[]; nextCursor: string | null }
 
 /**
  * The feed's first paint, rendered on the server and shipped with the page
@@ -100,7 +104,6 @@ export interface FeedInitial {
   viewer: boolean;
   sections: FeedSectionMeta[];
   primed: { key: string; page: FeedSectionPage } | null;
-  suggested: SuggestedItem[];
 }
 
 /**
@@ -132,8 +135,6 @@ export const feedApi = {
     req<FeedResult>(`/feed?${new URLSearchParams({ ...(opts.filter ? { filter: opts.filter } : {}), ...(opts.sort ? { sort: opts.sort } : {}), ...(opts.cursor ? { cursor: opts.cursor } : {}), ...city(opts.cityId) }).toString()}`),
   builderDashboard: () =>
     req<{ projects: { id: string; name: string; coverUrl: string | null; views: number; leads: number; spark: number[] }[]; sections: { label: string | null; items: any[] }[] }>("/feed/builder-dashboard"),
-  suggested: (cityId?: string | null) =>
-    req<{ items: { id: string; coverUrl: string | null; price: string; areaLabel: string | null }[] }>(`/feed/suggested?${new URLSearchParams(city(cityId)).toString()}`),
   newCount: (since: string, cityId?: string | null) =>
     req<{ count: number }>(`/feed/new-count?${new URLSearchParams({ since, ...city(cityId) }).toString()}`),
   banner: () => req<{ banner: { id: string; title: string; subtitle: string | null; imageUrl: string | null; targetUrl: string | null; frequencyCap: number } | null }>("/feed/banner"),

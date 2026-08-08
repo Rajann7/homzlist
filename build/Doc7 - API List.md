@@ -158,20 +158,19 @@ Res: `{ items, nextCursor, sections:[{label:"Nearby: University Road", items}] }
 
 **78a. GET `/feed/sections`** *(added 5 Aug 2026 — the carousel home feed)* — which RAILS the Property-mode feed draws, in order, for this viewer. Query: `?filter=buy|rent` (default all). Metadata only; each rail then fetches its own cards from 78b as it scrolls into view.
   **`city`** (all feed reads): the GUEST's city-chip pick. Validated as a `locations` row of level `city`; a signed-in profile's city always wins, so it can never re-scope an account. Omitted → unscoped for a guest who has not picked one.
-Order: `New Projects` → first two property-type rails → `Top Builders` → `Top Brokers` → the remaining property-type rails (`property_types.sort_order`) → the scheme-type rails (`project_types`).
-A rail whose type has **0 live rows in the viewer's city is not returned at all** (auto-hide), and a Buy/Rent chip removes every project rail — the same rule `/feed` applies. Counts come from `hz_feed_type_counts` (migration 0122).
-Res: `{ sections: [{ key, kind:"projects"|"builders"|"brokers"|"property_type"|"project_type", title, subtitle, total, viewAll }] }`.
+Order *(reordered 8 Aug 2026 — Rajan)*: `HomzList top picks` (projects) → `Newly-added properties` (listings) → `Featured Developers` (builders) → `Featured Brokers` (brokers) → `Featured properties` (everything boosted, both kinds) → `Have a property to sell?` (CTA block) → `News and Articles` (blog). The per-type rails (`type:` / `ptype:`) were **removed from this response** in the same change — type-wise browsing lives on Search.
+A rail with **0 live rows in the viewer's scope is not returned at all** (auto-hide), and a Buy/Rent chip removes the projects rail — the same rule `/feed` applies. `sell_cta` is the one section always present (it is a call to action, not a list). Counts come from `hz_feed_type_counts` (migration 0122) **plus** the boosted rows reaching in from outside the scope, so the number under a heading equals the cards the rail hands out. `featured` ships `viewAll: ""` — "boosted" is not a search filter, so it deliberately has no target rather than one that opens a different set.
+Res: `{ sections: [{ key, kind:"projects"|"newly_added"|"builders"|"brokers"|"featured"|"sell_cta"|"news", title, subtitle, total, viewAll }] }`.
 
-**78b. GET `/feed/section`** — one rail's page. Query: `?key=projects|builders|brokers|type:<code>|ptype:<code>&filter=&sort=&cursor=`. Same `getFeed` query as 78, narrowed to that rail — so boosts, the not-interested rules and card shape are identical inside a rail. Cursor = `live_at` for card rails, a numeric offset for the people rails. Unknown/malformed key → 422.
+**78b. GET `/feed/section`** — one rail's page. Query: `?key=projects|newly_added|featured|builders|brokers|news|sell_cta&filter=&sort=&cursor=`. Same `getFeed` query as 78, narrowed to that rail — so boosts, the not-interested rules and card shape are identical inside a rail. Cursor = `live_at` for card rails, a numeric offset for the people rails, `published_at` for `news`. `sell_cta` answers with an empty page. Unknown/malformed key → 422. The retired `type:<code>` / `ptype:<code>` keys are **still accepted** so a PWA on a pre-8-Aug-2026 bundle keeps working.
   **`city`** (all feed reads): the GUEST's city-chip pick. Validated as a `locations` row of level `city`; a signed-in profile's city always wins, so it can never re-scope an account. Omitted → unscoped for a guest who has not picked one.
-Res: `{ items, people, nextCursor }`.
+Res: `{ items, people, posts, nextCursor }`.
 
 **79. GET `/feed/requirement-mode`** — requirement cards; **unpaid → locked cards (preview fields only, server-stripped)**; boosted-locked top. Identical payload and query to 63 (one engine) — this one is IP rate-limited because the requirement-mode feed is reachable anonymously on the public host. The feed surface MUST use this route, not 63.
 
 **80. GET `/feed/builder-dashboard`** — builder role only: own project stats + matched requirements (no foreign listings). `matched: [{ card, matchedTo, tierLabel }]` where `card` is the SAME access-stripped browse card as 63/79 — a builder without active requirement access gets locked cards with no budget in the payload. Matching type set comes from `project_types.property_type_codes`, never a hardcoded list.
 
-**81. GET `/feed/suggested`** — "Suggested for you" strip (area/budget-based; boosts fill organically).
-  **`city`** (all feed reads): the GUEST's city-chip pick. Validated as a `locations` row of level `city`; a signed-in profile's city always wins, so it can never re-scope an account. Omitted → unscoped for a guest who has not picked one.
+**81. ~~GET `/feed/suggested`~~** — **REMOVED 8 Aug 2026** with the home-feed reorder. The "Suggested for you" strip was the same recency set as the new `newly_added` rail in a smaller card, so the strip, the endpoint and `lib/feed/service.suggested` all went together rather than leaving a route nothing calls.
 
 **82. POST `/feed/not-interested`** — down-rank a type/area for this user.
 

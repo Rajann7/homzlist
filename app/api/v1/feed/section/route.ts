@@ -9,9 +9,9 @@ import type { FeedFilter, FeedSort } from "@/lib/feed/service";
  * GET /api/v1/feed/section?key=…&cursor=… — one rail's page.
  *
  * `key` is the opaque id /api/v1/feed/sections handed out ("projects",
- * "builders", "type:flat", "ptype:plotting"). It is validated by SHAPE here and
- * resolved server-side; an unknown key returns an empty page rather than an
- * error, so a stale client cannot make the feed fail.
+ * "newly_added", "featured", "builders", "brokers", "news"). It is validated by
+ * SHAPE here and resolved server-side; an unknown key returns an empty page
+ * rather than an error, so a stale client cannot make the feed fail.
  *
  * The rail carries no ranking of its own — this is the same getFeed query the
  * vertical feed ran, narrowed to one type, so boosts and the not-interested
@@ -19,8 +19,14 @@ import type { FeedFilter, FeedSort } from "@/lib/feed/service";
  */
 export const dynamic = "force-dynamic";
 
-/** "projects" | "builders" | "brokers" | "type:<code>" | "ptype:<code>". */
-const KEY_RE = /^(projects|builders|brokers|type:[a-z0-9_]{1,40}|ptype:[a-z0-9_]{1,40})$/;
+/**
+ * The keys /feed/sections hands out, plus the two it no longer does.
+ *
+ * `type:`/`ptype:` stay accepted on purpose: the per-type rails left the home
+ * screen on 8 Aug 2026, but a PWA still running the cached bundle from before
+ * that asks for them, and a 422 would turn its feed into a wall of retry rows.
+ */
+const KEY_RE = /^(projects|newly_added|featured|builders|brokers|news|sell_cta|type:[a-z0-9_]{1,40}|ptype:[a-z0-9_]{1,40})$/;
 
 export async function GET(req: NextRequest) {
   const limited = await rateLimit(`feed:${clientIp(req.headers)}`, 240, 60);

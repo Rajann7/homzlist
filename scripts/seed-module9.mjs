@@ -343,15 +343,30 @@ await boost({
   startsAt: iso(now - 6 * DAY), endsAt: iso(now + 0.6 * DAY), approvedAt: iso(now - 6 * DAY),
 });
 
-// --- ACTIVE, state-targeted: a SURAT listing that must reach Rajkot viewers -
+// --- ACTIVE, state-targeted: an OUT-OF-RAJKOT listing that must reach Rajkot -
 // This is the case that proved wider targeting did nothing before Module 9 — a
 // city-scoped feed can never return it, so placement has to inject it.
-const suratListing = await one(
-  `select l.id, l.profile_id, l.area_id, l.city_id, l.state_id, l.title
-     from listings l where l.status='live' and l.availability='available' and l.city_id=$1
-     order by l.live_at desc nulls last limit 1`,
-  [surat],
-);
+//
+// It used to insist on a SURAT listing, and by 8 Aug 2026 the fixtures had none
+// live, so the seed printed a warning, created no such boost, and
+// `check:boost`'s wide-targeting assertion had been failing on missing fixture
+// data rather than on the rule. Surat is still preferred (the check's Surat
+// viewer makes the "and is absent for the other city" half readable), but ANY
+// live listing outside Rajkot proves the same rule — so it falls back to one.
+const suratListing =
+  (await one(
+    `select l.id, l.profile_id, l.area_id, l.city_id, l.state_id, l.title
+       from listings l where l.status='live' and l.availability='available' and l.city_id=$1
+       order by l.live_at desc nulls last limit 1`,
+    [surat],
+  )) ??
+  (await one(
+    `select l.id, l.profile_id, l.area_id, l.city_id, l.state_id, l.title
+       from listings l where l.status='live' and l.availability='available'
+         and l.city_id is not null and l.city_id <> $1
+       order by l.live_at desc nulls last limit 1`,
+    [rajkot],
+  ));
 if (suratListing) {
   await boost({
     profileId: suratListing.profile_id, subjectKind: "listing", subjectId: suratListing.id,
@@ -359,9 +374,9 @@ if (suratListing) {
   status: "active",
     startsAt: iso(now - 2 * DAY), endsAt: iso(now + 28 * DAY), approvedAt: iso(now - 2 * DAY),
   });
-  console.log(`state-targeted boost on a Surat listing: ${suratListing.title}`);
+  console.log(`state-targeted boost on an out-of-Rajkot listing: ${suratListing.title}`);
 } else {
-  console.log("! no live Surat listing — cross-city injection has no subject");
+  console.log("! no live listing outside Rajkot — cross-city injection has no subject");
 }
 
 // --- ACTIVE, All-India targeted -------------------------------------------

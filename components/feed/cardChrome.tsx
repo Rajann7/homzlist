@@ -74,7 +74,16 @@ export function FactsStrip({ facts, compact = false }: {
    */
   compact?: boolean;
 }) {
-  if (!facts.length) return null;
+  /**
+   * ONE fact is not a strip (Rajan, 8 Aug 2026 — "aama blank show thay che").
+   *
+   * The grid gives each fact an equal share of the full width, so a lone tile
+   * sat centred in a wide grey bar with emptiness either side and read as a
+   * card that had failed to load. Nothing is lost by dropping it: the same
+   * value is a row on the detail screen this card opens. Zero facts already
+   * rendered nothing — this makes the rule one rule instead of two.
+   */
+  if (facts.length < 2) return null;
   return (
     <span className="flex w-full items-stretch gap-0.5 rounded-8 bg-surface-2 px-1 py-2.5">
       {facts.map((f) => (

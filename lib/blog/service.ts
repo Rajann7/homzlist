@@ -127,6 +127,52 @@ export async function listBlog(opts: { category?: string | null; cursor?: string
   };
 }
 
+/**
+ * The newest published posts, as one flat page — the home feed's "News and
+ * Articles" rail (Rajan, 8 Aug 2026).
+ *
+ * Deliberately NOT `listBlog`: that one pulls the featured post out into a hero
+ * and drops it from the list, which on a carousel would silently hide the post
+ * the editor marked most important. Same table, same visibility rule (published
+ * AND not embargoed), same card shape and the same `published_at` cursor the
+ * blog screen pages on, so the rail and /blog can never disagree about what is
+ * live.
+ */
+export async function latestBlogCards(
+  opts: { limit?: number; cursor?: string | null } = {},
+): Promise<{ posts: BlogCard[]; nextCursor: string | null }> {
+  const limit = Math.min(Math.max(opts.limit ?? 6, 1), 20);
+  const labels = await categoryLabels();
+
+  let q = db()
+    .from("blog_posts")
+    .select(SELECT)
+    .eq("status", "published")
+    .lte("published_at", new Date().toISOString())
+    .order("published_at", { ascending: false })
+    .limit(limit + 1);
+  if (opts.cursor) q = q.lt("published_at", opts.cursor);
+
+  const { data } = await q;
+  const rows = (data ?? []) as Raw[];
+  const hasMore = rows.length > limit;
+  const page = hasMore ? rows.slice(0, limit) : rows;
+  return {
+    posts: page.map((r) => card(r, labels)),
+    nextCursor: hasMore ? page[page.length - 1].published_at : null,
+  };
+}
+
+/** How many posts are readable right now — the rail's subtitle count. */
+export async function publishedBlogCount(): Promise<number> {
+  const { count } = await db()
+    .from("blog_posts")
+    .select("slug", { count: "exact", head: true })
+    .eq("status", "published")
+    .lte("published_at", new Date().toISOString());
+  return count ?? 0;
+}
+
 export async function getBlogPost(slug: string): Promise<BlogPost | null> {
   const { data } = await db()
     .from("blog_posts")

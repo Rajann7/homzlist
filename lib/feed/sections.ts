@@ -1,53 +1,71 @@
 import "server-only";
 import { createServiceClient } from "@/lib/supabase/server";
 import {
-  getFeed, notInterested,
+  getFeed, notInterested, boostedCount,
   type FeedCard, type FeedFilter, type FeedSort,
 } from "./service";
 import { feedScope, type FeedScope } from "./scope";
 import { searchBrokers } from "@/lib/search/service";
+import { latestBlogCards, publishedBlogCount } from "@/lib/blog/service";
+import type { BlogCard } from "@/lib/blog/service";
 import type { BrokerResult } from "@/lib/search/types";
 
 /**
- * The P2 home feed as RAILS (5 Aug 2026 — Rajan).
+ * The P2 home feed as RAILS (5 Aug 2026 — Rajan), REORDERED 8 Aug 2026 to the
+ * seven blocks Rajan specified after reviewing housing.com and five other
+ * portals:
  *
- * The feed used to be one endless vertical column of mixed cards. It is now a
- * vertical stack of horizontal carousels: projects first, then one rail per
- * property type and per scheme type, with Top Builders and Top Brokers in the
- * middle. Nothing about a CARD changed — the same FeedCard/ProjectCard, the
- * same server-decided ranking, the same boosts, the same actions.
+ *   1. HomzList top picks      — live projects
+ *   2. Newly-added properties  — the freshest listings
+ *   3. Featured Developers     — builders with live projects
+ *   4. Featured Brokers        — brokers with live listings
+ *   5. Featured properties     — everything BOOSTED, properties and projects
+ *   6. Have a property to sell?— the post-a-listing block
+ *   7. News and Articles       — the blog
+ *
+ * What that replaced: one rail per property type (Flat, Shop, Plot…) and per
+ * orphan scheme type. Those are gone from the home screen on Rajan's call —
+ * type-wise browsing lives on Search, and every rail here still links into it.
+ * `getFeedSectionItems` still ANSWERS `type:`/`ptype:` keys, because a PWA
+ * running a cached bundle can still ask for one; it just is not offered.
  *
  * Three rules the design has to keep, and where each one lives:
  *
- *   • AUTO-HIDE — a type with nothing live in the viewer's city produces no
- *     rail at all. That decision is made HERE, from `hz_feed_type_counts`
- *     (migration 0122): a section with total 0 is never returned, so the client
- *     has nothing to render and cannot draw an empty heading.
+ *   • AUTO-HIDE — a rail with nothing live in the viewer's scope is never
+ *     returned, so the client has nothing to render and cannot draw an empty
+ *     heading. Decided HERE, from real counts.
  *
  *   • NO LIMIT — every rail paginates horizontally through
  *     `getFeedSectionItems`, using the same cursor the vertical feed used.
  *
- *   • EVERY LABEL AND COUNT IS A QUERY — titles come from `property_types` /
- *     `project_types`, subtitles carry a real count and the real city name.
- *     Nothing on this screen is a string in a component (CLAUDE.md rule 12).
+ *   • EVERY LABEL AND COUNT IS A QUERY — subtitles carry a real count and the
+ *     real place name. Nothing on this screen is a made-up number
+ *     (CLAUDE.md rule 12).
  *
  * The rails do NOT re-implement the feed query. `getFeed` gained a narrowing
- * (only/typeCode/projectType) so a rail is the same query, the same ranking and
- * the same card builder — otherwise a boosted listing would be boosted in the
- * feed and un-boosted inside its own type's rail.
+ * (only/typeCode/projectTypes/onlyBoosted) so a rail is the same query, the same
+ * ranking and the same card builder — otherwise a boosted listing would be
+ * boosted in the feed and un-boosted inside its own rail.
  */
 
 const db = () => createServiceClient();
 
-export type FeedSectionKind = "projects" | "builders" | "brokers" | "property_type" | "project_type";
+export type FeedSectionKind =
+  | "projects"
+  | "newly_added"
+  | "builders"
+  | "brokers"
+  | "featured"
+  | "sell_cta"
+  | "news";
 
 export interface FeedSectionMeta {
-  /** Stable id the item endpoint decodes: "projects" | "builders" | "brokers" | "type:flat" | "ptype:plotting". */
+  /** Stable id the item endpoint decodes — "projects", "featured", "news"… */
   key: string;
   kind: FeedSectionKind;
-  /** DB label — "Flat", "Plotting scheme (NA plots)", "Top Builders". */
+  /** "HomzList top picks", "Featured Developers", "News and Articles". */
   title: string;
-  /** Real count + real city — "12 available in Rajkot". */
+  /** Real count + real place — "12 live projects in Rajkot". */
   subtitle: string;
   total: number;
   /** Where "View all" goes; pre-filtered to exactly what the rail shows. */
@@ -58,6 +76,8 @@ export interface FeedSectionPage {
   items: FeedCard[];
   /** Builder/broker rails carry people instead of cards. */
   people: BrokerResult[];
+  /** The News rail carries blog cards instead of either. */
+  posts: BlogCard[];
   nextCursor: string | null;
 }
 
@@ -71,6 +91,8 @@ const RAIL_PAGE = 8;
  */
 const PEOPLE_SCAN = 200;
 const PEOPLE_PAGE = 12;
+/** Posts per page on the News rail. */
+const POST_PAGE = 6;
 
 interface CountRow { scope: string; code: string; n: number }
 
@@ -103,12 +125,15 @@ function inPlace(text: string, place: string | null): string {
   return place ? `${text} in ${place}` : text;
 }
 
+const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+
 /**
  * The rails to draw, in order, for THIS viewer right now.
  *
- * Order (Rajan, 5 Aug 2026): projects first; the seller rails sit in the middle
- * — after the first two property rails, not glued to the top — then the rest of
- * the property types, then the scheme types.
+ * A rail that would be empty is simply absent — including the two seller rails
+ * and News, so a fresh install with no blog posts does not render a heading over
+ * nothing. "Have a property to sell?" is the one block that is always present:
+ * it is a call to action, not a list, so it has no empty state to hit.
  */
 export async function getFeedSections(
   viewerId: string | null,
@@ -127,102 +152,67 @@ export async function getFeedSections(
   const scope = opts.scope ?? (await feedScope(viewerId, opts.cityId ?? null));
   const city = scope.placeLabel;
 
-  // Everything this needs, at once. The seller rails used to be a SECOND
-  // awaited stage after the counts — two queries deep in a screen the user is
-  // staring at a skeleton for. They do not read anything the first stage
-  // produces, so they belong in the same wave.
-  const [counts, hidden, { data: propTypes }, { data: projTypes }, builders, brokers] = await Promise.all([
+  // Everything this needs, at once. Each of these feeds exactly one rail's
+  // heading, and none of them reads another's output, so they belong in the
+  // same wave rather than in stages the user watches a skeleton through.
+  const [counts, hidden, builders, brokers, boosted, newsTotal] = await Promise.all([
     typeCounts(scope, viewerId, filter),
     notInterested(viewerId),
-    db().from("property_types").select("code,label,sort_order").eq("is_active", true).order("sort_order"),
-    db().from("project_types").select("code,label,sort_order,property_type_codes").eq("is_active", true).order("sort_order"),
     // Sellers are ranked over the whole city and only then counted, so a rail
     // that would show nobody is never announced.
     topPeople(viewerId, scope, "builder"),
     topPeople(viewerId, scope, "broker"),
+    // The same boosted set the Featured rail hands out — see service.boostedCount.
+    boostedCount(viewerId, scope, filter),
+    publishedBlogCount(),
   ]);
 
-  // Which scheme types ride on which property-type rail — a DB column
-  // (`project_types.property_type_codes`, migration 0123), never a map in code.
-  const schemeTypes = (projTypes ?? []) as { code: string; label: string; property_type_codes: string[] | null }[];
-  const schemesFor = (propertyCode: string) =>
-    schemeTypes.filter((t) => (t.property_type_codes ?? []).includes(propertyCode)).map((t) => t.code);
-
-  const propertyRails: FeedSectionMeta[] = ((propTypes ?? []) as { code: string; label: string }[])
-    // "Not interested in this type" hides the whole rail, not just its cards —
-    // the feed already drops those listings, so the rail would render a heading
-    // over an empty strip.
-    .filter((t) => !hidden.types.has(t.code))
-    .map((t) => {
-      const schemes = schemesFor(t.code);
-      const props = counts.property.get(t.code) ?? 0;
-      const projs = schemes.reduce((sum, code) => sum + (counts.project.get(code) ?? 0), 0);
-      return { t, schemes, props, projs };
-    })
-    // One rail per type, carrying BOTH kinds. It exists if EITHER half has
-    // something live — a type with only schemes and no resale still gets a rail.
-    .filter(({ props, projs }) => props + projs > 0)
-    .map(({ t, schemes, props, projs }) => ({
-      key: `type:${t.code}`,
-      kind: "property_type" as const,
-      title: t.label,
-      // The subtitle says what is actually in the rail, in the order it appears.
-      subtitle: inPlace(
-        [projs ? `${projs} ${projs === 1 ? "project" : "projects"}` : null,
-         props ? `${props} ${props === 1 ? "property" : "properties"}` : null]
-          .filter(Boolean).join(" · "),
-        city,
-      ),
-      total: props + projs,
-      viewAll: searchHref({
-        types: [t.code],
-        // Both halves travel, so the results screen's Projects tab is filtered
-        // to the same schemes the rail was showing.
-        ptypes: schemes,
-        intent: filter === "buy" ? "sell" : filter === "rent" ? "rent" : undefined,
-      }),
-    }));
-
-  // A scheme type that belongs under NO property type (Mixed use) would
-  // otherwise be reachable only from "New Projects" — it keeps its own rail.
-  const projectRails: FeedSectionMeta[] = schemeTypes
-    .filter((t) => !(t.property_type_codes ?? []).length)
-    .map((t) => ({ t, n: counts.project.get(t.code) ?? 0 }))
-    .filter(({ n }) => n > 0)
-    .map(({ t, n }) => ({
-      key: `ptype:${t.code}`,
-      kind: "project_type" as const,
-      title: t.label,
-      subtitle: inPlace(`${n} ${n === 1 ? "project" : "projects"}`, city),
-      total: n,
-      viewAll: searchHref({ tab: "projects", ptypes: [t.code] }),
-    }));
-
-  const projectTotal = [...counts.project.values()].reduce((a, b) => a + b, 0);
+  // "Not interested in this type" removes those listings from the feed, so the
+  // counts printed above the rails have to drop them too — otherwise Newly-added
+  // advertises rows it will never show.
+  //
+  // And a boost bought for a whole state (or All India) puts a row from another
+  // city ON these rails, which `hz_feed_type_counts` never counted, so those are
+  // added back. Both halves exist for the same reason: the number under the
+  // heading has to be the number of cards the rail will hand out.
+  let propertyTotal = boosted.propertiesOutside;
+  for (const [code, n] of counts.property) if (!hidden.types.has(code)) propertyTotal += n;
+  const projectTotal = [...counts.project.values()].reduce((a, b) => a + b, 0) + boosted.projectsOutside;
 
   const out: FeedSectionMeta[] = [];
 
-  // 1. Projects, first — every live scheme, newest (and boosted) first.
+  // 1. HomzList top picks — every live scheme, boosted then newest.
   if (projectTotal > 0) {
     out.push({
       key: "projects",
       kind: "projects",
-      title: "New Projects",
-      subtitle: inPlace(`${projectTotal} live ${projectTotal === 1 ? "project" : "projects"}`, city),
+      title: "HomzList top picks",
+      subtitle: inPlace(plural(projectTotal, "live project", "live projects"), city),
       total: projectTotal,
       viewAll: searchHref({ tab: "projects" }),
     });
   }
 
-  // 2. The first two property rails, then the sellers, then the rest.
-  out.push(...propertyRails.slice(0, 2));
+  // 2. Newly-added properties — listings only, freshest first (boosts still ride
+  //    on top: that rule is the feed's, not this rail's).
+  if (propertyTotal > 0) {
+    out.push({
+      key: "newly_added",
+      kind: "newly_added",
+      title: "Newly-added properties",
+      subtitle: inPlace(plural(propertyTotal, "property", "properties"), city),
+      total: propertyTotal,
+      viewAll: searchHref({ intent: filter === "buy" ? "sell" : filter === "rent" ? "rent" : undefined }),
+    });
+  }
 
+  // 3 + 4. The two seller rails.
   if (builders.length) {
     out.push({
       key: "builders",
       kind: "builders",
-      title: "Top Builders",
-      subtitle: inPlace(`${builders.length} ${builders.length === 1 ? "builder" : "builders"} with live projects`, city),
+      title: "Featured Developers",
+      subtitle: inPlace(`${plural(builders.length, "builder", "builders")} with live projects`, city),
       total: builders.length,
       viewAll: searchHref({ tab: "brokers", roles: ["builder"] }),
     });
@@ -231,24 +221,73 @@ export async function getFeedSections(
     out.push({
       key: "brokers",
       kind: "brokers",
-      title: "Top Brokers",
-      subtitle: inPlace(`${brokers.length} ${brokers.length === 1 ? "broker" : "brokers"} with live listings`, city),
+      title: "Featured Brokers",
+      subtitle: inPlace(`${plural(brokers.length, "broker", "brokers")} with live listings`, city),
       total: brokers.length,
       viewAll: searchHref({ tab: "brokers", roles: ["broker"] }),
     });
   }
 
-  out.push(...propertyRails.slice(2));
-  out.push(...projectRails);
+  // 5. Featured properties — everything boosted, BOTH kinds, in FIFO boost order.
+  if (boosted.total > 0) {
+    out.push({
+      key: "featured",
+      kind: "featured",
+      title: "Featured properties",
+      // The subtitle names both halves in the order the rail returns them, so a
+      // rail carrying two projects never says "2 properties".
+      subtitle: inPlace(
+        [
+          boosted.properties ? plural(boosted.properties, "property", "properties") : null,
+          boosted.projects ? plural(boosted.projects, "project", "projects") : null,
+        ].filter(Boolean).join(" · ") + " promoted",
+        city,
+      ),
+      total: boosted.total,
+      // NO "View all", deliberately. Every other rail's View all opens a search
+      // that contains exactly what the rail was showing; "boosted" is not a
+      // search filter, so this one would have opened 150 results under a heading
+      // that says 12 — a link that lies. The rail scrolls endlessly through all
+      // of them instead, and the empty string is what hides the pill.
+      viewAll: "",
+    });
+  }
+
+  // 6. Have a property to sell? — always present. Not a list, so no empty state.
+  out.push({
+    key: "sell_cta",
+    kind: "sell_cta",
+    title: "Have a property to sell?",
+    subtitle: inPlace("Post it free and reach buyers", city),
+    total: 0,
+    viewAll: "/create",
+  });
+
+  // 7. News and Articles.
+  if (newsTotal > 0) {
+    out.push({
+      key: "news",
+      kind: "news",
+      title: "News and Articles",
+      subtitle: plural(newsTotal, "article", "articles"),
+      total: newsTotal,
+      viewAll: "/blog",
+    });
+  }
+
   return out;
 }
+
+/** An empty page — one shape, so no caller has to remember the third field. */
+const EMPTY_PAGE: FeedSectionPage = { items: [], people: [], posts: [], nextCursor: null };
 
 /**
  * One rail's page.
  *
  * `cursor` means the same thing it means everywhere else in the feed: the
  * `live_at` of the last card handed out (people rails use a numeric offset,
- * because profiles are ranked by a computed count, not by time).
+ * because profiles are ranked by a computed count, not by time; the News rail
+ * uses `published_at`, the same cursor /blog pages on).
  */
 export async function getFeedSectionItems(
   viewerId: string | null,
@@ -263,27 +302,51 @@ export async function getFeedSectionItems(
   const cursor = opts.cursor ?? null;
   const limit = Math.min(opts.limit ?? RAIL_PAGE, 20);
 
+  // The blog is not scoped to a city and needs no session — answer it before
+  // paying for a scope resolution it would ignore.
+  if (key === "news") {
+    const { posts, nextCursor } = await latestBlogCards({ limit: POST_PAGE, cursor });
+    return { items: [], people: [], posts, nextCursor };
+  }
+  // The CTA block has no page. It is answered rather than rejected so a client
+  // that asks anyway gets a clean empty rail instead of a validation error.
+  if (key === "sell_cta") return EMPTY_PAGE;
+
   const scope = opts.scope ?? (await feedScope(viewerId, opts.cityId ?? null));
 
   if (key === "builders" || key === "brokers") {
     // Sellers follow the same widening: a state-wide rail of cards over an empty
-    // "Top Brokers" strip would be the one rail contradicting the rest.
+    // "Featured Brokers" strip would be the one rail contradicting the rest.
     const all = await topPeople(viewerId, scope, key === "builders" ? "builder" : "broker");
     const offset = Number.isFinite(Number(cursor)) && Number(cursor) > 0 ? Number(cursor) : 0;
     const page = all.slice(offset, offset + PEOPLE_PAGE);
     const next = offset + PEOPLE_PAGE < all.length ? String(offset + PEOPLE_PAGE) : null;
-    return { items: [], people: page, nextCursor: next };
+    return { items: [], people: page, posts: [], nextCursor: next };
   }
 
   if (key === "projects") {
     const r = await getFeed(viewerId, { filter, sort, cursor, limit, only: "project", scope });
-    return { items: r.items, people: [], nextCursor: r.nextCursor };
+    return { items: r.items, people: [], posts: [], nextCursor: r.nextCursor };
   }
 
+  if (key === "newly_added") {
+    // Listings only — the projects have their own rail directly above. Boosted
+    // still come first: that is getFeed's rule and this rail does not opt out.
+    const r = await getFeed(viewerId, { filter, sort, cursor, limit, only: "property", scope });
+    return { items: r.items, people: [], posts: [], nextCursor: r.nextCursor };
+  }
+
+  if (key === "featured") {
+    // BOTH kinds, boosted only, in the boost's own FIFO order.
+    const r = await getFeed(viewerId, { filter, sort, cursor, limit, onlyBoosted: true, scope });
+    return { items: r.items, people: [], posts: [], nextCursor: r.nextCursor };
+  }
+
+  // ---- compatibility: the per-type rails this screen no longer offers -------
+  // A PWA holding a cached bundle from before 8 Aug 2026 still asks for these.
+  // Answering them keeps that client working until it picks up the new build;
+  // nothing in the current UI produces these keys.
   if (key.startsWith("type:")) {
-    // ONE rail, both kinds: boosted first (either kind), then this type's
-    // projects, then its properties. Which scheme types belong here is the DB's
-    // answer, so the rail and its "View all" can never disagree.
     const code = key.slice(5);
     const { data } = await db().from("project_types").select("code").eq("is_active", true).contains("property_type_codes", [code]);
     const projectTypes = ((data ?? []) as { code: string }[]).map((r) => r.code);
@@ -291,25 +354,25 @@ export async function getFeedSectionItems(
       filter, sort, cursor, limit,
       typeCode: code, projectTypes, groupOrder: "project-first", scope,
     });
-    return { items: r.items, people: [], nextCursor: r.nextCursor };
+    return { items: r.items, people: [], posts: [], nextCursor: r.nextCursor };
   }
 
   if (key.startsWith("ptype:")) {
     const code = key.slice(6);
     const r = await getFeed(viewerId, { filter, sort, cursor, limit, only: "project", projectTypes: [code], scope });
-    return { items: r.items, people: [], nextCursor: r.nextCursor };
+    return { items: r.items, people: [], posts: [], nextCursor: r.nextCursor };
   }
 
-  return { items: [], people: [], nextCursor: null };
+  return EMPTY_PAGE;
 }
 
 /**
- * "Top" = the sellers with the most live inventory in the viewer's city.
+ * "Featured" = the sellers with the most live inventory in the viewer's city.
  *
  * Deliberately the SAME query the Brokers & Builders search tab runs
  * (`searchBrokers`), narrowed to one role — so the rail and the screen its
- * "View all" opens can never disagree about who is top, and the rule lives in
- * one place. That helper already excludes suspended accounts and anyone with
+ * "View all" opens can never disagree about who is featured, and the rule lives
+ * in one place. That helper already excludes suspended accounts and anyone with
  * nothing live, counts projects for a builder and listings for a broker, and
  * sorts by that count.
  */
@@ -339,5 +402,6 @@ function searchHref(f: { tab?: string; types?: string[]; ptypes?: string[]; role
   if (f.ptypes?.length) p.set("ptypes", f.ptypes.join(","));
   if (f.roles?.length) p.set("roles", f.roles.join(","));
   if (f.intent) p.set("intent", f.intent);
-  return `/search/results?${p.toString()}`;
+  const qs = p.toString();
+  return qs ? `/search/results?${qs}` : "/search/results";
 }

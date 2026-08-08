@@ -2,20 +2,24 @@
  * The carousel home feed (P2 rails) — live sweep.
  *
  * Checks what the SERVER actually returns for the rails, as a guest and as each
- * role, against a direct query of the same database. It encodes the four rules
- * the redesign promised:
+ * role, against a direct query of the same database. It encodes the rules the
+ * 8 Aug 2026 reorder promised:
  *
- *   1. order        — New Projects first; Top Builders / Top Brokers in the
- *                     middle (not glued to the top); type rails in
- *                     property_types.sort_order, scheme rails after them.
- *   2. auto-hide    — a type with 0 live rows in scope produces NO section, and
- *                     a Buy/Rent chip removes every project rail entirely.
+ *   1. order        — HomzList top picks → Newly-added properties → Featured
+ *                     Developers → Featured Brokers → Featured properties →
+ *                     Have a property to sell? → News and Articles, and NO
+ *                     per-type rails.
+ *   2. auto-hide    — a rail with nothing live in scope produces NO section, and
+ *                     a Buy/Rent chip removes the projects rail entirely. The
+ *                     sell CTA is the one block that is always present.
  *   3. no limit     — every rail hands back a cursor and the next page differs.
- *   4. real numbers — every subtitle count equals a real count, and every
- *                     rail's cards are actually of that rail's type.
+ *   4. real numbers — every subtitle count equals a real count.
+ *   5. purity       — Newly-added holds only listings, top picks only projects,
+ *                     Featured only boosted rows.
  *
  * Plus: "View all" targets resolve to the SAME set the rail was showing, an
- * unknown section key is refused, and own listings never appear in own feed.
+ * unknown section key is refused, the retired `type:` keys still answer for a
+ * cached PWA, and own listings never appear in own feed.
  *
  *   FEED_BASE=http://localhost:3000 node scripts/check-feed-sections.mjs
  */
@@ -86,164 +90,159 @@ console.log(`BASE=${BASE}\n== Guest — the rails ==`);
 
 const guest = await sections(null);
 check(guest.length > 0, "sections returned for a guest", `${guest.length} rails`);
-check(guest[0]?.key === "projects", "New Projects is the FIRST rail", guest[0]?.key);
 
-const bIdx = guest.findIndex((s) => s.key === "builders");
-const rIdx = guest.findIndex((s) => s.key === "brokers");
-check(bIdx > 0 && rIdx === bIdx + 1, "Top Builders + Top Brokers sit together", `at ${bIdx}, ${rIdx}`);
-check(bIdx >= 2 && bIdx < guest.length - 1, "…in the MIDDLE — property rails both above and below them",
-  `${bIdx} of ${guest.length}`);
+// ---- 1. the order Rajan specified ----------------------------------------
+const SPEC = ["projects", "newly_added", "builders", "brokers", "featured", "sell_cta", "news"];
+const keys = guest.map((s) => s.key);
+check(
+  JSON.stringify(keys) === JSON.stringify(SPEC.filter((k) => keys.includes(k))),
+  "rails come back in the specified order (absent ones simply skipped)",
+  keys.join(" → "),
+);
+check(keys.every((k) => SPEC.includes(k)), "no rail outside the seven — the per-type rails are gone",
+  keys.filter((k) => !SPEC.includes(k)).join(",") || "none");
+check(keys.includes("sell_cta"), "the sell CTA is always present");
 
-// Type rails follow property_types.sort_order, and scheme rails come after.
-const { data: ptRows } = await db.from("property_types").select("code,sort_order").eq("is_active", true).order("sort_order");
-const order = new Map(ptRows.map((t) => [t.code, t.sort_order]));
-const typeKeys = guest.filter((s) => s.kind === "property_type").map((s) => s.key.slice(5));
-const sorted = [...typeKeys].sort((a, b) => order.get(a) - order.get(b));
-check(JSON.stringify(typeKeys) === JSON.stringify(sorted), "type rails follow property_types.sort_order", typeKeys.join(","));
-const lastType = guest.map((s) => s.kind).lastIndexOf("property_type");
-const firstScheme = guest.map((s) => s.kind).indexOf("project_type");
-check(firstScheme === -1 || firstScheme > lastType, "scheme rails come after every property rail", `${lastType} → ${firstScheme}`);
+const titleOf = (k) => guest.find((s) => s.key === k)?.title;
+check(!titleOf("projects") || titleOf("projects") === "HomzList top picks", "top picks title", titleOf("projects"));
+check(!titleOf("newly_added") || titleOf("newly_added") === "Newly-added properties", "newly-added title", titleOf("newly_added"));
+check(!titleOf("builders") || titleOf("builders") === "Featured Developers", "developers title", titleOf("builders"));
+check(!titleOf("brokers") || titleOf("brokers") === "Featured Brokers", "brokers title", titleOf("brokers"));
+check(!titleOf("featured") || titleOf("featured") === "Featured properties", "featured title", titleOf("featured"));
 
-// ---- auto-hide + real counts, against the database ------------------------
+// ---- 2 + 4. auto-hide and counts, against the database ---------------------
 console.log("\n== Auto-hide and counts (vs the database) ==");
-const { data: liveListings } = await db.from("listings").select("type_code,kind").eq("status", "live").eq("availability", "available");
-const realCount = new Map();
-for (const l of liveListings) realCount.set(l.type_code, (realCount.get(l.type_code) ?? 0) + 1);
-
-// A type rail carries BOTH kinds, so its count is its listings PLUS the
-// projects of every scheme type mapped to it (project_types.property_type_codes,
-// migration 0123).
-const { data: liveProjectRows } = await db.from("projects").select("project_type").eq("status", "live");
-const projCount = new Map();
-for (const r of liveProjectRows) projCount.set(r.project_type, (projCount.get(r.project_type) ?? 0) + 1);
-const { data: schemeRows } = await db.from("project_types").select("code,label,property_type_codes").eq("is_active", true);
-const schemeLabel = new Map(schemeRows.map((r) => [r.code, r.label]));
-const schemesFor = (code) => schemeRows.filter((r) => (r.property_type_codes ?? []).includes(code)).map((r) => r.code);
-const railTotal = (code) =>
-  (realCount.get(code) ?? 0) + schemesFor(code).reduce((n, c) => n + (projCount.get(c) ?? 0), 0);
-
-let countMismatch = 0;
-for (const s of guest.filter((x) => x.kind === "property_type")) {
-  const code = s.key.slice(5);
-  if (s.total !== railTotal(code)) { countMismatch++; console.log(`      ${code}: rail says ${s.total}, DB says ${railTotal(code)}`); }
-}
-check(countMismatch === 0, "every type rail's count = its listings + its schemes' projects",
-  `${guest.filter((x) => x.kind === "property_type").length} rails checked`);
-
-const emptyTypes = ptRows.filter((t) => railTotal(t.code) === 0).map((t) => t.code);
-const leaked = emptyTypes.filter((c) => guest.some((s) => s.key === `type:${c}`));
-check(leaked.length === 0, "a type with nothing live in EITHER kind produces NO rail (auto-hide)",
-  emptyTypes.length ? `0-row types: ${emptyTypes.join(",")}` : "every active type has inventory right now");
-
-// A scheme type mapped to no property type keeps its own rail — otherwise it
-// would be reachable only from New Projects.
-const orphanSchemes = schemeRows.filter((r) => !(r.property_type_codes ?? []).length && (projCount.get(r.code) ?? 0) > 0);
-check(orphanSchemes.every((r) => guest.some((s) => s.key === `ptype:${r.code}`)),
-  "a scheme type under no property type keeps its own rail", orphanSchemes.map((r) => r.code).join(",") || "none");
-
 const { count: liveProjects } = await db.from("projects").select("id", { count: "exact", head: true }).eq("status", "live");
-check(guest[0]?.total === liveProjects, "New Projects count equals live projects in the DB", `${guest[0]?.total} vs ${liveProjects}`);
+const { count: liveListings } = await db.from("listings").select("id", { count: "exact", head: true })
+  .eq("status", "live").eq("availability", "available");
 
-// ---- the Buy/Rent chip -----------------------------------------------------
-console.log("\n== Buy / Rent chip ==");
-const buy = await sections(null, "buy");
-check(!buy.some((s) => s.kind === "projects" || s.kind === "project_type"),
-  "a Buy chip removes EVERY project rail", `${buy.length} rails left`);
-const buyFlat = buy.find((s) => s.key === "type:flat");
-const sellFlats = liveListings.filter((l) => l.type_code === "flat" && l.kind === "sell").length;
-check(buyFlat?.total === sellFlats, "Buy narrows the count to sale rows only", `${buyFlat?.total} vs ${sellFlats}`);
+const picks = guest.find((s) => s.key === "projects");
+check(liveProjects ? picks?.total === liveProjects : !picks, "top picks count == live projects in the DB", `${picks?.total} vs ${liveProjects}`);
 
-const rent = await sections(null, "rent");
-check(rent.every((s) => s.kind !== "projects" && s.kind !== "project_type"), "a Rent chip removes projects too");
-const rentItems = (await api(null, "/api/v1/feed/section?key=type:flat&filter=rent")).json?.data?.items ?? [];
-check(rentItems.length > 0 && rentItems.every((i) => i.saleLabel === "For Rent"), "a Rent rail contains only rentals", `${rentItems.length} cards`);
+const newly = guest.find((s) => s.key === "newly_added");
+check(liveListings ? newly?.total === liveListings : !newly, "Newly-added count == live available listings in the DB", `${newly?.total} vs ${liveListings}`);
 
-// ---- the rails themselves --------------------------------------------------
-console.log("\n== Rails: order, purity, exhaustiveness ==");
-const projRail = await railOf(null, "projects");
-check(projRail?.items?.length > 0 && projRail.items.every((i) => i.kind === "project"), "New Projects rail holds only project cards", `${projRail?.items?.length} cards`);
-check(Boolean(projRail?.nextCursor), "…and hands back a cursor (no limit)", String(projRail?.nextCursor));
+const { count: livePosts } = await db.from("blog_posts").select("slug", { count: "exact", head: true })
+  .eq("status", "published").lte("published_at", new Date().toISOString());
+const news = guest.find((s) => s.key === "news");
+check(livePosts ? news?.total === livePosts : !news, "News count == published, un-embargoed posts", `${news?.total} vs ${livePosts}`);
 
-/** Walk a rail to the end. Returns every card, in order. */
-async function walk(key) {
+// Featured = the boosted set the rail actually hands out.
+const featured = guest.find((s) => s.key === "featured");
+if (featured) {
+  const featuredPage = await railOf(null, "featured");
+  check(featuredPage.items.length > 0, "Featured rail returns cards", `${featuredPage.items.length}`);
+  check(featuredPage.items.every((i) => i.promoted), "…and EVERY one of them is promoted",
+    `${featuredPage.items.filter((i) => !i.promoted).length} organic leaked`);
+} else {
+  const { count: nBoosts } = await db.from("boost_placements").select("id", { count: "exact", head: true }).eq("status", "active");
+  check(true, "no Featured rail (auto-hidden)", `${nBoosts ?? 0} active boost rows in DB`);
+}
+
+// ---- 3 + 5. the rails themselves ------------------------------------------
+console.log("\n== Rails: purity, exhaustiveness, no limit ==");
+if (picks) {
+  const p = await railOf(null, "projects");
+  check(p.items.length > 0 && p.items.every((i) => i.kind === "project"), "top picks holds only project cards", `${p.items.length} cards`);
+  check(p.people.length === 0 && p.posts.length === 0, "…and no people or posts on it");
+}
+if (newly) {
+  const n = await railOf(null, "newly_added");
+  check(n.items.length > 0 && n.items.every((i) => i.kind === "property"), "Newly-added holds only property cards", `${n.items.length} cards`);
+  // Boosted still ride on top — that rule did not change with the reorder.
+  const shape = n.items.map((i) => (i.promoted ? "B" : "l")).join("");
+  check(/^B*l*$/.test(shape), "…boosted first, then recency", shape);
+}
+
+/** Walk a rail to the end. Returns everything it handed out, in order. */
+async function walk(key, pick = (d) => d.items ?? []) {
   const all = []; let cursor = null; let pages = 0;
   do {
     const d = await railOf(null, key, cursor);
-    all.push(...(d.items ?? []));
+    all.push(...pick(d));
     cursor = d.nextCursor; pages++;
   } while (cursor && pages < 25);
   return { all, pages };
 }
 
-let orderBad = 0, dupBad = 0, shortBad = 0, pureBad = 0;
-for (const s of guest.filter((x) => x.kind === "property_type")) {
-  const code = s.key.slice(5);
-  const schemes = schemesFor(code);
+for (const s of guest.filter((x) => x.key === "projects" || x.key === "newly_added")) {
   const { all } = await walk(s.key);
-
-  // no repeats, and every card the count promised is reachable
   const ids = new Set(all.map((i) => i.id));
-  if (ids.size !== all.length) { dupBad++; console.log(`      ${code}: ${all.length - ids.size} duplicate card(s)`); }
-  if (ids.size !== s.total) { shortBad++; console.log(`      ${code}: rail hands out ${ids.size}, its own count says ${s.total}`); }
-
-  // order: boosted (any kind) → projects → properties
-  const shape = all.map((i) => (i.promoted ? "B" : i.kind === "project" ? "P" : "l")).join("");
-  if (!/^B*P*l*$/.test(shape)) { orderBad++; console.log(`      ${code}: ${shape}`); }
-
-  // purity: this type's listings, and only schemes mapped to this type
-  const wrongL = all.filter((i) => i.kind === "property" && i.typeCode !== code);
-  const wrongP = all.filter((i) => i.kind === "project" && i.projectTypeLabel
-    && !schemes.some((c) => schemeLabel.get(c) === i.projectTypeLabel));
-  if (wrongL.length || wrongP.length) { pureBad++; console.log(`      ${code}: ${wrongL.length} wrong listings, ${wrongP.length} wrong projects`); }
+  check(ids.size === all.length, `${s.key}: no card appears twice across all its pages`, `${all.length - ids.size} dupes`);
+  check(ids.size === s.total, `${s.key}: hands out exactly the number it advertises`, `${ids.size} vs ${s.total}`);
 }
-check(orderBad === 0, "every type rail is ordered boosted → projects → properties", `${guest.filter((x) => x.kind === "property_type").length} rails`);
-check(dupBad === 0, "no card appears twice in a rail, across all its pages");
-check(shortBad === 0, "every rail hands out exactly the number it advertises");
-check(pureBad === 0, "a rail contains only its own type's listings and its own schemes");
 
-const peopleRail = await railOf(null, "builders");
-check(peopleRail.people.length > 0 && peopleRail.items.length === 0, "builders rail returns people, not cards", `${peopleRail.people.length} builders`);
-check(peopleRail.people.every((p) => p.role === "builder"), "…and only builders", [...new Set(peopleRail.people.map((p) => p.role))].join(","));
-check(peopleRail.people.every((p) => p.listingCount > 0), "…every one of them has live inventory (no zero rows)");
-const ranked = [...peopleRail.people].sort((a, b) => b.listingCount - a.listingCount);
-check(JSON.stringify(ranked.map((p) => p.id)) === JSON.stringify(peopleRail.people.map((p) => p.id)), "…ranked by live inventory");
+if (news) {
+  const { all } = await walk("news", (d) => d.posts ?? []);
+  const slugs = new Set(all.map((p) => p.slug));
+  check(slugs.size === all.length, "News: no post appears twice across pages");
+  check(slugs.size === news.total, "News: hands out exactly the number it advertises", `${slugs.size} vs ${news.total}`);
+  const first = await railOf(null, "news");
+  check(first.posts.every((p) => p.title && p.categoryLabel && p.readMinutes >= 0), "…every post carries title, category label and read time");
+}
 
-const brokersRail = await railOf(null, "brokers");
-check(brokersRail.people.every((p) => p.role === "broker"), "brokers rail holds only brokers");
+const buildersSection = guest.find((s) => s.key === "builders");
+if (buildersSection) {
+  const peopleRail = await railOf(null, "builders");
+  check(peopleRail.people.length > 0 && peopleRail.items.length === 0, "Featured Developers returns people, not cards", `${peopleRail.people.length}`);
+  check(peopleRail.people.every((p) => p.role === "builder"), "…and only builders", [...new Set(peopleRail.people.map((p) => p.role))].join(","));
+  check(peopleRail.people.every((p) => p.listingCount > 0), "…every one of them has live inventory (no zero rows)");
+  const ranked = [...peopleRail.people].sort((a, b) => b.listingCount - a.listingCount);
+  check(JSON.stringify(ranked.map((p) => p.id)) === JSON.stringify(peopleRail.people.map((p) => p.id)), "…ranked by live inventory");
+}
+const brokersSection = guest.find((s) => s.key === "brokers");
+if (brokersSection) {
+  const brokersRail = await railOf(null, "brokers");
+  check(brokersRail.people.every((p) => p.role === "broker"), "Featured Brokers holds only brokers");
+}
+
+// The CTA is answered, not refused — a client that asks gets a clean empty page.
+const ctaPage = await railOf(null, "sell_cta");
+check(ctaPage && ctaPage.items.length === 0 && ctaPage.posts.length === 0 && ctaPage.nextCursor === null,
+  "sell_cta answers with an empty page rather than an error");
+
+// ---- the Buy/Rent chip -----------------------------------------------------
+console.log("\n== Buy / Rent chip ==");
+const buy = await sections(null, "buy");
+check(!buy.some((s) => s.kind === "projects"), "a Buy chip removes the projects rail", buy.map((s) => s.key).join(","));
+const buyNewly = buy.find((s) => s.key === "newly_added");
+const { count: sellCount } = await db.from("listings").select("id", { count: "exact", head: true })
+  .eq("status", "live").eq("availability", "available").eq("kind", "sell");
+check(buyNewly?.total === sellCount, "Buy narrows Newly-added to sale rows only", `${buyNewly?.total} vs ${sellCount}`);
+const buyItems = (await api(null, "/api/v1/feed/section?key=newly_added&filter=buy")).json?.data?.items ?? [];
+check(buyItems.length > 0 && buyItems.every((i) => i.saleLabel === "For Sale"), "…and the cards are all sale rows", `${buyItems.length}`);
+
+const rent = await sections(null, "rent");
+check(!rent.some((s) => s.kind === "projects"), "a Rent chip removes the projects rail too");
+const rentItems = (await api(null, "/api/v1/feed/section?key=newly_added&filter=rent")).json?.data?.items ?? [];
+check(rentItems.length > 0 && rentItems.every((i) => i.saleLabel === "For Rent"), "a Rent rail contains only rentals", `${rentItems.length} cards`);
+check(rent.some((s) => s.key === "sell_cta") && rent.some((s) => s.key === "news") === Boolean(livePosts),
+  "the CTA and News survive the chip (they are not inventory)");
 
 // ---- View all targets ------------------------------------------------------
 console.log("\n== View all goes where the rail promised ==");
-const vaProjects = await api(null, "/api/v1/search?tab=projects");
-check(vaProjects.json?.data?.total === guest[0]?.total, "New Projects View all total == rail total", `${vaProjects.json?.data?.total} vs ${guest[0]?.total}`);
-check(Boolean(vaProjects.json?.data?.nextCursor), "…and that screen can page to all of them");
-
-const buildersSection = guest[bIdx];
-const vaBuilders = await api(null, "/api/v1/search?tab=brokers&roles=builder");
-check(vaBuilders.json?.data?.total === buildersSection.total, "Top Builders View all total == rail total",
-  `${vaBuilders.json?.data?.total} vs ${buildersSection.total}`);
-check(vaBuilders.json?.data?.items?.length === vaBuilders.json?.data?.total, "…and the list shows all of them, not a slice");
-
-// A type rail's View all carries BOTH halves: the results screen's Properties
-// tab shows the listings, its Projects tab the same schemes the rail showed.
-const flatSection = guest.find((s) => s.key === "type:flat");
-const flatQs = flatSection.viewAll.split("?")[1];
-const vaFlatProps = await api(null, `/api/v1/search?${flatQs}`);
-const vaFlatProj = await api(null, `/api/v1/search?${flatQs}&tab=projects`);
-check(vaFlatProps.json?.data?.total === (realCount.get("flat") ?? 0),
-  "Flat View all → Properties tab == the rail's listings", `${vaFlatProps.json?.data?.total} vs ${realCount.get("flat")}`);
-const flatSchemeTotal = schemesFor("flat").reduce((n, c) => n + (projCount.get(c) ?? 0), 0);
-check(vaFlatProj.json?.data?.total === flatSchemeTotal,
-  "Flat View all → Projects tab == the rail's projects", `${vaFlatProj.json?.data?.total} vs ${flatSchemeTotal}`);
-check(vaFlatProps.json?.data?.total + vaFlatProj.json?.data?.total === flatSection.total,
-  "…and the two halves add up to the rail's count");
-
-const schemeSection = guest.find((s) => s.kind === "project_type");
-if (schemeSection) {
-  const vaScheme = await api(null, `/api/v1/search?${schemeSection.viewAll.split("?")[1]}`);
-  const labels = [...new Set((vaScheme.json?.data?.items ?? []).map((i) => i.projectTypeLabel))];
-  check(vaScheme.json?.data?.total === schemeSection.total && labels.length <= 1,
-    "a scheme-only rail's View all is filtered to that scheme type", `${vaScheme.json?.data?.total} · ${labels.join(",")}`);
+if (picks) {
+  const vaProjects = await api(null, "/api/v1/search?tab=projects");
+  check(vaProjects.json?.data?.total === picks.total, "top picks View all total == rail total", `${vaProjects.json?.data?.total} vs ${picks.total}`);
+  check(Boolean(vaProjects.json?.data?.nextCursor), "…and that screen can page to all of them");
 }
+if (newly) {
+  const qs = newly.viewAll.split("?")[1] ?? "";
+  const vaProps = await api(null, `/api/v1/search${qs ? `?${qs}` : ""}`);
+  check(vaProps.json?.data?.total === newly.total, "Newly-added View all total == rail total", `${vaProps.json?.data?.total} vs ${newly.total}`);
+}
+if (buildersSection) {
+  const vaBuilders = await api(null, "/api/v1/search?tab=brokers&roles=builder");
+  check(vaBuilders.json?.data?.total === buildersSection.total, "Featured Developers View all total == rail total",
+    `${vaBuilders.json?.data?.total} vs ${buildersSection.total}`);
+  check(vaBuilders.json?.data?.items?.length === vaBuilders.json?.data?.total, "…and the list shows all of them, not a slice");
+}
+check(guest.find((s) => s.key === "sell_cta")?.viewAll === "/create", "the CTA points at the create flow");
+check(!news || news.viewAll === "/blog", "News points at the blog");
+// "Boosted" is not a search filter, so the Featured rail ships no target rather
+// than one that opens a different set from the one its heading counted.
+check(!featured || featured.viewAll === "", "Featured ships no View all (nothing to point at that matches it)", featured?.viewAll);
+check(guest.every((s) => s.key === "featured" || s.viewAll), "every other rail has a target");
 
 // ---- validation ------------------------------------------------------------
 console.log("\n== Validation ==");
@@ -251,6 +250,9 @@ for (const bad of ["type:flat';drop", "../../etc", "unknown", ""]) {
   const r = await api(null, `/api/v1/feed/section?key=${encodeURIComponent(bad)}`);
   check(r.status === 422 || r.json?.error?.code === "VALIDATION_ERROR", `bad key refused: ${bad || "(empty)"}`, r.json?.error?.code ?? r.status);
 }
+// A PWA on the pre-reorder bundle still asks for these; they must not 422.
+const legacy = await api(null, "/api/v1/feed/section?key=type:flat");
+check(legacy.status === 200, "a retired type: key still answers (cached PWA compat)", String(legacy.status));
 
 // ---- roles -----------------------------------------------------------------
 const ACTORS = [
@@ -266,33 +268,49 @@ for (const a of ACTORS) {
   if (!ok) continue;
 
   const mine = await sections(a.phone);
-  check(mine.length > 0, "sections returned for this role", `${mine.length} rails`);
+  check(mine.length > 0, "sections returned for this role", `${mine.map((s) => s.key).join(",")}`);
+  check(mine.every((s) => SPEC.includes(s.key)), "…all within the seven");
 
   const { data: prof } = await db.from("profiles").select("id,city_id").eq("phone", a.phone).maybeSingle();
-  const cityScoped = mine.find((s) => s.kind === "property_type");
-  if (cityScoped && prof?.city_id) {
-    const code = cityScoped.key.slice(5);
-    const { count: nListings } = await db.from("listings").select("id", { count: "exact", head: true })
-      .eq("status", "live").eq("availability", "available")
-      .eq("type_code", code).eq("city_id", prof.city_id).neq("profile_id", prof.id);
-    // Both halves of the rail are city-scoped and own-excluded, so both count.
-    const schemes = schemesFor(code);
-    let nProjects = 0;
-    if (schemes.length) {
-      const { count } = await db.from("projects").select("id", { count: "exact", head: true })
-        .eq("status", "live").in("project_type", schemes).eq("city_id", prof.city_id).neq("profile_id", prof.id);
-      nProjects = count ?? 0;
-    }
-    check(cityScoped.total === (nListings ?? 0) + nProjects,
-      `${cityScoped.title} rail is city-scoped and excludes own`,
-      `${cityScoped.total} vs ${nListings} listings + ${nProjects} projects`);
-  }
+  const mineNewly = mine.find((s) => s.key === "newly_added");
+  if (mineNewly && prof?.city_id) {
+    /**
+     * The count under the heading must equal the number of cards the rail hands
+     * out — walked, not recomputed. Recomputing it here would mean copying three
+     * server rules into the script (own-excluded, not-interested, and the
+     * state/All-India boosts that reach in from OTHER cities), and a copy that
+     * drifts stops testing anything.
+     */
+    let cursor = null; const all = []; let pages = 0;
+    do {
+      const d = await railOf(a.phone, "newly_added", cursor);
+      all.push(...(d.items ?? []));
+      cursor = d.nextCursor; pages++;
+    } while (cursor && pages < 25);
+    const ids = new Set(all.map((i) => i.id));
+    check(ids.size === mineNewly.total, "Newly-added advertises exactly what it hands out",
+      `${mineNewly.total} advertised, ${ids.size} handed out`);
 
-  // Own listings must never appear in one's own feed, in any rail.
-  const first = mine.find((s) => s.kind === "property_type");
-  const page = await railOf(a.phone, first.key);
-  const own = (page.items ?? []).filter((i) => i.poster.id === prof?.id);
-  check(own.length === 0, "own listings excluded from every rail", `${own.length} leaked`);
+    // Own listings must never appear in one's own feed, in any rail.
+    check(all.every((i) => i.poster.id !== prof.id), "own listings excluded from every rail",
+      `${all.filter((i) => i.poster.id === prof.id).length} leaked`);
+
+    // "Not interested in this type" is honoured on the cards, not just the count.
+    const { data: ni } = await db.from("feed_not_interested").select("type_code").eq("profile_id", prof.id);
+    const hiddenTypes = new Set((ni ?? []).map((r) => r.type_code).filter(Boolean));
+    if (hiddenTypes.size) {
+      check(all.every((i) => !hiddenTypes.has(i.typeCode)), "not-interested types never appear on the rail",
+        `hiding ${[...hiddenTypes].join(",")}`);
+    }
+
+    // Anything NOT promoted has to be from this viewer's own city — an organic
+    // card from elsewhere would mean the scope leaked.
+    const { data: cityRows } = await db.from("listings").select("id")
+      .eq("city_id", prof.city_id).in("id", [...ids].slice(0, 200));
+    const inCity = new Set((cityRows ?? []).map((r) => r.id));
+    check(all.every((i) => i.promoted || inCity.has(i.id)), "every organic card is from the viewer's city",
+      `${all.filter((i) => !i.promoted && !inCity.has(i.id)).length} out-of-city organic`);
+  }
 }
 
 console.log(fails === 0 ? "\nALL PASS" : `\n${fails} FAILURE(S)`);

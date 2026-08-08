@@ -5,7 +5,7 @@ import { Icon } from "@/components/ui/Icon";
 import type { FeedPerson } from "@/lib/feed/client";
 
 /**
- * A seller on the Top Builders / Top Brokers rails (P2, 5 Aug 2026).
+ * A seller on the Featured Developers / Featured Brokers rails (P2, 5 Aug 2026).
  *
  * Everything on it is measured: `stats` is built server-side from live
  * inventory ("6 projects", "14 listings"), the tick is a real approved

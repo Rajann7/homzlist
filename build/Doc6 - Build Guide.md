@@ -414,8 +414,9 @@ Story row (auto-only, no add-story, ring types, edge-fade), Property-mode feed (
 carousel/dots/counter, promoted, double-tap heart, save), Requirement-mode feed (locked/unlocked/
 boosted-locked), Builder dashboard feed (own stats + matched reqs, no foreign listings), Story
 viewer (segments/auto-advance/tap-zones/hold/swipe/unavailable), all sheets (city/sort/⋯/inquiry/
-share/report/paywall/proposal), pull-to-refresh, new-listings pill, caught-up, suggested strip,
-admin banner slot, skeleton/empty/guest/offline.
+share/report/paywall/proposal), pull-to-refresh, new-listings pill, caught-up,
+admin banner slot, skeleton/empty/guest/offline. (The suggested strip was removed 8 Aug 2026 —
+its recency set is now the "Newly-added properties" rail.)
 
 Logic (Doc2 §9): ranking (boosted FIFO → cascade → recency); own listings excluded; stories auto-
 generated from last-24h approved in user's city, cascade order no cap, 24h expiry (signed media

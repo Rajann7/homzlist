@@ -722,8 +722,8 @@ export async function searchBrokers(f: SearchFilters, viewerId: string | null, l
   const parsed = await parseQuery(f.q ?? "", { cityId: f.cityId });
   const cityId = f.cityId ?? parsed.cityId;
 
-  // `roles` narrows the same query to one role — what the feed's Top Builders
-  // and Top Brokers rails ask for. Unset = the search tab's three roles, so the
+  // `roles` narrows the same query to one role — what the feed's Featured
+  // Developers and Featured Brokers rails ask for. Unset = the search tab's three roles, so the
   // Brokers & Builders tab is unchanged.
   const ROLES = ["broker", "builder", "owner"];
   const roles = f.roles?.filter((r) => ROLES.includes(r));
@@ -737,7 +737,7 @@ export async function searchBrokers(f: SearchFilters, viewerId: string | null, l
     // NOT `.limit(limit)`. Whether a seller belongs in the result is decided
     // AFTER this query — by their live listing/project count — and so is the
     // order. Cutting to `limit` here meant "the top 20 of an arbitrary 20": the
-    // feed's Top Builders rail said 21 builders and this tab showed 11, because
+    // feed's Featured Developers rail said 21 builders and this tab showed 11, because
     // the two asked for different-sized slices of the same set. Scan the city,
     // then rank, then cut (below).
     .limit(SELLER_SCAN);

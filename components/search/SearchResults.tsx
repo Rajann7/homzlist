@@ -57,7 +57,7 @@ export function SearchResults({ basePath = "", isGuest = false }: { basePath?: s
   const qs = useMemo(() => filtersToQuery(filters), [filters]);
 
   // `?tab=` decides which tab opens. The feed's rails link here ("View all" on
-  // Projects / Top Builders / Top Brokers), and without this every one of them
+  // Projects / Featured Developers / Featured Brokers), and without this every one of them
   // landed on the Properties tab — a link that promised projects and showed
   // flats. Still local state after mount: tapping a tab must not push history.
   const [tab, setTab] = useState<SearchTab>(() => {

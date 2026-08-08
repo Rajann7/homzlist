@@ -61,7 +61,7 @@ export function RailCardSkeleton() {
   );
 }
 
-/** The Top Builders / Top Brokers tile — matches PersonCard. */
+/** The Featured Developers / Featured Brokers tile — matches PersonCard. */
 export function RailPersonSkeleton() {
   return (
     <div className="flex w-[156px] shrink-0 flex-col items-center gap-2 rounded-8 border border-border bg-surface-1 p-3">
@@ -74,21 +74,35 @@ export function RailPersonSkeleton() {
   );
 }
 
+/** The News and Articles tile — matches NewsCard. */
+export function RailPostSkeleton() {
+  return (
+    <div className="flex w-[248px] shrink-0 flex-col overflow-hidden rounded-8 border border-border bg-surface-1">
+      <Skeleton className="aspect-[16/9] w-full rounded-none" />
+      <div className="flex flex-col gap-1.5 px-3 py-2.5">
+        <Skeleton className="h-[18px] w-16 rounded-4" />
+        <Skeleton className="h-[13px] w-[92%] rounded-4" />
+        <Skeleton className="h-[13px] w-[60%] rounded-4" />
+        <Skeleton className="h-[11px] w-[46%] rounded-4" />
+      </div>
+    </div>
+  );
+}
+
 /**
  * A whole rail before its heading is known — used while /feed/sections is still
- * in flight. Same header geometry (icon + title + subtitle + View all) and the
+ * in flight. Same header geometry (title + subtitle + the View all pill) and the
  * same card row, so the rails do not reflow when the real titles land.
  */
 export function RailSkeleton({ people = false }: { people?: boolean }) {
   return (
     <section className="border-b-8 border-surface-2 bg-surface-1 py-3.5">
       <header className="flex items-end gap-2 px-4 pb-2.5">
-        <Skeleton className="h-8 w-8 shrink-0 self-center rounded-8" />
         <div className="flex min-w-0 flex-1 flex-col gap-1.5">
           <Skeleton className="h-[17px] w-[38%] rounded-4" />
           <Skeleton className="h-[11px] w-[58%] rounded-4" />
         </div>
-        <Skeleton className="h-[15px] w-14 shrink-0 rounded-4" />
+        <Skeleton className="h-[30px] w-[86px] shrink-0 rounded-full" />
       </header>
       <div className="flex items-stretch gap-3 overflow-hidden px-4">
         {people

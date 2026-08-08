@@ -27,7 +27,7 @@ export interface SearchFilters {
   ptypes?: string[];
   /**
    * profiles.role values for the Brokers & Builders tab. The feed's Top
-   * Builders / Top Brokers rails are the same tab narrowed to one role.
+   * Developers / Featured Brokers rails are the same tab narrowed to one role.
    */
   roles?: string[];
   /** location ids (areas). Empty → whole city. */
@@ -37,7 +37,7 @@ export interface SearchFilters {
   /**
    * location id (state) — used INSTEAD of cityId when the feed has widened
    * because the viewer's city holds no live inventory (lib/feed/scope). It
-   * exists so the Top Builders / Top Brokers rails follow the same widening as
+   * exists so the Featured Developers / Featured Brokers rails follow the same widening as
    * the cards beside them, rather than dropping the location filter and ranking
    * over the whole country. Ignored when cityId is present.
    */

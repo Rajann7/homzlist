@@ -2,9 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Icon } from "@/components/ui/Icon";
-import { RailCardSkeleton, RailPersonSkeleton } from "./skeletons";
-import { feedApi, type FeedCard as Card, type FeedPerson, type FeedSectionMeta, type FeedSectionPage } from "@/lib/feed/client";
-import { TYPE_ICON } from "@/lib/listings/type-icon";
+import { RailCardSkeleton, RailPersonSkeleton, RailPostSkeleton } from "./skeletons";
+import { feedApi, type FeedCard as Card, type FeedPerson, type FeedPost, type FeedSectionMeta, type FeedSectionPage } from "@/lib/feed/client";
 import { prefetchImages } from "@/lib/pwa/prefetch";
 
 /**
@@ -12,9 +11,9 @@ import { prefetchImages } from "@/lib/pwa/prefetch";
  *
  * Owns four things and nothing else:
  *
- *  1. LAZY LOAD. A feed can have twenty rails; fetching all of them on mount
- *     would be twenty requests for cards nobody has scrolled to. The rail asks
- *     for its first page only once it is within 400px of the viewport.
+ *  1. LAZY LOAD. A feed can have many rails; fetching all of them on mount
+ *     would be requests for cards nobody has scrolled to. The rail asks for its
+ *     first page only once it is within 400px of the viewport.
  *
  *  2. ENDLESS HORIZONTAL SCROLL. Scrolling near the right edge fetches the next
  *     page with the same cursor the vertical feed used. No cap.
@@ -26,9 +25,14 @@ import { prefetchImages } from "@/lib/pwa/prefetch";
  *
  *  4. STATES. Skeleton while loading, a retry row on failure. No dead ends.
  *
- * It renders no card markup of its own: `renderCard` / `renderPerson` come from
- * the feed, so every card in a rail is the same component, with the same
- * actions, as the card the feed has always shown.
+ * It renders no card markup of its own: `renderCard` / `renderPerson` /
+ * `renderPost` come from the feed, so every card in a rail is the same
+ * component, with the same actions, as the card the feed has always shown.
+ *
+ * Changed 8 Aug 2026 (Rajan): the "View all" TILE that used to sit at the end of
+ * the scroll is gone — the rail now just runs out of cards into its endless
+ * scroll — and the header's View all became a pill so it reads as a control
+ * rather than as a second line of the subtitle.
  */
 /** Append `next` onto `prev`, skipping anything already there. */
 function dedupe<T>(prev: T[], next: T[], key: (x: T) => string): T[] {
@@ -37,7 +41,7 @@ function dedupe<T>(prev: T[], next: T[], key: (x: T) => string): T[] {
 }
 
 export function SectionRail({
-  section, filter, sort, cityId = null, initial = null, renderCard, renderPerson, onViewAll,
+  section, filter, sort, cityId = null, initial = null, renderCard, renderPerson, renderPost, onViewAll,
 }: {
   section: FeedSectionMeta;
   filter: string;
@@ -55,10 +59,12 @@ export function SectionRail({
   initial?: FeedSectionPage | null;
   renderCard: (card: Card) => React.ReactNode;
   renderPerson: (person: FeedPerson) => React.ReactNode;
+  renderPost: (post: FeedPost) => React.ReactNode;
   onViewAll: (href: string) => void;
 }) {
   const [items, setItems] = useState<Card[] | null>(initial?.items ?? null);
   const [people, setPeople] = useState<FeedPerson[]>(initial?.people ?? []);
+  const [posts, setPosts] = useState<FeedPost[]>(initial?.posts ?? []);
   const [cursor, setCursor] = useState<string | null>(initial?.nextCursor ?? null);
   const [failed, setFailed] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -69,7 +75,7 @@ export function SectionRail({
   const started = useRef(initial !== null);
 
   const isPeople = section.kind === "builders" || section.kind === "brokers";
-  const icon = section.kind === "property_type" ? TYPE_ICON[section.key.slice(5)] : undefined;
+  const isPosts = section.kind === "news";
 
   const loadFirst = useCallback(async () => {
     setFailed(false);
@@ -77,6 +83,7 @@ export function SectionRail({
     if (res.ok) {
       setItems(res.data.items);
       setPeople(res.data.people);
+      setPosts(res.data.posts ?? []);
       setCursor(res.data.nextCursor);
       // Warm the covers just past the first screenful so the rail doesn't fill
       // in grey-then-photo as it is swiped (Doc8 §173).
@@ -139,6 +146,7 @@ export function SectionRail({
     // still arrive twice, and a duplicate React key silently drops a card.
     setItems((c) => dedupe(c ?? [], res.data.items, (x) => `${x.kind}-${x.id}`));
     setPeople((p) => dedupe(p, res.data.people, (x) => x.id));
+    setPosts((p) => dedupe(p, res.data.posts ?? [], (x) => x.slug));
     setCursor(res.data.nextCursor);
   }, [cursor, loadingMore, section.key, filter, sort, cityId]);
 
@@ -148,32 +156,37 @@ export function SectionRail({
     if (el.scrollLeft + el.clientWidth >= el.scrollWidth - 280) void loadMore();
   };
 
-  const count = isPeople ? people.length : (items?.length ?? 0);
+  const count = isPeople ? people.length : isPosts ? posts.length : (items?.length ?? 0);
   // Loaded, and there is genuinely nothing to show → the rail does not exist.
   if (items !== null && count === 0 && !failed) return null;
+
+  /**
+   * A rail holding ONE card lets it take the whole column instead of sitting at
+   * 86vw with a strip of empty rail beside it (Rajan, 8 Aug 2026: a rail with
+   * 1–2 items should adjust itself). Two or more keep the peek — that sliver of
+   * the next card is what tells the thumb there is something to swipe to.
+   */
+  const soloCard = !isPeople && !isPosts && items !== null && items.length === 1;
 
   return (
     <section ref={rootRef} className="border-b-8 border-surface-2 bg-surface-1 py-3.5">
       <header className="flex items-end gap-2 px-4 pb-2.5">
-        {/* The type's own icon — the same decorative map the P5 type picker
-            draws from, so a rail and the picker agree on what a Godown looks
-            like. A code with no icon renders none. */}
-        {icon && (
-          <span className="grid h-8 w-8 shrink-0 place-items-center self-center rounded-8 bg-surface-2 text-ink-secondary">
-            <Icon name={icon} size={18} />
-          </span>
-        )}
         <div className="min-w-0 flex-1">
           <h2 className="truncate text-17 font-semibold leading-[1.2] text-ink-primary">{section.title}</h2>
           <p className="mt-0.5 truncate text-11 text-ink-tertiary">{section.subtitle}</p>
         </div>
-        <button
-          type="button"
-          onClick={() => onViewAll(section.viewAll)}
-          className="flex shrink-0 items-center gap-0.5 py-1 text-13 font-semibold text-accent"
-        >
-          View all <Icon name="chevron-right" size={14} />
-        </button>
+        {/* A rail whose set has no screen behind it ships no target, and then no
+            pill — better than a control that opens something other than what the
+            heading counted (see lib/feed/sections, the Featured rail). */}
+        {section.viewAll && (
+          <button
+            type="button"
+            onClick={() => onViewAll(section.viewAll)}
+            className="flex shrink-0 items-center gap-0.5 rounded-full bg-accent-soft py-1.5 pl-3 pr-2 text-13 font-semibold text-accent active:bg-accent-soft/70"
+          >
+            View all <Icon name="chevron-right" size={14} />
+          </button>
+        )}
       </header>
 
       <div
@@ -185,7 +198,9 @@ export function SectionRail({
           // The card's own shape in grey — not a block the size of a card.
           isPeople
             ? [0, 1, 2].map((i) => <RailPersonSkeleton key={i} />)
-            : [0, 1].map((i) => <RailCardSkeleton key={i} />)
+            : isPosts
+              ? [0, 1].map((i) => <RailPostSkeleton key={i} />)
+              : [0, 1].map((i) => <RailCardSkeleton key={i} />)
         ) : failed ? (
           <button
             type="button"
@@ -198,27 +213,15 @@ export function SectionRail({
           <>
             {isPeople
               ? people.map((p) => <div key={p.id} className="shrink-0 snap-start">{renderPerson(p)}</div>)
-              : (items ?? []).map((c) => (
-                <div key={`${c.kind}-${c.id}`} className="w-[86vw] max-w-[320px] shrink-0 snap-start">
-                  {renderCard(c)}
-                </div>
-              ))}
+              : isPosts
+                ? posts.map((p) => <div key={p.slug} className="w-[248px] shrink-0 snap-start">{renderPost(p)}</div>)
+                : (items ?? []).map((c) => (
+                  <div key={`${c.kind}-${c.id}`} className={soloCard ? "w-full shrink-0 snap-start" : "w-[86vw] max-w-[320px] shrink-0 snap-start"}>
+                    {renderCard(c)}
+                  </div>
+                ))}
 
-            {/* The end-of-rail tile: the same destination as the header button,
-                where the thumb already is after scrolling to the end. */}
-            <button
-              type="button"
-              onClick={() => onViewAll(section.viewAll)}
-              className="flex w-[124px] shrink-0 snap-start flex-col items-center justify-center gap-2 rounded-8 border border-dashed border-border text-13 font-semibold text-accent"
-            >
-              <span className="grid h-10 w-10 place-items-center rounded-full bg-accent-soft">
-                <Icon name="chevron-right" size={20} />
-              </span>
-              View all
-              <span className="text-11 font-semibold text-ink-tertiary">{section.total} total</span>
-            </button>
-
-            {loadingMore && (isPeople ? <RailPersonSkeleton /> : <RailCardSkeleton />)}
+            {loadingMore && (isPeople ? <RailPersonSkeleton /> : isPosts ? <RailPostSkeleton /> : <RailCardSkeleton />)}
           </>
         )}
       </div>

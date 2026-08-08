@@ -4378,3 +4378,78 @@ screen that already lists exactly these notices with their severity dots.
 Migration 0132 repairs the 1276 existing rows and then ASSERTS the invariant:
 zero notification rows with no link, zero types with no landing page. The check
 script's exemption is gone with it, so nothing can quietly reintroduce a dead row.
+
+---
+
+## Home-feed reorder (8 Aug 2026) — found beyond the prompt
+
+The prompt asked for seven blocks in a fixed order, the end-of-rail "View all"
+tile gone, and a 1–2 card rail to adjust itself. Walking the six hidden-issue
+questions against it turned up four things the prompt did not mention.
+
+**1. FIXED IN THE SAME PASS — the Featured rail's "View all" would have lied.**
+Every other rail's View all opens a search that contains exactly what the rail
+was showing (the check script asserts it). "Boosted" is not a search filter, so
+the same button on `Featured properties` opened 150 results under a heading that
+counted 12. It now ships `viewAll: ""` and the pill is not rendered at all —
+`SectionRail` hides it when there is no target. The rail is endlessly scrollable,
+so nothing became unreachable.
+
+**2. FIXED IN THE SAME PASS — rail counts undercounted boosts reaching in from
+outside the city.** `hz_feed_type_counts` counts the scope; a boost bought for a
+state or for All India puts a listing from ANOTHER city on the rail. In Bhavnagar
+(one live listing) "Newly-added properties" printed **"1 property"** over **eight
+cards**, every one of them paid to be there. `boostedCount` now also returns how
+many boosted rows fall outside the counted scope and `getFeedSections` adds them,
+so the number under a heading equals the number of cards handed out — verified by
+walking the rail as each role rather than by recomputing the rule in the script.
+This was pre-existing (the old per-type rails had it too); the reorder is what
+made it visible, because one big rail now carries what nine small ones did.
+
+**3. OPEN — the "in <City>" phrasing over cards that are not in that city.**
+The count is now right, but the sentence is still "10 properties in Bhavnagar"
+when nine of the ten are boosted in from elsewhere (each card carries its own
+PROMOTED chip and its own real location). Housing.com and OLX both do this with
+sponsored rows, so it is not obviously wrong — but it is a COPY decision, not a
+code one, so it is not being changed unilaterally. Options if we want it exact:
+"1 in Bhavnagar · 9 promoted", or drop the place from this subtitle.
+→ **Needs Rajan's call.**
+
+**4. OPEN (dated cleanup) — the retired `type:` / `ptype:` section keys.**
+`/feed/section` still answers them, and `getFeedSectionItems` still resolves
+them, purely so a PWA holding a bundle from before 8 Aug 2026 does not turn its
+whole feed into retry rows. Nothing in the current UI produces these keys. They
+can be deleted once we are satisfied no cached client is still asking — the
+access logs for `/api/v1/feed/section?key=type:*` are the signal.
+→ **Delete after ~30 days of zero hits.**
+
+**5. FIXED IN THE SAME PASS (neighbouring suite) — `check:boost`'s wide-targeting
+assertion had been failing on missing fixtures, not on the rule.**
+`seed-module9.mjs` insisted the cross-city boost sit on a **Surat** listing, and
+the fixtures have had zero live Surat listings for a while, so the seed printed
+`! no live Surat listing`, created no state-targeted boost, and the check
+reported `a state/All-India boost on an out-of-city listing exists to test with`
+FAIL — for months, about data rather than about code. The seed now prefers Surat
+and falls back to ANY live listing outside Rajkot; it picked an Ahmedabad shop
+and `check:boost` is back to ALL CHECKS PASSED. This matters here because the
+home-feed count fix (item 2 above) depends on exactly that reach rule, which
+until now nothing was actually exercising.
+
+**6. PARTLY ADDRESSED (8 Aug 2026) — nine live projects have no key specs at all.**
+The card side is now handled: the strip is config-driven and hides below two
+tiles, so those projects no longer draw a blank grey bar. `check:story` still
+fails 1/17 because the STORY viewer promises every segment a strip, and these
+rows have nothing to put in one.
+`check:story` asserts "no segment shows an empty strip". Two seeded projects —
+`QA Row House Scheme Rajkot` and `Green Acres Plots` — render `specs: (none)`,
+because in the `projects` table `towers`, `floors`, `total_units`,
+`available_units` and `possession_date` are ALL null and `attributes` is `{}`.
+Nine live projects are in that state. Their `project_type` rows each configure
+8 `key_specs`, so a project created through the real form would fill some;
+`Green Acres Plots` is also typed `apartment` while being a plots scheme.
+Deliberately NOT patched: backfilling project rows to turn a check green is the
+same trap item 4 of the 6-Aug sweep warns about, and those rows are read by the
+story, boost and detail suites. The real question is whether the project form can
+legitimately produce an all-null project (→ the story strip needs an empty state)
+or cannot (→ these fixtures are invalid and should be reseeded).
+→ **Needs a decision before either fix.**

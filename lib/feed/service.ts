@@ -5,7 +5,8 @@ import { timeAgo, matchRequirementsForProjects, type MatchedRequirementCard } fr
 import { placementsFor, outOfCityIds, stateIdOfCity, type PlacementSet } from "@/lib/billing/placement";
 import { resolveViewerCity } from "@/lib/location/viewer-city";
 import { feedScope, applyFeedScope, type FeedScope } from "./scope";
-import { getFieldDefinitions, getAreaUnits, type FieldDefinitionRow } from "@/lib/listings/service";
+import { getFieldDefinitions, type FieldDefinitionRow } from "@/lib/listings/service";
+import { resolveKeySpecs, topUpSpecs, type KeySpecCandidate } from "@/lib/listings/dto";
 
 /**
  * The Property-mode feed (Doc7 §78, Doc2 §9.1).
@@ -115,7 +116,7 @@ const PAGE = 10;
  */
 export const PROJECT_COLS =
   "id,profile_id,name,project_type,build_status,possession_date,towers,floors,total_units,available_units," +
-  "attributes,rera_number,rera_exempt,area_label,area_id,city_id,cover_url,created_at,live_at";
+  "attributes,rera_number,rera_exempt,area_label,area_id,city_id,state_id,cover_url,created_at,live_at";
 
 /**
  * Narrowing options used by the carousel rails (lib/feed/sections.ts).
@@ -138,6 +139,14 @@ export interface FeedNarrow {
    * Absent → the mixed feed's original ordering, untouched.
    */
   groupOrder?: "project-first";
+  /**
+   * Only the BOOSTED subjects — the "Featured properties" rail (Rajan, 8 Aug
+   * 2026). It is not a second ranking: the boosted block is the same one every
+   * other rail puts on top, in the same FIFO order, with the same targeting,
+   * scope and not-interested rules — this just drops the organic tail. The
+   * organic queries are skipped entirely, so the rail costs one fetch-by-id.
+   */
+  onlyBoosted?: boolean;
 }
 
 /**
@@ -209,6 +218,7 @@ export async function getFeed(
   const cursor = opts.cursor ?? null;
   const only = opts.only ?? null;
   const grouped = opts.groupOrder === "project-first";
+  const onlyBoosted = opts.onlyBoosted === true;
   // A rail's cursor carries its phase; every other caller's is a bare timestamp.
   const { phase, ts: cursorTs, id: cursorId, boostOffset } = parsePhaseCursor(cursor);
 
@@ -268,7 +278,10 @@ export async function getFeed(
     && (filter === "all" || only === "project")
     && !(grouped && phase === "L")
     && !(opts.projectTypes !== undefined && opts.projectTypes.length === 0);
-  if (wantProjects) {
+  // `wantProjects` still has to be TRUE for a boosted-only rail — it is what
+  // lets fetchBoostedRows inject boosted PROJECTS — so the organic project query
+  // is skipped here rather than by narrowing the flag.
+  if (wantProjects && !onlyBoosted) {
     let pq = db()
       .from("projects")
       .select(PROJECT_COLS)
@@ -285,8 +298,9 @@ export async function getFeed(
     projRows = (((await pq).data ?? []) as any[]).filter((p) => !(p.area_id && hidden.areas.has(p.area_id)));
   }
 
-  // A project-only rail must not pay for a listings query it will discard.
-  const { data: lData } = only === "project" ? { data: [] as any[] } : await lq;
+  // A project-only rail must not pay for a listings query it will discard, and
+  // neither must a boosted-only one.
+  const { data: lData } = only === "project" || onlyBoosted ? { data: [] as any[] } : await lq;
   let listings = ((lData ?? []) as any[]).filter(
     (l) => !hidden.types.has(l.type_code) && !(l.area_id && hidden.areas.has(l.area_id)),
   );
@@ -338,7 +352,10 @@ export async function getFeed(
   // Nothing repeats, and a boost that did not fit on page 1 still gets its turn
   // on page 2 instead of being dropped — it was paid for.
   const boosted = cands.filter((c) => c.boost !== null).sort((a, b) => (a.boost ?? 0) - (b.boost ?? 0));
-  const organic = cands.filter((c) => c.boost === null);
+  // A boosted-only rail has no organic tail. The queries that would have
+  // produced one were skipped above; this keeps the sort and cursor code below
+  // on the single path instead of forking it.
+  const organic = onlyBoosted ? [] : cands.filter((c) => c.boost === null);
 
   organic.sort((a, b) => {
     // A type rail is one carousel of both kinds: after the boosted cards come
@@ -398,7 +415,7 @@ export async function getFeed(
 
   const projectIdsOnPage = page.filter((c) => c.kind === "project").map((c) => c.row.id);
 
-  const [{ data: profs }, { data: vers }, photosByListing, savedSet, unitsByProject, typeLabels, propTypes, fieldDefs, unitLabels] = await Promise.all([
+  const [{ data: profs }, { data: vers }, photosByListing, savedSet, unitsByProject, typeLabels, propTypes, fieldDefs, factCfg] = await Promise.all([
     // Projects publish the builder's number by design (Doc2 §6) — the same rule
     // the project detail runs on. It is selected here so the card's Call and
     // WhatsApp are real actions instead of a button that opens `tel:`.
@@ -412,13 +429,13 @@ export async function getFeed(
     // masters are already cached loaders — the card never spells an option out.
     propertyTypeLabels(),
     getFieldDefinitions(),
-    areaUnitLabelMap(),
+    factConfigs(),
   ]);
 
   const profMap = new Map<string, any>((profs ?? []).map((p: any) => [p.id, p]));
   const verifiedSet = new Set(((vers ?? []) as { profile_id: string }[]).map((v) => v.profile_id));
 
-  const items = page.map((c) => toCard(c, profMap, verifiedSet, photosByListing, savedSet, unitsByProject, typeLabels, propTypes, fieldDefs, unitLabels, rank, viewerId));
+  const items = page.map((c) => toCard(c, profMap, verifiedSet, photosByListing, savedSet, unitsByProject, typeLabels, propTypes, fieldDefs, factCfg, rank, viewerId));
 
   return { items, nextCursor, sections: [{ label: null, items }] };
 }
@@ -469,7 +486,9 @@ async function fetchBoostedRows(
   if (listingIds.length) {
     let q = db()
       .from("listings")
-      .select("id,profile_id,type_code,kind,title,price_paise,price_on_request,is_negotiable,area_label,area_id,city_id,cover_url,attributes,area_sqft,created_at,live_at")
+      // `state_id` is not rendered — it is how `boostedCount` tells a boosted row
+      // the rail's count already covers from one reaching in from outside it.
+      .select("id,profile_id,type_code,kind,title,price_paise,price_on_request,is_negotiable,area_label,area_id,city_id,state_id,cover_url,attributes,area_sqft,created_at,live_at")
       .in("id", listingIds)
       .eq("status", "live")
       .eq("availability", "available");
@@ -496,6 +515,69 @@ async function fetchBoostedRows(
   return {
     listings: ((lRes.data ?? []) as any[]).filter(inScope),
     projects: ((pRes.data ?? []) as any[]).filter(inScope),
+  };
+}
+
+/**
+ * How many boosted subjects this viewer would see right now, in this scope.
+ *
+ * The "Featured properties" rail prints this above itself, so it MUST be the
+ * same set the rail hands out — which is why it goes through the very same
+ * `placementsFor` + `fetchBoostedRows` + not-interested path `getFeed` uses,
+ * rather than counting `boost_placements` rows. A count taken from the boosts
+ * table would include a boost whose listing has since been sold, paused or
+ * hidden by this viewer, and the rail would advertise cards it never shows.
+ */
+export async function boostedCount(
+  viewerId: string | null,
+  scope: FeedScope,
+  filter: FeedFilter = "all",
+): Promise<{
+  properties: number; projects: number; total: number;
+  /**
+   * The boosted rows the SCOPE-WIDE counts do not already include — a boost
+   * targeted at a state or at All India can put a listing from another city on
+   * this rail, and `hz_feed_type_counts` counts only what is inside the scope.
+   * Without this the Newly-added rail printed "1 property in Bhavnagar" over
+   * eight cards, every one of them paid to reach there.
+   */
+  propertiesOutside: number; projectsOutside: number;
+}> {
+  const [placements, hidden] = await Promise.all([
+    placementsFor({ cityId: scope.cityId, stateId: scope.stateId }, ["listing", "project"]),
+    notInterested(viewerId),
+  ]);
+  const rows = await fetchBoostedRows(placements, {
+    cityId: scope.cityId,
+    viewerId,
+    filter,
+    only: null,
+    typeCode: null,
+    projectTypes: null,
+    // Projects only ride the unfiltered feed — the same gate getFeed applies.
+    wantProjects: filter === "all",
+  });
+  const listings = rows.listings.filter(
+    (l) => !hidden.types.has(l.type_code) && !(l.area_id && hidden.areas.has(l.area_id)),
+  );
+  const projects = rows.projects.filter((p) => !(p.area_id && hidden.areas.has(p.area_id)));
+
+  /**
+   * Is this row already inside what the scope-wide count counted? A widened
+   * request counts the whole STATE, an ordinary one counts the city, and a
+   * viewer with no city at all is counted un-scoped — so nothing is outside.
+   */
+  const outside = (row: { city_id: string | null; state_id: string | null }) => {
+    if (!scope.cityId) return false;
+    return scope.widened ? row.state_id !== scope.stateId : row.city_id !== scope.cityId;
+  };
+
+  return {
+    properties: listings.length,
+    projects: projects.length,
+    total: listings.length + projects.length,
+    propertiesOutside: listings.filter(outside).length,
+    projectsOutside: projects.filter(outside).length,
   };
 }
 
@@ -571,6 +653,82 @@ async function propertyTypeLabels(): Promise<Map<string, string>> {
   return new Map(((data ?? []) as { code: string; label: string }[]).map((t) => [t.code, t.label]));
 }
 
+/** What a type asks for and what it puts on the strip — the card's own config. */
+export interface TypeFactConfig {
+  required?: string[];
+  key_specs?: KeySpecCandidate[];
+}
+
+/**
+ * `field_config` per type, for the CARD's facts strip.
+ *
+ * The strip used to be a list written out in this file — one for projects, one
+ * for listings — while the detail screen and the story viewer both built theirs
+ * from `field_config.key_specs` (migration 0071). Three surfaces, two rules: a
+ * Shop scheme showed "Towers / Floors / Total units / Available" on the card and
+ * a different set on its own detail page, and when a builder had filled only one
+ * of those four the card drew a single tile floating in a full-width grey strip
+ * (Rajan, 8 Aug 2026 — "aama blank show thay che").
+ *
+ * Both card builders now read this, so all four surfaces answer to the same
+ * admin config row.
+ */
+async function typeFactConfigs(table: "property_types" | "project_types"): Promise<Map<string, TypeFactConfig>> {
+  const { data } = await db().from(table).select("code,field_config").eq("is_active", true);
+  return new Map(((data ?? []) as { code: string; field_config: TypeFactConfig | null }[])
+    .map((t) => [t.code, t.field_config ?? {}]));
+}
+
+/**
+ * The candidate list a card's strip is resolved from: the type's REQUIRED
+ * fields first, then its `key_specs`, deduped by field.
+ *
+ * Required-first is Rajan's rule (8 Aug 2026): "listing ma je required details
+ * che MAIN, te show karo" — the fields the form will not let a seller skip are
+ * the ones every card can actually fill, so leading with them is what stops a
+ * strip coming up empty. `key_specs` then supplies the type's nice-to-haves in
+ * the admin's own preference order. Nothing here is a list in code: an admin
+ * editing either array moves every card.
+ *
+ * A required field carries no icon or label of its own, so both come from
+ * `field_definitions` — the same place the form's own label comes from. The
+ * strip renders no icon at all (components/feed/cardChrome FactsStrip), so the
+ * icon is only here to satisfy the shared resolver.
+ */
+function factCandidates(cfg: TypeFactConfig | undefined, defs: FieldDefinitionRow[]): KeySpecCandidate[] {
+  const byKey = new Map(defs.map((d) => [d.key, d]));
+  const seen = new Set<string>();
+  const out: KeySpecCandidate[] = [];
+  for (const key of cfg?.required ?? []) {
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ field: key, label: byKey.get(key)?.label ?? key, icon: "list" });
+  }
+  for (const c of cfg?.key_specs ?? []) {
+    if (seen.has(c.field)) continue;
+    seen.add(c.field);
+    out.push(c);
+  }
+  return out;
+}
+
+/** `resolveKeySpecs` output → what the card's FactsStrip takes. */
+const toFacts = (specs: { label: string; value: string }[]) =>
+  specs.map((s) => ({ label: s.label, value: s.value }));
+
+/** Both masters at once — a page renders both kinds of card. */
+export interface FactConfigs {
+  property: Map<string, TypeFactConfig>;
+  project: Map<string, TypeFactConfig>;
+}
+async function factConfigs(): Promise<FactConfigs> {
+  const [property, project] = await Promise.all([
+    typeFactConfigs("property_types"),
+    typeFactConfigs("project_types"),
+  ]);
+  return { property, project };
+}
+
 /**
  * The project card's fields, for any screen that renders one.
  *
@@ -582,7 +740,7 @@ async function propertyTypeLabels(): Promise<Map<string, string>> {
 export async function projectCardExtras(rows: any[]): Promise<Map<string, Partial<FeedCard>>> {
   const out = new Map<string, Partial<FeedCard>>();
   if (!rows.length) return out;
-  const [units, typeLabels, unitLabels] = await Promise.all([unitsFor(rows.map((r) => r.id)), projectTypeLabels(), areaUnitLabelMap()]);
+  const [units, typeLabels, cfgs, defs] = await Promise.all([unitsFor(rows.map((r) => r.id)), projectTypeLabels(), factConfigs(), getFieldDefinitions()]);
   for (const row of rows) {
     const u = units.get(row.id);
     const band = u?.from != null
@@ -598,7 +756,7 @@ export async function projectCardExtras(rows: any[]): Promise<Map<string, Partia
       possessionLabel: row.possession_date
         ? new Date(row.possession_date).toLocaleDateString("en-IN", { month: "short", year: "numeric" })
         : null,
-      facts: projectFacts(row, u, unitLabels),
+      facts: projectFacts(row, u, cfgs.project.get(row.project_type ?? ""), defs),
     });
   }
   return out;
@@ -627,13 +785,13 @@ export async function previewCard(listingId: string, ownerId: string): Promise<F
   const row = data as any | null;
   if (!row) return null;
 
-  const [{ data: profs }, { data: vers }, photos, propTypes, fieldDefs, unitLabels] = await Promise.all([
+  const [{ data: profs }, { data: vers }, photos, propTypes, fieldDefs, factCfg] = await Promise.all([
     db().from("profiles").select("id,name,username,role,photo_url,phone").eq("id", ownerId),
     db().from("verifications").select("profile_id").eq("level", "phone").eq("status", "approved").eq("profile_id", ownerId),
     photosFor([listingId]),
     propertyTypeLabels(),
     getFieldDefinitions(),
-    areaUnitLabelMap(),
+    factConfigs(),
   ]);
 
   const card = toCard(
@@ -646,7 +804,7 @@ export async function previewCard(listingId: string, ownerId: string): Promise<F
     new Map(),
     propTypes,
     fieldDefs,
-    unitLabels,
+    factCfg,
     new Map(),
     // NOT the owner's own id: `isOwn` would strip the Save control, and the
     // preview exists to show what a BUYER sees.
@@ -677,14 +835,14 @@ export async function previewProjectCard(projectId: string, ownerId: string): Pr
   const row = data as any | null;
   if (!row) return null;
 
-  const [{ data: profs }, { data: vers }, units, typeLabels, propTypes, fieldDefs, unitLabels] = await Promise.all([
+  const [{ data: profs }, { data: vers }, units, typeLabels, propTypes, fieldDefs, factCfg] = await Promise.all([
     db().from("profiles").select("id,name,username,role,photo_url,phone").eq("id", ownerId),
     db().from("verifications").select("profile_id").eq("level", "phone").eq("status", "approved").eq("profile_id", ownerId),
     unitsFor([projectId]),
     projectTypeLabels(),
     propertyTypeLabels(),
     getFieldDefinitions(),
-    areaUnitLabelMap(),
+    factConfigs(),
   ]);
 
   const card = toCard(
@@ -697,7 +855,7 @@ export async function previewProjectCard(projectId: string, ownerId: string): Pr
     typeLabels,
     propTypes,
     fieldDefs,
-    unitLabels,
+    factCfg,
     new Map(),
     // Not the builder's own id — `isOwn` would collapse the action bar to
     // "View Project", and the preview exists to show what a BUYER sees.
@@ -718,86 +876,91 @@ function defLabel(defs: FieldDefinitionRow[], key: string, value: unknown): stri
 }
 
 /**
- * The property card's facts strip. Same rule as the project's: only what this
- * listing actually stored, in a fixed priority, at most four. Every label is a
- * `field_definitions` label and every coded value goes through its options, so
- * "semi" shows as "Semi-furnished" and nothing is spelled out in the component.
+ * The property card's facts strip — the type's own config, required-first.
+ *
+ * Was a hardcoded eleven-field priority list; now the same `field_config`
+ * (`required` then `key_specs`) the detail screen resolves, so the card and the
+ * page it opens show the same facts and an admin owns the order.
+ *
+ * Two things the old list got right and this keeps:
+ *   · BHK and the sqft figure are already CHIPS above the strip, so a tile
+ *     repeating either is dropped — the card said "3 BHK" twice otherwise.
+ *   · `area_sqft` is derived from built-up/carpet, so when that chip is showing
+ *     those two areas are suppressed here for the same reason.
  */
-function propertyFacts(l: any, defs: FieldDefinitionRow[], unitLabels: Record<string, string>): { label: string; value: string }[] {
+function propertyFacts(
+  l: any,
+  defs: FieldDefinitionRow[],
+  cfg: TypeFactConfig | undefined,
+): { label: string; value: string }[] {
   const a = (l.attributes ?? {}) as Record<string, any>;
-  const out: { label: string; value: string }[] = [];
-  const push = (label: string, value: string | null) => { if (value) out.push({ label, value }); };
+  // What the chips above the strip are already saying.
+  const onChips = new Set<string>(["bhk"]);
+  if (l.area_sqft) { onChips.add("builtup_area"); onChips.add("carpet_area"); }
 
-  push("Bathrooms", defLabel(defs, "bathrooms", a.bathrooms));
-  push("Furnishing", defLabel(defs, "furnishing", a.furnishing));
-  // "9 / 12" reads as a floor; the raw 9 does not.
-  if (a.floor != null && a.floor !== "") {
-    push("Floor", a.total_floors != null && a.total_floors !== "" ? `${a.floor} / ${a.total_floors}` : String(a.floor));
-  }
-  push("Facing", defLabel(defs, "facing", a.facing));
-  // A PLOT answers none of the four above, and its one headline number — "5
-  // Vigha" — lives in an `area` control. Without these a land card came back
-  // from the server with an empty strip and no chips at all.
-  // …but not the one the sqft chip is already showing: `area_sqft` is derived
-  // from built-up/carpet, so both together printed "520 sqft" twice on one card.
-  const areaKeys = l.area_sqft ? ["plot_area", "land_area"] : ["plot_area", "land_area", "builtup_area", "carpet_area"];
-  for (const key of areaKeys) {
-    const v = areaValue(a[key], unitLabels);
-    if (v) push(defs.find((d) => d.key === key)?.label ?? key, v);
-  }
-  push("Ownership", defLabel(defs, "ownership_type", a.ownership_type));
-  push("Water", defLabel(defs, "water", a.water));
-  push("Age", defLabel(defs, "age", a.age));
-  push("Parking", a.car_parking ? String(a.car_parking) : null);
-  push("Status", defLabel(defs, "construction_status", a.construction_status));
-  return out.slice(0, 4);
-}
+  const candidates = factCandidates(cfg, defs).filter((c) => !onChips.has(c.field));
+  const specs = resolveKeySpecs(candidates, a, defs);
 
-/** An `area` control's stored { value, unit } → "5 Vigha" / "1,450 sq ft". */
-function areaValue(raw: unknown, labels: Record<string, string>): string | null {
-  if (raw === null || raw === undefined || raw === "") return null;
-  const obj = typeof raw === "object" ? (raw as { value?: unknown; unit?: unknown }) : { value: raw, unit: undefined };
-  const n = typeof obj.value === "number" ? obj.value : Number(obj.value);
-  if (!Number.isFinite(n) || n === 0) return null;
-  return `${n.toLocaleString("en-IN")} ${labels[String(obj.unit ?? "sqft")] ?? labels.sqft ?? "sq ft"}`;
+  const rows = Object.entries(a)
+    .filter(([k, v]) => !onChips.has(k) && v !== null && v !== undefined && v !== "" && typeof v !== "object")
+    .map(([key, v]) => ({
+      key,
+      label: defs.find((d) => d.key === key)?.label ?? key,
+      // A coded answer must reach the tile as its LABEL ("Semi-furnished"), not
+      // as the stored code ("semi") — the same rule the old list applied.
+      value: defLabel(defs, key, v) ?? String(v),
+      group: null as string | null,
+    }));
+  return toFacts(topUpSpecs(specs, rows, undefined));
 }
 
 /**
- * Area-unit labels, from `area_units` (migration 0068) — the same rows the form
- * renders its unit picker from. Cached per process: it is master data of seven
- * rows, and a feed page would otherwise re-read it for every card.
+ * The project card's facts strip — the type's own config, required-first.
+ *
+ * Was a hardcoded seven-field list (Plots / Towers / Floors / Total units /
+ * Available / Site area / Open area) that ignored `project_types.field_config`
+ * entirely, while the detail screen and the story viewer read it. Same builder
+ * as those two now (`resolveKeySpecs` + `topUpSpecs`), so a card and the page it
+ * opens can no longer disagree, and an admin reordering `key_specs` moves both.
+ *
+ * The four `source: 'column'` candidates (towers/floors/total_units/
+ * available_units) live on the ROW rather than in `attributes`, so they are
+ * merged into the value map exactly as `projectDTO` merges them — a config entry
+ * can name a column or an attribute without this knowing the difference.
  */
-let areaUnitLabels: Record<string, string> | null = null;
-async function areaUnitLabelMap(): Promise<Record<string, string>> {
-  if (areaUnitLabels) return areaUnitLabels;
-  const units = await getAreaUnits();
-  areaUnitLabels = Object.fromEntries(units.map((u) => [u.code, u.label]));
-  return areaUnitLabels;
-}
-
-/** Facts strip — built ONLY from values the builder actually filled in. */
-function projectFacts(row: any, units: ProjectUnits | undefined, unitLabels: Record<string, string>): { label: string; value: string }[] {
+function projectFacts(
+  row: any,
+  units: ProjectUnits | undefined,
+  cfg: TypeFactConfig | undefined,
+  defs: FieldDefinitionRow[],
+): { label: string; value: string }[] {
   const attrs = (row.attributes ?? {}) as Record<string, any>;
-  const num = (v: unknown) => (typeof v === "number" ? v : typeof v === "string" && v.trim() !== "" && !Number.isNaN(Number(v)) ? Number(v) : null);
-  // `area` controls store { value, unit } (migration 0055's shape).
-  // The form's unit <select> defaults to sq ft and only writes `unit` once the
-  // builder touches it, so an absent unit means sq ft — not "unknown".
-  const land = areaValue(attrs.project_land_area, unitLabels);
-
-  const out: { label: string; value: string }[] = [];
-  const push = (label: string, value: number | null, fmt?: (n: number) => string) => {
-    if (value == null || Number.isNaN(value)) return;
-    out.push({ label, value: fmt ? fmt(value) : value.toLocaleString("en-IN") });
+  const values: Record<string, unknown> = {
+    ...attrs,
+    towers: row.towers,
+    floors: row.floors,
+    total_units: row.total_units,
+    // The count the builder typed, or — when they left it blank — the one the
+    // unit rows actually add up to. This is the "8 Available" on the card Rajan
+    // photographed, and it is the only fact that scheme had.
+    available_units: row.available_units ?? units?.available ?? null,
   };
-  push("Plots", num(attrs.total_plots));
-  push("Towers", num(row.towers));
-  push("Floors", num(row.floors));
-  push("Total units", num(row.total_units));
-  push("Available", row.available_units != null ? num(row.available_units) : units?.available ?? null);
-  if (land) out.push({ label: "Site area", value: land });
-  push("Open area", num(attrs.open_area_percent), (n) => `${n}%`);
-  return out.slice(0, 4);
+
+  const specs = resolveKeySpecs(factCandidates(cfg, defs), values, defs);
+  // Still short? Borrow from what the scheme DID answer, in the config's own
+  // order — `topUpSpecs` skips yes/no rows and long prose, so an amenity never
+  // lands in a tile (Rajan: "amenity jevi details show na karta").
+  const rows = Object.entries(values)
+    .filter(([, v]) => v !== null && v !== undefined && v !== "" && typeof v !== "object")
+    .map(([key, v]) => ({
+      key,
+      label: defs.find((d) => d.key === key)?.label ?? key,
+      value: String(v),
+      group: null as string | null,
+    }));
+  return toFacts(topUpSpecs(specs, rows, undefined));
 }
+
 
 function toCard(
   c: { row: any; kind: "property" | "project" },
@@ -809,7 +972,7 @@ function toCard(
   typeLabels: Map<string, string>,
   propTypeLabels: Map<string, string>,
   fieldDefs: FieldDefinitionRow[],
-  unitLabels: Record<string, string>,
+  factCfg: FactConfigs,
   boostRank: Map<string, number>,
   viewerId: string | null,
 ): FeedCard {
@@ -844,7 +1007,7 @@ function toCard(
       possessionLabel: c.row.possession_date
         ? new Date(c.row.possession_date).toLocaleDateString("en-IN", { month: "short", year: "numeric" })
         : null,
-      facts: projectFacts(c.row, u, unitLabels),
+      facts: projectFacts(c.row, u, factCfg.project.get(c.row.project_type ?? ""), fieldDefs),
       // Doc2 §6 makes a builder's number public on a project — the detail
       // screen already returns it. It is still withheld from GUESTS here, so a
       // logged-out scrape of the feed cannot harvest builder numbers in bulk;
@@ -895,7 +1058,7 @@ function toCard(
     title: l.title ?? undefined,
     meta, metaChips, listingKind: l.kind, typeCode: l.type_code,
     typeLabel: l.type_code ? propTypeLabels.get(l.type_code) ?? null : null,
-    facts: propertyFacts(l, fieldDefs, unitLabels),
+    facts: propertyFacts(l, fieldDefs, factCfg.property.get(l.type_code ?? "")),
   };
 }
 
@@ -1054,28 +1217,8 @@ export async function activeFeedBanner(viewer: BannerViewer = {}): Promise<FeedB
   };
 }
 
-/** "Suggested for you" strip (Doc7 §81) — a small area/recency set, mini cards. */
-export async function suggested(
-  viewerId: string | null,
-  pickedCityId?: string | null,
-  /**
-   * A scope the caller has already resolved. The server-rendered first paint
-   * (lib/feed/initial) asks for the rails and this strip together, and resolving
-   * the same city twice put four avoidable round trips on the critical path.
-   */
-  presetScope?: FeedScope,
-): Promise<{ id: string; coverUrl: string | null; price: string; areaLabel: string | null }[]> {
-  const scope = presetScope ?? (await feedScope(viewerId, pickedCityId ?? null));
-  let q = db().from("listings")
-    .select("id,cover_url,price_paise,price_on_request,area_label")
-    .eq("status", "live").eq("availability", "available")
-    .order("created_at", { ascending: false }).limit(8);
-  q = applyFeedScope(q, scope);
-  if (viewerId) q = q.neq("profile_id", viewerId);
-  const { data } = await q;
-  return ((data ?? []) as any[]).map((l) => ({
-    id: l.id, coverUrl: l.cover_url,
-    price: l.price_on_request ? "On request" : formatShortRupees(l.price_paise),
-    areaLabel: l.area_label,
-  }));
-}
+/**
+ * The "Suggested for you" strip used to live here (Doc7 §81). It was removed on
+ * 8 Aug 2026 with the home-feed reorder: "Newly-added properties" is now a rail
+ * of its own and the strip was the same recency set in a smaller card.
+ */

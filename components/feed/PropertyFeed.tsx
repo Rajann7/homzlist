@@ -8,12 +8,13 @@ import { useToast } from "@/components/ui/Toast";
 import { FeedCard } from "./FeedCard";
 import { ProjectCard } from "./ProjectCard";
 import { PersonCard } from "./PersonCard";
+import { NewsCard } from "./NewsCard";
+import { SellCta } from "./SellCta";
 import { SectionRail } from "./SectionRail";
 import { CaughtUp } from "./primitives";
 import { InquirySheet, MoreSheet, ReportSheet, ShareSheet, LoginSheet } from "./sheets";
 import { feedApi, interactionsApi, type FeedCard as Card, type FeedPerson, type FeedSectionMeta, type FeedInitial } from "@/lib/feed/client";
 import { contactBuilder } from "./contactBuilder";
-import { Img } from "@/components/ui/Img";
 
 export interface PropertyFeedHandle { refresh: () => void; }
 
@@ -21,11 +22,12 @@ export interface PropertyFeedHandle { refresh: () => void; }
  * Property-mode feed (Doc7 §78) — CAROUSELS since 5 Aug 2026 (Rajan).
  *
  * It used to be one endless vertical column of mixed cards. It is now a
- * vertical stack of horizontal rails: New Projects first, then per-type rails
- * with Top Builders / Top Brokers in the middle. What did NOT change is
- * everything else — the same FeedCard and ProjectCard, the same Save / Inquiry
- * / Share / Report / Call / WhatsApp flows, the same login gate for guests, the
- * same server-decided ranking and boosts inside every rail.
+ * vertical stack of horizontal rails: HomzList top picks → Newly-added
+ * properties → Featured Developers → Featured Brokers → Featured properties →
+ * Have a property to sell? → News and Articles (reordered 8 Aug 2026). What did
+ * NOT change is everything else — the same FeedCard and ProjectCard, the same
+ * Save / Inquiry / Share / Report / Call / WhatsApp flows, the same login gate
+ * for guests, the same server-decided ranking and boosts inside every rail.
  *
  * The order, the titles, the counts and which rails exist at all are decided by
  * the server (lib/feed/sections.ts). This component asks "what rails?" and
@@ -83,13 +85,10 @@ export const PropertyFeed = forwardRef<
     const sections = view && view.filter === filter && view.cityId === cityId ? view.list : null;    const [offline, setOffline] = useState(false);
     /**
      * Save state lives here, not in a rail: the same listing can appear in two
-     * rails at once (its type's rail and a boosted slot), and a heart that only
-     * updated the rail you tapped would leave the other one lying.
+     * rails at once (Newly-added and Featured), and a heart that only updated
+     * the rail you tapped would leave the other one lying.
      */
     const [savedOverride, setSavedOverride] = useState<Record<string, boolean>>({});
-    const [suggested, setSuggested] = useState<{ id: string; coverUrl: string | null; price: string; areaLabel: string | null }[]>(
-      primeUsable ? initial!.suggested : [],
-    );
 
     const [inquiryFor, setInquiryFor] = useState<Card | null>(null);
     const [shareFor, setShareFor] = useState<Card | null>(null);
@@ -101,13 +100,9 @@ export const PropertyFeed = forwardRef<
       setPrime(null);
       setView(null);
       setSavedOverride({});
-      // Both at once. "Suggested for you" (Doc7 §81) has nothing to do with the
-      // rails, and awaiting it AFTER them added a whole round trip to a strip
-      // that could have been fetched alongside.
-      const [res, sug] = await Promise.all([feedApi.sections(filter, cityId), feedApi.suggested(cityId)]);
+      const res = await feedApi.sections(filter, cityId);
       if (res.ok) { setView({ filter, cityId, list: res.data.sections }); setOffline(false); }
       else { setOffline(res.error.code === "OFFLINE"); setView({ filter, cityId, list: [] }); }
-      if (sug.ok) setSuggested(sug.data.items);
     }, [filter, cityId]);
 
     useEffect(() => {
@@ -199,8 +194,12 @@ export const PropertyFeed = forwardRef<
 
     return (
       <div>
-        {sections.map((s, i) => (
-          <div key={s.key}>
+        {sections.map((s) =>
+          // The CTA is a block, not a carousel: no cards, no cursor, no lazy
+          // load, so it does not go through SectionRail at all.
+          s.kind === "sell_cta" ? (
+            <SellCta key={s.key} section={s} onStart={() => router.push(s.viewAll)} />
+          ) : (
             <SectionRail
               // key includes the filter/sort so a Buy/Rent tap remounts the
               // rail with fresh state instead of showing the old page.
@@ -214,27 +213,11 @@ export const PropertyFeed = forwardRef<
               initial={prime?.primed?.key === s.key ? prime.primed.page : null}
               renderCard={renderCard}
               renderPerson={(p) => <PersonCard person={p} onOpen={() => openPerson(p)} />}
+              renderPost={(p) => <NewsCard post={p} onOpen={() => router.push(`/blog/${p.slug}`)} />}
               onViewAll={(href) => router.push(href)}
             />
-
-            {/* Suggested strip after the first rail (Doc7 §81) — same mini
-                cards, same endpoint, same destination as before. */}
-            {i === 0 && suggested.length > 0 && (
-              <div className="flex flex-col gap-2 border-b-8 border-surface-2 bg-surface-1 px-4 py-3">
-                <div className="text-13 font-semibold uppercase tracking-[0.3px] text-ink-tertiary">Suggested for you</div>
-                <div className="flex gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                  {suggested.map((s2) => (
-                    <button key={s2.id} onClick={() => router.push(`/property/${s2.id}`)} className="flex w-[104px] shrink-0 flex-col overflow-hidden rounded-8 border border-border bg-surface-1 text-left">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <div className="aspect-square w-full bg-surface-3">{s2.coverUrl && <Img src={s2.coverUrl} alt="" className="h-full w-full object-cover" />}</div>
-                      <div className="p-1.5"><div className="text-13 font-semibold text-ink-primary">{s2.price}</div><div className="truncate text-11 text-ink-tertiary">{s2.areaLabel ?? ""}</div></div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        ))}
+          ),
+        )}
 
         <CaughtUp />
 

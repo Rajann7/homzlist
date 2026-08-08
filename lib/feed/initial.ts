@@ -3,7 +3,6 @@ import { cookies } from "next/headers";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { getFeedSections, getFeedSectionItems } from "./sections";
 import { feedScope } from "./scope";
-import { suggested } from "./service";
 import { GUEST_CITY_COOKIE, parseGuestCity } from "./guest-city-shared";
 import type { FeedInitial } from "./client";
 
@@ -49,16 +48,17 @@ export async function getFeedInitial(): Promise<FeedInitial | null> {
     const guestCity = parseGuestCity((await cookies()).get(GUEST_CITY_COOKIE)?.value ?? null);
     const cityId = guestCity.cityId;
 
-    // ONE scope for the whole prime — the rails, the first rail's cards and
-    // Suggested cannot disagree about which city they are showing.
+    // ONE scope for the whole prime — the rails and the first rail's cards
+    // cannot disagree about which city they are showing.
     const scope = await feedScope(viewerId, cityId);
 
-    const [sections, sug] = await Promise.all([
-      getFeedSections(viewerId, { filter: "all", cityId, scope }),
-      suggested(viewerId, cityId, scope),
-    ]);
+    const sections = await getFeedSections(viewerId, { filter: "all", cityId, scope });
 
-    const first = sections[0] ?? null;
+    // The first rail that actually FETCHES. "Have a property to sell?" is a
+    // block, not a list, so priming it would ship an empty page under a key the
+    // rail component never asks for — and would waste the prime on a screen
+    // whose real first rail then still had to load itself.
+    const first = sections.find((s) => s.kind !== "sell_cta") ?? null;
     const page = first
       ? await getFeedSectionItems(viewerId, first.key, { filter: "all", sort: "latest", scope })
       : null;
@@ -69,7 +69,6 @@ export async function getFeedInitial(): Promise<FeedInitial | null> {
       viewer: viewerId !== null,
       sections,
       primed: first && page ? { key: first.key, page } : null,
-      suggested: sug,
     };
   } catch (err) {
     // A prime is an optimisation, never a dependency: if it throws, the page
