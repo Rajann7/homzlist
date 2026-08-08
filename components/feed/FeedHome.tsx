@@ -9,7 +9,7 @@ import { BuilderDashboard } from "./BuilderDashboard";
 import { NewListingsPill, AdminBanner, type FeedBanner } from "./primitives";
 import { SortSheet } from "./sheets";
 import { Icon } from "@/components/ui/Icon";
-import { storiesApi, feedApi, type StoryCircle } from "@/lib/feed/client";
+import { storiesApi, feedApi, type StoryCircle, type FeedInitial } from "@/lib/feed/client";
 import { apiFetch } from "@/lib/auth/api-fetch";
 import type { CityRow } from "./CitySheet";
 import { cn } from "@/lib/utils";
@@ -44,8 +44,42 @@ function recordBannerShown(id: string, cap: number): void {
  * only after ≥30s on feed) and the Property/Requirement mode split. A BUILDER
  * gets the dashboard variant instead (no foreign listings, no story row).
  */
-export function FeedHome() {
+export function FeedHome({ initial: primed = null }: { initial?: FeedInitial | null }) {
+  /**
+   * The server's first paint, and it is spent the moment it has been painted.
+   *
+   * It has to be dropped after that first commit, not merely on the feed's own
+   * first load: switching to Requirement mode and back unmounts and remounts the
+   * property feed, and a prime that was still on the prop would have handed that
+   * remount the cards as they were when the page was OPENED — a refresh that
+   * silently showed old rows. After the first paint every mount fetches, exactly
+   * as it always did.
+   */
+  const [initial, setInitial] = useState<FeedInitial | null>(primed);
+  useEffect(() => { setInitial(null); }, []);
+  /** Whether that prime was built for a signed-in viewer — see the effect below. */
+  const primedViewer = useRef<boolean | null>(primed ? primed.viewer : null);
+
   const [me, setMe] = useState<{ guest: boolean; role: string | null; cityId: string | null; cityName: string | null } | null>(null);
+  /**
+   * The city the FEED QUERIES run under, as opposed to the one the chip shows.
+   *
+   * It is the guest's pick and nothing else — a signed-in viewer's city lives on
+   * their profile and the server reads it from the session, so sending it is a
+   * no-op (lib/location/viewer-city: the profile always wins). That distinction
+   * is the whole point: this used to be `me.cityId`, which is null until
+   * `/profile/me` answers and then flips to the profile's city — a prop change
+   * that re-ran /feed/sections AND remounted every rail, so the feed fetched
+   * itself twice on every single load for a result that could not differ.
+   *
+   * The server's own answer comes first, and only then the browser's copy. Both
+   * read the same guest-city cookie, but `readGuestCity` needs a `window` and so
+   * returns null while the page is being rendered on the server — taking it
+   * first would have made the server render the skeleton for a guest whose
+   * primed cards the browser then rendered, which is a hydration mismatch as
+   * well as a wasted first paint.
+   */
+  const [scopeCityId, setScopeCityId] = useState<string | null>(() => primed?.cityId ?? readGuestCity().cityId);
   const [stories, setStories] = useState<StoryCircle[] | null>(null);
   const [mode, setMode] = useState<"property" | "requirement">("property");
   const [filter, setFilter] = useState<"buy" | "rent" | "all">("all");
@@ -68,8 +102,13 @@ export function FeedHome() {
    * whatever the city was on first render, and a guest switching city would
    * keep polling the old one. `onCity` writes this before it refreshes, so the
    * very next call already carries the new city.
+   *
+   * It STARTS at the guest's stored city rather than at null. The story row is
+   * loaded from the same effect that loads the profile, so on first paint this
+   * was still null and a guest who had picked Ahmedabad got an unscoped story
+   * row over an Ahmedabad feed until something re-read it.
    */
-  const cityRef = useRef<string | null>(null);
+  const cityRef = useRef<string | null>(scopeCityId);
 
   const loadMe = useCallback(async () => {
     try {
@@ -103,6 +142,21 @@ export function FeedHome() {
   }, []);
 
   useEffect(() => { void loadMe(); void loadStories(); }, [loadMe, loadStories]);
+
+  /**
+   * The server rendered this page's rails before the session was settled. That
+   * is almost always the same answer the client gets — but an access token that
+   * had expired makes the server render the GUEST feed for someone who is signed
+   * in (the client only becomes them after /auth/refresh). Those two feeds
+   * differ: your own listings are never in your own feed. So on a mismatch, and
+   * only on a mismatch, the feed re-loads under the right identity.
+   */
+  useEffect(() => {
+    if (primedViewer.current === null || !me) return;
+    const renderedForViewer = primedViewer.current;
+    primedViewer.current = null; // one answer is all this question has
+    if (renderedForViewer !== !me.guest) feedRef.current?.refresh();
+  }, [me]);
 
   // Admin banner (P2 slot) — DB-driven; renders only when a row is active AND
   // this viewer hasn't already met its frequency cap (0 = every visit, 1 = once
@@ -141,15 +195,26 @@ export function FeedHome() {
   }, []);
 
   const onCity = async (c: CityRow) => {
+    /**
+     * Who re-runs the feed after this switch.
+     *
+     * A GUEST's pick moves `scopeCityId`, and the feed re-loads on that prop by
+     * itself — telling it to refresh as well would fetch the same rails twice.
+     * A signed-in pick changes nothing the feed can see (their city lives on the
+     * profile the server reads), so that one still has to be told.
+     */
+    const scopeMoves = !(me && !me.guest) && c.id !== scopeCityId;
     cityRef.current = c.id;
     setMe((m) => (m ? { ...m, cityId: c.id, cityName: c.name } : m));
     if (me && !me.guest) {
       await apiFetch("/api/v1/profile/me", { method: "PATCH", headers: { "Content-Type": "application/json" }, cache: "no-store", body: JSON.stringify({ cityId: c.id }) });
     } else {
       writeGuestCity(c.id, c.name);
+      setScopeCityId(c.id);
     }
     loadedAt.current = Date.now(); setNewCount(0);
-    feedRef.current?.refresh(); void loadStories();
+    if (!scopeMoves) feedRef.current?.refresh();
+    void loadStories();
   };
 
   const refresh = async () => {
@@ -223,8 +288,8 @@ export function FeedHome() {
             </div>
 
             {mode === "property"
-              ? <PropertyFeed ref={feedRef} filter={filter} sort={sort} guest={me?.guest ?? true} cityId={me?.cityId ?? null} />
-              : <RequirementFeed kind={reqKind} guest={me?.guest ?? true} cityId={me?.cityId ?? null} />}
+              ? <PropertyFeed ref={feedRef} filter={filter} sort={sort} guest={me?.guest ?? true} cityId={scopeCityId} initial={initial} />
+              : <RequirementFeed kind={reqKind} guest={me?.guest ?? true} cityId={scopeCityId} />}
           </>
         )}
       </div>

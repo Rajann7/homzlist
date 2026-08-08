@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
-import { Skeleton } from "@/components/ui/Skeleton";
+import { RequirementCardSkeleton } from "./skeletons";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Checklist } from "@/components/billing/primitives";
@@ -60,7 +60,8 @@ export function RequirementFeed({
   }, [kind, cityId]);
   useEffect(() => { void load(); }, [load]);
 
-  if (!data) return <div className="flex flex-col gap-3 p-4">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-[150px] w-full rounded-12" />)}</div>;
+  // The requirement card's own shape in grey, not three grey blocks.
+  if (!data) return <div className="flex flex-col gap-3 p-4">{[0, 1, 2].map((i) => <RequirementCardSkeleton key={i} />)}</div>;
 
   const total = data.sections.reduce((n, s) => n + s.cards.length, 0);
   if (total === 0) {

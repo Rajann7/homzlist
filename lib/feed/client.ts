@@ -73,6 +73,36 @@ export interface FeedPerson {
 }
 export interface FeedSectionPage { items: FeedCard[]; people: FeedPerson[]; nextCursor: string | null }
 
+/** One of the mini cards in the "Suggested for you" strip (Doc7 §81). */
+export interface SuggestedItem { id: string; coverUrl: string | null; price: string; areaLabel: string | null }
+
+/**
+ * The feed's first paint, rendered on the server and shipped with the page
+ * (lib/feed/initial). It is the answer to the two requests the browser used to
+ * have to make before the first card could exist: which rails, and what is in
+ * the first one.
+ *
+ * `filter` and `cityId` say what it was built for. The client uses it only while
+ * its own view still matches; a Buy/Rent chip or a different city falls back to
+ * the API exactly as before.
+ */
+export interface FeedInitial {
+  filter: string;
+  cityId: string | null;
+  /**
+   * Whether the server built this for a SIGNED-IN viewer. Not identity — just
+   * which of the two feeds it is. An access token lives 15 minutes, so a user
+   * coming back after a break renders as a guest and only becomes themselves
+   * once the client refreshes the token; without this the primed rails would
+   * keep showing them the guest feed (their own listings included, which their
+   * own feed never shows) until something reloaded it.
+   */
+  viewer: boolean;
+  sections: FeedSectionMeta[];
+  primed: { key: string; page: FeedSectionPage } | null;
+  suggested: SuggestedItem[];
+}
+
 /**
  * The GUEST's city, sent with every feed read.
  *

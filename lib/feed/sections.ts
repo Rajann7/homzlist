@@ -112,23 +112,32 @@ function inPlace(text: string, place: string | null): string {
  */
 export async function getFeedSections(
   viewerId: string | null,
-  opts: { filter?: FeedFilter; cityId?: string | null } = {},
+  opts: {
+    filter?: FeedFilter; cityId?: string | null;
+    /**
+     * A scope already resolved by the caller. The server-rendered first paint
+     * (lib/feed/initial) needs the rails AND the first rail's cards in one
+     * response, and resolving the scope twice meant four extra round trips on
+     * the critical path for an answer that cannot differ.
+     */
+    scope?: FeedScope;
+  } = {},
 ): Promise<FeedSectionMeta[]> {
   const filter = opts.filter ?? "all";
-  const scope = await feedScope(viewerId, opts.cityId ?? null);
-  const cityId = scope.cityId;
+  const scope = opts.scope ?? (await feedScope(viewerId, opts.cityId ?? null));
   const city = scope.placeLabel;
 
-  const [counts, hidden, { data: propTypes }, { data: projTypes }] = await Promise.all([
+  // Everything this needs, at once. The seller rails used to be a SECOND
+  // awaited stage after the counts — two queries deep in a screen the user is
+  // staring at a skeleton for. They do not read anything the first stage
+  // produces, so they belong in the same wave.
+  const [counts, hidden, { data: propTypes }, { data: projTypes }, builders, brokers] = await Promise.all([
     typeCounts(scope, viewerId, filter),
     notInterested(viewerId),
     db().from("property_types").select("code,label,sort_order").eq("is_active", true).order("sort_order"),
     db().from("project_types").select("code,label,sort_order,property_type_codes").eq("is_active", true).order("sort_order"),
-  ]);
-
-  // Sellers are ranked over the whole city and only then counted, so a rail
-  // that would show nobody is never announced.
-  const [builders, brokers] = await Promise.all([
+    // Sellers are ranked over the whole city and only then counted, so a rail
+    // that would show nobody is never announced.
     topPeople(viewerId, scope, "builder"),
     topPeople(viewerId, scope, "broker"),
   ]);

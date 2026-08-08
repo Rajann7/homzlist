@@ -1,8 +1,8 @@
 "use client";
 
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useState } from "react";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Skeleton } from "@/components/ui/Skeleton";
+import { RailSkeleton } from "./skeletons";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { useToast } from "@/components/ui/Toast";
 import { FeedCard } from "./FeedCard";
@@ -11,7 +11,7 @@ import { PersonCard } from "./PersonCard";
 import { SectionRail } from "./SectionRail";
 import { CaughtUp } from "./primitives";
 import { InquirySheet, MoreSheet, ReportSheet, ShareSheet, LoginSheet } from "./sheets";
-import { feedApi, interactionsApi, type FeedCard as Card, type FeedPerson, type FeedSectionMeta } from "@/lib/feed/client";
+import { feedApi, interactionsApi, type FeedCard as Card, type FeedPerson, type FeedSectionMeta, type FeedInitial } from "@/lib/feed/client";
 import { contactBuilder } from "./contactBuilder";
 import { Img } from "@/components/ui/Img";
 
@@ -41,20 +41,55 @@ export const PropertyFeed = forwardRef<
      * re-labelled itself and the rails stayed all-India.
      */
     cityId?: string | null;
+    /**
+     * The rails, and the first one's cards, rendered ON THE SERVER with the page
+     * (lib/feed/initial). Used only for the first paint of the default view —
+     * any chip, sort or city change goes back to the API exactly as before.
+     */
+    initial?: FeedInitial | null;
   }
 >(
-  function PropertyFeed({ filter, sort, guest, cityId = null }, ref) {
+  function PropertyFeed({ filter, sort, guest, cityId = null, initial = null }, ref) {
     const router = useRouter();
     const toast = useToast();
-    const [sections, setSections] = useState<FeedSectionMeta[] | null>(null);
-    const [offline, setOffline] = useState(false);
+    /**
+     * Server-primed only while the view still matches what the server rendered.
+     * `filter`/`cityId` are the two things the prime was built for; the moment
+     * either differs, the primed rails are the wrong rails and the normal fetch
+     * has to run.
+     */
+    const primeUsable = initial !== null && initial.filter === filter && (initial.cityId ?? null) === cityId;
+    /**
+     * The prime is ONE-SHOT: `load()` drops it. Without that, a pull-to-refresh
+     * (which empties `sections` and so remounts every rail) would hand the first
+     * rail the server's original cards again and quietly undo the refresh.
+     */
+    const [prime, setPrime] = useState(primeUsable ? initial : null);
+    const skipFirstLoad = useRef(primeUsable);
+    /**
+     * The rails, together with WHAT THEY ARE THE RAILS FOR.
+     *
+     * The pair is stored as one value on purpose. A rail is keyed by
+     * `key:filter:sort:city`, so the render right after a Buy/Rent tap remounts
+     * every rail under the new filter while `sections` is still the old list —
+     * they would each fire a request for a rail that is about to be replaced by
+     * the answer to `/feed/sections` a moment later. Comparing the stored view
+     * against the current props makes that render draw the skeleton instead, so
+     * the tap costs exactly one round trip.
+     */
+    const [view, setView] = useState<{ filter: string; cityId: string | null; list: FeedSectionMeta[] } | null>(
+      primeUsable ? { filter, cityId, list: initial!.sections } : null,
+    );
+    const sections = view && view.filter === filter && view.cityId === cityId ? view.list : null;    const [offline, setOffline] = useState(false);
     /**
      * Save state lives here, not in a rail: the same listing can appear in two
      * rails at once (its type's rail and a boosted slot), and a heart that only
      * updated the rail you tapped would leave the other one lying.
      */
     const [savedOverride, setSavedOverride] = useState<Record<string, boolean>>({});
-    const [suggested, setSuggested] = useState<{ id: string; coverUrl: string | null; price: string; areaLabel: string | null }[]>([]);
+    const [suggested, setSuggested] = useState<{ id: string; coverUrl: string | null; price: string; areaLabel: string | null }[]>(
+      primeUsable ? initial!.suggested : [],
+    );
 
     const [inquiryFor, setInquiryFor] = useState<Card | null>(null);
     const [shareFor, setShareFor] = useState<Card | null>(null);
@@ -63,18 +98,24 @@ export const PropertyFeed = forwardRef<
     const [loginSheet, setLoginSheet] = useState(false);
 
     const load = useCallback(async () => {
-      setSections(null);
+      setPrime(null);
+      setView(null);
       setSavedOverride({});
-      const res = await feedApi.sections(filter, cityId);
-      if (res.ok) { setSections(res.data.sections); setOffline(false); }
-      else { setOffline(res.error.code === "OFFLINE"); setSections([]); }
-      // The "Suggested for you" strip (Doc7 §81) is unchanged — it just sits
-      // after the first rail now instead of after the first card.
-      const sug = await feedApi.suggested(cityId);
+      // Both at once. "Suggested for you" (Doc7 §81) has nothing to do with the
+      // rails, and awaiting it AFTER them added a whole round trip to a strip
+      // that could have been fetched alongside.
+      const [res, sug] = await Promise.all([feedApi.sections(filter, cityId), feedApi.suggested(cityId)]);
+      if (res.ok) { setView({ filter, cityId, list: res.data.sections }); setOffline(false); }
+      else { setOffline(res.error.code === "OFFLINE"); setView({ filter, cityId, list: [] }); }
       if (sug.ok) setSuggested(sug.data.items);
     }, [filter, cityId]);
 
-    useEffect(() => { void load(); }, [load]);
+    useEffect(() => {
+      // The server already rendered this exact view into the page; re-fetching
+      // it on mount would throw away the prime and put the skeletons back.
+      if (skipFirstLoad.current) { skipFirstLoad.current = false; return; }
+      void load();
+    }, [load]);
     useImperativeHandle(ref, () => ({ refresh: () => void load() }), [load]);
 
     const guard = (fn: () => void) => () => { if (guest) { setLoginSheet(true); return; } fn(); };
@@ -133,9 +174,13 @@ export const PropertyFeed = forwardRef<
     };
 
     if (!sections) {
+      // Two whole rails in grey — heading, subtitle, View all and the cards —
+      // so the screen fills in place instead of replacing two blocks with a
+      // completely different layout.
       return (
-        <div className="flex flex-col gap-4 p-4">
-          {[0, 1].map((i) => <Skeleton key={i} className="h-[300px] w-full rounded-12" />)}
+        <div>
+          <RailSkeleton />
+          <RailSkeleton />
         </div>
       );
     }
@@ -164,6 +209,9 @@ export const PropertyFeed = forwardRef<
               filter={filter}
               sort={sort}
               cityId={cityId}
+              // Only the rail the server primed, and only while its cards are
+              // still the right cards for the current chips.
+              initial={prime?.primed?.key === s.key ? prime.primed.page : null}
               renderCard={renderCard}
               renderPerson={(p) => <PersonCard person={p} onOpen={() => openPerson(p)} />}
               onViewAll={(href) => router.push(href)}

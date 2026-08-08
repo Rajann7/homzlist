@@ -1055,8 +1055,17 @@ export async function activeFeedBanner(viewer: BannerViewer = {}): Promise<FeedB
 }
 
 /** "Suggested for you" strip (Doc7 §81) — a small area/recency set, mini cards. */
-export async function suggested(viewerId: string | null, pickedCityId?: string | null): Promise<{ id: string; coverUrl: string | null; price: string; areaLabel: string | null }[]> {
-  const scope = await feedScope(viewerId, pickedCityId ?? null);
+export async function suggested(
+  viewerId: string | null,
+  pickedCityId?: string | null,
+  /**
+   * A scope the caller has already resolved. The server-rendered first paint
+   * (lib/feed/initial) asks for the rails and this strip together, and resolving
+   * the same city twice put four avoidable round trips on the critical path.
+   */
+  presetScope?: FeedScope,
+): Promise<{ id: string; coverUrl: string | null; price: string; areaLabel: string | null }[]> {
+  const scope = presetScope ?? (await feedScope(viewerId, pickedCityId ?? null));
   let q = db().from("listings")
     .select("id,cover_url,price_paise,price_on_request,area_label")
     .eq("status", "live").eq("availability", "available")
