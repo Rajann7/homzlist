@@ -18,27 +18,59 @@ const twMerge = extendTailwindMerge({
 });
 
 /**
- * An absolute URL for a page that only exists on the PUBLIC host.
+ * The origin of the PUBLIC host, from the browser's own address bar.
  *
  * Legal, blog and the rest of the marketing surface are served from
  * homzlist.com; the seller and admin apps are separate subdomains. A bare
- * `/legal/terms` from the seller app therefore resolves to
- * seller.homzlist.com/legal/terms, which the middleware does not serve — it
- * redirects to /login. That is how the Checkout screen ended up telling people
- * "by paying you agree to our Terms" over a link that went to a sign-in page.
+ * `/legal/terms` from the seller app resolves to seller.homzlist.com/legal/terms,
+ * which the middleware does not serve — it redirects to /login. So these links
+ * have to be absolute onto the public host.
  *
- * Always absolute, including on the public host itself: deciding per-host would
- * need `window`, which renders one href on the server and a different one in
- * the browser — a hydration mismatch. These are plain <a> tags either way, so
- * an absolute same-origin URL costs nothing.
+ * DERIVED, not configured. This used to read `NEXT_PUBLIC_APP_URL`, which Next
+ * inlines at BUILD time — so on a deployment where that variable is not set,
+ * every one of these links was literally built as `http://localhost:3000/...`
+ * and shipped that way. Nothing about the running site could correct it.
+ * Stripping the subdomain off the host we are actually on is right on
+ * localhost, on a LAN IP, on a preview URL and on the real domain, with nothing
+ * to configure and nothing to keep in sync.
+ *
+ * The label list matches middleware's `getZone` — those are the only two
+ * non-public hosts, so anything else is already the public host.
  */
-export function publicHref(path: string): string {
-  const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000").replace(/\/$/, "");
-  return `${appUrl}${path}`;
+export function publicOrigin(): string {
+  if (typeof window !== "undefined") {
+    const { protocol, host } = window.location;
+    return `${protocol}//${host.replace(/^(seller|account)\./i, "")}`;
+  }
+  return configuredPublicOrigin();
 }
 
-/** The same thing, named for its first caller. Kept so existing call sites read well. */
-export const legalHref = publicHref;
+/**
+ * The server-render fallback: there is no address bar during SSR.
+ *
+ * `NEXT_PUBLIC_APP_URL` first because local .env.local sets it to the dev
+ * origin; then `NEXT_PUBLIC_SITE_URL`; then the SAME literal default
+ * `lib/seo/schema.ts` `siteUrl()` uses, so a link and the canonical of the page
+ * it points at can never disagree. Defaulting to localhost here is what made an
+ * unconfigured deployment render localhost links — the production domain is the
+ * only sane default for a build with nothing set.
+ */
+export function configuredPublicOrigin(): string {
+  return (process.env.NEXT_PUBLIC_APP_URL ?? process.env.NEXT_PUBLIC_SITE_URL ?? "https://homzlist.com").replace(/\/$/, "");
+}
+
+/**
+ * An absolute URL for a page that only exists on the PUBLIC host.
+ *
+ * Safe inside an event handler, where `window` always exists. For an `href`
+ * RENDERED into markup use `usePublicHref` instead — calling this during render
+ * would produce one string on the server and another in the browser, which is a
+ * hydration mismatch.
+ */
+export function publicHref(path: string): string {
+  return `${publicOrigin()}${path}`;
+}
+
 
 /** Merge conditional class names, de-duplicating conflicting Tailwind classes. */
 export function cn(...inputs: ClassValue[]): string {

@@ -10,7 +10,8 @@ import {
 import { GSTIN_RE } from "@/lib/billing/money";
 import { BackButton, CouponRow, Radio } from "./primitives";
 import { payWithRazorpay, pollOrder } from "./pay";
-import { cn, legalHref } from "@/lib/utils";
+import { cn } from "@/lib/utils";
+import { usePublicOrigin } from "@/lib/hooks/use-public-href";
 
 /**
  * P6 S2 — Checkout.
@@ -43,6 +44,8 @@ export function Checkout() {
   const router = useRouter();
   const params = useSearchParams();
   const toast = useToast();
+  // Legal links leave for the public host — see lib/utils `publicOrigin`.
+  const publicBase = usePublicOrigin();
 
   const planId = params.get("plan") ?? "";
   const listingId = params.get("listing") ?? undefined;
@@ -395,8 +398,8 @@ export function Checkout() {
         )}
         <div className="mt-2.5 text-11 leading-[1.4] text-ink-tertiary">Payments are processed securely by Razorpay.</div>
         <div className="mt-4 text-11 leading-[1.4] text-ink-tertiary">
-          By paying you agree to our <a href={legalHref("/legal/terms")} className="text-accent">Terms</a> and{" "}
-          <a href={legalHref("/legal/refund")} className="text-accent">No-Refund Policy</a>.
+          By paying you agree to our <a href={`${publicBase}/legal/terms`} className="text-accent">Terms</a> and{" "}
+          <a href={`${publicBase}/legal/refund`} className="text-accent">No-Refund Policy</a>.
         </div>
       </div>
 

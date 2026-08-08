@@ -6,7 +6,7 @@ import { absorbOutgoingSession } from "@/lib/auth/account-pool";
 import { completeRegistration, getProfileById } from "@/lib/auth/service";
 import { clientIp, hashIp } from "@/lib/auth/rate-limit";
 import { toUserDTO, TC_VERSION } from "@/lib/auth/dto";
-import { publicEnv } from "@/lib/env";
+import { sellerOrigin } from "@/lib/hosts";
 
 /**
  * POST /api/v1/auth/register (Doc7 §1.4). Authorized ONLY by the register cookie
@@ -73,5 +73,9 @@ export async function POST(req: NextRequest) {
   await setSessionCookies(access, refresh);
   await absorbOutgoingSession(profile.id, outgoing);
 
-  return ok({ user: toUserDTO(profile), redirect: publicEnv.sellerUrl });
+  // Derived from THIS request, not NEXT_PUBLIC_SELLER_URL — that variable is
+  // inlined at build time and defaults to localhost, so an unconfigured
+  // deployment would hand a brand-new account a redirect to the developer's
+  // machine.
+  return ok({ user: toUserDTO(profile), redirect: await sellerOrigin() });
 }
