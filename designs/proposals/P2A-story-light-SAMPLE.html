@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SAMPLE — Story viewer, light — 3 options</title>
+<style>
+  :root{
+    --surface-1:#ffffff; --surface-2:#f5f5f5; --surface-3:#efefef;
+    --divider:#efefef;
+    --ink-primary:#111111; --ink-secondary:#555555; --ink-tertiary:#6e6e6e;
+    --accent:#0f9d58; --accent-pressed:#0c7c46; --accent-soft:#e6f4ec;
+    --warning:#f5a623;
+    --font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  body{font-family:var(--font);background:#e8e8ea;color:var(--ink-primary);padding:28px 16px 60px}
+  .banner{max-width:1240px;margin:0 auto 26px;background:#111;color:#fff;border-radius:14px;padding:16px 20px;font-size:13px;line-height:1.55}
+  .banner b{color:#ffd54f}
+  .rack{display:flex;gap:34px;justify-content:center;flex-wrap:wrap;max-width:1240px;margin:0 auto}
+  .col{width:375px}
+  .cap{font-size:13px;font-weight:700;margin-bottom:4px}
+  .capsub{font-size:12px;color:#555;margin-bottom:12px;line-height:1.5;min-height:52px}
+  .phone{width:375px;height:812px;border-radius:38px;overflow:hidden;position:relative;
+         background:var(--surface-1);box-shadow:0 18px 50px rgba(0,0,0,.18);user-select:none}
+
+  /* ---------- shared chrome ---------- */
+  .bars{position:absolute;top:0;left:0;right:0;display:flex;gap:4px;padding:12px 12px 0;z-index:20}
+  .bar{height:2.5px;flex:1;border-radius:999px;overflow:hidden}
+  .bar > i{display:block;height:100%;border-radius:999px;background:var(--accent)}
+
+  .head{position:absolute;top:0;left:0;right:0;display:flex;align-items:center;gap:10px;
+        padding:24px 12px 0;z-index:20}
+  .av{width:40px;height:40px;border-radius:50%;flex:0 0 40px;display:grid;place-items:center;
+      font-size:14px;font-weight:700;color:#fff;background:linear-gradient(135deg,#0f9d58,#12b06a)}
+  .avring{padding:2px;border-radius:50%;background:linear-gradient(45deg,var(--accent),var(--warning))}
+  .avring > .av{border:2px solid var(--surface-1)}
+  .who{min-width:0;flex:1;display:flex;flex-direction:column;gap:1px}
+  .nm{font-size:13px;font-weight:600;display:flex;align-items:center;gap:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .sub{font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .x{width:44px;height:44px;flex:0 0 44px;display:grid;place-items:center;border:0;background:none;cursor:pointer}
+  .x svg{width:22px;height:22px}
+  .vf{width:14px;height:14px;flex:0 0 14px}
+
+  /* fake photo */
+  .photo{position:absolute;inset:0;background:
+      radial-gradient(120% 80% at 20% 15%,#cfe4d6 0%,transparent 60%),
+      linear-gradient(160deg,#8fb3a2 0%,#6f8f9d 45%,#4a5f72 100%)}
+  .photo:after{content:"";position:absolute;left:8%;right:8%;bottom:32%;height:34%;border-radius:6px;
+      background:linear-gradient(180deg,rgba(255,255,255,.30),rgba(255,255,255,.06));
+      box-shadow:0 22px 50px rgba(0,0,0,.22)}
+
+  /* ---------- card innards (shared) ---------- */
+  .ttl{display:flex;align-items:center;gap:6px;width:100%;border:0;background:none;padding:0;text-align:left;cursor:pointer}
+  .ttl span{flex:1;min-width:0;font-size:15px;font-weight:700;line-height:1.25;
+            white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink-primary)}
+  .metarow{display:flex;align-items:center;gap:6px;margin-top:5px;font-size:11px;color:var(--ink-tertiary);min-width:0}
+  .tag{flex:0 0 auto;border-radius:6px;padding:2px 6px;font-size:10px;font-weight:800;
+       letter-spacing:.4px;text-transform:uppercase;background:var(--accent-soft);color:var(--accent-pressed)}
+  .price{display:flex;align-items:baseline;gap:8px;margin-top:8px;flex-wrap:wrap}
+  .price b{font-size:24px;font-weight:800;letter-spacing:-.5px;line-height:1.1}
+  .price i{font-size:11px;font-weight:600;font-style:normal;color:var(--ink-tertiary)}
+  .specs{display:flex;margin-top:12px;border-radius:12px;background:var(--surface-2);padding:9px 0}
+  .specs > div{flex:1;min-width:0;padding:0 4px;text-align:center}
+  .specs > div + div{border-left:1px solid var(--divider)}
+  .specs .v{display:flex;align-items:center;justify-content:center;gap:4px;font-size:13px;font-weight:700}
+  .specs .v svg{width:13px;height:13px;color:var(--ink-tertiary)}
+  .specs .l{font-size:10px;color:var(--ink-tertiary);margin-top:1px;
+            white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .acts{display:flex;gap:8px;margin-top:14px}
+  .ico{width:44px;height:44px;flex:0 0 44px;display:grid;place-items:center;border-radius:12px;
+       border:1px solid var(--divider);background:var(--surface-1);cursor:pointer}
+  .ico svg{width:19px;height:19px}
+  .ghost{height:44px;flex:1;border-radius:12px;border:1px solid var(--divider);background:var(--surface-1);
+         font:600 13px var(--font);color:var(--ink-primary);cursor:pointer;
+         white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 8px}
+  .cta{height:44px;flex:1.25;border-radius:12px;border:0;background:var(--accent);color:#fff;
+       font:800 15px var(--font);cursor:pointer;box-shadow:0 8px 20px rgba(15,157,88,.28)}
+
+  /* ---------- A · Paper ---------- */
+  .A{background:var(--surface-2)}
+  .A .bars{padding-top:12px}
+  .A .bar{background:rgba(17,17,17,.14)}
+  .A .nm,.A .x svg{color:var(--ink-primary)}
+  .A .sub{color:var(--ink-tertiary)}
+  .A .stage{position:absolute;top:76px;left:12px;right:12px;bottom:12px;border-radius:20px;
+            background:var(--surface-1);box-shadow:0 10px 34px rgba(0,0,0,.10);overflow:hidden;
+            display:flex;flex-direction:column}
+  .A .frame{position:relative;flex:1;min-height:0;background:var(--surface-3);overflow:hidden}
+  .A .frame .photo{border-radius:0}
+  .A .card{padding:14px 14px 16px;background:var(--surface-1)}
+
+  /* ---------- B · Frosted ---------- */
+  .B{background:#0b0b0b}
+  .B .bar{background:rgba(255,255,255,.34)}
+  .B .bar > i{background:#fff}
+  .B .scrim{position:absolute;inset:0 0 auto;height:150px;z-index:10;
+            background:linear-gradient(180deg,rgba(0,0,0,.55),rgba(0,0,0,0))}
+  .B .nm{color:#fff} .B .sub{color:rgba(255,255,255,.72)} .B .x svg{color:#fff}
+  .B .card{position:absolute;left:12px;right:12px;bottom:14px;z-index:20;border-radius:18px;
+           padding:14px 14px 16px;background:rgba(255,255,255,.90);
+           -webkit-backdrop-filter:blur(18px) saturate(1.5);backdrop-filter:blur(18px) saturate(1.5);
+           box-shadow:0 14px 44px rgba(0,0,0,.28)}
+  .B .specs{background:rgba(17,17,17,.05)}
+  .B .ico,.B .ghost{background:rgba(255,255,255,.7);border-color:rgba(17,17,17,.12)}
+
+  /* ---------- C · Sheet ---------- */
+  .C{background:var(--surface-1)}
+  .C .frame{position:absolute;top:0;left:0;right:0;height:60%;background:var(--surface-3);overflow:hidden}
+  .C .bar{background:rgba(255,255,255,.40)}
+  .C .bar > i{background:#fff}
+  .C .scrim{position:absolute;inset:0 0 auto;height:140px;z-index:10;
+            background:linear-gradient(180deg,rgba(0,0,0,.45),rgba(0,0,0,0))}
+  .C .nm{color:#fff} .C .sub{color:rgba(255,255,255,.75)} .C .x svg{color:#fff}
+  .C .sheet{position:absolute;left:0;right:0;bottom:0;top:calc(60% - 20px);z-index:20;
+            background:var(--surface-1);border-radius:22px 22px 0 0;padding:16px 16px 18px;
+            box-shadow:0 -8px 30px rgba(0,0,0,.10);display:flex;flex-direction:column}
+  .C .grab{width:36px;height:4px;border-radius:999px;background:var(--surface-3);margin:0 auto 14px}
+  .C .acts{margin-top:auto}
+  .C .hint{text-align:center;font-size:11px;color:var(--ink-tertiary);margin-top:10px}
+</style>
+</head>
+<body>
+
+<div class="banner">
+  <b>DECIDED 9 Aug 2026 — Rajan chose A · Paper. A is BUILT and live in
+  <code>components/feed/StoryViewer.tsx</code>; B and C are kept below only as the record of what
+  was compared.</b> Three light-mode directions for the P2 story viewer (S4): same content, same
+  gestures, same flow as before — only the skin changed. Nothing in <code>designs/</code> itself was
+  touched. As built, A additionally: shows the property/project photo <b>uncropped</b>
+  (<code>object-contain</code> over a white frame with a soft blurred copy of the same photo behind
+  it), and <b>truncates every long string with an ellipsis</b> — title, price, type badge, area,
+  spec values and labels, poster name.
+</div>
+
+<div class="rack">
+
+  <!-- ============ A ============ -->
+  <div class="col">
+    <div class="cap">A · Paper</div>
+    <div class="capsub">Photo lives inside a white card on a light-grey page. Nothing ever covers the photo,
+      and the facts sit on plain white. Calmest, most "listing app", least Instagram.</div>
+    <div class="phone A">
+      <div class="bars">
+        <div class="bar"><i style="width:100%"></i></div>
+        <div class="bar"><i style="width:62%"></i></div>
+        <div class="bar"><i style="width:0"></i></div>
+      </div>
+      <div class="head">
+        <span class="avring"><span class="av">HD</span></span>
+        <span class="who">
+          <span class="nm">Hardik Detroja
+            <svg class="vf" viewBox="0 0 24 24" fill="var(--accent)"><path d="M12 2l2.4 1.8 3 .2.9 2.9 2.2 2-1.2 2.8 1.2 2.8-2.2 2-.9 2.9-3 .2L12 22l-2.4-1.8-3-.2-.9-2.9-2.2-2L4.7 12 3.5 9.2l2.2-2 .9-2.9 3-.2L12 2z"/><path d="M10.6 15.2l-3-3 1.3-1.3 1.7 1.7 4-4L16 9.9l-5.4 5.3z" fill="#fff"/></svg>
+          </span>
+          <span class="sub">4d ago · Ramdevpir Chowk 16, Rajkot</span>
+        </span>
+        <button class="x"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+      </div>
+
+      <div class="stage">
+        <div class="frame"><div class="photo"></div></div>
+        <div class="card">
+          <button class="ttl"><span>Shop, Kasturbadham</span>
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--ink-tertiary)" stroke-width="2.4" stroke-linecap="round"><path d="M9 5l7 7-7 7"/></svg>
+          </button>
+          <div class="metarow"><span class="tag">Shop</span><span>Ramdevpir Chowk 16, Rajkot</span></div>
+          <div class="price"><b>₹1.4 Cr</b><i>Negotiable</i></div>
+          <div class="specs">
+            <div><div class="v"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>3,700</div><div class="l">Carpet</div></div>
+            <div><div class="v">16</div><div class="l">Frontage ft</div></div>
+            <div><div class="v">3+</div><div class="l">Washrooms</div></div>
+            <div><div class="v">14/16</div><div class="l">Floor</div></div>
+          </div>
+          <div class="acts">
+            <button class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="var(--ink-primary)" stroke-width="2" stroke-linejoin="round"><path d="M6 3h12v18l-6-4.5L6 21z"/></svg></button>
+            <button class="ghost">View property</button>
+            <button class="cta">Send Inquiry</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ B ============ -->
+  <div class="col">
+    <div class="cap">B · Frosted light</div>
+    <div class="capsub">Today's layout, inverted: photo edge-to-edge, but the bottom card is frosted
+      <em>white</em> with dark ink instead of frosted black. Closest to what you have now — smallest jump.</div>
+    <div class="phone B">
+      <div class="photo"></div>
+      <div class="scrim"></div>
+      <div class="bars">
+        <div class="bar"><i style="width:100%"></i></div>
+        <div class="bar"><i style="width:62%"></i></div>
+        <div class="bar"><i style="width:0"></i></div>
+      </div>
+      <div class="head">
+        <span class="avring"><span class="av">HD</span></span>
+        <span class="who">
+          <span class="nm">Hardik Detroja
+            <svg class="vf" viewBox="0 0 24 24" fill="#fff"><path d="M12 2l2.4 1.8 3 .2.9 2.9 2.2 2-1.2 2.8 1.2 2.8-2.2 2-.9 2.9-3 .2L12 22l-2.4-1.8-3-.2-.9-2.9-2.2-2L4.7 12 3.5 9.2l2.2-2 .9-2.9 3-.2L12 2z"/><path d="M10.6 15.2l-3-3 1.3-1.3 1.7 1.7 4-4L16 9.9l-5.4 5.3z" fill="#0f9d58"/></svg>
+          </span>
+          <span class="sub">4d ago · Ramdevpir Chowk 16, Rajkot</span>
+        </span>
+        <button class="x"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+      </div>
+
+      <div class="card">
+        <button class="ttl"><span>Shop, Kasturbadham</span>
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--ink-tertiary)" stroke-width="2.4" stroke-linecap="round"><path d="M9 5l7 7-7 7"/></svg>
+        </button>
+        <div class="metarow"><span class="tag">Shop</span><span>Ramdevpir Chowk 16, Rajkot</span></div>
+        <div class="price"><b>₹1.4 Cr</b><i>Negotiable</i></div>
+        <div class="specs">
+          <div><div class="v">3,700</div><div class="l">Carpet</div></div>
+          <div><div class="v">16</div><div class="l">Frontage ft</div></div>
+          <div><div class="v">3+</div><div class="l">Washrooms</div></div>
+          <div><div class="v">14/16</div><div class="l">Floor</div></div>
+        </div>
+        <div class="acts">
+          <button class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="var(--ink-primary)" stroke-width="2" stroke-linejoin="round"><path d="M6 3h12v18l-6-4.5L6 21z"/></svg></button>
+          <button class="ghost">View property</button>
+          <button class="cta">Send Inquiry</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ C ============ -->
+  <div class="col">
+    <div class="cap">C · Sheet</div>
+    <div class="capsub">Photo on top, a solid white sheet below it — no overlay at all, so the photo is
+      never covered and the price never fights the picture. Most legible; most premium in light mode.</div>
+    <div class="phone C">
+      <div class="frame"><div class="photo"></div></div>
+      <div class="scrim"></div>
+      <div class="bars">
+        <div class="bar"><i style="width:100%"></i></div>
+        <div class="bar"><i style="width:62%"></i></div>
+        <div class="bar"><i style="width:0"></i></div>
+      </div>
+      <div class="head">
+        <span class="avring"><span class="av">HD</span></span>
+        <span class="who">
+          <span class="nm">Hardik Detroja
+            <svg class="vf" viewBox="0 0 24 24" fill="#fff"><path d="M12 2l2.4 1.8 3 .2.9 2.9 2.2 2-1.2 2.8 1.2 2.8-2.2 2-.9 2.9-3 .2L12 22l-2.4-1.8-3-.2-.9-2.9-2.2-2L4.7 12 3.5 9.2l2.2-2 .9-2.9 3-.2L12 2z"/><path d="M10.6 15.2l-3-3 1.3-1.3 1.7 1.7 4-4L16 9.9l-5.4 5.3z" fill="#0f9d58"/></svg>
+          </span>
+          <span class="sub">4d ago · Ramdevpir Chowk 16, Rajkot</span>
+        </span>
+        <button class="x"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+      </div>
+
+      <div class="sheet">
+        <div class="grab"></div>
+        <button class="ttl"><span>Shop, Kasturbadham</span>
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--ink-tertiary)" stroke-width="2.4" stroke-linecap="round"><path d="M9 5l7 7-7 7"/></svg>
+        </button>
+        <div class="metarow"><span class="tag">Shop</span><span>Ramdevpir Chowk 16, Rajkot</span></div>
+        <div class="price"><b>₹1.4 Cr</b><i>Negotiable</i></div>
+        <div class="specs">
+          <div><div class="v">3,700</div><div class="l">Carpet</div></div>
+          <div><div class="v">16</div><div class="l">Frontage ft</div></div>
+          <div><div class="v">3+</div><div class="l">Washrooms</div></div>
+          <div><div class="v">14/16</div><div class="l">Floor</div></div>
+        </div>
+        <div class="acts">
+          <button class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="var(--ink-primary)" stroke-width="2" stroke-linejoin="round"><path d="M6 3h12v18l-6-4.5L6 21z"/></svg></button>
+          <button class="ghost">View property</button>
+          <button class="cta">Send Inquiry</button>
+        </div>
+        <div class="hint">Swipe up for full details</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>
