@@ -8,6 +8,7 @@ import { useRole } from "@/components/nav/RoleContext";
 import { NetworkStatus } from "@/components/pwa/NetworkStatus";
 import { ScrollRestore } from "@/components/nav/ScrollRestore";
 import { FeedHeader } from "./FeedHeader";
+import { KeyboardInset } from "@/components/nav/KeyboardInset";
 import { CitySheet, type CityRow } from "./CitySheet";
 
 /**
@@ -74,7 +75,31 @@ export function FeedShell({
 
   return (
     <CityPickerContext.Provider value={openCityPicker}>
-    <div className="mx-auto flex h-[100dvh] w-full max-w-column flex-col bg-surface-1">
+    {/*
+      Sized and clipped exactly like AppShell, which every OTHER screen uses.
+      This one was `h-[100dvh]` with no `overflow-hidden` and no keyboard inset,
+      and both halves of that hid the bottom nav (Rajan, 9 Aug 2026 — "bottom
+      nav amuk time hide thay jay che, kyak click thay jay che to"):
+
+        · WITHOUT `overflow-hidden`, a single sub-pixel of rounding makes the
+          DOCUMENT scrollable — measured at 1px here. The shell is a fixed
+          100dvh box, so once the document scrolls, the whole box (nav included)
+          slides off the bottom. Any tap that focuses something then scrolls it
+          there by itself, which is why it looked random.
+
+        · `100dvh` does NOT shrink when the on-screen keyboard opens on iOS or
+          Android (see KeyboardInset) — the keyboard overlays the page. So
+          tapping any input (the city sheet's search, an inquiry box) left the
+          shell full height with its last 52px underneath the keyboard.
+
+      `--kbd` is published by KeyboardInset, which AppShell mounts for its own
+      screens; the feed does not go through AppShell, so it mounts it too.
+    */}
+    <div
+      className="mx-auto flex w-full max-w-column flex-col overflow-hidden bg-surface-1"
+      style={{ height: "calc(100dvh - var(--kbd, 0px))" }}
+    >
+      <KeyboardInset />
       <FeedHeader
         compact={compact}
         cityName={cityName}
