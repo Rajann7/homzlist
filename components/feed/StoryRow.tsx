@@ -1,19 +1,39 @@
 "use client";
 
+import { useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Avatar } from "@/components/ui/Avatar";
 import { Icon } from "@/components/ui/Icon";
 import { Skeleton } from "@/components/ui/Skeleton";
 import type { StoryCircle } from "@/lib/feed/client";
+import { setStoryHandoff } from "@/lib/feed/story-handoff";
 import { cn } from "@/lib/utils";
 
 /**
  * P2 story row (Doc2 §9.3) — auto-generated circles ONLY. Ring types come from
  * the server (unseen / seen / project / boosted); there is NO "add story" / "your
  * story" circle and no create path anywhere. 24px edge-fade both sides.
+ *
+ * Opening is warmed on POINTER-DOWN, ~100ms before the tap completes, because
+ * the tap itself used to start three cold things at once — the route's RSC
+ * payload, the circle list, and the first photo — and the viewer sat black
+ * until all three landed. Nothing here changes what the row looks like or where
+ * it goes; it only starts the same work earlier and hands the viewer the list
+ * it already has (lib/feed/story-handoff).
  */
 export function StoryRow({ circles, loading, basePath = "/story" }: { circles: StoryCircle[]; loading?: boolean; basePath?: string }) {
   const router = useRouter();
+  /** Warm once per circle per row — pointerdown can fire repeatedly on a drag. */
+  const warmed = useRef<Set<string>>(new Set());
+
+  const warm = useCallback((c: StoryCircle) => {
+    if (warmed.current.has(c.posterId)) return;
+    warmed.current.add(c.posterId);
+    router.prefetch(`${basePath}/${c.posterId}`);
+    // Decode the first frame while the finger is still down.
+    const cover = c.segments[0]?.cover;
+    if (cover) { const img = new Image(); img.decoding = "async"; img.src = cover; }
+  }, [router, basePath]);
 
   if (loading) {
     return (
@@ -39,7 +59,8 @@ export function StoryRow({ circles, loading, basePath = "/story" }: { circles: S
         {circles.map((c) => (
           <button
             key={c.posterId}
-            onClick={() => router.push(`${basePath}/${c.posterId}`)}
+            onPointerDown={() => warm(c)}
+            onClick={() => { setStoryHandoff(circles); router.push(`${basePath}/${c.posterId}`); }}
             className="flex w-[72px] shrink-0 flex-col items-center gap-1.5"
           >
             <span className="relative">
