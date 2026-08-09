@@ -4453,3 +4453,61 @@ story, boost and detail suites. The real question is whether the project form ca
 legitimately produce an all-null project (→ the story strip needs an empty state)
 or cannot (→ these fixtures are invalid and should be reseeded).
 → **Needs a decision before either fix.**
+
+---
+
+## 9 Aug 2026 — found while fixing the story viewer (out of that fix's scope)
+
+**1. `next build` warns that the `middleware` file convention is deprecated
+(Next 16) — "use `proxy` instead". ATTEMPTED 9 Aug AND REVERTED, ON PURPOSE.**
+The rename itself is trivial (`middleware.ts` → `proxy.ts`, `export async
+function middleware` → `proxy`; nothing else in the app imports it, every other
+mention is a prose comment). It was done, then backed out, because of what the
+migration silently changes underneath:
+
+> `node_modules/next/dist/docs/.../file-conventions/proxy.md` §Runtime —
+> *"Proxy defaults to using the Node.js runtime. The `runtime` config option is
+> not available in Proxy files. Setting the `runtime` config option in Proxy
+> will throw an error."*
+
+Our file runs on the **edge** today — confirmed in the shipped build, whose
+`middleware-manifest.json` entry points at `server/edge/chunks/*`. It verifies
+both the user and the admin session with jose on every request its matcher
+catches, which is nearly all of them. Renaming it therefore does not just rename
+it: it moves the single hottest thing in the request path from edge to Node and
+adds a cold start in front of every page load. That is a latency regression
+bought with nothing but the removal of a build warning — and it directly
+contradicts the decision already locked in `docs/UPGRADE-BASELINE.md`
+("Decisions locked before starting" §1 and "Decisions carried into 16" §1),
+taken during the Next 16 upgrade for exactly this reason.
+→ **Stays `middleware.ts`. Revisit only when Next ships an edge story for
+`proxy`.** Until then the build warning is the correct trade and should be
+treated as expected output, not as a TODO.
+
+**2. A guest feed load fires two requests that always 401 (`/api/v1/profile/me`
+and `/api/v1/auth/refresh`), once per client navigation. HALF FIXED 9 Aug.**
+`/api/v1/auth/refresh` is gone for guests: `lib/auth/api-fetch.ts` treated every
+401 as "maybe the access token just expired" and answered it with a refresh POST,
+so a browser with no refresh cookie re-asked a question the server had already
+answered, on every single screen. A refresh that comes back with an explicit 401
+now latches for the life of the document — the route only 401s when there is no
+usable refresh token (no cookie, or a rotation failure that has just cleared the
+cookies), so after one, there is provably nothing to refresh with. Failures that
+say nothing about the session (offline, 5xx, parse error) deliberately do NOT
+latch, so a signed-in user is never stranded on stale-token errors. Account
+switching is a hard `window.location` navigation, so the latch cannot survive an
+identity change.
+`/api/v1/profile/me` still 401s once per navigation for a guest, and that one is
+kept: it is the app honestly asking who it is talking to, and the 401 IS the
+answer that renders the guest strip. Silencing it would mean a second,
+non-httpOnly session-hint cookie written on login/logout/switch/register — a real
+auth surface change, not a console cleanup.
+→ **Guest console noise halved. The remaining single 401 per navigation is
+expected, not a defect.**
+
+**3. The checked-out `.next` production build was serving HTTP 500 for its own
+JS chunks** (`/_next/static/chunks/*.js` → 500, `MIME type 'text/plain'`), so
+`npm start` rendered the HTML and then never hydrated: every button on the site
+was dead, including the story circles. It was a stale/corrupt build directory,
+not a code fault. Rebuilt on 9 Aug and healthy. Worth recognising the signature —
+"page looks right, nothing is clickable" means the build, not the component.
