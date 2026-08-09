@@ -20,7 +20,16 @@
   /* Ink */
   --ink-primary: #111111;
   --ink-secondary: #555555;
-  --ink-tertiary: #8e8e8e;
+  /* Doc1 said #8e8e8e. Darkened 9 Aug 2026 (Rajan: "ye color dim color hai").
+     This is the caption ink — 11px timestamps, rail subtitles, "8 min read ·
+     12 Jan" — and at #8e8e8e it measured 3.28:1 on white and 3.01:1 on
+     `--surface-2`, both under the 4.5:1 WCAG AA needs for text that size.
+     #6e6e6e clears it on BOTH grounds (5.10:1 / 4.68:1) while staying clearly
+     a step below `--ink-secondary`, so the hierarchy is unchanged.
+     LIGHT ONLY: the dark theme's #8e8e8e already passes (5.72:1 / 5.09:1)
+     because there the contrast runs the other way — darkening it there would
+     be the same mistake in reverse. */
+  --ink-tertiary: #6e6e6e;
   --ink-disabled: #c7c7c7;
   --ink-inverse: #ffffff;
   /* Accent — Trust Green (Option B) */
