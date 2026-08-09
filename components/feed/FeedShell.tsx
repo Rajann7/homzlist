@@ -8,7 +8,6 @@ import { useRole } from "@/components/nav/RoleContext";
 import { NetworkStatus } from "@/components/pwa/NetworkStatus";
 import { ScrollRestore } from "@/components/nav/ScrollRestore";
 import { FeedHeader } from "./FeedHeader";
-import { PullSpinner } from "./primitives";
 import { CitySheet, type CityRow } from "./CitySheet";
 
 /**
@@ -35,10 +34,13 @@ export function FeedShell({
   onCity: (c: CityRow) => void;
   /** Header bell/message counts, both real server queries (Module 10). */
   badges?: { messages: number; notifications: number | null };
-  /** Pull-to-refresh handler (P2). Returns a promise so the spinner can wait on it. */
+  /**
+   * Refresh the feed in place. No longer a pull gesture (removed 9 Aug 2026) —
+   * it is what the "N new listings" pill and a city switch call.
+   */
   onRefresh?: () => void | Promise<void>;
   children: React.ReactNode;
-  /** Optional external ref to the scroll container (feed uses it for pull-to-refresh). */
+  /** Optional external ref to the scroll container (the feed scrolls it to top). */
   scrollRef?: React.RefObject<HTMLDivElement | null>;
 }) {
   const router = useRouter();
@@ -59,34 +61,15 @@ export function FeedShell({
   const [compact, setCompact] = useState(false);
   const [citySheet, setCitySheet] = useState(false);
 
-  // Pull-to-refresh (P2 "pull to refresh indicator"). Only arms at scrollTop 0;
-  // distance is damped so it feels like iOS rubber-banding, and a pull past the
-  // threshold fires onRefresh and spins until it resolves.
-  const THRESHOLD = 64;
-  const startY = useRef<number | null>(null);
-  const [pull, setPull] = useState(0);
-  const [refreshing, setRefreshing] = useState(false);
-
-  const onTouchStart = (e: React.TouchEvent) => {
-    if (!onRefresh || refreshing) return;
-    startY.current = (ref.current?.scrollTop ?? 0) <= 0 ? e.touches[0].clientY : null;
-  };
-  const onTouchMove = (e: React.TouchEvent) => {
-    if (startY.current == null) return;
-    const dy = e.touches[0].clientY - startY.current;
-    if (dy <= 0) { setPull(0); return; }
-    setPull(Math.min(dy * 0.5, THRESHOLD + 24)); // damped
-  };
-  const onTouchEnd = async () => {
-    if (startY.current == null) return;
-    const past = pull >= THRESHOLD;
-    startY.current = null;
-    if (past && onRefresh) {
-      setRefreshing(true); setPull(THRESHOLD);
-      try { await onRefresh(); } finally { setRefreshing(false); setPull(0); }
-    } else setPull(0);
-  };
-
+  /**
+   * Pull-to-refresh was removed on 9 Aug 2026 (Rajan: "upper thi niche swipe
+   * kari aetle insta jevu reload thay che ae remove karo").
+   *
+   * `onRefresh` is NOT gone with it — the "N new listings" pill still calls it,
+   * and so does a city switch, which is where a refresh is a deliberate act
+   * rather than a side effect of scrolling back to the top. What is gone is the
+   * gesture and its spinner.
+   */
   const openCityPicker = useMemo(() => () => setCitySheet(true), []);
 
   return (
@@ -110,13 +93,9 @@ export function FeedShell({
         ref={ref}
         // Design P2 threshold: scrollTop > 60 (was 80 — the header morphed late).
         onScroll={(e) => setCompact((e.target as HTMLDivElement).scrollTop > 60)}
-        onTouchStart={onTouchStart}
-        onTouchMove={onTouchMove}
-        onTouchEnd={onTouchEnd}
         className={cn("flex-1 overflow-y-auto overscroll-contain")}
       >
         <ScrollRestore />
-        <PullSpinner active={refreshing} distance={pull} />
         {children}
       </div>
       {/* Unread count rides the Messages icon (now in the bottom nav). */}

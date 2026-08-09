@@ -103,7 +103,22 @@ export interface FeedInitial {
    */
   viewer: boolean;
   sections: FeedSectionMeta[];
-  primed: { key: string; page: FeedSectionPage } | null;
+  /**
+   * Set when the viewer's chosen city has nothing live and the rails above are
+   * therefore ALL-INDIA. The screen turns it into the notice that says so.
+   */
+  emptyCity: { cityName: string } | null;
+  /**
+   * EVERY fetchable rail's first page, not just the top one (9 Aug 2026 — the
+   * home screen no longer lazy loads anything). Keyed by section, so a rail
+   * picks out its own; a rail missing from here (its query failed) falls back to
+   * fetching itself.
+   */
+  primed: { key: string; page: FeedSectionPage }[];
+  /** The story row, rendered with the page rather than fetched after hydration. */
+  stories: StoryCircle[];
+  /** The home footer's links. Legal pages are `cms_pages` rows, never a list in code. */
+  footer: { legal: { slug: string; title: string }[] };
 }
 
 /**
@@ -119,7 +134,7 @@ const city = (cityId?: string | null): Record<string, string> => (cityId ? { cit
 export const feedApi = {
   /** The rails to draw, in order. Metadata only — each rail loads its own cards. */
   sections: (filter?: string, cityId?: string | null) =>
-    req<{ sections: FeedSectionMeta[] }>(`/feed/sections?${new URLSearchParams({
+    req<{ sections: FeedSectionMeta[]; emptyCity: { cityName: string } | null }>(`/feed/sections?${new URLSearchParams({
       ...(filter && filter !== "all" ? { filter } : {}),
       ...city(cityId),
     }).toString()}`),

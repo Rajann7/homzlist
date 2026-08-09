@@ -11,7 +11,8 @@ import { PersonCard } from "./PersonCard";
 import { NewsCard } from "./NewsCard";
 import { SellCta } from "./SellCta";
 import { SectionRail } from "./SectionRail";
-import { CaughtUp } from "./primitives";
+import { CityEmptyNotice } from "./CityEmptyNotice";
+import { FeedFooter } from "./FeedFooter";
 import { InquirySheet, MoreSheet, ReportSheet, ShareSheet, LoginSheet } from "./sheets";
 import { feedApi, interactionsApi, type FeedCard as Card, type FeedPerson, type FeedSectionMeta, type FeedInitial } from "@/lib/feed/client";
 import { contactBuilder } from "./contactBuilder";
@@ -67,7 +68,34 @@ export const PropertyFeed = forwardRef<
      * rail the server's original cards again and quietly undo the refresh.
      */
     const [prime, setPrime] = useState(primeUsable ? initial : null);
-    const skipFirstLoad = useRef(primeUsable);
+    /**
+     * The view the SERVER already rendered, or null once we have left it.
+     *
+     * This used to be a one-shot `skipFirstLoad` boolean, and it was wrong in a
+     * way that only showed up in the network panel: React StrictMode invokes an
+     * effect twice, so the first pass spent the flag and the second pass fetched
+     * anyway — /feed/sections plus every rail, on every load, over a screen the
+     * server had already filled. Comparing the view instead is idempotent, so
+     * running the effect twice does nothing twice.
+     *
+     * It is cleared the moment a chip or a city takes us off the primed view, so
+     * coming BACK to it fetches properly rather than trusting a prime that no
+     * longer matches what is on screen.
+     */
+    const primedView = useRef(primeUsable ? { filter, cityId } : null);
+    /** This rail's server-rendered page, or null if it has to fetch its own. */
+    const primedFor = (key: string) => prime?.primed.find((p) => p.key === key)?.page ?? null;
+    /**
+     * The footer's links, captured on the FIRST render and kept.
+     *
+     * It cannot read the `initial` prop on later renders: FeedHome deliberately
+     * nulls that prop once the first paint is committed (so a remount refetches
+     * rather than replaying stale cards), which would have taken the footer off
+     * the screen a tick after it appeared. Unlike the rails, these links do not
+     * depend on the filter, the sort or the city — there is nothing for a
+     * refetch to correct — so holding the first answer is right, not stale.
+     */
+    const [footer] = useState(initial?.footer ?? null);
     /**
      * The rails, together with WHAT THEY ARE THE RAILS FOR.
      *
@@ -79,10 +107,18 @@ export const PropertyFeed = forwardRef<
      * against the current props makes that render draw the skeleton instead, so
      * the tap costs exactly one round trip.
      */
-    const [view, setView] = useState<{ filter: string; cityId: string | null; list: FeedSectionMeta[] } | null>(
-      primeUsable ? { filter, cityId, list: initial!.sections } : null,
+    const [view, setView] = useState<{ filter: string; cityId: string | null; list: FeedSectionMeta[]; emptyCity: { cityName: string } | null } | null>(
+      primeUsable ? { filter, cityId, list: initial!.sections, emptyCity: initial!.emptyCity } : null,
     );
-    const sections = view && view.filter === filter && view.cityId === cityId ? view.list : null;    const [offline, setOffline] = useState(false);
+    const current = view && view.filter === filter && view.cityId === cityId ? view : null;
+    const sections = current?.list ?? null;
+    /**
+     * The viewer picked a city we have nothing live in, so every rail above is
+     * all-India. Server-decided (lib/feed/scope), never inferred here from an
+     * empty list.
+     */
+    const emptyCity = current?.emptyCity ?? null;
+    const [offline, setOffline] = useState(false);
     /**
      * Save state lives here, not in a rail: the same listing can appear in two
      * rails at once (Newly-added and Featured), and a heart that only updated
@@ -101,16 +137,18 @@ export const PropertyFeed = forwardRef<
       setView(null);
       setSavedOverride({});
       const res = await feedApi.sections(filter, cityId);
-      if (res.ok) { setView({ filter, cityId, list: res.data.sections }); setOffline(false); }
-      else { setOffline(res.error.code === "OFFLINE"); setView({ filter, cityId, list: [] }); }
+      if (res.ok) { setView({ filter, cityId, list: res.data.sections, emptyCity: res.data.emptyCity }); setOffline(false); }
+      else { setOffline(res.error.code === "OFFLINE"); setView({ filter, cityId, list: [], emptyCity: null }); }
     }, [filter, cityId]);
 
     useEffect(() => {
       // The server already rendered this exact view into the page; re-fetching
-      // it on mount would throw away the prime and put the skeletons back.
-      if (skipFirstLoad.current) { skipFirstLoad.current = false; return; }
+      // it would throw away the prime and put the skeletons back.
+      const p = primedView.current;
+      if (p && p.filter === filter && p.cityId === cityId) return;
+      primedView.current = null;
       void load();
-    }, [load]);
+    }, [load, filter, cityId]);
     useImperativeHandle(ref, () => ({ refresh: () => void load() }), [load]);
 
     const guard = (fn: () => void) => () => { if (guest) { setLoginSheet(true); return; } fn(); };
@@ -194,9 +232,14 @@ export const PropertyFeed = forwardRef<
 
     return (
       <div>
+        {/* Above the rails, because it explains what the rails are showing. */}
+        {emptyCity && (
+          <CityEmptyNotice cityName={emptyCity.cityName} onList={() => router.push("/create")} />
+        )}
+
         {sections.map((s) =>
-          // The CTA is a block, not a carousel: no cards, no cursor, no lazy
-          // load, so it does not go through SectionRail at all.
+          // The CTA is a block, not a carousel: no cards, no cursor, nothing to
+          // fetch, so it does not go through SectionRail at all.
           s.kind === "sell_cta" ? (
             <SellCta key={s.key} section={s} onStart={() => router.push(s.viewAll)} />
           ) : (
@@ -208,9 +251,10 @@ export const PropertyFeed = forwardRef<
               filter={filter}
               sort={sort}
               cityId={cityId}
-              // Only the rail the server primed, and only while its cards are
-              // still the right cards for the current chips.
-              initial={prime?.primed?.key === s.key ? prime.primed.page : null}
+              // The page the server rendered for THIS rail, while its cards are
+              // still the right cards for the current chips. Every rail is
+              // primed now, so in the default view none of them fetches.
+              initial={primedFor(s.key)}
               renderCard={renderCard}
               renderPerson={(p) => <PersonCard person={p} onOpen={() => openPerson(p)} />}
               renderPost={(p) => <NewsCard post={p} onOpen={() => router.push(`/blog/${p.slug}`)} />}
@@ -219,7 +263,8 @@ export const PropertyFeed = forwardRef<
           ),
         )}
 
-        <CaughtUp />
+        {/* Home only — see FeedFooter. Nothing follows it but the fixed nav. */}
+        {footer && <FeedFooter legal={footer.legal} />}
 
         <InquirySheet open={Boolean(inquiryFor)} onClose={() => setInquiryFor(null)} card={inquiryFor} />
         <ShareSheet open={Boolean(shareFor)} onClose={() => setShareFor(null)} card={shareFor} />

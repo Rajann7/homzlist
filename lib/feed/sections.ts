@@ -72,6 +72,20 @@ export interface FeedSectionMeta {
   viewAll: string;
 }
 
+/**
+ * What `/feed/sections` answers: the rails, plus whether this feed had to leave
+ * the viewer's city to find them.
+ *
+ * `emptyCity` is not a second copy of the scope — it is the ONE fact the screen
+ * needs from it. The rails above are all-India when it is set, and the notice
+ * the client draws from it is what stops that being a silent swap (Rajan, 9 Aug
+ * 2026: "tya kevanu che, your city have no listing").
+ */
+export interface FeedSectionsView {
+  sections: FeedSectionMeta[];
+  emptyCity: { cityName: string } | null;
+}
+
 export interface FeedSectionPage {
   items: FeedCard[];
   /** Builder/broker rails carry people instead of cards. */
@@ -97,12 +111,13 @@ const POST_PAGE = 6;
 interface CountRow { scope: string; code: string; n: number }
 
 async function typeCounts(scope: FeedScope, viewerId: string | null, filter: FeedFilter) {
-  // EITHER city OR state, never both (migration 0127) — the widened case has to
-  // count what the widened rails will actually fetch, or a rail would be
-  // announced from a count of 0 and render nothing.
+  // The counts have to be taken over exactly what the rails will fetch, or a
+  // rail gets announced from a count of 0 and renders nothing. A widened
+  // request passes NEITHER a city nor a state: the RPC's `else true` branch
+  // (0127) is the all-India count, which is what `applyFeedScope` now queries.
   const { data, error } = await db().rpc("hz_feed_type_counts", {
     p_city: scope.widened ? null : scope.cityId,
-    p_state: scope.widened ? scope.stateId : null,
+    p_state: null,
     p_viewer: viewerId, p_filter: filter,
   });
   if (error) throw error;
@@ -117,9 +132,10 @@ async function typeCounts(scope: FeedScope, viewerId: string | null, filter: Fee
 /**
  * "12 available in Rajkot" / "12 available" when the viewer has no city set.
  *
- * The place name comes from the SCOPE, not from the viewer's city: a request
- * that widened to the state is showing state-wide cards, so "in Mumbai" over
- * Rajkot inventory would be the label lying about the rows beneath it.
+ * The place name comes from the SCOPE, not from the viewer's city: a widened
+ * request is showing cards from every city in the country, so `placeLabel` is
+ * null there and the count stands on its own — naming Rajkot over Mumbai
+ * inventory would be the label lying about the rows beneath it.
  */
 function inPlace(text: string, place: string | null): string {
   return place ? `${text} in ${place}` : text;
@@ -147,7 +163,7 @@ export async function getFeedSections(
      */
     scope?: FeedScope;
   } = {},
-): Promise<FeedSectionMeta[]> {
+): Promise<FeedSectionsView> {
   const filter = opts.filter ?? "all";
   const scope = opts.scope ?? (await feedScope(viewerId, opts.cityId ?? null));
   const city = scope.placeLabel;
@@ -275,7 +291,12 @@ export async function getFeedSections(
     });
   }
 
-  return out;
+  return {
+    sections: out,
+    // The screen says in words what the scope did silently: this viewer picked a
+    // city we have nothing live in, so every rail above is all-India.
+    emptyCity: scope.widened && scope.cityName ? { cityName: scope.cityName } : null,
+  };
 }
 
 /** An empty page — one shape, so no caller has to remember the third field. */
@@ -381,13 +402,10 @@ async function topPeople(viewerId: string | null, scope: FeedScope, role: "build
   // list. Asking for PEOPLE_SCAN of them means the rail can page through the
   // whole city without a second round trip per page.
   //
-  // A widened request passes the STATE instead of the city (0128 gave profiles
-  // a state_id), so the people rails are scoped exactly like the card rails
-  // beside them — not un-scoped to the whole country.
+  // A widened request passes NO location at all, so the people rails are scoped
+  // exactly like the card rails beside them — all India, not one state.
   const { items } = await searchBrokers(
-    scope.widened
-      ? { stateId: scope.stateId ?? undefined, roles: [role] }
-      : { cityId: scope.cityId ?? undefined, roles: [role] },
+    scope.widened ? { roles: [role] } : { cityId: scope.cityId ?? undefined, roles: [role] },
     viewerId,
     PEOPLE_SCAN,
   );

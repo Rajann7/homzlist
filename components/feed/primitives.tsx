@@ -20,18 +20,11 @@ export function NewListingsPill({ count, onClick }: { count: number; onClick: ()
   );
 }
 
-/** P2 caught-up marker at the feed end. */
-export function CaughtUp({ onNearby }: { onNearby?: () => void }) {
-  return (
-    <div className="flex flex-col items-center gap-1.5 px-6 py-10 text-center">
-      <Icon name="check-circle" size={32} className="text-accent" />
-      <div className="text-15 font-semibold text-ink-primary">You&apos;re all caught up</div>
-      {onNearby && (
-        <button onClick={onNearby} className="text-13 font-semibold text-accent">See listings in nearby areas</button>
-      )}
-    </div>
-  );
-}
+/**
+ * "You are all caught up" used to close the feed here. Removed 9 Aug 2026
+ * (Rajan) — the home screen now ends in its footer, and a "that is everything"
+ * marker above a footer read as the page having failed to load the rest.
+ */
 
 /**
  * P2 admin banner slot — 16:5 strip with dismiss. Content is DB-driven
@@ -75,18 +68,8 @@ export function AdminBanner({ banner, onDismiss, onTap }: { banner: FeedBanner; 
   );
 }
 
-/** Pull-to-refresh spinner shown above the feed while dragging/refreshing. */
-export function PullSpinner({ active, distance }: { active: boolean; distance: number }) {
-  const shown = distance > 4 || active;
-  if (!shown) return null;
-  return (
-    <div className="flex justify-center overflow-hidden" style={{ height: Math.min(distance, 64) }}>
-      <Icon
-        name="refund"
-        size={22}
-        className={cn("mt-2 text-accent", active && "animate-spin")}
-        style={!active ? { transform: `rotate(${distance * 4}deg)` } : undefined}
-      />
-    </div>
-  );
-}
+/**
+ * `PullSpinner` lived here until 9 Aug 2026. It went with the pull-to-refresh
+ * gesture itself (Rajan: "insta jevu reload thay che ae remove karo") — see
+ * FeedShell, which still exposes `onRefresh` for the new-listings pill.
+ */

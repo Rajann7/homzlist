@@ -564,12 +564,13 @@ export async function boostedCount(
 
   /**
    * Is this row already inside what the scope-wide count counted? A widened
-   * request counts the whole STATE, an ordinary one counts the city, and a
-   * viewer with no city at all is counted un-scoped — so nothing is outside.
+   * request counts ALL INDIA and a viewer with no city at all is counted
+   * un-scoped, so in both cases nothing can be outside it; only a city-scoped
+   * count can be reached into from elsewhere by a paid placement.
    */
   const outside = (row: { city_id: string | null; state_id: string | null }) => {
-    if (!scope.cityId) return false;
-    return scope.widened ? row.state_id !== scope.stateId : row.city_id !== scope.cityId;
+    if (!scope.cityId || scope.widened) return false;
+    return row.city_id !== scope.cityId;
   };
 
   return {

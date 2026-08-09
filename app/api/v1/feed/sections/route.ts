@@ -30,8 +30,11 @@ export async function GET(req: NextRequest) {
   try {
   // Guest's city-chip pick; validated server-side and ignored for anyone whose
   // profile already has a city (lib/location/viewer-city).
-    const sections = await getFeedSections(claims?.sub ?? null, { filter, cityId: url.searchParams.get("city") });
-    return ok({ sections });
+    // `emptyCity` rides along: the client has to know the rails widened to all
+    // India so it can say so, and the alternative was a second endpoint for one
+    // boolean the same query already resolved.
+    const view = await getFeedSections(claims?.sub ?? null, { filter, cityId: url.searchParams.get("city") });
+    return ok(view);
   } catch (err) {
     // Doc9 §20: the detail stays in the log, the caller gets a clean code.
     console.error("[feed/sections] failed", err);

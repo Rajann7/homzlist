@@ -3,6 +3,8 @@ import { cookies } from "next/headers";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { getFeedSections, getFeedSectionItems } from "./sections";
 import { feedScope } from "./scope";
+import { getStories } from "./stories";
+import { getLegalIndex } from "@/lib/legal/service";
 import { GUEST_CITY_COOKIE, parseGuestCity } from "./guest-city-shared";
 import type { FeedInitial } from "./client";
 
@@ -12,25 +14,27 @@ import type { FeedInitial } from "./client";
  *
  * What it was: the page shipped an empty shell, the browser downloaded and ran
  * the bundle, THEN asked `/feed/sections` which rails exist, and only then could
- * each rail ask `/feed/section` for its cards. Measured on the dev server,
- * nothing was requested until 1.2s after navigation and the first card landed
- * near 3.5s — three serial waits (HTML → bundle → sections → cards) before a
- * single property was on screen.
+ * each rail ask `/feed/section` for its cards. Three serial waits (HTML →
+ * bundle → sections → cards) before a single property was on screen.
  *
- * What it is now: the server already knows the answer to the first two of those
- * questions, so it answers them in the same response as the HTML. The client
- * renders the rails it was handed, and the first rail's cards are in the markup.
- * Everything after that first paint is untouched — every other rail still lazy
- * loads on scroll, every chip/sort/city change still goes to the API, and the
- * endpoints are unchanged for the PWA and for a client-side navigation.
+ * What it is now (9 Aug 2026 — Rajan: "home page lazy load che ae remove karo,
+ * aakho home page also including story"): the ENTIRE screen is resolved here and
+ * ships in the HTML — the story row, every rail's first page, the empty-city
+ * notice and the footer's links. Nothing on the home screen waits for a second
+ * round trip, and `SectionRail` no longer carries an IntersectionObserver.
  *
- * Nothing viewer-private is primed. Only what a guest could read anonymously
- * goes into the HTML (public cards, public counts) — identity still comes from
- * `/profile/me` on the client, so a cached page can never carry someone's
- * session state.
+ * The rails are resolved in ONE `Promise.all`, so the wall-clock cost is the
+ * slowest rail rather than the sum of them; each is the same query the endpoint
+ * would have run. The endpoints all still exist and still work — a Buy/Rent
+ * chip, a city switch, a sort and the PWA's own navigations go through them
+ * exactly as before. This is the first paint, not a replacement for them.
+ *
+ * Nothing viewer-private is primed beyond what this viewer's own session would
+ * fetch anyway: the cards are the same ones `/feed/section` would return for
+ * them, and identity still comes from `/profile/me` on the client, so the markup
+ * carries no session state of its own.
  */
 
-/** The scope the prime was built under, so the client can tell whether it fits. */
 export async function getFeedInitial(): Promise<FeedInitial | null> {
   try {
     const claims = await getCurrentUser();
@@ -48,27 +52,40 @@ export async function getFeedInitial(): Promise<FeedInitial | null> {
     const guestCity = parseGuestCity((await cookies()).get(GUEST_CITY_COOKIE)?.value ?? null);
     const cityId = guestCity.cityId;
 
-    // ONE scope for the whole prime — the rails and the first rail's cards
+    // ONE scope for the whole prime — the rails, the story row and the cards
     // cannot disagree about which city they are showing.
     const scope = await feedScope(viewerId, cityId);
 
-    const sections = await getFeedSections(viewerId, { filter: "all", cityId, scope });
+    // The rails have to be known before their pages can be fetched; the story
+    // row and the footer do not depend on them, so they ride alongside.
+    const [{ sections, emptyCity }, stories, legal] = await Promise.all([
+      getFeedSections(viewerId, { filter: "all", cityId, scope }),
+      getStories(viewerId, cityId),
+      getLegalIndex(),
+    ]);
 
-    // The first rail that actually FETCHES. "Have a property to sell?" is a
-    // block, not a list, so priming it would ship an empty page under a key the
-    // rail component never asks for — and would waste the prime on a screen
-    // whose real first rail then still had to load itself.
-    const first = sections.find((s) => s.kind !== "sell_cta") ?? null;
-    const page = first
-      ? await getFeedSectionItems(viewerId, first.key, { filter: "all", sort: "latest", scope })
-      : null;
+    // Every rail that actually fetches, at once. "Have a property to sell?" is a
+    // block, not a list, so it has no page to prime.
+    const fetchable = sections.filter((s) => s.kind !== "sell_cta");
+    const pages = await Promise.all(
+      fetchable.map((s) =>
+        getFeedSectionItems(viewerId, s.key, { filter: "all", sort: "latest", scope })
+          // One rail failing must not cost the whole prime: that rail falls back
+          // to fetching itself, exactly as it did before this change.
+          .then((page) => ({ key: s.key, page }))
+          .catch(() => null),
+      ),
+    );
 
     return {
       filter: "all",
       cityId,
       viewer: viewerId !== null,
       sections,
-      primed: first && page ? { key: first.key, page } : null,
+      emptyCity,
+      primed: pages.filter((p): p is NonNullable<typeof p> => p !== null),
+      stories,
+      footer: { legal: legal.map((p) => ({ slug: p.slug, title: p.title })) },
     };
   } catch (err) {
     // A prime is an optimisation, never a dependency: if it throws, the page

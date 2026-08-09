@@ -11,9 +11,13 @@ import { prefetchImages } from "@/lib/pwa/prefetch";
  *
  * Owns four things and nothing else:
  *
- *  1. LAZY LOAD. A feed can have many rails; fetching all of them on mount
- *     would be requests for cards nobody has scrolled to. The rail asks for its
- *     first page only once it is within 400px of the viewport.
+ *  1. ITS FIRST PAGE. Normally that page arrives with the HTML (lib/feed/initial
+ *     primes EVERY rail since 9 Aug 2026 — Rajan: "home page lazy load che ae
+ *     remove karo"), so the rail renders its cards on the first paint with no
+ *     request of its own. The fetch below is the fallback for the cases the
+ *     prime cannot cover: a Buy/Rent chip, a sort, a city switch, or a prime
+ *     that failed. There is deliberately no IntersectionObserver any more —
+ *     nothing on this screen waits to be scrolled to.
  *
  *  2. ENDLESS HORIZONTAL SCROLL. Scrolling near the right edge fetches the next
  *     page with the same cursor the vertical feed used. No cap.
@@ -69,7 +73,6 @@ export function SectionRail({
   const [failed, setFailed] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
 
-  const rootRef = useRef<HTMLElement>(null);
   const railRef = useRef<HTMLDivElement>(null);
   // A primed rail has already "started" — its first page came with the HTML.
   const started = useRef(initial !== null);
@@ -100,39 +103,18 @@ export function SectionRail({
     // fetching the previous city's cards.
   }, [section.key, filter, sort, cityId]);
 
-  // Arm the lazy load. There is deliberately no state reset here: a Buy/Rent
-  // chip tap or a city switch REMOUNTS this rail (the feed keys it by
-  // key+filter+sort), which is React's own way of resetting state on a prop
-  // change — resetting inside the effect would just cascade an extra render.
+  /**
+   * Fetch the first page — but ONLY when the server did not already ship it.
+   *
+   * There is deliberately no state reset here: a Buy/Rent chip tap or a city
+   * switch REMOUNTS this rail (the feed keys it by key+filter+sort), which is
+   * React's own way of resetting state on a prop change — resetting inside the
+   * effect would just cascade an extra render.
+   */
   useEffect(() => {
-    const el = rootRef.current;
-    if (!el || started.current) return;
-
-    // Already on screen at mount → fetch now, without waiting for the observer.
-    // Two reasons this is not just an optimisation: the observer's first
-    // callback costs a frame the top rails do not need to pay, and a document
-    // that is HIDDEN (a background tab, a page restored behind another) does not
-    // report intersections at all — the feed would sit on skeletons until it was
-    // looked at. Everything below the fold still waits, exactly as before.
-    const box = el.getBoundingClientRect();
-    if (box.top < window.innerHeight + 400 && box.bottom > -400) {
-      started.current = true;
-      void loadFirst();
-      return;
-    }
-
-    const io = new IntersectionObserver(
-      (entries) => {
-        if (!entries.some((e) => e.isIntersecting) || started.current) return;
-        started.current = true;
-        void loadFirst();
-      },
-      // Start fetching one screen early so the cards are there by the time the
-      // rail is actually looked at.
-      { rootMargin: "400px 0px" },
-    );
-    io.observe(el);
-    return () => io.disconnect();
+    if (started.current) return;
+    started.current = true;
+    void loadFirst();
   }, [loadFirst]);
 
   const loadMore = useCallback(async () => {
@@ -169,7 +151,7 @@ export function SectionRail({
   const soloCard = !isPeople && !isPosts && items !== null && items.length === 1;
 
   return (
-    <section ref={rootRef} className="border-b-8 border-surface-2 bg-surface-1 py-3.5">
+    <section className="border-b-8 border-surface-2 bg-surface-1 py-3.5">
       <header className="flex items-end gap-2 px-4 pb-2.5">
         <div className="min-w-0 flex-1">
           <h2 className="truncate text-17 font-semibold leading-[1.2] text-ink-primary">{section.title}</h2>

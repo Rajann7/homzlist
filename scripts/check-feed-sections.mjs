@@ -244,6 +244,45 @@ check(!news || news.viewAll === "/blog", "News points at the blog");
 check(!featured || featured.viewAll === "", "Featured ships no View all (nothing to point at that matches it)", featured?.viewAll);
 check(guest.every((s) => s.key === "featured" || s.viewAll), "every other rail has a target");
 
+// ---- the empty city widens to ALL INDIA ------------------------------------
+// Doc4 §9, changed 9 Aug 2026: a city with nothing live used to fall back to the
+// rest of its STATE, which still left a blank feed for a state we have not
+// opened. It now falls back to the whole country, and the screen says so.
+console.log("\n== A city with no inventory ==");
+const { data: emptyRows } = await db.rpc("hz_feed_type_counts", { p_city: null, p_viewer: null, p_filter: "all", p_state: null });
+void emptyRows;
+const { data: cities } = await db.from("locations").select("id,name").eq("level", "city").limit(400);
+let emptyCityRow = null;
+for (const c of cities ?? []) {
+  const [{ count: l }, { count: p }] = await Promise.all([
+    db.from("listings").select("id", { count: "exact", head: true }).eq("status", "live").eq("availability", "available").eq("city_id", c.id),
+    db.from("projects").select("id", { count: "exact", head: true }).eq("status", "live").eq("city_id", c.id),
+  ]);
+  if ((l ?? 0) === 0 && (p ?? 0) === 0) { emptyCityRow = c; break; }
+}
+if (emptyCityRow) {
+  const r = await api(null, `/api/v1/feed/sections?city=${emptyCityRow.id}`);
+  const view = r.json?.data;
+  check(view?.emptyCity?.cityName === emptyCityRow.name,
+    "an empty city reports itself so the screen can say so", `${JSON.stringify(view?.emptyCity)} vs ${emptyCityRow.name}`);
+  const wNewly = view?.sections?.find((s) => s.key === "newly_added");
+  check(wNewly?.total === liveListings,
+    "…and its rails carry the ALL-INDIA count, not one state's", `${wNewly?.total} vs ${liveListings}`);
+  check(!/ in /.test(wNewly?.subtitle ?? " in "),
+    "…with no place name in the subtitle (the cards come from everywhere)", wNewly?.subtitle);
+  const wPage = (await api(null, `/api/v1/feed/section?key=newly_added&city=${emptyCityRow.id}`)).json?.data;
+  check((wPage?.items?.length ?? 0) > 0, "…and it hands out real cards rather than an empty feed", `${wPage?.items?.length}`);
+  // The whole point: no blank screen. Every rail the empty city gets must be
+  // one the un-scoped feed also has.
+  const plainKeys = guest.map((s) => s.key).join(",");
+  check(view?.sections?.map((s) => s.key).join(",") === plainKeys,
+    "…and it gets the same rails an un-scoped visitor gets", view?.sections?.map((s) => s.key).join(","));
+} else {
+  check(true, "no empty city in this dataset to test the all-India fallback with");
+}
+const plain = await api(null, "/api/v1/feed/sections");
+check(plain.json?.data?.emptyCity === null, "a normal (or city-less) visitor reports no empty city", JSON.stringify(plain.json?.data?.emptyCity));
+
 // ---- validation ------------------------------------------------------------
 console.log("\n== Validation ==");
 for (const bad of ["type:flat';drop", "../../etc", "unknown", ""]) {

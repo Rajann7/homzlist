@@ -80,7 +80,14 @@ export function FeedHome({ initial: primed = null }: { initial?: FeedInitial | n
    * well as a wasted first paint.
    */
   const [scopeCityId, setScopeCityId] = useState<string | null>(() => primed?.cityId ?? readGuestCity().cityId);
-  const [stories, setStories] = useState<StoryCircle[] | null>(null);
+  /**
+   * The story row. Primed with the page since 9 Aug 2026 (nothing on home lazy
+   * loads any more), and re-fetched only when the city changes or the
+   * new-listings pill is tapped — the two things that can actually change it.
+   */
+  const [stories, setStories] = useState<StoryCircle[] | null>(primed?.stories ?? null);
+  /** One-shot: the primed row is already on screen, so skip the mount fetch. */
+  const primedStories = useRef(Boolean(primed?.stories));
   const [mode, setMode] = useState<"property" | "requirement">("property");
   const [filter, setFilter] = useState<"buy" | "rent" | "all">("all");
   const [reqKind, setReqKind] = useState<"all" | "sell" | "rent">("all");
@@ -141,7 +148,16 @@ export function FeedHome({ initial: primed = null }: { initial?: FeedInitial | n
     setStories(res.ok ? res.data.circles : []);
   }, []);
 
-  useEffect(() => { void loadMe(); void loadStories(); }, [loadMe, loadStories]);
+  // The profile still has to be asked for (identity is never in the prime), but
+  // the story row already came with the HTML — fetching it again on mount would
+  // be a request for rows the screen is already showing.
+  useEffect(() => {
+    void loadMe();
+    // Read, never consumed: a one-shot flag would be spent by StrictMode's first
+    // pass and the second pass would fetch the row anyway. A city switch calls
+    // `loadStories` directly (see `onCity`), so nothing else needs this effect.
+    if (!primedStories.current) void loadStories();
+  }, [loadMe, loadStories]);
 
   /**
    * The server rendered this page's rails before the session was settled. That
