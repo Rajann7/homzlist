@@ -83,7 +83,11 @@ export function FeedFooter({
                 <button
                   type="button"
                   onClick={() => router.push(`/legal/${p.slug}`)}
-                  className="block w-full truncate text-left text-13 leading-[1.3] text-ink-secondary active:text-accent"
+                  // PRIMARY ink, not secondary. These are the same page titles
+                  // the /legal screen lists, and it draws them in `--ink-primary`
+                  // — anything you TAP is primary; `--ink-secondary` is for
+                  // supporting prose like the tagline above.
+                  className="block w-full truncate text-left text-13 leading-[1.3] text-ink-primary active:text-accent"
                 >
                   {p.title}
                 </button>
