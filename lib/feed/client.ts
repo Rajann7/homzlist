@@ -117,8 +117,12 @@ export interface FeedInitial {
   primed: { key: string; page: FeedSectionPage }[];
   /** The story row, rendered with the page rather than fetched after hydration. */
   stories: StoryCircle[];
-  /** The home footer's links. Legal pages are `cms_pages` rows, never a list in code. */
-  footer: { legal: { slug: string; title: string }[] };
+  /**
+   * The home footer. Both halves are DB-owned: the legal links are `cms_pages`
+   * rows and the tagline is `branding_settings.tagline`, so neither is a string
+   * typed into the component.
+   */
+  footer: { legal: { slug: string; title: string }[]; tagline: string };
 }
 
 /**

@@ -1,14 +1,20 @@
 import type { MetadataRoute } from "next";
+import { getBranding } from "@/lib/branding/service";
 
 /**
- * PWA manifest (Doc6 §8). HomzList placeholder brand — admin-changeable later
- * (Doc1 §12 / Doc7 §181 branding). Served at /manifest.webmanifest.
+ * PWA manifest (Doc6 §8). Served at /manifest.webmanifest.
+ *
+ * The name and description come from `branding_settings` (Doc1 §12 / Doc7 §181)
+ * rather than from literals here — the admin's Branding tab has always written
+ * those rows, and until 9 Aug 2026 nothing read them. This is its own route, so
+ * reading the DB costs nothing that page rendering pays for.
  */
-export default function manifest(): MetadataRoute.Manifest {
+export default async function manifest(): Promise<MetadataRoute.Manifest> {
+  const { appName, tagline } = await getBranding();
   return {
-    name: "HomzList",
-    short_name: "HomzList",
-    description: "Properties without spam calls — Instagram-style real estate listings.",
+    name: appName,
+    short_name: appName,
+    description: `${tagline} — browse flats, plots and projects from owners, brokers and builders.`,
     id: "/",
     start_url: "/",
     scope: "/",

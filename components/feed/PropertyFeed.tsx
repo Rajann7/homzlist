@@ -264,7 +264,7 @@ export const PropertyFeed = forwardRef<
         )}
 
         {/* Home only — see FeedFooter. Nothing follows it but the fixed nav. */}
-        {footer && <FeedFooter legal={footer.legal} />}
+        {footer && <FeedFooter legal={footer.legal} tagline={footer.tagline} />}
 
         <InquirySheet open={Boolean(inquiryFor)} onClose={() => setInquiryFor(null)} card={inquiryFor} />
         <ShareSheet open={Boolean(shareFor)} onClose={() => setShareFor(null)} card={shareFor} />

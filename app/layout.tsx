@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { getBranding } from "@/lib/branding/service";
 import "./globals.css";
 import { ThemeScript } from "@/components/theme/ThemeScript";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
@@ -6,23 +7,33 @@ import { ToastProvider } from "@/components/ui/Toast";
 import { ServiceWorkerRegistrar } from "@/components/pwa/ServiceWorkerRegistrar";
 import { InstallPrompt } from "@/components/pwa/InstallPrompt";
 
-// Brand: HomzList placeholder (admin-changeable later — Doc1 §12).
-export const metadata: Metadata = {
-  title: {
-    default: "HomzList — Properties without spam calls",
-    template: "%s · HomzList",
-  },
-  description:
-    "Instagram-style real estate listings. Browse flats, plots, and projects. Photos and text only — no spam calls.",
-  applicationName: "HomzList",
-  manifest: "/manifest.webmanifest",
-  appleWebApp: { capable: true, statusBarStyle: "default", title: "HomzList" },
-  formatDetection: { telephone: false },
-  icons: {
-    icon: "/icons/icon-192.png",
-    apple: "/icons/apple-touch-icon.png",
-  },
-};
+/**
+ * Brand metadata, from `branding_settings` (Doc1 §12 / Doc7 §181).
+ *
+ * It was three literals — here, in the manifest and in the feed footer — while
+ * the admin's Branding tab wrote rows nothing read. `getBranding` caches for a
+ * minute in-process, so this is not a query per render, and the admin screen's
+ * own promise to the operator is "within 5 minutes".
+ */
+export async function generateMetadata(): Promise<Metadata> {
+  const { appName, tagline } = await getBranding();
+  return {
+    title: {
+      default: `${appName} — ${tagline}`,
+      template: `%s · ${appName}`,
+    },
+    description:
+      `${tagline}. Browse flats, plots and projects from owners, brokers and builders — photos and text only, no spam calls.`,
+    applicationName: appName,
+    manifest: "/manifest.webmanifest",
+    appleWebApp: { capable: true, statusBarStyle: "default", title: appName },
+    formatDetection: { telephone: false },
+    icons: {
+      icon: "/icons/icon-192.png",
+      apple: "/icons/apple-touch-icon.png",
+    },
+  };
+}
 
 export const viewport: Viewport = {
   width: "device-width",

@@ -5,6 +5,7 @@ import { getFeedSections, getFeedSectionItems } from "./sections";
 import { feedScope } from "./scope";
 import { getStories } from "./stories";
 import { getLegalIndex } from "@/lib/legal/service";
+import { getBranding } from "@/lib/branding/service";
 import { GUEST_CITY_COOKIE, parseGuestCity } from "./guest-city-shared";
 import type { FeedInitial } from "./client";
 
@@ -58,10 +59,11 @@ export async function getFeedInitial(): Promise<FeedInitial | null> {
 
     // The rails have to be known before their pages can be fetched; the story
     // row and the footer do not depend on them, so they ride alongside.
-    const [{ sections, emptyCity }, stories, legal] = await Promise.all([
+    const [{ sections, emptyCity }, stories, legal, branding] = await Promise.all([
       getFeedSections(viewerId, { filter: "all", cityId, scope }),
       getStories(viewerId, cityId),
       getLegalIndex(),
+      getBranding(),
     ]);
 
     // Every rail that actually fetches, at once. "Have a property to sell?" is a
@@ -85,7 +87,10 @@ export async function getFeedInitial(): Promise<FeedInitial | null> {
       emptyCity,
       primed: pages.filter((p): p is NonNullable<typeof p> => p !== null),
       stories,
-      footer: { legal: legal.map((p) => ({ slug: p.slug, title: p.title })) },
+      footer: {
+        legal: legal.map((p) => ({ slug: p.slug, title: p.title })),
+        tagline: branding.tagline,
+      },
     };
   } catch (err) {
     // A prime is an optimisation, never a dependency: if it throws, the page
