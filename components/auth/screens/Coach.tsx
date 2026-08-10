@@ -14,7 +14,7 @@ const STEPS = [
   { text: "All inquiries and leads live here" },
 ];
 
-export function Coach({ onDone }: { onDone: () => void }) {
+export function Coach({ city, onDone }: { city?: string; onDone: () => void }) {
   const [step, setStep] = useState(0);
   const s = STEPS[step];
   const last = step === STEPS.length - 1;
@@ -31,7 +31,9 @@ export function Coach({ onDone }: { onDone: () => void }) {
         </div>
         <div className="flex items-center gap-2 px-4 py-2">
           <span className="flex items-center gap-1 rounded-full bg-surface-2 px-3 py-1.5 text-13">
-            <Icon name="pin" size={16} strokeWidth={1.7} /> Rajkot
+            {/* The city this account was just created with — the chip the first
+                coach mark points at. It was hardcoded to "Rajkot". */}
+            <Icon name="pin" size={16} strokeWidth={1.7} /> {city}
           </span>
         </div>
         <div className="flex gap-3 overflow-hidden px-4 py-2">

@@ -55,6 +55,10 @@ export function AuthFlow() {
   const [offline, setOffline] = useState(false);
   const [flow, setFlow] = useState<{ phone: string; otpSession: string; devCode?: string; role?: string }>({ phone: "", otpSession: "" });
   const [saved, setSaved] = useState<SavedAccountHint[]>([]);
+  // The city the account was just created with, for the S8 coach mark that
+  // points at the header's city chip. It stood on a hardcoded "Rajkot", so the
+  // very first thing a new user in Ahmedabad read was the wrong city.
+  const [city, setCity] = useState("");
   // /login?add=1 — arriving from the P9 switch sheet to sign a SECOND account
   // into this device. The server keeps both sessions (lib/auth/account-pool).
   // Read on every render, NOT via useState: this component is server-rendered
@@ -65,18 +69,66 @@ export function AuthFlow() {
 
   const screen = stack[stack.length - 1];
 
+  /**
+   * Depth of the history entry the CURRENT screen owns.
+   *
+   * This flow is one document with its own screen stack, so it reads `popstate`
+   * as "the user pressed Back, drop a screen". That was true until every sheet
+   * and dialog in the app started pushing a throwaway history entry to make
+   * Android Back close the top layer (lib/hooks/use-back-close, Module 13) —
+   * closing one calls `history.back()`, which fires a real `popstate` that was
+   * never a screen Back. So picking a city on S7 (or reading a role's ⓘ and
+   * tapping "Got it" on S6) popped the screen underneath the sheet and threw a
+   * half-registered user back to Role, losing everything they had typed.
+   *
+   * A layer's entry carries the screen's own `hzDepth` (use-back-close spreads
+   * the existing state), so its pop lands on the SAME depth we are already on,
+   * while a genuine screen Back lands on a LOWER one. That is the whole test.
+   */
+  const depth = useRef(0);
+
+  /**
+   * The account exists — S7 came back ok and the session cookies are set.
+   *
+   * From here the flow behind us is spent: OTP session consumed, and POST
+   * /register answers FORBIDDEN for a profile that is already registered. Back
+   * off the coach marks was walking straight into it — a signed-in user landed
+   * on "I am a…" and every Continue from there dead-ended on "Something went
+   * wrong". Back now leaves for the app, which is where they already are.
+   */
+  const registered = useRef(false);
+
+  // Relative so it works on any host (localhost, a LAN IP via nip.io, the real
+  // domain). The seller dashboard lives on the same host as /login already.
+  // Adding an account lands back on the profile, where the switch sheet is —
+  // that's where the user was and where the new account is now visible.
+  const goHome = useCallback(() => {
+    window.location.href = addingAccount ? "/profile" : "/";
+  }, [addingAccount]);
+
   const go = useCallback((s: Screen) => {
     setStack((st) => [...st, s]);
-    window.history.pushState({ hzDepth: (window.history.state?.hzDepth ?? 0) + 1 }, "");
+    depth.current = (window.history.state?.hzDepth ?? depth.current) + 1;
+    window.history.pushState({ ...(window.history.state ?? {}), hzDepth: depth.current }, "");
   }, []);
   const replace = useCallback((s: Screen) => setStack((st) => [...st.slice(0, -1), s]), []);
   const back = useCallback(() => setStack((st) => (st.length > 1 ? st.slice(0, -1) : st)), []);
 
   useEffect(() => {
-    const onPop = () => back();
+    const onPop = (e: PopStateEvent) => {
+      const to = (e.state as { hzDepth?: number } | null)?.hzDepth ?? 0;
+      // A sheet/dialog closing pops its own entry and lands back on ours.
+      if (to >= depth.current) return;
+      depth.current = to;
+      if (registered.current) {
+        goHome();
+        return;
+      }
+      back();
+    };
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
-  }, [back]);
+  }, [back, goHome]);
 
   useEffect(() => {
     const update = () => setOffline(!navigator.onLine);
@@ -140,13 +192,6 @@ export function AuthFlow() {
       go("login");
     }
   };
-  // Relative so it works on any host (localhost, a LAN IP via nip.io, the real
-  // domain). The seller dashboard lives on the same host as /login already.
-  // Adding an account lands back on the profile, where the switch sheet is —
-  // that's where the user was and where the new account is now visible.
-  const goHome = () => {
-    window.location.href = addingAccount ? "/profile" : "/";
-  };
 
   return (
     <div className="mx-auto w-full max-w-column">
@@ -194,14 +239,16 @@ export function AuthFlow() {
         <Details
           role={flow.role ?? "owner"}
           onBack={back}
-          onDone={(user) => {
+          onDone={(user, cityName) => {
             const hint = hintFromUser(flow.phone, user);
             if (hint) rememberAccount(hint);
+            registered.current = true;
+            setCity(cityName ?? "");
             replace("coach");
           }}
         />
       )}
-      {screen === "coach" && <Coach onDone={goHome} />}
+      {screen === "coach" && <Coach city={city} onDone={goHome} />}
       {screen === "browserUnsupported" && <BrowserUnsupported />}
     </div>
   );

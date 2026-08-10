@@ -23,7 +23,7 @@ import { Img } from "@/components/ui/Img";
  * server-side inside the register-cookie window, so re-picking replaces it and
  * "Remove photo" clears the column. Nothing about the photo is client-truth.
  */
-export function Details({ role, onBack, onDone }: { role: string; onBack: () => void; onDone: (user?: unknown) => void }) {
+export function Details({ role, onBack, onDone }: { role: string; onBack: () => void; onDone: (user?: unknown, cityName?: string) => void }) {
   const { show } = useToast();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -59,7 +59,7 @@ export function Details({ role, onBack, onDone }: { role: string; onBack: () => 
     setEmailError(null);
     const res = await authApi.register({ role, name: name.trim(), cityId: city!.id, email: email.trim() || null, consent18: age18, consentDpdp: dpdp });
     setLoading(false);
-    if (res.ok) onDone((res.data as any).user);
+    if (res.ok) onDone((res.data as any).user, city!.name);
     else if (res.error.code === "VALIDATION_ERROR" && res.error.field === "name") setNameError("Please enter your full name.");
     else if (res.error.code === "VALIDATION_ERROR" && res.error.field === "email") setEmailError("Enter a valid email address.");
     else show(friendlyError(res.error));
