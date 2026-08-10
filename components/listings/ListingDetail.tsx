@@ -9,7 +9,7 @@ import { listingsApi, type Photo, type MyListing } from "@/lib/listings/client";
 import { InquirySheet, MoreSheet, ShareSheet, ReportSheet, LoginSheet } from "@/components/feed/sheets";
 import { interactionsApi, type FeedCard } from "@/lib/feed/client";
 import { DETAIL_PAD, DetailHero, DetailRow, DetailSection, DetailSeparator, PropertyDetailBody } from "./detailBody";
-import { cn } from "@/lib/utils";
+import { cn, publicHref } from "@/lib/utils";
 import { Img } from "@/components/ui/Img";
 
 /**
@@ -73,7 +73,10 @@ export function ListingDetail({ id, isGuest = false }: { id: string; isGuest?: b
   };
 
   const share = () => {
-    const url = window.location.href;
+    // The PUBLIC url, not the one in the address bar: an owner shares this
+    // screen from seller.homzlist.com, where the recipient has no session and
+    // gets a login wall instead of the listing.
+    const url = publicHref(`/property/${id}`);
     if (navigator.share) void navigator.share({ title: listing?.title ?? "", url });
     else { void navigator.clipboard?.writeText(url); toast.show("Link copied"); }
   };

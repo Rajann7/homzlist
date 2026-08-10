@@ -7,6 +7,7 @@ import { breadcrumbSchema, faqSchema, itemListSchema, jsonLd } from "@/lib/seo/s
 import { FaqAccordion } from "./FaqAccordion";
 import { ShareAreaButton } from "./ShareAreaButton";
 import { Img } from "@/components/ui/Img";
+import { loginHref } from "@/lib/auth/next-url";
 
 /**
  * P3 S4 — AREA PAGE, which doubles as the SEO landing page (Doc3 §4, Doc4 §14).
@@ -31,6 +32,10 @@ export function LandingView({ page, basePath = "" }: { page: LandingPage; basePa
   // contradicting itself. Projects are content, so they lift the page out of
   // the empty state.
   const thin = page.cards.length === 0 && page.projects.length === 0;
+  // A guest signs in and lands on the requirement form, not on the feed.
+  // Static destination, so no hook and nothing host-dependent — this renders
+  // identically on the server and after hydration.
+  const guestCta = loginHref("/requirements/new");
 
   return (
     <AppShell
@@ -138,7 +143,7 @@ export function LandingView({ page, basePath = "" }: { page: LandingPage; basePa
                 prefetch that redirect and hand off anyway (same reason as the
                 feed's guest strip). */}
             <a
-              href={basePath ? path("/requirements/new") : "/login"}
+              href={basePath ? path("/requirements/new") : guestCta}
               className="mx-auto mt-4 grid h-11 w-full max-w-[260px] place-items-center rounded-8 bg-accent text-15 font-semibold text-white"
             >
               Post a Requirement

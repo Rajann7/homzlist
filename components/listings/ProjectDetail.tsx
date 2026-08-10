@@ -9,7 +9,7 @@ import { InquirySheet, LoginSheet, ReportSheet, ShareSheet } from "@/components/
 import type { FeedCard } from "@/lib/feed/client";
 import { DETAIL_PAD, DetailHero, DetailSection, DetailSeparator, ProjectDetailBody } from "./detailBody";
 import { PhotoViewer, useScrolledPastHero } from "./ListingDetail";
-import { cn } from "@/lib/utils";
+import { cn, publicHref } from "@/lib/utils";
 
 /**
  * P4 S3 — project detail (redesigned, Rajan 28 Jul 2026).
@@ -126,7 +126,9 @@ export function ProjectDetail({ id, isGuest = false }: { id: string; isGuest?: b
   };
 
   const share = () => {
-    const url = window.location.href;
+    // Public url, same reason as the property detail: a builder shares this
+    // from the seller host, where nobody else can open it.
+    const url = publicHref(`/project/${id}`);
     if (navigator.share) void navigator.share({ title: p.name ?? "", url });
     else { void navigator.clipboard?.writeText(url); toast.show("Link copied"); }
   };

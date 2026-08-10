@@ -34,6 +34,10 @@ import {
   type Col,
 } from "@/components/admin/ds";
 import { Pager, useAdminList, ListError } from "@/components/admin/list";
+// Copy-public-link builds the PUBLIC origin off the host the panel is on
+// (account.<host> → <host>), so a staging or local admin never hands out a
+// production link — and never a link that only works on one deployment.
+import { publicHref } from "@/lib/utils";
 
 type Tab = "pages" | "blog" | "faqs" | "banners" | "broadcasts";
 
@@ -156,7 +160,7 @@ function PagesTab() {
             [
               "Copy public link",
               () => {
-                void navigator.clipboard?.writeText(`https://homzlist.com/${r.slug}`);
+                void navigator.clipboard?.writeText(publicHref(`/${r.slug}`));
                 toast("Link copied");
               },
             ],
@@ -268,7 +272,7 @@ function BlogTab() {
             [
               "Copy public link",
               () => {
-                void navigator.clipboard?.writeText(`https://homzlist.com/blog/${r.slug}`);
+                void navigator.clipboard?.writeText(publicHref(`/blog/${r.slug}`));
                 toast("Link copied");
               },
             ],

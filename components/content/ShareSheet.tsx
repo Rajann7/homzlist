@@ -3,6 +3,7 @@
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { Icon, type IconName } from "@/components/ui/Icon";
 import { useToast } from "@/components/ui/Toast";
+import { publicHref } from "@/lib/utils";
 
 /**
  * P12's share sheet — four circular 56px actions in a row: WhatsApp, Copy link,
@@ -31,7 +32,10 @@ export function ShareSheet({
 }) {
   const toast = useToast();
 
-  const absolute = () => (url.startsWith("http") ? url : `${window.location.origin}${url}`);
+  // A relative `url` is resolved against the PUBLIC origin, never the host we
+  // happen to be on: this sheet is reachable from the seller subdomain, and a
+  // seller.homzlist.com link is gated for whoever receives it.
+  const absolute = () => (url.startsWith("http") ? url : publicHref(url));
 
   const copy = async () => {
     try {

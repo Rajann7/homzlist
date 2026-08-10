@@ -10,6 +10,7 @@ import { searchApi, type ExploreTile, type RecentRow } from "@/lib/search/client
 import type { AutocompleteResult } from "@/lib/search/types";
 import { interactionsApi } from "@/lib/feed/client";
 import { cn } from "@/lib/utils";
+import { currentPath, loginHref } from "@/lib/auth/next-url";
 import { Img } from "@/components/ui/Img";
 
 /**
@@ -123,7 +124,8 @@ export function SearchHome({ basePath = "", isGuest = false }: SearchHomeProps) 
 
   const savePeek = async (t: ExploreTile) => {
     setPeek(null);
-    if (isGuest) { router.push(path("/login")); return; }
+    // Back to the explore grid they were saving from, not the feed.
+    if (isGuest) { router.push(path(loginHref(currentPath()))); return; }
     // No `saved` on an explore tile, so no offline optimism here (see client).
     const r = await interactionsApi.toggleSave(t.id);
     if (!r.ok) { toast.show("Couldn't save that", { variant: "error" }); return; }
@@ -478,6 +480,10 @@ function RequirementMode({ basePath, isGuest }: { basePath: string; isGuest: boo
     })();
   }, [isGuest]);
 
+  // A guest signs in first, then lands on the requirement form — the thing the
+  // button promised — instead of on the feed.
+  const guestCta = loginHref("/requirements/new");
+
   const steps = [
     { n: "1", t: "Tell us what you need", d: "Location, budget, property type & BHK" },
     { n: "2", t: "Verified sellers respond", d: "Brokers & owners send matching options" },
@@ -492,7 +498,7 @@ function RequirementMode({ basePath, isGuest }: { basePath: string; isGuest: boo
           Post your requirement and let verified brokers &amp; owners reach out to you with matching properties.
         </div>
         <Link
-          href={`${basePath}${isGuest ? "/login" : "/requirements/new"}`}
+          href={`${basePath}${isGuest ? guestCta : "/requirements/new"}`}
           className="mt-3 grid h-11 w-full place-items-center rounded-8 bg-accent text-15 font-semibold text-white"
         >
           Post a Requirement

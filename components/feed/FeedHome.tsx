@@ -13,6 +13,7 @@ import { storiesApi, feedApi, type StoryCircle, type FeedInitial } from "@/lib/f
 import { apiFetch } from "@/lib/auth/api-fetch";
 import type { CityRow } from "./CitySheet";
 import { cn } from "@/lib/utils";
+import { useLoginHref } from "@/lib/hooks/use-login-href";
 import { useNow } from "@/lib/hooks/useNow";
 // Guest city choice is a UI-only preference (no identity, no server profile to
 // hold it) — shared with the story viewer so the two agree on scope.
@@ -243,6 +244,9 @@ export function FeedHome({ initial: primed = null }: { initial?: FeedInitial | n
   };
 
   const isBuilder = me?.role === "builder";
+  // The guest strip's Sign In comes back to the feed the user was reading —
+  // including its city/filter query — instead of resetting them to the top.
+  const signInHref = useLoginHref();
 
   return (
     <FeedShell cityName={me?.cityName ?? null} selectedCityId={me?.cityId ?? null} onCity={onCity} onRefresh={refresh} badges={badges} scrollRef={scrollRef}>
@@ -256,8 +260,7 @@ export function FeedHome({ initial: primed = null }: { initial?: FeedInitial | n
             {/* /login lives on the seller host — the middleware 307s this off
                 the public origin — so <Link> would prefetch a redirect and then
                 hand off anyway. */}
-            {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- see above */}
-            <a href="/login" className="font-semibold text-accent">Sign In</a>
+            <a href={signInHref} className="font-semibold text-accent">Sign In</a>
           </div>
         )}
 

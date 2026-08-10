@@ -9,6 +9,7 @@ import { Longform } from "@/components/content/Longform";
 import { ShareSheet } from "@/components/content/ShareSheet";
 import { Cover, shortDate } from "./BlogList";
 import type { BlogCard } from "@/lib/content/client";
+import { publicHref } from "@/lib/utils";
 
 /**
  * P12 S4b — the blog post.
@@ -97,7 +98,7 @@ export function BlogPost({ post, guest = false, base = "" }: { post: PostView; g
             aria-label="Share on WhatsApp"
             onClick={() =>
               window.open(
-                `https://wa.me/?text=${encodeURIComponent(`${post.title}\n${window.location.origin}${shareUrl}`)}`,
+                `https://wa.me/?text=${encodeURIComponent(`${post.title}\n${publicHref(shareUrl)}`)}`,
                 "_blank",
                 "noopener,noreferrer",
               )
@@ -109,7 +110,7 @@ export function BlogPost({ post, guest = false, base = "" }: { post: PostView; g
           <button
             aria-label="Copy link"
             onClick={async () => {
-              try { await navigator.clipboard.writeText(`${window.location.origin}${shareUrl}`); toast.show("Copied to clipboard"); }
+              try { await navigator.clipboard.writeText(publicHref(shareUrl)); toast.show("Copied to clipboard"); }
               catch { toast.show("Couldn't copy"); }
             }}
             className="chrome grid h-11 w-11 place-items-center rounded-full bg-surface-2 text-ink-primary"

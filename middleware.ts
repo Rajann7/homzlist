@@ -1,5 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { verifyAccessEdge } from "@/lib/auth/edge";
+import { loginHref, sanitizeNext } from "@/lib/auth/next-url";
+import { HINT_BOUNCE_PARAM, SESSION_HINT_COOKIE, sessionHintDomain } from "@/lib/auth/session-hint";
 import { verifyAdminAccessEdge } from "@/lib/admin/edge";
 import { edgeMaintenanceState } from "@/lib/system/maintenance-edge";
 
@@ -28,6 +30,64 @@ function getZone(host: string): Zone {
   if (label === "seller") return "seller";
   if (label === "account") return "admin";
   return "public";
+}
+
+/**
+ * The first path segment of every screen that exists on BOTH hosts — the set a
+ * signed-in device can safely be handed from homzlist.com to seller.homzlist.com.
+ *
+ * Shares always point at the main domain, so this is what turns a shared link
+ * into the signed-in view for a user who already has a session (and leaves it
+ * as the public guest page for everyone else).
+ *
+ * It is an explicit list rather than "everything", because `/area/*` and the
+ * `[landing]` SEO pages are PUBLIC-ONLY — bouncing those to the seller host
+ * would turn a working page into a 404. Keep it in step with
+ * app/(seller)/seller/* : a segment only belongs here once the seller host
+ * actually serves it.
+ */
+const SELLER_MIRRORED_SEGMENTS = new Set([
+  "property",
+  "project",
+  "projects",
+  "requirements",
+  "profile",
+  "search",
+  "story",
+  "blog",
+  "legal",
+  "messages",
+  "notifications",
+  "create",
+]);
+
+function mirroredOnSeller(pathname: string): boolean {
+  if (pathname === "/") return true;
+  return SELLER_MIRRORED_SEGMENTS.has(pathname.split("/")[1] ?? "");
+}
+
+/**
+ * A redirect target on an EXPLICIT host.
+ *
+ * `new URL(request.url)` is not reliable for this: its host is the origin the
+ * server was reached on, which is not always the Host header the browser used
+ * (a proxy, a rewritten dev host, `seller.localhost` in front of :3000). A
+ * seller-zone redirect built that way silently lands on the PUBLIC host, which
+ * for a signed-in user means bouncing straight back again. Every redirect here
+ * therefore names the host it means.
+ */
+function redirectTo(request: NextRequest, host: string, pathname: string, search = ""): NextResponse {
+  const to = new URL(request.url);
+  to.host = host;
+  to.pathname = pathname;
+  to.search = search;
+  return NextResponse.redirect(to);
+}
+
+/** `/login?next=<where they were>` — the shared post-auth return contract. */
+function loginRedirect(request: NextRequest, url: URL, host: string): NextResponse {
+  const [path, query] = loginHref(`${url.pathname}${url.search}`).split("?");
+  return redirectTo(request, host, path, query ? `?${query}` : "");
 }
 
 export async function middleware(request: NextRequest) {
@@ -127,12 +187,57 @@ export async function middleware(request: NextRequest) {
     //     that way. A signed-in user visiting the public host therefore sees the
     //     guest view; their content is only on seller.<host>.
     if (isLogin) {
-      const to = new URL(request.url);
-      to.host = `seller.${host}`;
-      to.pathname = "/login";
-      to.search = "";
-      return NextResponse.redirect(to);
+      // The search string used to be WIPED here, which silently ate the whole
+      // `?next=` contract: every guest CTA on the public host (save, inquire,
+      // report, "Post a Requirement", the grievance link) sends the user to
+      // /login with where-to-come-back-to attached, and this hop threw it away
+      // before the login screen ever saw it. Only the two params that mean
+      // something to the flow survive, re-sanitised — nothing else from a
+      // public URL is carried onto the seller host.
+      const next = sanitizeNext(url.searchParams.get("next"));
+      const carried = new URLSearchParams();
+      if (next) carried.set("next", next);
+      if (url.searchParams.get("add") === "1") carried.set("add", "1");
+      return redirectTo(request, `seller.${host}`, "/login", carried.toString() ? `?${carried}` : "");
     }
+
+    /**
+     * A device that already HAS a session, opening a main-domain link.
+     *
+     * Shares are always minted on homzlist.com (lib/utils `publicHref`), which
+     * is what makes a pasted link work for everyone. But the signed-in
+     * experience lives on seller.*, and the real session cookies are host-only
+     * — so a signed-in user opening their own shared listing landed in the
+     * guest view with a "Sign in to save, inquire and chat" strip over content
+     * they own. The domain-wide hint (lib/auth/session-hint) is what lets this
+     * host tell the two cases apart; it is a routing flag, not a credential,
+     * and the seller host re-verifies the real session on arrival.
+     *
+     * Guests never see any of this — no hint cookie, no redirect, and crawlers
+     * (which carry no cookies) keep getting the same public HTML they do today.
+     */
+    const bounced = url.searchParams.get(HINT_BOUNCE_PARAM) === "1";
+    if (bounced) {
+      // The seller host sent this back: the hint was stale (session expired or
+      // cleared on that host). Drop the hint so it cannot bounce again, and
+      // serve the page here as a guest.
+      const clean = new URLSearchParams(url.search);
+      clean.delete(HINT_BOUNCE_PARAM);
+      const res = redirectTo(request, host, pathname, clean.toString() ? `?${clean}` : "");
+      const domain = sessionHintDomain(host);
+      res.cookies.set(SESSION_HINT_COOKIE, "", { path: "/", maxAge: 0, ...(domain ? { domain } : {}) });
+      return res;
+    }
+    if (
+      request.method === "GET" &&
+      request.cookies.has(SESSION_HINT_COOKIE) &&
+      mirroredOnSeller(pathname)
+    ) {
+      const carried = new URLSearchParams(url.search);
+      carried.set(HINT_BOUNCE_PARAM, "1");
+      return redirectTo(request, `seller.${host}`, pathname, `?${carried}`);
+    }
+
     if (user) {
       // Strip ONLY the auth cookies from the forwarded request so downstream
       // (pages + APIs via getCurrentUser) sees a guest on THIS request; keep any
@@ -167,12 +272,11 @@ export async function middleware(request: NextRequest) {
     // lied about a feature that exists. It goes through the same gate now and
     // the stale placeholder page is gone.
     if (!user && (pathname.startsWith("/messages") || pathname.startsWith("/notifications") || pathname.startsWith("/saved"))) {
-      const to = new URL(request.url);
-      to.host = `seller.${host}`;
-      to.pathname = "/login";
-      to.search = "";
-      return NextResponse.redirect(to);
+      // …and they come back here after signing in, rather than being dumped on
+      // the feed having lost the screen they asked for.
+      return loginRedirect(request, url, `seller.${host}`);
     }
+
     return NextResponse.next();
   }
 
@@ -181,8 +285,33 @@ export async function middleware(request: NextRequest) {
     // they are deliberately signing a SECOND account into this device. Every
     // other authenticated hit on /login still bounces home.
     const addingAccount = url.searchParams.get("add") === "1";
-    if (isLogin && user && !addingAccount) return NextResponse.redirect(new URL("/", request.url));
-    if (!isLogin && !user) return NextResponse.redirect(new URL("/login", request.url));
+    if (isLogin && user && !addingAccount) {
+      // Straight to where they were headed when the login screen was reached,
+      // not always the feed. Sanitised, so `next` can only ever be a path on
+      // this host — never somewhere else's origin.
+      const [nextPath, nextQuery] = (sanitizeNext(url.searchParams.get("next")) ?? "/").split("?");
+      return redirectTo(request, host, nextPath, nextQuery ? `?${nextQuery}` : "");
+    }
+
+    /**
+     * Arrived from the public host's session-hint redirect. Either way the
+     * marker is stripped, so it never sits in the address bar and never gets
+     * re-shared.
+     */
+    const bounced = url.searchParams.get(HINT_BOUNCE_PARAM) === "1";
+    if (bounced) {
+      const clean = new URLSearchParams(url.search);
+      clean.delete(HINT_BOUNCE_PARAM);
+      const query = clean.toString() ? `?${clean}` : "";
+      if (user) return redirectTo(request, host, pathname, query);
+      // The hint lied — there is no session on this host. A shared link must
+      // not turn into a login wall, so hand the visit back to the public host,
+      // which clears the hint and renders the guest page.
+      clean.set(HINT_BOUNCE_PARAM, "1");
+      return redirectTo(request, host.replace(/^seller\./i, ""), pathname, `?${clean}`);
+    }
+
+    if (!isLogin && !user) return loginRedirect(request, url, host);
     url.pathname = `/seller${pathname === "/" ? "" : pathname}`;
     return NextResponse.rewrite(url);
   }

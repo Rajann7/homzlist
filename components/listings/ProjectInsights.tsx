@@ -8,7 +8,7 @@ import { BackButton, OfflineBanner, SheetOption } from "@/components/billing/pri
 import { ConfirmDialog } from "@/components/ui/Dialog";
 import { listingsApi, type ProjectInsights as Insights } from "@/lib/listings/client";
 import type { BadgeKind } from "@/components/ui/StatusBadge";
-import { cn } from "@/lib/utils";
+import { cn, publicHref } from "@/lib/utils";
 import { Img } from "@/components/ui/Img";
 
 /**
@@ -47,7 +47,8 @@ export function ProjectInsights({ id }: { id: string }) {
    *  and the screen no longer claims a number for them. */
   const share = () => {
     setMenu(false);
-    const url = `${location.origin}/project/${id}`;
+    // Public url — the builder is on the seller host, the recipient is not.
+    const url = publicHref(`/project/${id}`);
     if (navigator.share) void navigator.share({ title: p?.name ?? "", url });
     else { void navigator.clipboard?.writeText(url); toast.show("Link copied"); }
   };

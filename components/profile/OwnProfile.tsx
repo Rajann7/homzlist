@@ -19,7 +19,7 @@ import { authApi, type DeviceAccount } from "@/lib/auth/client";
 // `RequirementCard` is also the name of the card COMPONENT above, so the DTO
 // type is aliased rather than shadowed.
 import { listingsApi, type MyListing, type MyProject, type RequirementCard as RequirementCardT } from "@/lib/listings/client";
-import { cn } from "@/lib/utils";
+import { cn, publicHref } from "@/lib/utils";
 import { Img } from "@/components/ui/Img";
 import { NetworkStatus } from "@/components/pwa/NetworkStatus";
 import { ScrollRestore } from "@/components/nav/ScrollRestore";
@@ -362,7 +362,7 @@ export function OwnProfile() {
               variant="outline"
               className="flex-1"
               onClick={() => {
-                navigator.clipboard?.writeText(`homzlist.com/${p.username}`).catch(() => {});
+                navigator.clipboard?.writeText(publicHref(`/profile/${p.username}`)).catch(() => {});
                 show("Link copied");
               }}
             >

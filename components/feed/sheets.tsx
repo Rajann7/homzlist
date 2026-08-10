@@ -11,6 +11,8 @@ import { SheetOption } from "@/components/billing/primitives";
 import { interactionsApi, type FeedCard } from "@/lib/feed/client";
 import { listingsApi } from "@/lib/listings/client";
 import { cn } from "@/lib/utils";
+import { usePublicOrigin } from "@/lib/hooks/use-public-href";
+import { currentPath, loginHref } from "@/lib/auth/next-url";
 import { Img } from "@/components/ui/Img";
 
 // ---- Sort sheet (P2 S1) ----------------------------------------------------
@@ -55,7 +57,13 @@ export function MoreSheet({
 // ---- Share sheet -----------------------------------------------------------
 export function ShareSheet({ open, onClose, card }: { open: boolean; onClose: () => void; card: FeedCard | null }) {
   const toast = useToast();
-  const link = card ? `${typeof location !== "undefined" ? location.origin : "https://homzlist.com"}/${card.kind === "project" ? "project" : "property"}/${card.id}` : "";
+  // ALWAYS the main domain, never the host we happen to be on. This sheet is
+  // opened from the feed, the detail screens and the builder's own screens —
+  // all of which run on seller.* for a signed-in user, so the link that went
+  // out on WhatsApp was seller.homzlist.com/property/…, which is gated and
+  // bounces every recipient to a login screen. A share is a public link.
+  const origin = usePublicOrigin();
+  const link = card ? `${origin}/${card.kind === "project" ? "project" : "property"}/${card.id}` : "";
 
   // The Shares metric on P9 S5 counts what actually happened here. Fire-and-
   // forget: a share must never wait on (or be blocked by) analytics. Projects
@@ -255,8 +263,10 @@ export function LoginSheet({ open, onClose }: { open: boolean; onClose: () => vo
         <Button
           fullWidth
           onClick={() => {
-            // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- see above
-            location.href = "/login";
+            // …and back to this exact screen afterwards. The sheet opens on top
+            // of whatever the guest was trying to do (save, inquire, report), so
+            // the page they are on IS the thing to return to.
+            location.href = loginHref(currentPath());
           }}
         >
           Continue with phone

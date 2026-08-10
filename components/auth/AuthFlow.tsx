@@ -10,6 +10,7 @@ import { Details } from "./screens/Details";
 import { Coach } from "./screens/Coach";
 import { BrowserUnsupported, OfflineBanner, SavedAccounts } from "./screens/Misc";
 import { publicHref } from "@/lib/utils";
+import { sanitizeNext } from "@/lib/auth/next-url";
 import { authApi } from "@/lib/auth/client";
 import { getSavedAccounts, rememberAccount, type SavedAccountHint } from "@/lib/auth/saved-accounts";
 
@@ -67,6 +68,25 @@ export function AuthFlow() {
   const addingAccount =
     typeof window !== "undefined" && new URLSearchParams(window.location.search).get("add") === "1";
 
+  /**
+   * /login?next=… — the screen the user was actually trying to reach.
+   *
+   * Every guest CTA in the app lands here (save, inquire, report, chat, "Post a
+   * Requirement", the legal reader's grievance link, and the middleware's own
+   * gate on /messages, /notifications, /saved). Without this the flow ended on
+   * the feed and the user had to find their way back, which for a link opened
+   * from WhatsApp means they simply do not.
+   *
+   * Read the same way as `addingAccount` and for the same reason: a lazy
+   * useState would freeze the server value through hydration. Sanitised here
+   * as well as in the middleware — this value ends up in `location.href`, so
+   * it is never trusted just because it survived one hop.
+   */
+  const nextPath =
+    typeof window !== "undefined"
+      ? sanitizeNext(new URLSearchParams(window.location.search).get("next"))
+      : null;
+
   const screen = stack[stack.length - 1];
 
   /**
@@ -102,9 +122,12 @@ export function AuthFlow() {
   // domain). The seller dashboard lives on the same host as /login already.
   // Adding an account lands back on the profile, where the switch sheet is —
   // that's where the user was and where the new account is now visible.
+  // "Adding an account" is deliberately NOT a `next` case: the user came from
+  // the P9 switch sheet, so the profile is where they were and where the new
+  // account is now visible.
   const goHome = useCallback(() => {
-    window.location.href = addingAccount ? "/profile" : "/";
-  }, [addingAccount]);
+    window.location.href = addingAccount ? "/profile" : (nextPath ?? "/");
+  }, [addingAccount, nextPath]);
 
   const go = useCallback((s: Screen) => {
     setStack((st) => [...st, s]);
@@ -159,8 +182,13 @@ export function AuthFlow() {
       const refreshed = await authApi.refresh().catch(() => ({ ok: false }) as const);
       if (cancelled) return;
       if (refreshed.ok) {
-        // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- The session identity changes here, so this has to be a real page load — router.push() would keep the previous user's client cache and rendered tree.
-        window.location.href = "/";
+        // A valid-but-expired session, silently revived — still honour `next`,
+        // otherwise a shared link opened after an idle hour drops the user on
+        // the feed even though they were never asked to sign in.
+        // A full page load, not router.push(): the session identity changes
+        // here, and a client-side push would keep the previous user's cache and
+        // rendered tree.
+        window.location.href = nextPath ?? "/";
         return;
       }
       const onboarded = localStorage.getItem(ONBOARDED_KEY);

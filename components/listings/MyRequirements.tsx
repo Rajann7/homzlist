@@ -6,7 +6,7 @@ import { AppShell, BottomSheet, Button, EmptyState, Header, Icon, Skeleton, Stat
 import { BackButton, OfflineBanner, SheetOption } from "@/components/billing/primitives";
 import { ConfirmDialog } from "@/components/ui/Dialog";
 import { listingsApi, requirementsApi, type RequirementCard } from "@/lib/listings/client";
-import { cn } from "@/lib/utils";
+import { cn, publicHref } from "@/lib/utils";
 import { Img } from "@/components/ui/Img";
 
 /**
@@ -136,7 +136,7 @@ export function MyRequirements() {
       <BottomSheet open={Boolean(sheetFor)} onClose={() => setSheetFor(null)} title="Requirement options">
         <div className="flex flex-col pb-2">
           <SheetOption icon={<Icon name="rocket" size={22} className="text-ink-secondary" />} label="Boost requirement" onClick={() => { setSheetFor(null); router.push(`/boost/new?requirement=${sheetFor?.id}`); }} />
-          <SheetOption icon={<Icon name="share" size={22} className="text-ink-secondary" />} label="Share" onClick={() => { const r = sheetFor; setSheetFor(null); if (r) { void navigator.clipboard?.writeText(`${location.origin}/requirements/${r.id}`); toast.show("Link copied"); } }} />
+          <SheetOption icon={<Icon name="share" size={22} className="text-ink-secondary" />} label="Share" onClick={() => { const r = sheetFor; setSheetFor(null); if (r) { void navigator.clipboard?.writeText(publicHref(`/requirements/${r.id}`)); toast.show("Link copied"); } }} />
           <SheetOption icon={<Icon name="trash" size={22} className="text-error" />} label="Delete" destructive onClick={() => { const r = sheetFor; setSheetFor(null); if (r) setDialog({ kind: "delete", r }); }} />
         </div>
       </BottomSheet>

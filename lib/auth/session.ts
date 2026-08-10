@@ -1,7 +1,8 @@
 import "server-only";
 import { SignJWT, jwtVerify } from "jose";
 import { randomUUID, createHash, randomBytes } from "node:crypto";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
+import { SESSION_HINT_COOKIE, sessionHintDomain } from "@/lib/auth/session-hint";
 import { kv } from "@/lib/kv";
 import { serverEnv } from "@/lib/env";
 import { sessionTtlSec } from "@/lib/system/config";
@@ -246,12 +247,28 @@ export function cookieOpts(maxAge: number) {
   };
 }
 
+/**
+ * Write (or delete) the cross-subdomain session hint — see
+ * lib/auth/session-hint.ts for what it is and, more importantly, what it is
+ * not. It rides along with the real cookies so it can never drift out of step
+ * with them: these two functions are the ONLY places a session begins or ends.
+ */
+async function writeSessionHint(present: boolean, maxAge: number) {
+  const domain = sessionHintDomain((await headers()).get("host") ?? "");
+  const jar = await cookies();
+  const opts = { ...cookieOpts(present ? maxAge : 0), ...(domain ? { domain } : {}) };
+  // Deleting a Domain cookie means re-setting it empty with the SAME domain —
+  // `jar.delete(name)` targets the host-only one and would leave this alive.
+  jar.set(SESSION_HINT_COOKIE, present ? "1" : "", opts);
+}
+
 export async function setSessionCookies(access: string, refresh: string) {
   const jar = await cookies();
   const refreshTtl = await sessionTtlSec();
   jar.set(COOKIE.ACCESS, access, cookieOpts(ACCESS_TTL_SEC));
   jar.set(COOKIE.REFRESH, refresh, cookieOpts(refreshTtl));
   jar.delete(COOKIE.REGISTER);
+  await writeSessionHint(true, refreshTtl);
 }
 
 export async function setRegisterCookie(token: string) {
@@ -260,7 +277,21 @@ export async function setRegisterCookie(token: string) {
 
 export async function clearAuthCookies() {
   const jar = await cookies();
+  // Whether this request actually CARRIED a session, read before we delete it.
+  const hadSession = Boolean(jar.get(COOKIE.ACCESS)?.value || jar.get(COOKIE.REFRESH)?.value);
   jar.delete(COOKIE.ACCESS);
   jar.delete(COOKIE.REFRESH);
   jar.delete(COOKIE.REGISTER);
+  /**
+   * Only a real sign-out clears the cross-subdomain hint — and this is the
+   * distinction that keeps it honest.
+   *
+   * The public host STRIPS the auth cookies off every forwarded request (see
+   * middleware, "public session is stripped"), so any /auth/refresh reaching a
+   * route from homzlist.com looks exactly like an expired session and lands
+   * here. Clearing the domain-wide hint on that would knock the user's real
+   * seller session out of the routing, from a request that never had a session
+   * to lose. No cookie in, no hint out.
+   */
+  if (hadSession) await writeSessionHint(false, 0);
 }

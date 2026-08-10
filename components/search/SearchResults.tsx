@@ -20,6 +20,7 @@ import {
 } from "@/lib/search/client";
 import type { AreaResult, BrokerResult, SearchSort, SearchTab } from "@/lib/search/types";
 import { cn } from "@/lib/utils";
+import { loginHref } from "@/lib/auth/next-url";
 
 /**
  * P3 S2 — SEARCH RESULTS.
@@ -467,6 +468,8 @@ function ZeroResults({
   }, []);
 
   const copy = ZERO_COPY[tab];
+  // Signing in returns the guest to the requirement form this CTA promised.
+  const guestCta = loginHref("/requirements/new");
 
   return (
     <div className="flex flex-col items-center px-6 py-12 text-center">
@@ -501,7 +504,7 @@ function ZeroResults({
         // /login onto the seller host), which is where the form lives anyway.
         // Plain <a> so <Link> doesn't prefetch a cross-host redirect.
         <a
-          href={isGuest ? "/login" : `${basePath}/requirements/new`}
+          href={isGuest ? guestCta : `${basePath}/requirements/new`}
           className="mt-5 grid h-11 place-items-center rounded-8 bg-accent px-6 text-15 font-semibold text-white"
         >
           Post a Requirement

@@ -13,7 +13,8 @@ import { ProfileBadges } from "./ProfileBadges";
 import { FeaturedCollectionSheet } from "./ProfileSheets";
 import { CardList, ListingCard, ProjectCard, TabCount } from "./ProfileRows";
 import { profileApi, type FeaturedCollection, type FeaturedItem, type PublicProject } from "@/lib/profile/client";
-import { cn } from "@/lib/utils";
+import { cn, publicHref } from "@/lib/utils";
+import { currentPath, loginHref } from "@/lib/auth/next-url";
 import { Img } from "@/components/ui/Img";
 
 /**
@@ -43,7 +44,8 @@ export function OtherProfile({ username, isGuest = false }: { username: string; 
   // On the public host the viewer is always a guest (middleware strips the
   // session). Block/Report/Message write or require auth, so a guest is sent to
   // login instead of hitting a 401.
-  const guard = (fn: () => void) => { if (isGuest) { router.push("/login"); return; } fn(); };
+  // …and back to this profile once they have, rather than onto the feed.
+  const guard = (fn: () => void) => { if (isGuest) { router.push(loginHref(currentPath())); return; } fn(); };
   const [p, setP] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState(0);
@@ -363,7 +365,7 @@ export function OtherProfile({ username, isGuest = false }: { username: string; 
           {/* "Copy link" was removed — it was byte-identical to Share profile
               (same clipboard write, same toast), so the sheet offered the same
               action twice under two names. */}
-          <MenuRow icon="share" label="Share profile" onClick={() => { navigator.clipboard?.writeText(`homzlist.com/${p.username}`).catch(() => {}); show("Link copied"); setMenu(false); }} />
+          <MenuRow icon="share" label="Share profile" onClick={() => { navigator.clipboard?.writeText(publicHref(`/profile/${p.username}`)).catch(() => {}); show("Link copied"); setMenu(false); }} />
           <MenuRow icon="alert" label="Report profile" destructive onClick={() => { setMenu(false); guard(() => setReportSheet(true)); }} />
         </div>
       </BottomSheet>

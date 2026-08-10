@@ -8,6 +8,7 @@ import { ConfirmDialog } from "@/components/ui/Dialog";
 import { ProposalSheet } from "./ProposalSheet";
 import { requirementsApi, type RequirementDetail as Detail, type UnlockPlan } from "@/lib/listings/client";
 import { DetailAnswerGrid, DetailCard, DetailSection } from "./detailBody";
+import { loginHref } from "@/lib/auth/next-url";
 
 /**
  * P4 S4 — requirement detail, three variants the SERVER picks:
@@ -20,7 +21,10 @@ export function RequirementDetail({ id, isGuest = false }: { id: string; isGuest
   const toast = useToast();
   // Billing routes are seller-only; a guest on the public host must sign in
   // first (unlock then happens on the seller subdomain).
-  const goOrLogin = (path: string) => router.push(isGuest ? "/login" : path);
+  // The INTENT is the return destination, not the current screen: a guest who
+  // tapped "Unlock" is taken to the unlock/checkout route after signing in,
+  // which is what they asked for.
+  const goOrLogin = (path: string) => router.push(isGuest ? loginHref(path) : path);
 
   const [r, setR] = useState<Detail | null>(null);
   const [unlockPlan, setUnlockPlan] = useState<UnlockPlan | null>(null);

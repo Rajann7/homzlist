@@ -27,3 +27,17 @@ export function usePublicOrigin(): string {
 export function usePublicHref(path: string): string {
   return `${usePublicOrigin()}${path}`;
 }
+
+/**
+ * THIS page's address, rebuilt onto the public host — for a share sheet that
+ * shares "wherever I am" rather than a known route.
+ *
+ * The path has to go through the same store as the origin: reading
+ * `location.pathname` straight during render is the identical hydration
+ * mismatch, just one line further along.
+ */
+const currentPublicUrl = () => `${publicOrigin()}${window.location.pathname}${window.location.search}`;
+
+export function useCurrentPublicUrl(): string {
+  return useSyncExternalStore(subscribe, currentPublicUrl, configuredPublicOrigin);
+}

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { Icon } from "@/components/ui/Icon";
 import { useToast } from "@/components/ui/Toast";
+import { useCurrentPublicUrl } from "@/lib/hooks/use-public-href";
 
 /**
  * Share sheet for the area/landing page (designs/P3 S4 header + share sheet):
@@ -12,7 +13,11 @@ import { useToast } from "@/components/ui/Toast";
 export function ShareAreaButton({ title }: { title: string }) {
   const [open, setOpen] = useState(false);
   const toast = useToast();
-  const link = typeof location !== "undefined" ? location.href : "";
+  // The link row is rendered, so this goes through the hydration-safe store
+  // rather than reading `location` during render — and it is rebuilt onto the
+  // PUBLIC origin, so a page shared from the seller host opens for the person
+  // who receives it.
+  const link = useCurrentPublicUrl();
 
   const copy = () => {
     void navigator.clipboard?.writeText(link);

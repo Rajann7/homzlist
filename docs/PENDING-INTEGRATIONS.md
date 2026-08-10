@@ -4511,3 +4511,19 @@ JS chunks** (`/_next/static/chunks/*.js` → 500, `MIME type 'text/plain'`), so
 was dead, including the story circles. It was a stale/corrupt build directory,
 not a code fault. Rebuilt on 9 Aug and healthy. Worth recognising the signature —
 "page looks right, nothing is clickable" means the build, not the component.
+
+**4. `/area/*` and the `[landing]` SEO pages stay on the public host for a
+signed-in user. BY DESIGN, 10 Aug.** Shares now always point at the main domain,
+and a device with a session is handed on to `seller.*` so the signed-in view
+opens (middleware, `SELLER_MIRRORED_SEGMENTS` + `lib/auth/session-hint.ts`). That
+hand-off is limited to path segments the seller host actually serves. `area` and
+the root-level `[landing]` city/locality pages exist ONLY under `app/(public)`,
+so bouncing them would turn a working page into a 404 — they render as the
+public page for everyone, signed in or not. If those two ever get seller
+counterparts, add their segments to that one set and nothing else changes.
+→ **Not a defect. Revisit only if area/landing pages are built for the seller host.**
+
+**5. The session HINT cookie does not change the guest-401 note in item 2.**
+`hz_sh` (added 10 Aug) is domain-wide but **httpOnly**, so no client code can
+read it and `/api/v1/profile/me` is still how the feed asks who it is talking
+to. The non-httpOnly variant item 2 describes was deliberately NOT built.
