@@ -6,6 +6,7 @@ import type { IconName } from "@/components/ui/Icon";
 import type { Photo } from "@/lib/listings/client";
 import { cn } from "@/lib/utils";
 import { Img } from "@/components/ui/Img";
+import { avatarFill, avatarInitial } from "@/components/ui/Avatar";
 
 /**
  * The shared BODIES of the property and project detail screens.
@@ -394,9 +395,23 @@ export function PosterCard({
           onClick={() => poster.username && onOpen?.(poster.username)}
           className={cn("flex w-full items-center gap-3 border-t border-divider py-3 text-left disabled:cursor-default", PAD)}
         >
-          <span className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-8 bg-surface-2 text-ink-tertiary">
+          {/* P4 draws this tile as a rounded-8 SQUARE, not a circle — the shape
+              and size stay exactly as designed. Only what fills it when there is
+              no photo changes: the same name-keyed letter the rest of the app
+              uses, instead of a generic silhouette that made every poster
+              without a photo look like the same person. */}
+          <span
+            className={cn(
+              "grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-8",
+              poster.avatarUrl || avatarInitial(poster.name) ? "" : "bg-surface-2 text-ink-tertiary",
+            )}
+          >
             {poster.avatarUrl ? (
               <Img src={poster.avatarUrl} alt="" data-protected="true" className="h-full w-full object-cover" />
+            ) : avatarInitial(poster.name) ? (
+              <span className={cn("grid h-full w-full place-items-center text-17 font-semibold leading-none text-ink-inverse", avatarFill(poster.name))}>
+                {avatarInitial(poster.name)}
+              </span>
             ) : (
               <Icon name="user" size={22} />
             )}

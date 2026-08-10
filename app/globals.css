@@ -57,6 +57,22 @@
   --tone-indigo: #4f46e5;
   --tone-cyan: #0e7490;
   --tone-orange: #c2410c;
+  /* Default-avatar fills (Rajan, 10 Aug 2026 — "like the Google profile img").
+     A user with no photo gets a SOLID circle with the first letter of their name
+     in white, the colour picked from this set by a hash of the name so the same
+     person is always the same colour. Deliberately NOT --tone-*: those flip to
+     light values in dark mode (they are foreground colours), and white text on
+     them would be unreadable. Every value here clears 4.5:1 against white and
+     reads on both a white and a black page, so the set is theme-independent —
+     there is intentionally no dark-mode override below. */
+  --avatar-1: #1565c0;
+  --avatar-2: #0b7a43;
+  --avatar-3: #ad1457;
+  --avatar-4: #6a1b9a;
+  --avatar-5: #00695c;
+  --avatar-6: #c62828;
+  --avatar-7: #4527a0;
+  --avatar-8: #d84315;
   /* Semantic */
   --error: #ed4956;
   --error-soft: #fdecee;
