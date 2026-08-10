@@ -103,6 +103,17 @@ const config: Config = {
           cyan: v("tone-cyan"),
           orange: v("tone-orange"),
         },
+        // Default-avatar fills — solid circle behind a white initial (globals.css).
+        avatar: {
+          "1": v("avatar-1"),
+          "2": v("avatar-2"),
+          "3": v("avatar-3"),
+          "4": v("avatar-4"),
+          "5": v("avatar-5"),
+          "6": v("avatar-6"),
+          "7": v("avatar-7"),
+          "8": v("avatar-8"),
+        },
         error: { DEFAULT: v("error"), soft: v("error-soft") },
         warning: { DEFAULT: v("warning"), soft: v("warning-soft") },
         info: { DEFAULT: v("info"), soft: v("info-soft") },
