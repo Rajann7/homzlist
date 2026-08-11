@@ -741,8 +741,17 @@ export async function getProject(id: string, viewerId: string | null) {
     // viewer taps Call/WhatsApp, and no more sensitive than the poster id the
     // feed already publishes on every card.
     profileId: p.profile_id,
-    contact: (poster as { phone?: string | null } | null)?.phone
-      ? { number: (poster as { phone: string }).phone, name: (poster as { name?: string | null }).name ?? null }
+    // A project may now carry its own number (0138) — a sales line that is not
+    // the builder's personal phone. When it does, that is the number buyers
+    // get; otherwise it falls back to the profile phone exactly as before, so
+    // every existing project keeps the contact it has always had.
+    contact: (p.contact_number || (poster as { phone?: string | null } | null)?.phone)
+      ? {
+          number: (p.contact_number as string | null) || (poster as { phone: string }).phone,
+          whatsapp: (p.whatsapp_number as string | null) || null,
+          verified: p.contact_number ? p.contact_verified === true : true,
+          name: (poster as { name?: string | null }).name ?? null,
+        }
       : null,
     pincode: p.pincode ?? null,
     brochureScanned: p.brochure_scanned,

@@ -36,7 +36,8 @@ export type LeadStatus = "new" | "contacted" | "converted" | "archived";
 
 export interface LeadSubject {
   kind: SubjectKind; id: string; title: string; subtitle: string;
-  coverUrl: string | null; stateLabel: string; total: number; unseen: number; lastAt: string | null;
+  coverUrl: string | null; stateLabel: string; total: number; unseen: number;
+  contacted: number; converted: number; lastAt: string | null;
 }
 export interface LeadGroups {
   subjects: LeadSubject[];
@@ -65,7 +66,10 @@ export interface SubjectLeads {
   counts: { key: string; label: string; count: number }[];
 }
 export interface SentLead {
-  id: string; state: "sent" | "seen" | "contacted" | "closed"; stateLabel: string;
+  id: string;
+  senderAnswer: "contacted" | "not_yet" | null;
+  askAnswer: boolean;
+  state: "sent" | "seen" | "contacted" | "closed"; stateLabel: string;
   createdAt: string; summary: string; closedReason: string | null; canWithdraw: boolean;
   subject: { kind: SubjectKind; id: string | null; title: string; subtitle: string; coverUrl: string | null };
   to: { id: string; name: string; role: string | null; photoUrl: string | null };
@@ -91,12 +95,26 @@ export const notRelevant = (id: string) =>
 /** Recorded BEFORE the dialler opens — it is the only proof a connection happened. */
 export const recordContact = (id: string, channel: "call" | "whatsapp" | "profile") =>
   req<{ updated: true }>(`/leads/${id}`, "PATCH", { action: "contact", channel });
+export const answerSent = (id: string, answer: "contacted" | "not_yet") =>
+  req<{ updated: true }>(`/leads/${id}`, "PATCH", { action: "answer", answer });
 export const withdraw = (id: string) =>
   req<{ updated: true }>(`/leads/${id}`, "PATCH", { action: "withdraw" });
 export const reportLead = (id: string, reason: string, note?: string) =>
   req<{ reported: true; alreadyReported: boolean }>(`/leads/${id}`, "PATCH", { action: "report", reason, note });
 
 // ---- inquiry sheet ---------------------------------------------------------
+
+export interface ExistingInquiry {
+  id: string;
+  leadId: string | null;
+  sentAt: string;
+  wants: { code: string; label: string }[];
+  contactPref: "call" | "whatsapp";
+  contactNumber: string | null;
+  whenLabel: string | null;
+  preferredOn: string | null;
+  withdrawn: boolean;
+}
 
 export interface InquiryOptions {
   wants: { code: string; label: string }[];
@@ -106,9 +124,12 @@ export interface InquiryOptions {
   consentText: string;
   allowed: boolean;
   myNumber: string | null;
+  /** Set when this person already connected on this subject. */
+  existing: ExistingInquiry | null;
 }
 
-export const inquiryOptions = (kind: SubjectKind) => req<InquiryOptions>(`/inquiries?kind=${kind}`, "GET");
+export const inquiryOptions = (kind: SubjectKind, subjectId?: string) =>
+  req<InquiryOptions>(`/inquiries?kind=${kind}${subjectId ? `&subjectId=${subjectId}` : ""}`, "GET");
 
 export interface SendInquiryBody {
   listingId?: string;
@@ -129,6 +150,10 @@ export const sendInquiry = (body: SendInquiryBody) =>
 export const myNumbers = () =>
   req<{ myNumber: string | null; verified: { number: string; expiresAt: string }[]; reuseDays: number }>("/contact-numbers", "GET");
 export const startNumberOtp = (number: string) =>
-  req<{ alreadyVerified: boolean; number: string; otpSession?: string }>("/contact-numbers", "POST", { number });
+  req<{ alreadyVerified: boolean; number: string; otpSession?: string; devCode?: string; resendIn?: number | null }>(
+    "/contact-numbers", "POST", { number },
+  );
+export const resendNumberOtp = (otpSession: string) =>
+  req<{ resent: true; devCode?: string; resendIn: number | null }>("/contact-numbers", "POST", { otpSession, resend: true });
 export const confirmNumberOtp = (otpSession: string, code: string) =>
   req<{ verified: true; number: string; expiresAt: string }>("/contact-numbers", "PUT", { otpSession, code });

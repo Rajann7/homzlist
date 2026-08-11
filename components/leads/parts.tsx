@@ -86,8 +86,14 @@ export function PersonRow({
  * the ordinary path leaves a record.
  */
 export function LeadActions({
-  lead, onChanged, compact = false,
-}: { lead: leadsApi.LeadView; onChanged?: () => void; compact?: boolean }) {
+  lead, onChanged, compact = false, quiet = false,
+}: {
+  lead: leadsApi.LeadView;
+  onChanged?: () => void;
+  compact?: boolean;
+  /** A lead already worked drops to three equal outline buttons (design 11). */
+  quiet?: boolean;
+}) {
   const toast = useToast();
   const router = useRouter();
   const [menu, setMenu] = useState(false);
@@ -108,18 +114,32 @@ export function LeadActions({
   return (
     <>
       <div className="mt-2.5 flex gap-2">
-        <Button size="small" className="flex-1" onClick={() => void go("call")}>
-          <Icon name="phone" size={15} />Call
+        <Button size="small" variant={quiet ? "outline" : "primary"} className="flex-1" onClick={() => void go("call")}>
+          {!quiet && <Icon name="phone" size={15} />}Call
         </Button>
         <Button size="small" variant="outline" className="flex-1" onClick={() => void go("whatsapp")}>
-          <Icon name="whatsapp" size={15} className="text-[#25D366]" />WhatsApp
+          {!quiet && <Icon name="whatsapp" size={15} className="text-[#25D366]" />}WhatsApp
         </Button>
-        {!compact && (
+        {quiet ? (
+          <Button
+            size="small"
+            variant="outline"
+            className="flex-1"
+            onClick={() => { void leadsApi.recordContact(lead.id, "profile"); router.push(`/u/${lead.person.id}`); }}
+          >
+            Profile
+          </Button>
+        ) : !compact ? (
           <Button size="small" variant="outline" className="w-11 px-0" aria-label="More" onClick={() => setMenu(true)}>
             <Icon name="more" size={16} />
           </Button>
-        )}
+        ) : null}
       </div>
+      {quiet && (
+        <button type="button" onClick={() => setMenu(true)} className="chrome mt-2 text-11 font-semibold text-ink-tertiary">
+          More options
+        </button>
+      )}
 
       <BottomSheet open={menu} onClose={() => setMenu(false)} title="Lead options">
         <div className="flex flex-col pb-2">

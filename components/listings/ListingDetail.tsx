@@ -7,6 +7,7 @@ import { SheetOption } from "@/components/billing/primitives";
 import { ConfirmDialog } from "@/components/ui/Dialog";
 import { listingsApi, type Photo, type MyListing } from "@/lib/listings/client";
 import { InquirySheet, MoreSheet, ShareSheet, ReportSheet, LoginSheet } from "@/components/feed/sheets";
+import { loginHref, currentPath } from "@/lib/auth/next-url";
 import { interactionsApi, type FeedCard } from "@/lib/feed/client";
 import { DETAIL_PAD, DetailHero, DetailRow, DetailSection, DetailSeparator, PropertyDetailBody } from "./detailBody";
 import { cn, publicHref } from "@/lib/utils";
@@ -49,6 +50,28 @@ export function ListingDetail({ id, isGuest = false }: { id: string; isGuest?: b
   /** The owner action awaiting confirmation — every one of them writes. */
   const [confirm, setConfirm] = useState<null | { action: OwnerAction; title: string; body: string; label: string; destructive?: boolean }>(null);
   const [busy, setBusy] = useState(false);
+
+  /**
+   * Send Inquiry as a guest: remember WHAT they were doing across the sign-in
+   * round trip. The intent rides in the return URL (?inquire=1) rather than
+   * storage, because sign-in crosses hosts and storage would not survive it.
+   */
+  const startInquiry = () => {
+    if (!isGuest) { setSheet("inquiry"); return; }
+    const here = currentPath();
+    window.location.assign(loginHref(`${here}${here.includes("?") ? "&" : "?"}inquire=1`));
+  };
+
+  // Landed back from sign-in with the intent still attached: open the sheet
+  // and clean the flag out of the URL so a refresh does not reopen it.
+  useEffect(() => {
+    if (isGuest || typeof window === "undefined") return;
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("inquire") !== "1") return;
+    url.searchParams.delete("inquire");
+    window.history.replaceState({}, "", url.pathname + (url.search || "") + url.hash);
+    setSheet("inquiry");
+  }, [isGuest]);
 
   const load = useCallback(async () => {
     const l = await listingsApi.get(id);
@@ -325,7 +348,7 @@ export function ListingDetail({ id, isGuest = false }: { id: string; isGuest?: b
                   <Icon name="whatsapp" size={20} />
                 </a>
               )}
-              <Button fullWidth onClick={() => (isGuest ? setSheet("login") : setSheet("inquiry"))}>Send Inquiry</Button>
+              <Button fullWidth onClick={startInquiry}>Send Inquiry</Button>
             </>
           ) : (
             /* "Request Number" is gone with the chat: a number is no longer
@@ -333,7 +356,7 @@ export function ListingDetail({ id, isGuest = false }: { id: string; isGuest?: b
                theirs (the branch above) or they don't — and either way the
                buyer's route is the same one action, which also tells the seller
                how and when to reach back. */
-            <Button fullWidth onClick={() => (isGuest ? setSheet("login") : setSheet("inquiry"))}>
+            <Button fullWidth onClick={startInquiry}>
               <Icon name="zap" size={17} /> Send Inquiry
             </Button>
           )}

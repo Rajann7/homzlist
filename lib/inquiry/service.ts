@@ -19,6 +19,13 @@ import { isNumberVerified } from "./numbers";
 
 const db = () => createServiceClient();
 
+/**
+ * How long before the SAME inquiry may be re-sent to the same subject. One
+ * live inquiry per (sender, subject) is a unique index; this is the wall on
+ * re-opening it, which is what actually re-notifies the receiver.
+ */
+export const RESEND_COOLDOWN_MS = 6 * 3600_000;
+
 /** Bumped whenever the consent wording changes; stored on every inquiry. */
 export const CONSENT_VERSION = "connect-1";
 
@@ -52,6 +59,60 @@ export async function listInquiryOptions(kind: SubjectKind): Promise<InquiryOpti
   return { wants: of("want"), when: of("when"), offers: of("offer"), consentVersion: CONSENT_VERSION, consentText: CONSENT_TEXT };
 }
 
+export interface ExistingInquiry {
+  id: string;
+  leadId: string | null;
+  sentAt: string;
+  wants: { code: string; label: string }[];
+  contactPref: "call" | "whatsapp";
+  contactNumber: string | null;
+  whenLabel: string | null;
+  preferredOn: string | null;
+  /** The sender pulled it back — they may send a fresh one. */
+  withdrawn: boolean;
+}
+
+/**
+ * Has this person already connected on this subject?
+ *
+ * The sheet asks before it draws: offering the same three steps a second time
+ * silently overwrites the inquiry they already sent, which is exactly what a
+ * double send looks like from the outside.
+ */
+export async function existingInquiry(
+  senderId: string,
+  kind: "listing" | "project",
+  subjectId: string,
+): Promise<ExistingInquiry | null> {
+  const col = kind === "listing" ? "listing_id" : "project_id";
+  const { data } = await db()
+    .from("inquiries")
+    .select("id,wants,contact_pref,contact_number,when_token,preferred_on,created_at,updated_at,withdrawn_at")
+    .eq("profile_id", senderId)
+    .eq(col, subjectId)
+    .maybeSingle();
+  const row = data as Record<string, any> | null;
+  if (!row) return null;
+
+  const [{ data: opts }, { data: lead }] = await Promise.all([
+    db().from("inquiry_options").select("code,label"),
+    db().from("leads").select("id").eq("inquiry_id", row.id).maybeSingle(),
+  ]);
+  const labelOf = new Map<string, string>(((opts ?? []) as { code: string; label: string }[]).map((o) => [o.code, o.label]));
+
+  return {
+    id: row.id,
+    leadId: (lead as { id: string } | null)?.id ?? null,
+    sentAt: row.updated_at ?? row.created_at,
+    wants: ((row.wants ?? []) as string[]).map((c) => ({ code: c, label: labelOf.get(c) ?? c })),
+    contactPref: row.contact_pref === "whatsapp" ? "whatsapp" : "call",
+    contactNumber: row.contact_number ?? null,
+    whenLabel: row.when_token ? labelOf.get(row.when_token) ?? row.when_token : null,
+    preferredOn: row.preferred_on,
+    withdrawn: Boolean(row.withdrawn_at),
+  };
+}
+
 export interface SendInquiryInput {
   kind: "listing" | "project";
   subjectId: string;
@@ -69,7 +130,7 @@ export interface SendInquiryInput {
 
 export type SendInquiryResult =
   | { ok: true; leadId: string; alreadySent: boolean }
-  | { ok: false; reason: "self" | "not_found" | "blocked" | "role" | "consent" | "invalid" | "number_unverified" | "withdrawn_locked" };
+  | { ok: false; reason: "self" | "not_found" | "blocked" | "role" | "consent" | "invalid" | "number_unverified" | "cooldown" };
 
 /**
  * A builder can only ever connect on a REQUIREMENT (Doc2 role rules): they sell
@@ -149,12 +210,20 @@ export async function sendInquiry(senderId: string, input: SendInquiryInput): Pr
   };
 
   const { data: existing } = await db()
-    .from("inquiries").select("id").eq("profile_id", senderId).eq(col, input.subjectId).maybeSingle();
+    .from("inquiries").select("id,updated_at").eq("profile_id", senderId).eq(col, input.subjectId).maybeSingle();
 
   let inquiryId: string;
   let alreadySent = false;
   if (existing) {
-    inquiryId = (existing as { id: string }).id;
+    const prior = existing as { id: string; updated_at: string | null };
+    // Re-sending the same inquiry re-notifies the owner and puts the lead back
+    // on unread. Without a wall that is a free way to poke somebody every few
+    // seconds, so a repeat inside the cooldown is refused rather than throttled
+    // silently (the sheet shows the already-sent state instead).
+    if (prior.updated_at && Date.now() - new Date(prior.updated_at).getTime() < RESEND_COOLDOWN_MS) {
+      return { ok: false, reason: "cooldown" };
+    }
+    inquiryId = prior.id;
     alreadySent = true;
     await db().from("inquiries").update(row).eq("id", inquiryId);
   } else {

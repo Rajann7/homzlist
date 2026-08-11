@@ -274,7 +274,7 @@ export function ProposalSheet({
                   </div>
                 )}
                 <Note tone="accent" icon="check">
-                  <b>No message is required.</b> Your offer and preferences are shared automatically.
+                  Your offer and preferences are shared with them automatically.
                 </Note>
                 <Button className="mt-3" fullWidth disabled={!canContinue} onClick={() => setStep(2)}>Continue</Button>
                 <Dots step={1} />

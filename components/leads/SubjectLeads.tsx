@@ -62,6 +62,9 @@ export function SubjectLeads({
                 <span className="text-11 font-normal text-ink-secondary">
                   {data.subject.total} lead{data.subject.total === 1 ? "" : "s"}
                   {data.subject.unseen ? ` · ${data.subject.unseen} new` : ""}
+                  {/* The one quality number a seller has left: of everyone who
+                      asked, how many did you actually take somewhere. */}
+                  {data.subject.converted ? ` · ${data.subject.converted} converted` : ""}
                 </span>
               )}
             </span>
@@ -106,15 +109,30 @@ export function SubjectLeads({
   );
 }
 
+/**
+ * One lead card. The design gives a lead three weights, and the weight IS the
+ * information: a NEW one opens its whole payload and a primary Call, a worked
+ * one collapses to a single line with quieter buttons, and a closed one is just
+ * a name and a verdict. Rendering every card at full weight — which the first
+ * pass did — makes a busy listing unreadable and hides the one that needs you.
+ */
 export function LeadCard({
   lead, base, onChanged,
 }: { lead: leadsApi.LeadView; base: string; onChanged: () => void }) {
+  const fresh = lead.status === "new";
+  const closed = lead.status === "archived";
+  const summary = [
+    lead.wants.map((w) => w.label).join(", "),
+    lead.contactPref === "whatsapp" ? "WhatsApp" : "Call",
+    lead.preferredOn ? `${lead.whenLabel ?? ""} ${lead.preferredOn}`.trim() : lead.whenLabel,
+  ].filter(Boolean).join(" · ");
+
   return (
     <div
       className={cn(
         "border-b border-divider px-3 py-3",
         !lead.seen && "bg-accent-soft/30 shadow-[inset_3px_0_0_var(--accent)]",
-        lead.status === "archived" && "opacity-70",
+        closed && "opacity-60",
       )}
     >
       <PersonRow
@@ -128,15 +146,21 @@ export function LeadCard({
         }
       />
 
-      <Link href={`${base}/lead/${lead.id}`} className="mt-2.5 block rounded-8 border border-divider bg-surface-2 px-3">
-        <Row k="Wants" v={lead.wants.map((w) => w.label).join(" · ") || "—"} />
-        <Row k="Contact by" v={`${lead.contactPref === "whatsapp" ? "WhatsApp" : "Call"}${lead.contactNumber ? ` · ${lead.contactNumber}` : ""}`} />
-        <Row k="Best time" v={lead.preferredOn ? `${lead.whenLabel ?? ""} · ${lead.preferredOn}`.replace(/^ · /, "") : (lead.whenLabel ?? "—")} last />
-      </Link>
+      {fresh ? (
+        <Link href={`${base}/lead/${lead.id}`} className="mt-2.5 block rounded-8 border border-divider bg-surface-2 px-3">
+          <Row k="Wants" v={lead.wants.map((w) => w.label).join(" · ") || "—"} />
+          <Row k="Contact by" v={`${lead.contactPref === "whatsapp" ? "WhatsApp" : "Call"}${lead.contactNumber ? ` · ${lead.contactNumber}` : ""}`} />
+          <Row k="Best time" v={lead.preferredOn ? `${lead.whenLabel ?? ""} · ${lead.preferredOn}`.replace(/^ · /, "") : (lead.whenLabel ?? "—")} last />
+        </Link>
+      ) : summary ? (
+        <Link href={`${base}/lead/${lead.id}`} className="mt-2 block truncate text-12 text-ink-secondary">
+          {summary}
+        </Link>
+      ) : null}
 
       {lead.closedReason && <p className="mt-2 text-11 text-ink-tertiary">{lead.closedReason}</p>}
 
-      <LeadActions lead={lead} onChanged={onChanged} />
+      {!closed && <LeadActions lead={lead} onChanged={onChanged} quiet={!fresh} />}
     </div>
   );
 }

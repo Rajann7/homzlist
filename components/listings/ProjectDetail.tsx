@@ -112,7 +112,11 @@ export function ProjectDetail({ id, isGuest = false }: { id: string; isGuest?: b
   // direct: Call dials it, WhatsApp/Enquire opens a prefilled chat. No inquiry
   // thread — projects have no chat pipeline (that's for listings).
   const contactBuilder = (via: "call" | "whatsapp", unitType?: string) => {
-    const number = p.contact?.number ? String(p.contact.number).replace(/\D/g, "") : "";
+    // Call and WhatsApp can be different lines (0138): a project may publish a
+    // sales number, and a separate WhatsApp for it. Falling back keeps every
+    // project that only has the one number working exactly as before.
+    const raw = via === "whatsapp" ? (p.contact?.whatsapp ?? p.contact?.number) : p.contact?.number;
+    const number = raw ? String(raw).replace(/\D/g, "") : "";
     if (!number) { toast.show("The builder hasn't shared a contact number"); return; }
     // Record the lead (migration 0051) — fire-and-forget, because the call must
     // connect whether or not this write lands. The server drops it for a guest,

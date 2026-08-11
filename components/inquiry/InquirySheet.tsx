@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { BottomSheet, Button, Chip, Icon, Skeleton, useToast } from "@/components/billing/ui";
+import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { ago } from "@/components/leads/parts";
 import * as leadsApi from "@/lib/leads/client";
 import { NumberVerifySheet } from "./NumberVerifySheet";
 
@@ -54,7 +56,7 @@ export function InquirySheet({
     setPreferredDate(""); setConsent(false); setSending(false); setOptions(null);
     setIdem(crypto.randomUUID());
     void (async () => {
-      const res = await leadsApi.inquiryOptions(subject.kind);
+      const res = await leadsApi.inquiryOptions(subject.kind, subject.id);
       if (res.ok) { setOptions(res.data); setNumber(res.data.myNumber); }
     })();
   }, [open, subject.kind]);
@@ -110,6 +112,12 @@ export function InquirySheet({
             <Skeleton className="h-10 w-full rounded-8" />
             <Skeleton className="h-11 w-full rounded-8" />
           </div>
+        ) : options.existing && !options.existing.withdrawn ? (
+          <AlreadySent
+            existing={options.existing}
+            onClose={onClose}
+            onWithdrawn={() => { onSent?.(options.existing?.leadId ?? ""); onClose(); }}
+          />
         ) : (
           <div className="flex flex-col pb-2">
             <div className="flex items-start gap-3">
@@ -200,12 +208,12 @@ export function InquirySheet({
             <div className="mt-3 flex flex-col gap-2">
               {step === 1 && (
                 <Note tone="accent" icon="check">
-                  <b>No message is required.</b> Your inquiry and selected preferences will be shared automatically.
+                  Your selected preferences are shared with the owner automatically.
                 </Note>
               )}
               {step === 2 && (
                 <>
-                  <Note icon="lock">Your contact details will only be shared with the person connected to this {subject.kind === "project" ? "project" : "property"}.</Note>
+                    <Note icon="lock">Your contact details will only be shared with the person connected to this {subject.kind === "project" ? "project" : "property"}.</Note>
                   <Note icon="phone">The owner may contact you using your selected contact method.</Note>
                 </>
               )}
@@ -256,6 +264,62 @@ export function InquirySheet({
         onVerified={(n) => { setNumber(n); setVerifyOpen(false); }}
       />
     </>
+  );
+}
+
+/**
+ * "You already sent this." The design's own state (screen 16): what was asked
+ * for, when, and the two things that are still true — you can look at it in
+ * Sent, or cancel it. Cancelling does NOT unshare what was already delivered,
+ * and the copy says exactly that rather than implying a recall.
+ */
+function AlreadySent({
+  existing, onClose, onWithdrawn,
+}: { existing: leadsApi.ExistingInquiry; onClose: () => void; onWithdrawn: () => void }) {
+  const router = useRouter();
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+
+  return (
+    <div className="flex flex-col pb-2">
+      <div className="flex items-center gap-2">
+        <Icon name="check-circle" size={18} className="text-accent" />
+        <h2 className="flex-1 text-15 font-semibold text-ink-primary">Inquiry already sent</h2>
+        <span className="rounded-full bg-accent-soft px-2 py-0.5 text-11 font-semibold text-accent">{ago(existing.sentAt)}</span>
+      </div>
+
+      <p className="mt-2 text-13 leading-snug text-ink-secondary">
+        You asked for {existing.wants.map((w) => w.label).join(", ") || "details"} ·{" "}
+        {existing.contactPref === "whatsapp" ? "WhatsApp" : "Call"}
+        {existing.whenLabel ? ` · ${existing.whenLabel}` : ""}. The owner has your details.
+      </p>
+
+      <div className="mt-3 flex gap-2">
+        <Button variant="outline" className="flex-1" onClick={() => { onClose(); router.push("/leads"); }}>
+          View in Sent
+        </Button>
+        <Button
+          variant="outline"
+          className="flex-1 border-error/30 text-error"
+          loading={busy}
+          disabled={!existing.leadId}
+          onClick={async () => {
+            if (!existing.leadId) return;
+            setBusy(true);
+            const res = await leadsApi.withdraw(existing.leadId);
+            setBusy(false);
+            if (!res.ok) { toast.show("Couldn't cancel that", { variant: "error" }); return; }
+            toast.show("Request cancelled");
+            onWithdrawn();
+          }}
+        >
+          Cancel request
+        </Button>
+      </div>
+      <p className="mt-2 text-11 leading-snug text-ink-tertiary">
+        Your details have already been shared and cannot be recalled. Cancelling only stops further contact through HomzList.
+      </p>
+    </div>
   );
 }
 

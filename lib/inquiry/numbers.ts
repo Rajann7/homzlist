@@ -1,6 +1,6 @@
 import "server-only";
 import { createServiceClient } from "@/lib/supabase/server";
-import { requestOtp, verifyOtp } from "@/lib/auth/otp";
+import { requestOtp, resendOtp, verifyOtp } from "@/lib/auth/otp";
 import { toE164, isValidIndianMobile } from "@/lib/auth/phone";
 import { rateLimit } from "@/lib/auth/rate-limit";
 
@@ -21,7 +21,7 @@ const db = () => createServiceClient();
 export const REUSE_DAYS = 7;
 
 export type StartResult =
-  | { ok: true; otpSession: string; alreadyVerified: false; number: string }
+  | { ok: true; otpSession: string; alreadyVerified: false; number: string; devCode?: string; resendIn?: number }
   | { ok: true; alreadyVerified: true; number: string }
   | { ok: false; reason: "invalid" | "rate_limited" | "locked" };
 
@@ -44,7 +44,17 @@ export async function startNumberVerification(profileId: string, raw: string, ip
 
   const out = await requestOtp(e164, ipHash);
   if (!out.ok || !out.otpSession) return { ok: false, reason: out.reason === "NUMBER_LOCKED" ? "locked" : "rate_limited" };
-  return { ok: true, otpSession: out.otpSession, alreadyVerified: false, number: e164 };
+  // `devCode` is echoed in the dev band exactly as the sign-in flow does it —
+  // there is no SMS provider wired yet, so without it the popup asks for a code
+  // that can never arrive and the whole custom-number option is dead.
+  return {
+    ok: true,
+    otpSession: out.otpSession,
+    alreadyVerified: false,
+    number: e164,
+    ...(out.devCode ? { devCode: out.devCode } : {}),
+    ...(out.resendIn ? { resendIn: out.resendIn } : {}),
+  };
 }
 
 export type ConfirmResult =
@@ -73,6 +83,15 @@ export async function confirmNumberVerification(profileId: string, otpSession: s
     { onConflict: "profile_id,number" },
   );
   return { ok: true, number, expiresAt };
+}
+
+export type ResendResult = { ok: true; devCode?: string; resendIn?: number } | { ok: false; reason: string };
+
+/** Resend the code for a verification already in flight. */
+export async function resendNumberOtp(otpSession: string, ipHash: string): Promise<ResendResult> {
+  const out = await resendOtp(otpSession, ipHash);
+  if (!out.ok) return { ok: false, reason: out.reason ?? "RATE_LIMITED" };
+  return { ok: true, ...(out.devCode ? { devCode: out.devCode } : {}), ...(out.resendIn ? { resendIn: out.resendIn } : {}) };
 }
 
 /** Is there a live (unexpired) verification of this number for this profile? */

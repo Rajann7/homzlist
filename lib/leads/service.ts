@@ -63,6 +63,9 @@ export interface LeadSubject {
   stateLabel: string;
   total: number;
   unseen: number;
+  /** The only quality metric left once there are no messages to measure. */
+  contacted: number;
+  converted: number;
   lastAt: string | null;
 }
 
@@ -94,6 +97,7 @@ interface Row {
   notes: { text: string; at: string }[];
   seen_at: string | null;
   closed_reason: string | null;
+  sender_answer: "contacted" | "not_yet" | null;
   last_activity: string | null;
   last_activity_at: string;
   is_relevant: boolean;
@@ -109,7 +113,12 @@ interface Row {
  */
 export async function listLeadGroups(ownerId: string): Promise<LeadGroups> {
   const { data: counts } = await db().rpc("lead_subject_counts", { p_owner: ownerId });
-  const rows = ((counts ?? []) as { kind: SubjectKind; subject_id: string; total: string | number; unseen: string | number; last_at: string | null }[]);
+  const rows = ((counts ?? []) as {
+    kind: SubjectKind; subject_id: string;
+    total: string | number; unseen: string | number;
+    contacted: string | number; converted: string | number;
+    last_at: string | null;
+  }[]);
 
   const ids = (k: SubjectKind) => rows.filter((r) => r.kind === k).map((r) => r.subject_id);
   const [listingIds, projectIds, requirementIds] = [ids("listing"), ids("project"), ids("requirement")];
@@ -135,6 +144,8 @@ export async function listLeadGroups(ownerId: string): Promise<LeadGroups> {
   for (const row of rows) {
     const total = Number(row.total);
     const unseen = Number(row.unseen);
+    const contacted = Number(row.contacted ?? 0);
+    const converted = Number(row.converted ?? 0);
     if (row.kind === "listing") {
       const l: any = lMap.get(row.subject_id);
       if (!l) continue;
@@ -144,7 +155,7 @@ export async function listLeadGroups(ownerId: string): Promise<LeadGroups> {
         subtitle: [l.price_on_request ? "Price on request" : priceLabel(l.price_paise), l.area_label].filter(Boolean).join(" · "),
         coverUrl: l.cover_url ?? null,
         stateLabel: listingState(l.status),
-        total, unseen, lastAt: row.last_at,
+        total, unseen, contacted, converted, lastAt: row.last_at,
       });
     } else if (row.kind === "project") {
       const p: any = pMap.get(row.subject_id);
@@ -153,7 +164,7 @@ export async function listLeadGroups(ownerId: string): Promise<LeadGroups> {
         kind: "project", id: row.subject_id,
         title: p.name ?? "Project", subtitle: listingState(p.status),
         coverUrl: p.cover_url ?? null, stateLabel: listingState(p.status),
-        total, unseen, lastAt: row.last_at,
+        total, unseen, contacted, converted, lastAt: row.last_at,
       });
     } else if (row.kind === "requirement") {
       const r: any = rMap.get(row.subject_id);
@@ -166,7 +177,7 @@ export async function listLeadGroups(ownerId: string): Promise<LeadGroups> {
         subtitle: budgetLabel(r.budget_min_paise, r.budget_max_paise),
         coverUrl: null,
         stateLabel: requirementState(r.status, r.expires_at),
-        total, unseen, lastAt: row.last_at,
+        total, unseen, contacted, converted, lastAt: row.last_at,
       });
     }
   }
@@ -347,6 +358,10 @@ async function hydrate(rows: Row[]): Promise<LeadView[]> {
 
 export interface SentLead {
   id: string;
+  /** null = not answered yet. Only asked once the receiver has had a chance. */
+  senderAnswer: "contacted" | "not_yet" | null;
+  /** Show the one-tap question on this card. */
+  askAnswer: boolean;
   /** Sender-facing state. The receiver's pipeline stage is NEVER exposed. */
   state: "sent" | "seen" | "contacted" | "closed";
   stateLabel: string;
@@ -408,8 +423,13 @@ export async function listSentLeads(profileId: string): Promise<SentLead[]> {
       r.contact_pref === "whatsapp" ? "WhatsApp" : r.contact_pref === "call" ? "Call" : "",
       r.when_token ? whenMap.get(r.when_token) ?? "" : "",
     ].filter(Boolean);
+    const oldEnough = Date.now() - new Date(r.created_at).getTime() > 24 * 3600_000;
     return {
       id: r.id,
+      senderAnswer: r.sender_answer ?? null,
+      // Asked once the inquiry has had a day to land, and only while it is
+      // still open — asking about a closed lead is noise.
+      askAnswer: !r.sender_answer && oldEnough && state !== "closed",
       state,
       stateLabel: state === "sent" ? "Sent" : state === "seen" ? "Seen" : state === "contacted" ? "Owner contacted you" : "Closed",
       createdAt: r.created_at,
@@ -494,6 +514,24 @@ export async function recordContact(id: string, actorId: string, channel: "call"
     }).eq("id", id).eq("owner_id", actorId);
   }
   return true;
+}
+
+/**
+ * The sender answering "did they actually contact you?".
+ *
+ * The receiver tapping Call is one half of the evidence; this is the other, and
+ * it is the only signal that distinguishes a seller who works their leads from
+ * one who collects numbers. Sender-scoped: nobody can answer for someone else.
+ */
+export async function answerSent(id: string, senderId: string, answer: "contacted" | "not_yet"): Promise<boolean> {
+  const { data } = await db()
+    .from("leads")
+    .update({ sender_answer: answer, sender_answer_at: new Date().toISOString() })
+    .eq("id", id)
+    .eq("lead_profile_id", senderId)
+    .select("id")
+    .maybeSingle();
+  return Boolean(data);
 }
 
 export async function markLeadNotRelevant(id: string, ownerId: string): Promise<boolean> {

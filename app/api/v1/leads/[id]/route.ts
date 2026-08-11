@@ -4,7 +4,7 @@ import { getCurrentUser } from "@/lib/auth/current-user";
 import { rateLimit } from "@/lib/auth/rate-limit";
 import {
   getLead, setLeadStatus, addLeadNote, markLeadNotRelevant, markLeadSeen,
-  recordContact, withdrawSent, LEAD_STATUSES, type LeadStatus,
+  recordContact, withdrawSent, answerSent, LEAD_STATUSES, type LeadStatus,
 } from "@/lib/leads/service";
 import { reportLead } from "@/lib/leads/report";
 
@@ -72,6 +72,12 @@ export async function PATCH(req: NextRequest, props: { params: Promise<{ id: str
     case "withdraw":
       done = await withdrawSent(id, claims.sub);
       break;
+    case "answer": {
+      // The sender closing the loop. Sender-scoped inside the service.
+      const answer = body.answer === "contacted" ? "contacted" : "not_yet";
+      done = await answerSent(id, claims.sub, answer);
+      break;
+    }
     case "report": {
       const res = await reportLead(id, claims.sub,
         typeof body.reason === "string" ? body.reason : "",

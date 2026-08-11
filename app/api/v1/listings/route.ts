@@ -8,6 +8,7 @@ import { validateListing } from "@/lib/listings/validate";
 import { scanAndRecord } from "@/lib/moderation/rules";
 import { listingCardDTO } from "@/lib/listings/dto";
 import { getUserPrefs } from "@/lib/settings/service";
+import { resolvePublisherContact } from "@/lib/inquiry/publisher-number";
 import { canPostListing } from "@/lib/listings/capabilities";
 
 /**
@@ -65,6 +66,17 @@ export async function POST(req: NextRequest) {
   const pricePaise =
     typeof body.pricePaise === "number" && Number.isFinite(body.pricePaise) ? Math.trunc(body.pricePaise) : null;
 
+  // A number we cannot stand behind is never PUBLISHED — but the create is not
+  // failed over it either. The resolver drops an unverified number back to the
+  // account's own registered one and flags the post `contact_verified = false`,
+  // so a stranger's phone can never end up on a listing while every existing
+  // create flow keeps working exactly as it did.
+  const publisherContact = await resolvePublisherContact(claims.sub, {
+    number: typeof body.contactNumber === "string" ? body.contactNumber : null,
+    whatsapp: typeof body.whatsappNumber === "string" ? body.whatsappNumber : null,
+    alt: typeof body.altNumber === "string" ? body.altNumber : null,
+  });
+
   // Attributes are filtered to what this type + kind actually asks for, and to
   // what was VISIBLE given the rest of the answers, before anything is checked
   // or stored — see `sanitizeAttributes`.
@@ -86,7 +98,16 @@ export async function POST(req: NextRequest) {
     pincode: typeof body.pincode === "string" ? body.pincode.trim() : null,
     attributes,
     photoCount: typeof body.photoCount === "number" ? body.photoCount : 0,
-    contact: { public: contactPublic, number: typeof body.contactNumber === "string" ? body.contactNumber : null },
+    // A published number is somebody's phone ringing. It has to be one this
+    // account has proved it holds — the same OTP layer the inquiry sheet's
+    // "use a different number" goes through (lib/inquiry/publisher-number).
+    contact: {
+      public: contactPublic,
+      number: publisherContact.number,
+      whatsapp: publisherContact.whatsapp,
+      alt: publisherContact.alt,
+      verified: publisherContact.verified,
+    },
   };
 
   // The content rules live in `number_patterns` / `blocklist_words` and are

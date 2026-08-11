@@ -3,7 +3,7 @@ import { ok, fail } from "@/lib/api";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { getProfileById } from "@/lib/profile/service";
 import { rateLimit } from "@/lib/auth/rate-limit";
-import { sendInquiry, listInquiryOptions, mayInquire } from "@/lib/inquiry/service";
+import { sendInquiry, listInquiryOptions, mayInquire, existingInquiry } from "@/lib/inquiry/service";
 
 /**
  * POST /api/v1/inquiries — the connection sheet's Send.
@@ -25,8 +25,22 @@ export async function GET(req: NextRequest) {
   const kind = kindParam === "project" ? "project" : kindParam === "requirement" ? "requirement" : "listing";
   const profile = await getProfileById(claims.sub);
   if (!profile || profile.state !== "active") return fail("FORBIDDEN");
+
+  // The sheet must know whether this person has ALREADY connected on this
+  // subject — otherwise it offers the same three steps again and quietly
+  // overwrites the inquiry they already sent, which reads as a double send.
+  const subjectId = req.nextUrl.searchParams.get("subjectId") ?? "";
+  const existing = subjectId && UUID_RE.test(subjectId)
+    ? await existingInquiry(claims.sub, kind === "project" ? "project" : "listing", subjectId)
+    : null;
+
   const options = await listInquiryOptions(kind);
-  return ok({ ...options, allowed: mayInquire(profile.role, kind), myNumber: profile.phone ?? null });
+  return ok({
+    ...options,
+    allowed: mayInquire(profile.role, kind),
+    myNumber: profile.phone ?? null,
+    existing,
+  });
 }
 
 export async function POST(req: NextRequest) {
@@ -69,6 +83,9 @@ export async function POST(req: NextRequest) {
     if (res.reason === "role") return fail("FORBIDDEN");
     if (res.reason === "number_unverified") return fail("NUMBER_NOT_ALLOWED");
     if (res.reason === "consent" || res.reason === "invalid") return fail("VALIDATION_ERROR");
+    // Already sent, too recently to send again — the sheet shows the
+    // already-sent card rather than pretending the send failed.
+    if (res.reason === "cooldown") return fail("INQUIRY_COOLDOWN");
     // A block must not be distinguishable from a subject that isn't there —
     // otherwise the endpoint tells you who blocked you.
     return fail("NOT_FOUND");

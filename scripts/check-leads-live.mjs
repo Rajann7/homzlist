@@ -383,6 +383,151 @@ if (E.CRON_SECRET) {
 }
 
 // ---------------------------------------------------------------------------
+// 15. The reported bugs — each one reproduced, then proved fixed
+// ---------------------------------------------------------------------------
+
+// (a) The sheet must SAY it was already sent instead of offering the steps again.
+const reopened = await buyerA.req(`/api/v1/inquiries?kind=listing&subjectId=${listing.id}`);
+check("sheet reports the existing inquiry (no silent second send)",
+  reopened.json?.ok && reopened.json.data.existing && reopened.json.data.existing.id,
+  reopened.json?.data?.existing ? `sent ${reopened.json.data.existing.wants.map((w) => w.label).join(", ")}` : "existing: null");
+
+// (b) A rapid re-send is refused rather than re-notifying the owner.
+const rapid = await buyerA.req("/api/v1/inquiries", "POST", {
+  listingId: listing.id, wants: ["price"], contactPref: "call", whenToken: "anytime", consent: true,
+});
+check("re-sending the same inquiry inside the cooldown → refused",
+  rapid.json?.error?.code === "INQUIRY_COOLDOWN", rapid.json?.error?.code ?? `HTTP ${rapid.status}`);
+
+// (c) Custom number: the whole OTP round trip, ending in a real row.
+// A number no profile owns, so "did this create an account?" is a real question.
+const { rows: [{ n: freeNum }] } = await db.query(
+  `select (9700000000 + floor(random()*8999999)::bigint)::text n`);
+const CUSTOM = freeNum.slice(-10);
+const { rows: [{ count: profilesBefore }] } = await db.query(`select count(*)::int from profiles`);
+await db.query(`delete from verified_contact_numbers where profile_id=$1 and number=$2`, [buyer.id, `+91${CUSTOM}`]);
+const startOtp = await buyerA.req("/api/v1/contact-numbers", "POST", { number: CUSTOM });
+check("custom number: OTP starts and the dev band returns a code",
+  startOtp.json?.ok === true && Boolean(startOtp.json.data.otpSession) && Boolean(startOtp.json.data.devCode),
+  startOtp.json?.ok ? (startOtp.json.data.devCode ? "code returned" : "NO devCode — popup would be unusable") : JSON.stringify(startOtp.json?.error));
+
+if (startOtp.json?.ok && startOtp.json.data.otpSession) {
+  const confirmOtp = await buyerA.req("/api/v1/contact-numbers", "PUT", {
+    otpSession: startOtp.json.data.otpSession,
+    code: startOtp.json.data.devCode ?? "123456",
+  });
+  check("custom number: code verifies", confirmOtp.json?.ok === true, JSON.stringify(confirmOtp.json?.error ?? ""));
+
+  const { rows: [vn] } = await db.query(
+    `select number, expires_at > now() live from verified_contact_numbers where profile_id=$1 and number=$2`,
+    [buyer.id, `+91${CUSTOM}`]);
+  check("custom number: a live verification row exists", vn?.live === true, vn ? vn.number : "no row");
+
+  // …and it never created an account. Compared before/after, because dev data
+  // already contains plenty of numbers this run did not make.
+  const { rows: [{ count: profilesAfter }] } = await db.query(`select count(*)::int from profiles`);
+  const { rows: [{ count: ghost }] } = await db.query(
+    `select count(*)::int from profiles where phone=$1`, [`+91${CUSTOM}`]);
+  check("verifying a number does NOT create an account",
+    ghost === 0 && profilesAfter === profilesBefore, `${ghost} for this number, total ${profilesBefore}→${profilesAfter}`);
+
+  const reuse = await buyerA.req("/api/v1/contact-numbers", "POST", { number: CUSTOM });
+  check("a verified number is reused without another OTP", reuse.json?.data?.alreadyVerified === true,
+    String(reuse.json?.data?.alreadyVerified));
+
+  // And it is actually usable on a send.
+  const other = await db.query(
+    `select id from listings where status='live' and profile_id <> $1 and id <> $2 order by created_at desc limit 1`,
+    [buyer.id, listing.id]);
+  if (other.rows[0]) {
+    await db.query(`delete from leads where listing_id=$1 and lead_profile_id=$2`, [other.rows[0].id, buyer.id]);
+    await db.query(`delete from inquiries where listing_id=$1 and profile_id=$2`, [other.rows[0].id, buyer.id]);
+    const withCustom = await buyerA.req("/api/v1/inquiries", "POST", {
+      listingId: other.rows[0].id, wants: ["price"], contactPref: "whatsapp",
+      whenToken: "anytime", consent: true, contactNumber: `+91${CUSTOM}`,
+    });
+    check("inquiry sends on the verified custom number", withCustom.json?.ok === true,
+      JSON.stringify(withCustom.json?.error ?? ""));
+    const { rows: [cn] } = await db.query(
+      `select contact_number, contact_number_verified from inquiries where listing_id=$1 and profile_id=$2`,
+      [other.rows[0].id, buyer.id]);
+    check("…and the lead carries THAT number, flagged verified",
+      cn?.contact_number === `+91${CUSTOM}` && cn?.contact_number_verified === true,
+      `${cn?.contact_number} verified=${cn?.contact_number_verified}`);
+  }
+}
+
+// (d) An UNVERIFIED number must be refused on the send.
+const unverified = await buyerA.req("/api/v1/inquiries", "POST", {
+  listingId: listing.id, wants: ["price"], contactPref: "call",
+  whenToken: "anytime", consent: true, contactNumber: "+919000000123",
+});
+check("an unverified custom number is refused",
+  unverified.json?.error?.code === "NUMBER_NOT_ALLOWED" || unverified.json?.error?.code === "INQUIRY_COOLDOWN",
+  unverified.json?.error?.code ?? `HTTP ${unverified.status}`);
+
+// (e) A stranger's number must never reach a published listing. The create is
+// NOT failed over it — it falls back to the account's own number, flagged
+// unverified — because failing it would break every existing create flow.
+const STRANGER = "+919000000456";
+const badPublish = await ownerA.req("/api/v1/listings", "POST", {
+  typeCode: "flat", kind: "sell", title: "contact verification probe", contactNumber: STRANGER,
+});
+const probeId = badPublish.json?.data?.listing?.id ?? badPublish.json?.data?.id ?? null;
+const { rows: [{ count: leaked }] } = await db.query(
+  `select count(*)::int from listings where contact_number = $1`, [STRANGER]);
+check("a stranger's number never lands on a listing", leaked === 0, `${leaked} listings carry it`);
+// The create must never be BLOCKED by the number — that is what broke the whole
+// create flow the first time. Any other validation error is the probe payload
+// being deliberately minimal, not the contact rule.
+check("…and the number rule never blocks a create",
+  badPublish.json?.error?.code !== "NUMBER_NOT_ALLOWED",
+  badPublish.json?.error?.code ?? "created");
+if (probeId) {
+  const { rows: [probe] } = await db.query(
+    `select contact_number, contact_verified from listings where id=$1`, [probeId]);
+  check("…the post falls back to the account's own number, flagged unverified",
+    probe?.contact_number === listing.owner_phone && probe?.contact_verified === false,
+    `${probe?.contact_number} verified=${probe?.contact_verified}`);
+  await db.query(`delete from listings where id=$1`, [probeId]);
+}
+
+// (f) The sender can close the loop.
+const answer = await buyerA.req(`/api/v1/leads/${lead.id}`, "PATCH", { action: "answer", answer: "contacted" });
+const { rows: [answered] } = await db.query(`select sender_answer from leads where id=$1`, [lead.id]);
+check("sender can answer 'did they contact you?'",
+  answer.json?.ok === true && answered?.sender_answer === "contacted", answered?.sender_answer ?? "null");
+const ownerCantAnswer = await ownerA.req(`/api/v1/leads/${lead.id}`, "PATCH", { action: "answer", answer: "not_yet" });
+check("…and the RECEIVER cannot answer for them", ownerCantAnswer.status === 404, `got ${ownerCantAnswer.status}`);
+
+// (g) The Leads header must not throw the user into property search.
+const hubSrc = fs.readFileSync(path.join(ROOT, "components/leads/LeadsHub.tsx"), "utf8");
+check("Leads search stays on the Leads screen",
+  !/href="\/search"/.test(hubSrc) && /Search your leads/.test(hubSrc),
+  /href="\/search"/.test(hubSrc) ? "still links to /search" : "in-screen");
+
+// (h) No chat/message vocabulary left in the connection UI.
+const uiFiles = [
+  "components/inquiry/InquirySheet.tsx",
+  "components/inquiry/NumberVerifySheet.tsx",
+  "components/leads/LeadsHub.tsx",
+  "components/leads/SubjectLeads.tsx",
+  "components/leads/LeadDetail.tsx",
+  "components/listings/ProposalSheet.tsx",
+];
+const banned = [];
+for (const rel of uiFiles) {
+  const src = fs.readFileSync(path.join(ROOT, rel), "utf8");
+  // Only user-visible strings matter, so scan JSX text and quoted copy.
+  for (const bad of ["No message is required", "chat", "Chat"]) {
+    const hit = src.split("\n").find((line) =>
+      line.includes(bad) && !line.trim().startsWith("*") && !line.trim().startsWith("//"));
+    if (hit) banned.push(`${rel}: ${bad}`);
+  }
+}
+check("no message/chat wording left in the connection UI", banned.length === 0, banned.join(" | "));
+
+// ---------------------------------------------------------------------------
 console.log("");
 const failed = results.filter((r) => !r.p);
 console.log(`${results.length - failed.length}/${results.length} passed`);

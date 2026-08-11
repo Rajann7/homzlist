@@ -31,10 +31,13 @@ export function NumberVerifySheet({
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState<{ number: string; expiresAt: string }[]>([]);
   const [reuseDays, setReuseDays] = useState(7);
+  // Dev band has no SMS provider, so the server echoes the code and the popup
+  // fills it in — otherwise the whole option is untestable and unusable here.
+  const [devCode, setDevCode] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
-    setPhase("enter"); setNumber(""); setCode(""); setSession(""); setBusy(false);
+    setPhase("enter"); setNumber(""); setCode(""); setSession(""); setBusy(false); setDevCode(null);
     void (async () => {
       const res = await leadsApi.myNumbers();
       if (res.ok) { setSaved(res.data.verified.filter((v) => v.number !== res.data.myNumber)); setReuseDays(res.data.reuseDays); }
@@ -57,8 +60,9 @@ export function NumberVerifySheet({
       return;
     }
     // Already inside the 7-day window: no OTP, straight back to the sheet.
-    if (res.data.alreadyVerified) { onVerified(res.data.number); return; }
+    if (res.data.alreadyVerified) { toast.show("Number already verified"); onVerified(res.data.number); return; }
     setSession(res.data.otpSession ?? "");
+    if (res.data.devCode) { setDevCode(res.data.devCode); setCode(res.data.devCode); }
     setPhase("code");
   }
 
@@ -127,6 +131,11 @@ export function NumberVerifySheet({
         ) : (
           <>
             <p className="text-13 text-ink-secondary">Code sent to +91 {number}</p>
+            {devCode && (
+              <p className="rounded-8 border border-divider bg-surface-2 px-3 py-2 text-12 text-ink-secondary">
+                Dev mode — your code is <b className="font-semibold text-ink-primary">{devCode}</b>
+              </p>
+            )}
             <input
               inputMode="numeric"
               maxLength={6}
@@ -141,9 +150,23 @@ export function NumberVerifySheet({
             <Button fullWidth loading={busy} disabled={code.length !== 6} onClick={() => void confirm()}>
               Verify number
             </Button>
-            <button type="button" onClick={() => setPhase("enter")} className="chrome text-12 font-semibold text-ink-secondary">
-              Change number
-            </button>
+            <div className="flex items-center justify-between">
+              <button type="button" onClick={() => setPhase("enter")} className="chrome text-12 font-semibold text-ink-secondary">
+                Change number
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  const again = await leadsApi.resendNumberOtp(session);
+                  if (!again.ok) { toast.show("Couldn't resend just yet", { variant: "error" }); return; }
+                  if (again.data.devCode) { setDevCode(again.data.devCode); setCode(again.data.devCode); }
+                  toast.show("Code sent again");
+                }}
+                className="chrome text-12 font-semibold text-accent"
+              >
+                Resend code
+              </button>
+            </div>
           </>
         )}
       </div>

@@ -4,7 +4,7 @@ import { getCurrentUser } from "@/lib/auth/current-user";
 import { getProfileById } from "@/lib/profile/service";
 import { hashIp } from "@/lib/auth/rate-limit";
 import {
-  startNumberVerification, confirmNumberVerification, liveVerifiedNumbers, REUSE_DAYS,
+  startNumberVerification, confirmNumberVerification, resendNumberOtp, liveVerifiedNumbers, REUSE_DAYS,
 } from "@/lib/inquiry/numbers";
 
 /**
@@ -38,9 +38,17 @@ export async function POST(req: NextRequest) {
   let body: Record<string, unknown>;
   try { body = await req.json(); } catch { return fail("VALIDATION_ERROR"); }
   const number = typeof body.number === "string" ? body.number : "";
-  if (!number) return fail("VALIDATION_ERROR", { field: "number" });
+  if (!number && body.resend !== true) return fail("VALIDATION_ERROR", { field: "number" });
 
   const ipHash = await hashIp(req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "");
+
+  // Resend uses the same endpoint so the popup does not need a second route.
+  if (typeof body.otpSession === "string" && body.resend === true) {
+    const again = await resendNumberOtp(body.otpSession, ipHash);
+    if (!again.ok) return fail(again.reason === "NUMBER_LOCKED" ? "NUMBER_LOCKED" : "RATE_LIMITED");
+    return ok({ resent: true, ...(again.devCode ? { devCode: again.devCode } : {}), resendIn: again.resendIn ?? null });
+  }
+
   const res = await startNumberVerification(claims.sub, number, ipHash);
   if (!res.ok) {
     if (res.reason === "invalid") return fail("VALIDATION_ERROR", { field: "number" });
@@ -48,7 +56,16 @@ export async function POST(req: NextRequest) {
     return fail("RATE_LIMITED");
   }
   if (res.alreadyVerified) return ok({ alreadyVerified: true, number: res.number });
-  return ok({ alreadyVerified: false, number: res.number, otpSession: res.otpSession });
+  // devCode is echoed only in the dev band, exactly as the sign-in flow does —
+  // there is no SMS provider wired yet, so without it the popup would ask for a
+  // code that can never arrive.
+  return ok({
+    alreadyVerified: false,
+    number: res.number,
+    otpSession: res.otpSession,
+    ...(res.devCode ? { devCode: res.devCode } : {}),
+    resendIn: res.resendIn ?? null,
+  });
 }
 
 export async function PUT(req: NextRequest) {

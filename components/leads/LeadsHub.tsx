@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { AppShell, Header, Icon, Skeleton, EmptyState } from "@/components/billing/ui";
+import { AppShell, BottomSheet, Header, Icon, Skeleton, EmptyState } from "@/components/billing/ui";
 import { cn } from "@/lib/utils";
 import * as leadsApi from "@/lib/leads/client";
 import { KIND, StatusPill, SubjectThumb, ago } from "./parts";
@@ -23,6 +23,13 @@ import { KIND, StatusPill, SubjectThumb, ago } from "./parts";
  */
 export function LeadsHub({ base = "/leads" }: { base?: string }) {
   const [tab, setTab] = useState<"received" | "sent">("received");
+  // The header's search searches THIS screen. It used to be a link to /search,
+  // which threw the user out of their leads into property search — the single
+  // most jarring thing on the screen.
+  const [searching, setSearching] = useState(false);
+  const [q, setQ] = useState("");
+  const [sort, setSort] = useState<"recent" | "new" | "unanswered">("recent");
+  const [sortOpen, setSortOpen] = useState(false);
   const [groups, setGroups] = useState<leadsApi.LeadGroups | null>(null);
   const [sent, setSent] = useState<leadsApi.SentLead[] | null>(null);
   const [failed, setFailed] = useState(false);
@@ -37,8 +44,18 @@ export function LeadsHub({ base = "/leads" }: { base?: string }) {
   useEffect(() => { void load(); }, [load]);
 
   const loading = !groups && !failed;
-  const subjects = groups?.subjects ?? [];
+  const needle = q.trim().toLowerCase();
+  const allSubjects = groups?.subjects ?? [];
+  const subjects = allSubjects
+    .filter((s) => (needle ? `${s.title} ${s.subtitle}`.toLowerCase().includes(needle) : true))
+    .filter((s) => (sort === "unanswered" ? s.unseen > 0 : true))
+    .sort((a, b) =>
+      sort === "new"
+        ? b.unseen - a.unseen || (b.lastAt ?? "").localeCompare(a.lastAt ?? "")
+        : 0);
   const byKind = (k: leadsApi.SubjectKind) => subjects.filter((s) => s.kind === k);
+  const sentShown = (sent ?? []).filter((s) =>
+    needle ? `${s.subject.title} ${s.to.name}`.toLowerCase().includes(needle) : true);
 
   return (
     <AppShell
@@ -55,9 +72,24 @@ export function LeadsHub({ base = "/leads" }: { base?: string }) {
             </span>
           }
           right={
-            <Link href="/search" aria-label="Search" className="chrome grid h-11 w-11 place-items-center">
-              <Icon name="search" size={22} />
-            </Link>
+            <span className="flex items-center">
+              <button
+                type="button"
+                aria-label="Search your leads"
+                onClick={() => { setSearching((v) => !v); if (searching) setQ(""); }}
+                className="chrome grid h-11 w-11 place-items-center"
+              >
+                <Icon name={searching ? "close" : "search"} size={22} />
+              </button>
+              <button
+                type="button"
+                aria-label="Sort and filter"
+                onClick={() => setSortOpen(true)}
+                className={cn("chrome grid h-11 w-11 place-items-center", sort !== "recent" && "text-accent")}
+              >
+                <Icon name="filter" size={22} />
+              </button>
+            </span>
           }
         />
       }
@@ -78,6 +110,26 @@ export function LeadsHub({ base = "/leads" }: { base?: string }) {
         ))}
       </div>
 
+      {searching && (
+        <div className="border-b border-divider bg-surface-1 px-3 py-2">
+          <div className="flex items-center gap-2 rounded-8 bg-surface-2 px-3">
+            <Icon name="search" size={16} className="text-ink-tertiary" />
+            <input
+              autoFocus
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder={tab === "received" ? "Search your properties, projects…" : "Search what you sent…"}
+              className="h-10 flex-1 bg-transparent text-14 text-ink-primary outline-none placeholder:text-ink-tertiary"
+            />
+            {q && (
+              <button type="button" aria-label="Clear" onClick={() => setQ("")} className="chrome grid h-8 w-8 place-items-center">
+                <Icon name="close" size={14} className="text-ink-tertiary" />
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {loading && (
         <div className="flex flex-col gap-3 p-3">
           {[0, 1, 2].map((i) => <Skeleton key={i} className="h-[76px] w-full rounded-12" />)}
@@ -94,11 +146,19 @@ export function LeadsHub({ base = "/leads" }: { base?: string }) {
 
       {!loading && !failed && tab === "received" && (
         subjects.length === 0 ? (
-          <EmptyState
-            title="No leads yet"
-            subtitle="When someone sends an inquiry on your property, project or requirement, it lands here with Call and WhatsApp ready."
-            cta={{ label: "Share a listing", href: "/profile" }}
-          />
+          needle || sort === "unanswered" ? (
+            <EmptyState
+              title="Nothing matches"
+              subtitle={needle ? `No post of yours matches "${q.trim()}".` : "Every post has been opened — nothing is waiting."}
+              cta={{ label: "Clear", onClick: () => { setQ(""); setSort("recent"); } }}
+            />
+          ) : (
+            <EmptyState
+              title="No leads yet"
+              subtitle="When someone sends an inquiry on your property, project or requirement, it lands here with Call and WhatsApp ready."
+              cta={{ label: "Share a listing", href: "/profile" }}
+            />
+          )
         ) : (
           <div className="pb-6">
             <Group label="Properties" items={byKind("listing")} base={base} />
@@ -109,18 +169,50 @@ export function LeadsHub({ base = "/leads" }: { base?: string }) {
       )}
 
       {!loading && !failed && tab === "sent" && (
-        (sent?.length ?? 0) === 0 ? (
-          <EmptyState
-            title="You haven't sent anything yet"
-            subtitle="Send an inquiry on a property or answer someone's requirement — they show up here with their status."
-            cta={{ label: "Explore properties", href: "/" }}
-          />
+        sentShown.length === 0 ? (
+          needle ? (
+            <EmptyState
+              title="Nothing matches"
+              subtitle={`Nothing you sent matches "${q.trim()}".`}
+              cta={{ label: "Clear", onClick: () => setQ("") }}
+            />
+          ) : (
+            <EmptyState
+              title="You haven't sent anything yet"
+              subtitle="Send an inquiry on a property or answer someone's requirement — they show up here with their status."
+              cta={{ label: "Explore properties", href: "/" }}
+            />
+          )
         ) : (
           <div className="pb-6">
-            {(sent ?? []).map((s) => <SentCard key={s.id} sent={s} onChanged={() => void load()} />)}
+            {sentShown.map((s) => <SentCard key={s.id} sent={s} onChanged={() => void load()} />)}
           </div>
         )
       )}
+      <BottomSheet open={sortOpen} onClose={() => setSortOpen(false)} title="Sort & filter">
+        <div className="flex flex-col pb-2">
+          {([
+            { key: "recent", label: "Newest activity", sub: "The order they last moved in" },
+            { key: "new", label: "Most new leads", sub: "Biggest unopened counts first" },
+            { key: "unanswered", label: "Only unopened", sub: "Hide posts you have already been through" },
+          ] as const).map((o) => (
+            <button
+              key={o.key}
+              type="button"
+              onClick={() => { setSort(o.key); setSortOpen(false); }}
+              className="chrome flex items-center gap-3 border-b border-divider py-3 text-left last:border-0"
+            >
+              <span className={cn("grid h-5 w-5 shrink-0 place-items-center rounded-full border", sort === o.key ? "border-accent bg-accent text-white" : "border-border")}>
+                {sort === o.key && <Icon name="check" size={12} />}
+              </span>
+              <span className="min-w-0">
+                <span className="block text-14 text-ink-primary">{o.label}</span>
+                <span className="block text-12 text-ink-secondary">{o.sub}</span>
+              </span>
+            </button>
+          ))}
+        </div>
+      </BottomSheet>
     </AppShell>
   );
 }
@@ -205,6 +297,38 @@ function SentCard({ sent, onChanged }: { sent: leadsApi.SentLead; onChanged: () 
       )}
 
       {sent.closedReason && <div className="mt-2 text-11 text-ink-tertiary">{sent.closedReason}</div>}
+
+      {/* The other half of the evidence. The receiver tapping Call is what the
+          platform can see; whether the sender's phone actually rang is the only
+          thing that makes "response rate" a measurement rather than a guess. */}
+      {sent.askAnswer && (
+        <div className="mt-2.5 rounded-8 border border-divider bg-surface-2 p-2.5">
+          <div className="text-12 font-semibold text-ink-primary">Did {sent.to.name} contact you?</div>
+          <div className="mt-2 flex gap-2">
+            <button
+              type="button"
+              disabled={busy}
+              onClick={async () => { setBusy(true); await leadsApi.answerSent(sent.id, "contacted"); setBusy(false); onChanged(); }}
+              className="chrome h-8 flex-1 rounded-8 bg-accent text-12 font-semibold text-ink-inverse disabled:opacity-50"
+            >
+              Yes, they did
+            </button>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={async () => { setBusy(true); await leadsApi.answerSent(sent.id, "not_yet"); setBusy(false); onChanged(); }}
+              className="chrome h-8 flex-1 rounded-8 border border-border text-12 font-semibold text-ink-primary disabled:opacity-50"
+            >
+              Not yet
+            </button>
+          </div>
+        </div>
+      )}
+      {sent.senderAnswer && (
+        <div className="mt-2 text-11 text-ink-tertiary">
+          {sent.senderAnswer === "contacted" ? "You confirmed they contacted you." : "You told us they hadn't reached out yet."}
+        </div>
+      )}
 
       <div className="mt-2.5 flex gap-2">
         {href && (

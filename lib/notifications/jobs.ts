@@ -32,6 +32,7 @@ export interface ScheduledReport {
   digests: number;
   leadDueToday: number;
   leadUnanswered: number;
+  senderFollowUps: number;
 }
 
 /** Claim one send. Returns false when it already went out. */
@@ -51,6 +52,7 @@ export async function runScheduledNotifications(): Promise<ScheduledReport> {
     digests: await weeklyDigests(),
     leadDueToday: await leadDueTodayNudges(),
     leadUnanswered: await leadUnansweredNudges(),
+    senderFollowUps: await senderFollowUps(),
   };
 }
 
@@ -135,6 +137,44 @@ async function leadUnansweredNudges(): Promise<number> {
       entityKind: "lead",
       entityId: l.id,
       groupKey: `lead-unanswered:${l.owner_id}`,
+    });
+    sent += 1;
+  }
+  return sent;
+}
+
+/**
+ * Ask the SENDER, two days on, whether the connection actually happened.
+ *
+ * Without this the platform only ever hears one side: the receiver tapping
+ * Call. That tap proves intent, not contact. This is the question that turns
+ * leads into a measurable marketplace — and it is asked once, not repeatedly.
+ */
+async function senderFollowUps(): Promise<number> {
+  const cutoff = new Date(Date.now() - 2 * DAY).toISOString();
+  const { data } = await db()
+    .from("leads")
+    .select("id,owner_id,lead_profile_id,subject_snapshot,created_at")
+    .is("sender_answer", null)
+    .lt("created_at", cutoff)
+    .in("stage", ["new", "contacted", "visit", "negotiation"])
+    .limit(500);
+
+  let sent = 0;
+  for (const l of ((data ?? []) as Record<string, any>[])) {
+    if (!(await claim(l.lead_profile_id, "lead_followup", l.id, "48h"))) continue;
+    const who = await nameOfProfile(l.owner_id);
+    const title = (l.subject_snapshot?.title as string | undefined) ?? "the listing";
+    await notify({
+      profileId: l.lead_profile_id,
+      type: "inquiry_received",
+      title: `Did ${who} contact you?`,
+      body: `About ${title} — one tap tells us, and helps everyone else.`,
+      actorId: l.owner_id,
+      href: "/leads",
+      entityKind: "lead",
+      entityId: l.id,
+      groupKey: `lead-followup:${l.lead_profile_id}`,
     });
     sent += 1;
   }

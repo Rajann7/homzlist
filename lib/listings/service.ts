@@ -500,7 +500,7 @@ export async function createListing(
     location: { stateId?: string | null; districtId?: string | null; talukaId?: string | null; cityId?: string | null; areaId?: string | null; pincode?: string | null; label?: string | null };
     attributes: Record<string, unknown>;
     amenities: string[];
-    contact: { public: boolean; number?: string | null; alt?: string | null; whatsapp?: string | null };
+    contact: { public: boolean; number?: string | null; alt?: string | null; whatsapp?: string | null; verified?: boolean };
     ownershipProof?: { type?: string | null; key?: string | null };
     flaggedReason?: string | null;
   },
@@ -548,6 +548,8 @@ export async function createListing(
       contact_number: input.contact.number ?? null,
       alt_number: input.contact.alt ?? null,
       whatsapp_number: input.contact.whatsapp ?? null,
+      // Whether the number on the post passed OTP. Never assumed true.
+      contact_verified: input.contact.verified === true,
       ownership_proof_type: input.ownershipProof?.type ?? null,
       ownership_proof_key: input.ownershipProof?.key ?? null,
       flagged_reason: input.flaggedReason ?? null,
