@@ -278,9 +278,9 @@ export const billingApi = {
   renewBoost: (id: string) => req<{ checkout: CheckoutIntent }>(`/billing/boost/${id}/renew`, "POST", {}),
 };
 
-/** Fresh idempotency key per user-initiated pay attempt (Doc7 §0). */
-export function newIdempotencyKey(): string {
-  return typeof crypto !== "undefined" && "randomUUID" in crypto
-    ? crypto.randomUUID()
-    : `k${Date.now()}${Math.random().toString(36).slice(2, 10)}`;
-}
+/**
+ * Fresh idempotency key per user-initiated pay attempt (Doc7 §0).
+ * The implementation lives in lib/utils so payments and the inquiry sheet
+ * cannot drift apart on the one thing that must never collide.
+ */
+export { newIdempotencyKey } from "@/lib/utils";

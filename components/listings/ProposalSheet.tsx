@@ -135,7 +135,10 @@ export function ProposalSheet({
   return (
     <>
       <BottomSheet
-        open={open && !topup && !verifyOpen}
+        // Same rule as the inquiry sheet: the number popup stacks on top, it
+        // does not replace this. Top-up still takes over, because that is a
+        // payment flow and not a popup.
+        open={open && !topup}
         onClose={onClose}
         title="Send Proposal"
         hideHeader={step !== 0}

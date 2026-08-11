@@ -121,11 +121,18 @@ export function LeadCard({
 }: { lead: leadsApi.LeadView; base: string; onChanged: () => void }) {
   const fresh = lead.status === "new";
   const closed = lead.status === "archived";
-  const summary = [
-    lead.wants.map((w) => w.label).join(", "),
-    lead.contactPref === "whatsapp" ? "WhatsApp" : "Call",
-    lead.preferredOn ? `${lead.whenLabel ?? ""} ${lead.preferredOn}`.trim() : lead.whenLabel,
-  ].filter(Boolean).join(" · ");
+  // Only say something when there is something to say. A lead from before the
+  // connection system has no wants and no time, so this used to collapse to the
+  // bare word "Call" sitting above the Call button — which reads as a stray
+  // label, not as a summary.
+  const wantsText = lead.wants.map((w) => w.label).join(", ");
+  const summary = wantsText
+    ? [
+        wantsText,
+        lead.contactPref === "whatsapp" ? "WhatsApp" : "Call",
+        lead.preferredOn ? `${lead.whenLabel ?? ""} ${lead.preferredOn}`.trim() : lead.whenLabel,
+      ].filter(Boolean).join(" · ")
+    : "";
 
   return (
     <div
@@ -135,16 +142,21 @@ export function LeadCard({
         closed && "opacity-60",
       )}
     >
-      <PersonRow
-        person={lead.person}
-        meta={`${roleLabel(lead.person.role)} · ${ago(lead.createdAt)}`}
-        right={
-          <>
-            {lead.overdue && <StatusPill tone="overdue">Overdue</StatusPill>}
-            <StatusPill tone={lead.status}>{lead.statusLabel}</StatusPill>
-          </>
-        }
-      />
+      {/* The person row is the door into the lead. It has to be, because a
+          worked lead with nothing captured on it has no summary line to hang a
+          link on — and a card you cannot open is a dead end. */}
+      <Link href={`${base}/lead/${lead.id}`} className="block">
+        <PersonRow
+          person={lead.person}
+          meta={`${roleLabel(lead.person.role)} · ${ago(lead.createdAt)}`}
+          right={
+            <>
+              {lead.overdue && <StatusPill tone="overdue">Overdue</StatusPill>}
+              <StatusPill tone={lead.status}>{lead.statusLabel}</StatusPill>
+            </>
+          }
+        />
+      </Link>
 
       {fresh ? (
         <Link href={`${base}/lead/${lead.id}`} className="mt-2.5 block rounded-8 border border-divider bg-surface-2 px-3">

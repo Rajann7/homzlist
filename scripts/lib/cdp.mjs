@@ -1,9 +1,16 @@
 /**
- * Minimal Chrome DevTools Protocol client.
+ * A 100-line Chrome DevTools Protocol client, with no dependencies.
  *
- * The in-app Browser pane cannot composite frames when it is not displayed, so
- * its screenshot call times out. Driving a headless Chrome over CDP instead
- * gives us real PNG bytes on disk, which is what a true pixel-diff needs.
+ * The in-app browser pane runs its tab hidden, and Chrome FREEZES a tab that is
+ * never composited: the page loads, Next's runtime boots, the flight payload is
+ * consumed — and then React's scheduled hydration never gets a task slot, so
+ * nothing on the screen is ever interactive. That is an artifact of the pane,
+ * not of the app, but it means the pane can never answer "does the button
+ * work?".
+ *
+ * This drives a real Chrome (headless=new, which composites) over CDP instead,
+ * using Node 22's built-in WebSocket. Real hydration, real clicks, real
+ * screenshots.
  */
 import { spawn } from "node:child_process";
 import fs from "node:fs";
@@ -13,199 +20,206 @@ import path from "node:path";
 const CHROME_CANDIDATES = [
   "C:/Program Files/Google/Chrome/Application/chrome.exe",
   "C:/Program Files (x86)/Google/Chrome/Application/chrome.exe",
+  `${process.env.LOCALAPPDATA ?? ""}/Google/Chrome/Application/chrome.exe`,
   "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe",
   "/usr/bin/google-chrome",
-  "/usr/bin/chromium",
+  "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
 ];
+
+function findChrome() {
+  for (const c of CHROME_CANDIDATES) if (c && fs.existsSync(c)) return c;
+  throw new Error("no Chrome/Edge binary found");
+}
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-export async function launchChrome({ port = 9333 } = {}) {
-  const bin = CHROME_CANDIDATES.find((p) => fs.existsSync(p));
-  if (!bin) throw new Error("No Chrome/Edge binary found");
-  const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), "hz-cdp-"));
-  const proc = spawn(bin, [
-    "--headless=new",
+export async function launch({ port = 9333, headless = true } = {}) {
+  const bin = findChrome();
+  const profile = fs.mkdtempSync(path.join(os.tmpdir(), "hz-cdp-"));
+  const args = [
     `--remote-debugging-port=${port}`,
-    `--user-data-dir=${userDataDir}`,
+    `--user-data-dir=${profile}`,
     "--no-first-run",
     "--no-default-browser-check",
     "--disable-extensions",
-    "--disable-gpu",
-    "--hide-scrollbars",
-    "--force-device-scale-factor=1",
-    "--force-color-profile=srgb",
-    "--disable-lcd-text",
-    "--font-render-hinting=none",
-    "--allow-running-insecure-content",
+    "--disable-background-timer-throttling",
+    "--disable-backgrounding-occluded-windows",
+    "--disable-renderer-backgrounding",
+    // The whole point: a composited page that never gets frozen.
+    ...(headless ? ["--headless=new", "--window-size=390,844", "--hide-scrollbars"] : ["--window-size=390,900"]),
     "about:blank",
-  ], { stdio: "ignore" });
+  ];
+  const proc = spawn(bin, args, { stdio: "ignore", detached: false });
 
-  let info;
-  for (let i = 0; i < 100; i++) {
+  // Wait for the debugging endpoint.
+  let version = null;
+  for (let i = 0; i < 60; i++) {
     try {
-      info = await (await fetch(`http://127.0.0.1:${port}/json/version`)).json();
-      break;
-    } catch { await sleep(150); }
+      const r = await fetch(`http://127.0.0.1:${port}/json/version`);
+      if (r.ok) { version = await r.json(); break; }
+    } catch { /* not up yet */ }
+    await sleep(250);
   }
-  if (!info) throw new Error("Chrome did not expose a debugging port");
-  return { proc, port, userDataDir, wsUrl: info.webSocketDebuggerUrl };
+  if (!version) { proc.kill(); throw new Error("Chrome did not expose a debugging port"); }
+
+  return {
+    proc,
+    port,
+    profile,
+    version,
+    async close() {
+      try { await fetch(`http://127.0.0.1:${port}/json/close`); } catch { /* best effort */ }
+      try { proc.kill(); } catch { /* already gone */ }
+      try { fs.rmSync(profile, { recursive: true, force: true }); } catch { /* temp dir */ }
+    },
+  };
 }
 
-/** One CDP session bound to a freshly created target (tab). */
-export class Session {
-  constructor(ws, sessionId) { this.ws = ws; this.sessionId = sessionId; }
+/** Open a tab and return a small page handle. */
+export async function newPage(browser, url = "about:blank") {
+  const created = await (await fetch(`http://127.0.0.1:${browser.port}/json/new?${encodeURIComponent(url)}`, { method: "PUT" })).json();
+  const ws = new WebSocket(created.webSocketDebuggerUrl);
+  await new Promise((res, rej) => { ws.onopen = res; ws.onerror = rej; });
 
-  static async connect(browserWsUrl) {
-    const ws = new WebSocket(browserWsUrl);
-    const pending = new Map();
-    const events = [];
-    let id = 0;
-    ws._send = (method, params, sessionId) =>
-      new Promise((resolve, reject) => {
-        const msgId = ++id;
-        pending.set(msgId, { resolve, reject });
-        ws.send(JSON.stringify({ id: msgId, method, params: params ?? {}, ...(sessionId ? { sessionId } : {}) }));
-      });
-    ws.addEventListener("message", (e) => {
-      const msg = JSON.parse(e.data);
-      if (msg.id && pending.has(msg.id)) {
-        const { resolve, reject } = pending.get(msg.id);
-        pending.delete(msg.id);
-        msg.error ? reject(new Error(`${msg.error.message} (${msg.error.code})`)) : resolve(msg.result);
-      } else if (msg.method) {
-        events.push(msg);
-        for (const h of ws._handlers ?? []) h(msg);
-      }
-    });
-    ws._handlers = [];
-    ws._events = events;
-    await new Promise((res, rej) => {
-      ws.addEventListener("open", res, { once: true });
-      ws.addEventListener("error", rej, { once: true });
-    });
-
-    const { targetId } = await ws._send("Target.createTarget", { url: "about:blank" });
-    const { sessionId } = await ws._send("Target.attachToTarget", { targetId, flatten: true });
-    const s = new Session(ws, sessionId);
-    s.targetId = targetId;
-    await s.send("Page.enable");
-    await s.send("Runtime.enable");
-    await s.send("Network.enable");
-    await s.send("Console.enable");
-    s.consoleErrors = [];
-    s.failedRequests = [];
-    // Response statuses, so a check can assert "no 404/5xx on this screen"
-    // rather than only noticing requests that failed at the transport layer.
-    s.responses = [];
-    ws._handlers.push((msg) => {
-      if (msg.sessionId !== sessionId) return;
-      if (msg.method === "Runtime.exceptionThrown")
-        s.consoleErrors.push(msg.params.exceptionDetails?.exception?.description ?? msg.params.exceptionDetails?.text);
-      if (msg.method === "Console.messageAdded" && msg.params.message.level === "error")
-        s.consoleErrors.push(msg.params.message.text);
-      if (msg.method === "Network.loadingFailed") s.failedRequests.push(msg.params.errorText);
-      if (msg.method === "Network.responseReceived")
-        s.responses.push({ status: msg.params.response.status, url: msg.params.response.url });
-    });
-    return s;
-  }
-
-  send(method, params) { return this.ws._send(method, params, this.sessionId); }
-
-  async setViewport(width, height, deviceScaleFactor = 1, mobile = true) {
-    await this.send("Emulation.setDeviceMetricsOverride", {
-      width, height, deviceScaleFactor, mobile,
-      screenWidth: width, screenHeight: height,
-    });
-  }
-
-  async setCookies(cookies) { await this.send("Network.setCookies", { cookies }); }
-
-  async goto(url, { waitMs = 0 } = {}) {
-    const done = new Promise((resolve) => {
-      const h = (msg) => {
-        if (msg.sessionId === this.sessionId && msg.method === "Page.loadEventFired") {
-          this.ws._handlers.splice(this.ws._handlers.indexOf(h), 1);
-          resolve();
-        }
-      };
-      this.ws._handlers.push(h);
-    });
-    await this.send("Page.navigate", { url });
-    await Promise.race([done, sleep(20000)]);
-    if (waitMs) await sleep(waitMs);
-  }
-
-  async eval(expression, { awaitPromise = true } = {}) {
-    const r = await this.send("Runtime.evaluate", {
-      expression, returnByValue: true, awaitPromise, userGesture: true,
-    });
-    if (r.exceptionDetails) throw new Error(r.exceptionDetails.exception?.description ?? "eval failed");
-    return r.result.value;
-  }
-
-  /** PNG buffer of the viewport (or the full scrollable page). */
-  async screenshot({ fullPage = false } = {}) {
-    let clip;
-    if (fullPage) {
-      const m = await this.send("Page.getLayoutMetrics");
-      const c = m.cssContentSize ?? m.contentSize;
-      clip = { x: 0, y: 0, width: Math.ceil(c.width), height: Math.ceil(c.height), scale: 1 };
+  let id = 0;
+  const pending = new Map();
+  const events = [];
+  ws.onmessage = (m) => {
+    const msg = JSON.parse(m.data);
+    if (msg.id && pending.has(msg.id)) {
+      const { resolve, reject } = pending.get(msg.id);
+      pending.delete(msg.id);
+      msg.error ? reject(new Error(msg.error.message)) : resolve(msg.result);
+    } else if (msg.method) {
+      events.push(msg);
     }
-    const { data } = await this.send("Page.captureScreenshot", {
-      format: "png", captureBeyondViewport: fullPage, ...(clip ? { clip } : {}),
-    });
-    return Buffer.from(data, "base64");
-  }
-
-  async close() { await this.ws._send("Target.closeTarget", { targetId: this.targetId }); }
-}
-
-export { sleep };
-
-/**
- * Run an async body in the page and return its value.
- *
- * `Session.eval` takes a bare expression, but every non-trivial check wants
- * `await` and `return` inside it — so wrap the body in an async IIFE rather than
- * each script re-inventing the wrapper.
- */
-export function ev(session, body) {
-  return session.eval(`(async () => { ${body} })()`);
-}
-
-/**
- * Dev-mode OTP sign-in (fixed code, no SMS — CLAUDE.md "OTP: DEV MODE now").
- *
- * Deliberately step-by-step with short evals rather than one long one: the OTP
- * submit NAVIGATES, which tears down the JS execution context, and a single
- * awaiting eval just rejects with "Inspected target navigated or closed".
- *
- * `/login` also opens on the onboarding carousel, so it skips through to the
- * phone screen first. Returns where it landed, so a caller can assert.
- */
-export async function devLogin(session, { sellerOrigin, phone = "9999000007", otp = "123456" } = {}) {
-  const HELPERS = `
-    const set=(el,v)=>{Object.getOwnPropertyDescriptor(Object.getPrototypeOf(el),'value').set.call(el,v);el.dispatchEvent(new Event('input',{bubbles:true}));};
-    const vis=()=>[...document.querySelectorAll('input')].filter(i=>i.offsetParent!==null&&i.type!=='hidden');
-    const btn=(re)=>[...document.querySelectorAll('button')].find(b=>!b.disabled&&re.test(b.textContent.trim()));`;
-  const safe = async (body, fallback = null) => {
-    try { return await ev(session, body); } catch { return fallback; }
   };
 
-  await session.goto(`${sellerOrigin}/login`, { waitMs: 5000 });
-  await safe(`${HELPERS} const b=btn(/^Skip$/); if(b)b.click(); return 1`);
-  await sleep(2500);
-  if (!(await safe(`${HELPERS} const i=vis()[0]; if(!i) return 0; set(i,'${phone}'); return 1`, 0))) {
-    return "no phone input";
-  }
-  await sleep(600);
-  await safe(`${HELPERS} const b=btn(/continue|send|next|otp/i); if(b)b.click(); return 1`);
-  await sleep(4000);
-  await safe(`${HELPERS} const ins=vis(); if(ins.length>=6){'${otp}'.split('').forEach((d,i)=>set(ins[i],d));} else if(ins.length){set(ins[ins.length-1],'${otp}');} return 1`);
-  await sleep(1200);
-  await safe(`${HELPERS} const b=btn(/verify|continue|submit/i); if(b)b.click(); return 1`);
-  await sleep(6000);
-  return safe("return location.host + location.pathname", "context lost");
+  const send = (method, params = {}) =>
+    new Promise((resolve, reject) => {
+      const mid = ++id;
+      pending.set(mid, { resolve, reject });
+      ws.send(JSON.stringify({ id: mid, method, params }));
+      setTimeout(() => { if (pending.delete(mid)) reject(new Error(`${method} timed out`)); }, 45_000);
+    });
+
+  await send("Page.enable");
+  await send("Runtime.enable");
+  await send("Network.enable");
+  await send("Log.enable");
+
+  const page = {
+    send,
+    events,
+    consoleErrors: () =>
+      events
+        .filter((e) => e.method === "Log.entryAdded" && e.params.entry.level === "error")
+        .map((e) => e.params.entry.text),
+    async goto(target, { waitMs = 1200 } = {}) {
+      await send("Page.navigate", { url: target });
+      await sleep(waitMs);
+      // Settle: wait for the document to be complete AND for React to hydrate.
+      //
+      // Hydration is detected by React's own fiber keys on a real DOM node, NOT
+      // by __REACT_DEVTOOLS_GLOBAL_HOOK__.renderers — that hook is only
+      // populated when the DevTools extension is installed, which headless
+      // Chrome does not have, so it reads 0 on a perfectly hydrated page.
+      for (let i = 0; i < 60; i++) {
+        const r = await page.eval(`(() => {
+          const el = document.querySelector("main button, main a, button, a");
+          const keys = el ? Object.keys(el).filter(k => k.startsWith("__react")) : [];
+          return { ready: document.readyState, hydrated: keys.length > 0, keys: keys.length };
+        })()`);
+        if (r?.ready === "complete" && r?.hydrated) return r;
+        await sleep(250);
+      }
+      return page.eval(`(() => {
+        const el = document.querySelector("main button, main a, button, a");
+        const keys = el ? Object.keys(el).filter(k => k.startsWith("__react")) : [];
+        return { ready: document.readyState, hydrated: keys.length > 0, keys: keys.length };
+      })()`);
+    },
+    async eval(expression) {
+      const r = await send("Runtime.evaluate", {
+        expression: `(async () => { const v = await (${expression}); return JSON.stringify(v ?? null); })()`,
+        awaitPromise: true,
+        returnByValue: true,
+      });
+      if (r.exceptionDetails) throw new Error(r.exceptionDetails.exception?.description ?? "eval failed");
+      try { return JSON.parse(r.result.value); } catch { return r.result.value; }
+    },
+    /** Click by visible text — the way a person finds a button. */
+    async clickText(text, { nth = 0 } = {}) {
+      const box = await page.eval(`(() => {
+        const wanted = ${JSON.stringify(text)};
+        const nodes = [...document.querySelectorAll("button, a, [role=button], input[type=submit]")]
+          .filter(el => (el.innerText || el.value || "").trim().toLowerCase().includes(wanted.toLowerCase()));
+        const el = nodes[${nth}];
+        if (!el) return null;
+        el.scrollIntoView({ block: "center" });
+        const r = el.getBoundingClientRect();
+        return { x: r.left + r.width / 2, y: r.top + r.height / 2, label: (el.innerText || el.value || "").trim().slice(0, 40) };
+      })()`);
+      if (!box) return null;
+      for (const type of ["mousePressed", "mouseReleased"]) {
+        await send("Input.dispatchMouseEvent", { type, x: box.x, y: box.y, button: "left", clickCount: 1 });
+      }
+      await sleep(450);
+      return box.label;
+    },
+    /** Real mouse click on the first element matching a selector. */
+    async clickSelector(selector) {
+      const box = await page.eval(`(() => {
+        const el = document.querySelector(${JSON.stringify(selector)});
+        if (!el) return null;
+        el.scrollIntoView({ block: "center" });
+        const r = el.getBoundingClientRect();
+        if (r.width === 0 || r.height === 0) return null;
+        return { x: r.left + r.width / 2, y: r.top + r.height / 2, href: el.getAttribute("href") ?? null };
+      })()`);
+      if (!box) return null;
+      for (const type of ["mousePressed", "mouseReleased"]) {
+        await send("Input.dispatchMouseEvent", { type, x: box.x, y: box.y, button: "left", clickCount: 1 });
+      }
+      await sleep(900);
+      return box.href ?? "clicked";
+    },
+    async waitFor(expression, { tries = 30, gap = 300 } = {}) {
+      for (let i = 0; i < tries; i++) {
+        if (await page.eval(expression)) return true;
+        await sleep(gap);
+      }
+      return false;
+    },
+    async typeInto(selector, value) {
+      const ok = await page.eval(`(() => {
+        const el = document.querySelector(${JSON.stringify(selector)});
+        if (!el) return false;
+        el.focus();
+        return true;
+      })()`);
+      if (!ok) return false;
+      for (const ch of value) {
+        await send("Input.dispatchKeyEvent", { type: "keyDown", text: ch });
+        await send("Input.dispatchKeyEvent", { type: "keyUp" });
+      }
+      await sleep(250);
+      return true;
+    },
+    async text() {
+      return page.eval(`(document.querySelector("main")?.innerText ?? document.body.innerText).slice(0, 4000)`);
+    },
+    async screenshot(file) {
+      const r = await send("Page.captureScreenshot", { format: "png", captureBeyondViewport: false });
+      fs.mkdirSync(path.dirname(file), { recursive: true });
+      fs.writeFileSync(file, Buffer.from(r.data, "base64"));
+      return file;
+    },
+    async setViewport(width, height) {
+      await send("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: 2, mobile: true });
+    },
+    close: () => ws.close(),
+  };
+
+  return page;
 }

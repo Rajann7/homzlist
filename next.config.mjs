@@ -116,6 +116,16 @@ const devOrigins = isProd
         .map((n) => n.address);
       return [
         "localhost",
+        // The subdomain hosts this product is ROUTED on. Next 16 refuses a dev
+        // asset request whose Origin is not listed — with a 403, not a warning
+        // — so on seller.lvh.me every /_next/static chunk was blocked, React
+        // never hydrated, and the whole app rendered as dead SSR HTML. It looks
+        // exactly like "nothing works", and nothing in the app is at fault.
+        // `localhost` does NOT cover `seller.localhost`, and lvh.me was never
+        // listed at all even though it is what we test subdomain cookies on.
+        "*.localhost",
+        "lvh.me",
+        "*.lvh.me",
         ...ips,
         // seller.<ip>.nip.io / account.<ip>.nip.io — subdomain routing on a phone
         ...ips.map((ip) => `*.${ip}.nip.io`),

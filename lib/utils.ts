@@ -129,3 +129,17 @@ export function scrollToId(id: string, offset = 76): boolean {
   }, 120);
   return true;
 }
+
+/**
+ * A unique key for one user-initiated action, safe on every origin.
+ *
+ * `crypto.randomUUID()` only exists in a SECURE context — https, or localhost.
+ * On plain http (a LAN address, `seller.lvh.me`, a staging box without TLS) it
+ * is simply not there, and calling it throws. That threw inside an effect, React
+ * unmounted the tree, and the whole screen fell into the error boundary: one
+ * missing browser API took out the entire Send Inquiry sheet.
+ */
+export function newIdempotencyKey(): string {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID();
+  return `k${Date.now().toString(36)}${Math.random().toString(36).slice(2, 12)}`;
+}

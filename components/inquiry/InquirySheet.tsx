@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { BottomSheet, Button, Chip, Icon, Skeleton, useToast } from "@/components/billing/ui";
 import { useRouter } from "next/navigation";
-import { cn } from "@/lib/utils";
+import { cn, newIdempotencyKey } from "@/lib/utils";
 import { ago } from "@/components/leads/parts";
 import * as leadsApi from "@/lib/leads/client";
 import { NumberVerifySheet } from "./NumberVerifySheet";
@@ -54,7 +54,7 @@ export function InquirySheet({
     if (!open) return;
     setStep(1); setWants([]); setContactPref("call"); setWhenToken("anytime");
     setPreferredDate(""); setConsent(false); setSending(false); setOptions(null);
-    setIdem(crypto.randomUUID());
+    setIdem(newIdempotencyKey());
     void (async () => {
       const res = await leadsApi.inquiryOptions(subject.kind, subject.id);
       if (res.ok) { setOptions(res.data); setNumber(res.data.myNumber); }
@@ -105,7 +105,12 @@ export function InquirySheet({
 
   return (
     <>
-      <BottomSheet open={open && !verifyOpen} onClose={onClose} hideHeader>
+      {/* The number popup sits ON TOP of this sheet; this sheet does not close
+          for it. Closing it was tearing down a history layer at the same moment
+          the popup pushed one, and the resulting popstate shut the popup a frame
+          after it appeared — it looked like the button did nothing. Staying open
+          is also what a popup means: you come back to Step 2 where you left it. */}
+      <BottomSheet open={open} onClose={onClose} hideHeader>
         {!options ? (
           <div className="flex flex-col gap-3 pb-4 pt-2">
             <Skeleton className="h-5 w-32 rounded-8" />

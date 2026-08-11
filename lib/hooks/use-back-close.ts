@@ -23,6 +23,15 @@ let seq = 0;
 
 /** Read by components/nav/ScrollRestore — a pop this hook caused, not the user. */
 export const SYNTHETIC_POP = "hz-nav-synthetic";
+/**
+ * Which layer's teardown fired the synthetic pop. Needed because a sheet that
+ * opens another sheet tears down and builds up in the SAME commit: the closing
+ * layer's cleanup calls history.back(), and the resulting popstate would
+ * otherwise be read by the layer that just opened as "the user pressed Back",
+ * closing it a frame after it appeared. Which is exactly what happened to the
+ * "use a different number" popup — it opened and vanished, every time.
+ */
+export const SYNTHETIC_POP_LAYER = "hz-nav-synthetic-layer";
 
 /**
  * Navigate OUT of an open sheet/dialog. Use this instead of calling the router
@@ -69,7 +78,16 @@ export function useBackClose(open: boolean, onClose: () => void) {
     const marker = ++seq;
     window.history.pushState({ ...(window.history.state ?? {}), hzLayer: marker }, "");
 
-    const onPop = () => closeRef.current();
+    const onPop = () => {
+      // Ignore a pop that another layer's teardown caused. Only a REAL Back
+      // should close this one.
+      try {
+        const at = Number(sessionStorage.getItem(SYNTHETIC_POP) ?? 0);
+        const from = sessionStorage.getItem(SYNTHETIC_POP_LAYER);
+        if (from && from !== String(marker) && Date.now() - at < 2000) return;
+      } catch { /* private mode — fall through and close, as before */ }
+      closeRef.current();
+    };
     window.addEventListener("popstate", onPop);
 
     return () => {
@@ -84,7 +102,10 @@ export function useBackClose(open: boolean, onClose: () => void) {
         // the mark, closing a sheet and then tapping a link within the next
         // couple of seconds would restore the previous screen's scroll offset
         // onto the new one.
-        try { sessionStorage.setItem(SYNTHETIC_POP, String(Date.now())); } catch { /* private mode */ }
+        try {
+          sessionStorage.setItem(SYNTHETIC_POP, String(Date.now()));
+          sessionStorage.setItem(SYNTHETIC_POP_LAYER, String(marker));
+        } catch { /* private mode */ }
         window.history.back();
       }
     };

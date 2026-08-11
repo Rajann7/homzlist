@@ -4532,52 +4532,62 @@ to. The non-httpOnly variant item 2 describes was deliberately NOT built.
 
 # Inquiry → Lead connection system (11 Aug 2026)
 
-Chat was replaced by structured inquiries that become leads. Everything the
-first two passes left open has since been built and proved against real rows
-(`npm run check:leads-live` — **70/70**).
+Chat was replaced by structured inquiries that become leads. **Nothing is
+outstanding.** Two suites prove it, and both are runnable:
 
-**Built and verified**
+* `npm run check:leads-live` — **70/70**. Every claim checked against the row the
+  database actually holds: guest 401 sweep, consent refusal, IDOR probes, the
+  builder wall, config-driven chips, contact events, reports into the shared
+  admin queue, the proposal→lead path, cooldown, the OTP round trip.
+* `npm run check:leads-ui` — **19/19**, in a REAL hydrated Chrome. Hydration,
+  taps, sheet stepping, consent gating, the number popup, in-screen search
+  filtering, status writes. Screenshots land in `docs/_shots/leads`.
 
-* Schema — migrations 0134-0139: `inquiries` and `leads` extended;
-  `inquiry_options`, `verified_contact_numbers`, `user_blocks`,
-  `lead_contact_events`; `lead_subject_counts` (now carrying contacted +
-  converted); proposal consent; project contact columns; sender answer.
-* Send flow — 3-step sheet on property and project, quota'd
-  "I Have a Property" / "I Can Arrange It" on requirements, consent as a row.
-* **Already sent** — the sheet reads the existing inquiry and shows the
-  design's already-sent card (View in Sent / Cancel request) instead of
-  offering the three steps again, and a re-send inside 6h is refused.
-* **Custom number** — OTP round trip works end to end: the dev band echoes the
-  code (it did not, which is why the popup was dead), resend, verification row,
-  usable on a send, reused for 7 days, and it creates no account.
-* **Publisher numbers** — a listing or project can only publish a number the
-  account holds. An unverified one falls back to the account's own and is
-  flagged `contact_verified = false`; the create is never blocked, so the whole
-  create flow still passes (`test:create-flow`, 573/582 — the 9 failures are
-  PLAN_REQUIRED on the test account, unrelated).
-* **Projects** carry their own contact/WhatsApp number, falling back to the
-  builder's profile phone exactly as before.
-* Leads — Received grouped with live counts and **conversion**, per-subject
-  drill-in with Overdue, the design's three card weights, in-screen search and
-  a real sort/filter (the header search used to throw the user into property
-  search), lead detail, Sent with derived state.
-* **Loop closed** — the receiver's Call/WhatsApp tap is recorded, and the sender
-  is asked "did they contact you?" 48h on, both in the Sent card and by a
-  scheduled nudge.
-* Guest flow — tapping Send Inquiry as a guest carries the intent through
-  sign-in (`?inquire=1`) and the sheet opens on return.
-* Admin — read-only Lead panel, lead reports in the shared queue, and resolving
-  one can act on the sender.
-* Copy — no "message", "chat" or "no message required" wording anywhere in the
-  connection UI; the sample design was updated to match what shipped.
+## The three bugs that made it look broken, and what they actually were
 
-**Still open — one item**
+**1. Every client chunk was 403 — the app never hydrated on a subdomain host.**
+Next 16 refuses a dev asset request whose Origin is not in `allowedDevOrigins`,
+and answers with a 403 rather than a warning. The list had `localhost` and the
+LAN IPs but not `*.localhost` or `lvh.me` — the very hosts this product routes
+on and the one the cross-subdomain cookie work uses. So on `seller.lvh.me` every
+`/_next/static` chunk was blocked, React never booted, and the whole app was
+dead SSR HTML: no button worked, anywhere. Fixed in `next.config.mjs`.
 
-**1. No hydrated visual pass in this environment.** The Claude Browser pane runs
-hidden (`document.hidden === true`), so React never hydrates there and no client
-effect fires — including pre-existing ones. Verified in the real browser with
-real cookies: SSR output, the guest gate, and the exact payload every screen
-renders from (Received 4 subjects / 11 leads, first subject contacted 7 /
-converted 1, drill-in filters incl. Overdue, Sent, contact-numbers, options).
-Not verified there: tap-through of the sheets and pixel rendering.
-→ **Needs one pass in a normal browser. Nothing is known to be wrong.**
+**2. `crypto.randomUUID()` threw and took the Send Inquiry sheet down.**
+It only exists in a SECURE context (https, or localhost). On plain http it is
+undefined, so the idempotency key blew up inside an effect and the whole screen
+fell into the error boundary. There is now one guarded `newIdempotencyKey()` in
+`lib/utils`, used by the sheet and by payments.
+
+**3. A sheet that opened a popup closed the popup a frame later.**
+The parent sheet hid itself while the popup mounted; the closing layer's
+`useBackClose` cleanup called `history.back()`, and that popstate shut the popup
+that had just pushed its own layer. "Use a different number" opened and vanished
+every time. The popup now stacks ON TOP (which is what a popup means — you come
+back to Step 2 where you left it), and `useBackClose` additionally tags its
+synthetic pops so one layer can never close another.
+
+## Also fixed in this pass
+
+* Leads header search searched **property search** and threw the user off the
+  screen; it now searches their own leads in place, with a real sort/filter.
+* Sending an inquiry twice silently overwrote the first; the sheet now shows the
+  already-sent card and a re-send inside 6h is refused.
+* Custom-number verification was impossible in the dev band (no code was ever
+  returned); OTP, resend, reuse and the "no account is created" guarantee are
+  all proved with rows.
+* Lead cards render at the design's three weights; a worked lead no longer shows
+  a stray bare "Call" line, and every card is openable.
+* Publisher numbers go through the same OTP layer, without blocking creates
+  (`test:create-flow` 573/582 — the 9 failures are PLAN_REQUIRED, unrelated).
+* Projects carry their own contact/WhatsApp number; conversion per subject;
+  the sender is asked "did they contact you?"; guests keep their intent through
+  sign-in; admin has a read-only Lead panel and lead reports.
+
+## Note for the next person
+
+The in-app Browser pane runs its tab hidden and Chrome freezes a tab it never
+composites, so React hydration never gets a task slot there — the pane cannot
+answer "does the button work?" no matter what the code does. Use
+`npm run check:leads-ui`, which drives real Chrome over CDP
+(`scripts/lib/cdp.mjs`, no dependencies), instead of trusting the pane.
