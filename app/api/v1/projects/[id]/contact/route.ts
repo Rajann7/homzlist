@@ -1,6 +1,7 @@
 import type { NextRequest } from "next/server";
 import { ok, fail } from "@/lib/api";
 import { getCurrentUser } from "@/lib/auth/current-user";
+import { createServiceClient } from "@/lib/supabase/server";
 import { getProject, recordProjectLead } from "@/lib/listings/projects";
 import { rateLimit } from "@/lib/auth/rate-limit";
 
@@ -30,6 +31,14 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
   const claims = await getCurrentUser();
   if (!claims) return fail("UNAUTHORIZED");
   if (!UUID_RE.test(params.id)) return fail("NOT_FOUND");
+
+  // Tapping Call on a project WRITES A LEAD, so it is a connection and the
+  // same role rule applies: a builder reaches people through requirements, not
+  // by landing in another builder's pipeline. Silent, like the other
+  // non-recording cases below — the caller is not told whether it landed.
+  const { data: me } = await createServiceClient()
+    .from("profiles").select("role").eq("id", claims.sub).maybeSingle();
+  if ((me as { role: string | null } | null)?.role === "builder") return ok({ recorded: false });
 
   const limited = await rateLimit(`project-contact:${claims.sub}`, 120, 3600);
   if (!limited.allowed) return fail("RATE_LIMITED");

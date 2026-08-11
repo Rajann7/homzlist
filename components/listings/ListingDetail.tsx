@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AppShell, BottomSheet, Button, Icon, Skeleton, StatusBadge, useToast } from "@/components/billing/ui";
 import { SheetOption } from "@/components/billing/primitives";
@@ -10,6 +11,7 @@ import { InquirySheet, MoreSheet, ShareSheet, ReportSheet, LoginSheet } from "@/
 import { loginHref, currentPath } from "@/lib/auth/next-url";
 import { interactionsApi, type FeedCard } from "@/lib/feed/client";
 import { DETAIL_PAD, DetailHero, DetailRow, DetailSection, DetailSeparator, PropertyDetailBody } from "./detailBody";
+import { useRole } from "@/components/nav/RoleContext";
 import { cn, publicHref } from "@/lib/utils";
 import { Img } from "@/components/ui/Img";
 
@@ -56,6 +58,12 @@ export function ListingDetail({ id, isGuest = false }: { id: string; isGuest?: b
    * round trip. The intent rides in the return URL (?inquire=1) rather than
    * storage, because sign-in crosses hosts and storage would not survive it.
    */
+  // A builder cannot connect on a property at all, so the primary CTA is not
+  // theirs to press. Hiding it is the visible half of the server's rule; the
+  // sheet still refuses if it is reached any other way.
+  const role = useRole();
+  const cannotInquire = role === "builder";
+
   const startInquiry = () => {
     if (!isGuest) { setSheet("inquiry"); return; }
     const here = currentPath();
@@ -348,8 +356,12 @@ export function ListingDetail({ id, isGuest = false }: { id: string; isGuest?: b
                   <Icon name="whatsapp" size={20} />
                 </a>
               )}
-              <Button fullWidth onClick={startInquiry}>Send Inquiry</Button>
+              {cannotInquire
+                ? <BuilderRouteNote />
+                : <Button fullWidth onClick={startInquiry}>Send Inquiry</Button>}
             </>
+          ) : cannotInquire ? (
+            <BuilderRouteNote />
           ) : (
             /* "Request Number" is gone with the chat: a number is no longer
                something you ask for and wait on. The seller either publishes
@@ -784,6 +796,21 @@ export function PhotoViewer({
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * A builder connects through REQUIREMENTS, never by inquiring on somebody
+ * else's property (Doc2 role rules). Rendering the CTA and letting the server
+ * 403 it is a dead button; this says why and points at what they can do.
+ */
+function BuilderRouteNote() {
+  return (
+    <div className="flex h-11 flex-1 items-center gap-2 rounded-8 bg-surface-2 px-3">
+      <Icon name="info" size={15} className="shrink-0 text-ink-tertiary" />
+      <span className="min-w-0 flex-1 truncate text-12 text-ink-secondary">Builders answer requirements</span>
+      <Link href="/requirements" className="chrome shrink-0 text-12 font-semibold text-accent">Browse</Link>
     </div>
   );
 }

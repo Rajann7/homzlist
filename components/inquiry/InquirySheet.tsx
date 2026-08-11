@@ -117,6 +117,8 @@ export function InquirySheet({
             <Skeleton className="h-10 w-full rounded-8" />
             <Skeleton className="h-11 w-full rounded-8" />
           </div>
+        ) : !options.allowed ? (
+          <NotForThisRole kind={subject.kind} onClose={onClose} />
         ) : options.existing && !options.existing.withdrawn ? (
           <AlreadySent
             existing={options.existing}
@@ -324,6 +326,31 @@ function AlreadySent({
       <p className="mt-2 text-11 leading-snug text-ink-tertiary">
         Your details have already been shared and cannot be recalled. Cancelling only stops further contact through HomzList.
       </p>
+    </div>
+  );
+}
+
+/**
+ * A builder reaches the market through REQUIREMENTS, never by inquiring on
+ * someone else's property or project (Doc2 role rules). The server refuses it;
+ * this is the half the person actually sees, so the refusal arrives before they
+ * have filled anything in — and it points at the thing they CAN do.
+ */
+function NotForThisRole({ kind, onClose }: { kind: "listing" | "project"; onClose: () => void }) {
+  const router = useRouter();
+  return (
+    <div className="flex flex-col pb-2">
+      <div className="flex items-center gap-2">
+        <Icon name="info" size={18} className="text-warning" />
+        <h2 className="text-15 font-semibold text-ink-primary">Builders answer requirements</h2>
+      </div>
+      <p className="mt-2 text-13 leading-snug text-ink-secondary">
+        A builder account can&apos;t send an inquiry on someone else&apos;s {kind === "project" ? "project" : "property"}.
+        Buyers come to you through your projects, and you reach them by answering their requirements.
+      </p>
+      <Button className="mt-3" fullWidth onClick={() => { onClose(); router.push("/requirements"); }}>
+        Browse requirements
+      </Button>
     </div>
   );
 }

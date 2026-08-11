@@ -4584,6 +4584,45 @@ synthetic pops so one layer can never close another.
   the sender is asked "did they contact you?"; guests keep their intent through
   sign-in; admin has a read-only Lead panel and lead reports.
 
+## Role matrix — owner · broker · builder · guest (11 Aug 2026)
+
+`npm run check:leads-roles` — **53/53**. Every rule is asserted twice, at the
+API and in a real hydrated browser, because a wall the server keeps but the
+screen does not show is a dead button, and a wall the screen shows but the
+server does not keep is not a wall.
+
+| | property | project | requirement | own Leads |
+|---|---|---|---|---|
+| Owner | yes | yes | yes | yes |
+| Broker | yes | yes | yes | yes |
+| Builder | 403 | 403 | yes | yes |
+| Guest | 401 | 401 | 401 | sent to sign in |
+
+Two role holes were found and closed while testing:
+
+**1. A builder was shown a Send Inquiry button the server then refused.** The
+wall existed only in the API, so a builder could open the sheet, answer all
+three steps and be refused at the end. The sheet now refuses up front from ONE
+place (every entry point opens it) and says where they DO connect; the property
+detail shows "Builders answer requirements · Browse" instead of a CTA that was
+never going to work.
+
+**2. Tapping Call on a project wrote a lead for a builder.**
+`POST /projects/:id/contact` had no role gate, so the one connection route that
+bypasses the inquiry sheet let a builder into another builder's pipeline. It now
+drops the write silently, the same way it already did for a guest or an own
+project, and `ProjectDetail` says so rather than pretending it worked.
+
+RLS re-checked with the anon key: `leads`, `inquiries`,
+`verified_contact_numbers`, `user_blocks`, `lead_contact_events` and
+`inquiry_options` all return 0 rows to a browser key.
+
+**Known legacy data, deliberately left alone.** 36 leads exist where a builder
+is the sender on a property or project. Every one predates the rule (newest
+9 Aug) and the gate now creates none. They record things that really happened
+in the chat era, so they are not deleted — but a builder will see them in their
+own Sent tab, and this is why.
+
 ## Note for the next person
 
 The in-app Browser pane runs its tab hidden and Chrome freezes a tab it never

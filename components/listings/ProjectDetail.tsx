@@ -9,6 +9,7 @@ import { InquirySheet, LoginSheet, ReportSheet, ShareSheet } from "@/components/
 import type { FeedCard } from "@/lib/feed/client";
 import { DETAIL_PAD, DetailHero, DetailSection, DetailSeparator, ProjectDetailBody } from "./detailBody";
 import { PhotoViewer, useScrolledPastHero } from "./ListingDetail";
+import { useRole } from "@/components/nav/RoleContext";
 import { cn, publicHref } from "@/lib/utils";
 
 /**
@@ -28,6 +29,8 @@ import { cn, publicHref } from "@/lib/utils";
 export function ProjectDetail({ id, isGuest = false }: { id: string; isGuest?: boolean }) {
   const router = useRouter();
   const toast = useToast();
+  // Role decides whether this viewer may connect on a project at all (Doc2).
+  const role = useRole();
 
   const [p, setP] = useState<any>(null);
   const [brochure, setBrochure] = useState<{ url: string | null; scanned: boolean } | null>(null);
@@ -112,6 +115,10 @@ export function ProjectDetail({ id, isGuest = false }: { id: string; isGuest?: b
   // direct: Call dials it, WhatsApp/Enquire opens a prefilled chat. No inquiry
   // thread — projects have no chat pipeline (that's for listings).
   const contactBuilder = (via: "call" | "whatsapp", unitType?: string) => {
+    // A builder does not connect on another builder's project (Doc2 role
+    // rules) — and the tap would otherwise write a lead the server now drops,
+    // which is worse than saying so.
+    if (role === "builder") { toast.show("Builders answer requirements — browse them from the feed"); return; }
     // Call and WhatsApp can be different lines (0138): a project may publish a
     // sales number, and a separate WhatsApp for it. Falling back keeps every
     // project that only has the one number working exactly as before.

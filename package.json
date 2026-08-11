@@ -64,7 +64,8 @@
     "check:req-visibility": "node scripts/check-requirement-visibility.mjs",
     "check:pwa": "node scripts/check-pwa-live.mjs",
     "check:leads-live": "node scripts/check-leads-live.mjs",
-    "check:leads-ui": "node scripts/check-leads-ui.mjs"
+    "check:leads-ui": "node scripts/check-leads-ui.mjs",
+    "check:leads-roles": "node scripts/check-leads-roles.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1091.0",
