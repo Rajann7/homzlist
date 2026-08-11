@@ -1,6 +1,5 @@
 import "server-only";
 import { createServiceClient } from "@/lib/supabase/server";
-import { numberResponse } from "@/lib/chat/thread";
 import { answerStillAvailable } from "@/lib/listings/lifecycle";
 import { revokeAllSessions } from "@/lib/auth/session";
 
@@ -91,17 +90,13 @@ export async function runAction(profileId: string, notificationId: string, key: 
 
 async function perform(profileId: string, key: ActionKey, n: any): Promise<ActionOutcome> {
   switch (key) {
-    // ---- number request: Allow / Deny (Doc2 §10, owned by the chat module) --
+    // Number request Allow/Deny lived here until chat was removed. Numbers are
+    // no longer requested: the sender chooses what to share up front, so an old
+    // notification row with these keys resolves to a no-op rather than a
+    // button that calls into a module that no longer exists.
     case "number_allow":
-    case "number_deny": {
-      if (!n.thread_id) return { ok: false, reason: "failed" };
-      const allow = key === "number_allow";
-      const r = await numberResponse(n.thread_id, profileId, allow);
-      if (!r.ok) return { ok: false, reason: "failed" };
-      if (!allow) return { ok: true, dismissed: true, toast: "Number request denied" };
-      const who = await nameOf(n.actor_id);
-      return { ok: true, toast: "Number shared", text: `You shared your number with **${who}** ✓` };
-    }
+    case "number_deny":
+      return { ok: true, dismissed: true, toast: "This request is no longer available" };
 
     // ---- 2-month "Still available?" (Doc2 §5.4) ----------------------------
     case "still_yes":

@@ -3,60 +3,75 @@ import { ok, fail } from "@/lib/api";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { getProfileById } from "@/lib/profile/service";
 import { rateLimit } from "@/lib/auth/rate-limit";
-import { sendInquiry, sendProjectInquiry } from "@/lib/feed/interactions";
+import { sendInquiry, listInquiryOptions, mayInquire } from "@/lib/inquiry/service";
 
 /**
- * POST /api/v1/inquiries — the Inquiry sheet (Doc2 §10.1). Self-inquiry blocked,
- * one per (buyer, listing) with revival on re-send. Persists to `inquiries`;
- * Module 7 (Chat) grows a thread from it. Min profile (name) required (Doc2 §10.1).
+ * POST /api/v1/inquiries — the connection sheet's Send.
+ *
+ * There is no message. The body carries the three answers (wants / contact
+ * preference / when), the consent flag, and optionally a custom number that
+ * must already hold a live OTP verification.
+ *
+ * GET returns the option chips for a subject, straight from `inquiry_options`,
+ * so the sheet never ships a hardcoded list.
  */
 export const dynamic = "force-dynamic";
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export async function GET(req: NextRequest) {
+  const claims = await getCurrentUser();
+  if (!claims) return fail("UNAUTHORIZED");
+  const kindParam = req.nextUrl.searchParams.get("kind");
+  const kind = kindParam === "project" ? "project" : kindParam === "requirement" ? "requirement" : "listing";
+  const profile = await getProfileById(claims.sub);
+  if (!profile || profile.state !== "active") return fail("FORBIDDEN");
+  const options = await listInquiryOptions(kind);
+  return ok({ ...options, allowed: mayInquire(profile.role, kind), myNumber: profile.phone ?? null });
+}
 
 export async function POST(req: NextRequest) {
   const claims = await getCurrentUser();
   if (!claims) return fail("UNAUTHORIZED");
   const profile = await getProfileById(claims.sub);
   if (!profile || profile.state !== "active") return fail("FORBIDDEN");
-  // Min profile = name + CITY (Doc2 §10.1). The city half was never checked.
+  // Min profile = name + city (Doc2 §10.1) — unchanged by this module.
   if (!profile.name || !profile.city_id) return fail("PROFILE_INCOMPLETE", { field: profile.name ? "city" : "name" });
 
-  const limited = await rateLimit(`inquiry:${claims.sub}`, 100, 86_400, "inquiry_send"); // Doc2 §15: 100/day
+  // Inquiries are free, so the cap is what stops one broker carpet-bombing a
+  // city. Proposals stay quota'd separately.
+  const limited = await rateLimit(`inquiry:${claims.sub}`, 50, 86_400, "inquiry_send");
   if (!limited.allowed) return fail("RATE_LIMITED");
 
   let body: Record<string, unknown>;
   try { body = await req.json(); } catch { return fail("VALIDATION_ERROR"); }
-  // One endpoint, two subjects (migration 0084): `listingId` inquires on a
-  // property, `projectId` on a project. Exactly one of them, never both — the
-  // thread's subject is single by DB constraint too.
+
   const listingId = typeof body.listingId === "string" ? body.listingId : "";
   const projectId = typeof body.projectId === "string" ? body.projectId : "";
   if (!!listingId === !!projectId) return fail("VALIDATION_ERROR", { field: "listingId" });
-  if (listingId && !UUID_RE.test(listingId)) return fail("VALIDATION_ERROR", { field: "listingId" });
-  if (projectId && !UUID_RE.test(projectId)) return fail("VALIDATION_ERROR", { field: "projectId" });
+  const subjectId = listingId || projectId;
+  if (!UUID_RE.test(subjectId)) return fail("VALIDATION_ERROR", { field: listingId ? "listingId" : "projectId" });
 
-  // Which unit the buyer tapped Enquire on (0087). Optional — "Contact builder"
-  // is about the whole project. Ownership of the id is checked server-side.
-  const unitId = typeof body.unitId === "string" ? body.unitId : "";
-  if (unitId && !UUID_RE.test(unitId)) return fail("VALIDATION_ERROR", { field: "unitId" });
+  const res = await sendInquiry(claims.sub, {
+    kind: listingId ? "listing" : "project",
+    subjectId,
+    wants: Array.isArray(body.wants) ? body.wants.filter((w): w is string => typeof w === "string") : [],
+    contactPref: body.contactPref === "whatsapp" ? "whatsapp" : "call",
+    contactNumber: typeof body.contactNumber === "string" ? body.contactNumber : null,
+    whenToken: typeof body.whenToken === "string" ? body.whenToken : "anytime",
+    preferredDate: typeof body.preferredDate === "string" ? body.preferredDate : null,
+    consent: body.consent === true,
+    idempotencyKey: typeof body.idempotencyKey === "string" ? body.idempotencyKey.slice(0, 64) : null,
+    ip: req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null,
+  });
 
-  const res = projectId
-    ? await sendProjectInquiry(claims.sub, projectId, {
-        message: typeof body.message === "string" ? body.message : "",
-        unitId: unitId || null,
-      })
-    : await sendInquiry(claims.sub, listingId, {
-        message: typeof body.message === "string" ? body.message : "",
-        intents: Array.isArray(body.intents) ? body.intents.filter((i): i is string => typeof i === "string") : [],
-        shareNumber: body.shareNumber !== false,
-      });
   if (!res.ok) {
     if (res.reason === "self") return fail("SELF_ACTION_BLOCKED");
-    // The poster declined: tell the sender WHEN they may try again (the same
-    // date their thread's DeclinedCard shows) rather than a bare failure.
-    if (res.reason === "cooldown") return fail("INQUIRY_COOLDOWN", { until: res.until });
-    if (res.reason === "blocked") return fail("FORBIDDEN");
+    if (res.reason === "role") return fail("FORBIDDEN");
+    if (res.reason === "number_unverified") return fail("NUMBER_NOT_ALLOWED");
+    if (res.reason === "consent" || res.reason === "invalid") return fail("VALIDATION_ERROR");
+    // A block must not be distinguishable from a subject that isn't there —
+    // otherwise the endpoint tells you who blocked you.
     return fail("NOT_FOUND");
   }
-  return ok({ sent: true, alreadySent: res.alreadySent, threadId: res.threadId ?? null });
+  return ok({ sent: true, leadId: res.leadId, alreadySent: res.alreadySent });
 }

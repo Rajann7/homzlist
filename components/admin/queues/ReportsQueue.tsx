@@ -16,20 +16,7 @@
  */
 
 import { useState } from "react";
-import {
-  AdminIcon,
-  Badge,
-  Btn,
-  Chip,
-  Modal,
-  PageHead,
-  RightSheet,
-  Shimmer,
-  SheetMenu,
-  Thumb,
-  useAdmin,
-  useToast,
-} from "@/components/admin/ds";
+import { AdminIcon, Badge, Btn, Chip, Modal, PageHead, RightSheet, SheetMenu, Shimmer, Thumb, useAdmin, usePanels, useToast } from "@/components/admin/ds";
 import { Pager, useAdminList, ListError } from "@/components/admin/list";
 import { ageOf } from "./shared";
 import { ROLE_RANK } from "@/components/admin/ds/screens";
@@ -301,14 +288,49 @@ export function ReportsQueue() {
 
 /* template 928-934 — a different preview per reported kind */
 function EntityPreview({ row }: { row: Row }) {
+  const { pushPanel } = usePanels();
+  // A reported LEAD is the common case now that there are no messages: the
+  // lead itself is the evidence, so the card opens the read-only lead panel
+  // where the payload, the number shared and the consent row all live.
+  if (row.subject_type === "lead") {
+    return (
+      <div style={{ background: "var(--s2)", borderRadius: 8, padding: 10 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <AdminIcon name="flag" size={14} />
+          <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink1)" }}>
+            {`Lead #${row.subject_id.slice(0, 8)}`}
+          </div>
+          <button
+            type="button"
+            onClick={() => pushPanel("lead", { id: row.subject_id, who: `#${row.subject_id.slice(0, 8)}` })}
+            style={{
+              marginLeft: "auto", background: "none", border: "none", cursor: "pointer",
+              fontSize: 12, fontWeight: 600, color: "var(--accent)",
+            }}
+          >
+            Open lead →
+          </button>
+        </div>
+        <div style={{ fontSize: 12, color: "var(--ink2)", marginTop: 6 }}>
+          {row.note ?? `Reported ${row.report_count} time${row.report_count === 1 ? "" : "s"}`}
+        </div>
+        <div style={{ fontSize: 11, color: "var(--ink3)", marginTop: 6 }}>
+          The inquiry payload, the number that was shared and the consent record are on the lead — read-only.
+        </div>
+      </div>
+    );
+  }
+
+  // Historic rows only: messages were removed from the product, so nothing
+  // writes this subject any more. The card stays readable for old reports.
   if (row.subject_type === "message") {
     return (
       <div style={{ background: "var(--s2)", borderRadius: 8, padding: 10 }}>
         <div style={{ fontSize: 12, color: "var(--ink1)" }}>
-          {row.note ?? "A message in a chat was reported."}
+          {row.note ?? "A message was reported."}
         </div>
         <div style={{ fontSize: 11, color: "var(--ink3)", marginTop: 6 }}>
-          Admins can read chat context for reported messages only — sending is disabled everywhere.
+          Chat was removed from HomzList — this report predates that. Act on the reported user instead.
         </div>
       </div>
     );
@@ -497,7 +519,7 @@ function SuspendModal({
           color: "var(--ink2)",
         }}
       >
-        Their listings will be hidden and chats frozen.
+        Their listings will be hidden and their leads frozen.
       </div>
     </Modal>
   );

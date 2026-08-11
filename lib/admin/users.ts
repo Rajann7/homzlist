@@ -14,7 +14,7 @@ import type { AdminIdentity } from "./guard";
  * one of them here reads or writes a real table. Two rules run through the file:
  *
  *  · A TAB IS A QUERY, NOT A PAYLOAD. The panel asks for one tab at a time, so
- *    opening a user does not drag their whole chat history across the wire —
+ *    opening a user does not drag their whole lead history across the wire —
  *    and the Chats tab, which is the most sensitive thing on the screen, is not
  *    fetched at all until an admin actually opens it.
  *  · THE ACTION FILTER IS THE CLAIM. Every mutation carries the state it is
@@ -102,7 +102,6 @@ export type UserTab =
   | "listings"
   | "requirements"
   | "leads"
-  | "chats"
   | "communication"
   | "notes"
   | "timeline";
@@ -121,8 +120,6 @@ export async function userTab(id: string, tab: UserTab): Promise<unknown> {
       return requirementsTab(id);
     case "leads":
       return leadsTab(id);
-    case "chats":
-      return chatsTab(id);
     case "communication":
       return communicationTab(id);
     case "notes":
@@ -198,7 +195,12 @@ async function overviewTab(id: string) {
     completion: Math.round((filled / fields.length) * 100),
     responseLabel: (row.response_label as string) ?? null,
     consents: (consents ?? []) as { kind: string; version: string; accepted: boolean; accepted_at: string }[],
-    marketingOptIn: Boolean((settings as { show_number_default?: boolean } | null)?.show_number_default),
+    // There is no marketing opt-in in HomzList. This field used to report
+    // `show_number_default` — a listing privacy default — as if it were a
+    // marketing consent, so every user row showed a consent value that was
+    // simply a different setting. Until a real marketing consent exists, the
+    // honest answer is null (CLAUDE.md rule 12: no invented values).
+    marketingOptIn: null as boolean | null,
     flags: (flags ?? []) as { kind: string; severity: string; title: string; detail: string | null; created_at: string }[],
     priorRejections: 0,
     bioFlag: row.bio_flagged_at
@@ -396,135 +398,6 @@ async function leadsTab(id: string) {
   };
 }
 
-/** template 1362 — the thread LIST. The thread itself is a second, explicit read. */
-async function chatsTab(id: string) {
-  const { data } = await db()
-    .from("chat_threads")
-    .select(
-      "id, kind, buyer_id, poster_id, listing_id, project_id, status, last_message_at, last_message_preview",
-    )
-    .or(`buyer_id.eq.${id},poster_id.eq.${id}`)
-    .order("last_message_at", { ascending: false })
-    .limit(50);
-
-  const rows = (data ?? []) as Record<string, unknown>[];
-  const otherIds = [
-    ...new Set(rows.map((r) => (r.buyer_id === id ? r.poster_id : r.buyer_id) as string)),
-  ];
-  const listingIds = [...new Set(rows.map((r) => r.listing_id).filter(Boolean) as string[])];
-
-  const [people, listings, counts] = await Promise.all([
-    otherIds.length
-      ? db().from("profiles").select("id, name, photo_url").in("id", otherIds)
-      : Promise.resolve({ data: [] }),
-    listingIds.length
-      ? db().from("listings").select("id, title, cover_url").in("id", listingIds)
-      : Promise.resolve({ data: [] }),
-    rows.length
-      ? db()
-          .from("chat_messages")
-          .select("thread_id")
-          .in(
-            "thread_id",
-            rows.map((r) => r.id as string),
-          )
-      : Promise.resolve({ data: [] }),
-  ]);
-
-  const msgCount = new Map<string, number>();
-  for (const m of (counts.data ?? []) as { thread_id: string }[]) {
-    msgCount.set(m.thread_id, (msgCount.get(m.thread_id) ?? 0) + 1);
-  }
-  const person = new Map(
-    ((people.data ?? []) as { id: string; name: string; photo_url: string | null }[]).map((p) => [
-      p.id,
-      p,
-    ]),
-  );
-  const listing = new Map(
-    ((listings.data ?? []) as { id: string; title: string; cover_url: string | null }[]).map((l) => [
-      l.id,
-      l,
-    ]),
-  );
-
-  return {
-    rows: rows.map((r) => {
-      const otherId = (r.buyer_id === id ? r.poster_id : r.buyer_id) as string;
-      return {
-        id: r.id,
-        other_name: person.get(otherId)?.name ?? "—",
-        other_photo: person.get(otherId)?.photo_url ?? null,
-        subject: r.listing_id ? (listing.get(r.listing_id as string)?.title ?? "Listing") : "Project",
-        cover_url: r.listing_id ? (listing.get(r.listing_id as string)?.cover_url ?? null) : null,
-        preview: r.last_message_preview,
-        last_message_at: r.last_message_at,
-        message_count: msgCount.get(r.id as string) ?? 0,
-      };
-    }),
-  };
-}
-
-/**
- * The READ-ONLY thread viewer (template 1390-1409).
- *
- * Doc9: admin chats are read-only ENFORCED AT THE API — there is no send path
- * here at all, not a disabled one. Deleted messages are returned, labelled, as
- * the design's own footnote promises ("shown to admins as 'Deleted by user' for
- * evidence") — which is also why the body is blanked rather than passed
- * through: the evidence that matters is that a message existed and was removed.
- */
-export async function adminThread(threadId: string) {
-  const { data: thread } = await db()
-    .from("chat_threads")
-    .select(
-      "id, kind, buyer_id, poster_id, listing_id, project_id, status, created_at, unit_id",
-    )
-    .eq("id", threadId)
-    .maybeSingle();
-  if (!thread) return null;
-  const t = thread as Record<string, unknown>;
-
-  const [{ data: people }, { data: messages }, { data: listing }] = await Promise.all([
-    db()
-      .from("profiles")
-      .select("id, name, photo_url, role")
-      .in("id", [t.buyer_id as string, t.poster_id as string]),
-    db()
-      .from("chat_messages")
-      .select("id, sender_id, kind, body, photo_url, meta, deleted_all, created_at")
-      .eq("thread_id", threadId)
-      .order("created_at", { ascending: true })
-      .limit(300),
-    t.listing_id
-      ? db()
-          .from("listings")
-          .select("id, title, price_paise, status, cover_url")
-          .eq("id", t.listing_id as string)
-          .maybeSingle()
-      : Promise.resolve({ data: null }),
-  ]);
-
-  return {
-    id: t.id,
-    participants: (people ?? []) as { id: string; name: string; photo_url: string | null; role: string }[],
-    buyerId: t.buyer_id,
-    posterId: t.poster_id,
-    startedAt: t.created_at,
-    listing: listing as Record<string, unknown> | null,
-    messages: ((messages ?? []) as Record<string, unknown>[]).map((m) => ({
-      id: m.id,
-      sender_id: m.sender_id,
-      kind: m.kind,
-      created_at: m.created_at,
-      deleted: Boolean(m.deleted_all),
-      body: m.deleted_all ? null : m.body,
-      photo_url: m.deleted_all ? null : m.photo_url,
-      meta: m.deleted_all ? {} : m.meta,
-    })),
-  };
-}
-
 /** template 1364-1366 — every admin-sent message, with its channel and delivery. */
 async function communicationTab(id: string) {
   const { data } = await db()
@@ -589,9 +462,9 @@ async function timelineTab(id: string) {
         .order("created_at", { ascending: false })
         .limit(20),
       db()
-        .from("chat_threads")
+        .from("inquiries")
         .select("id, created_at")
-        .or(`buyer_id.eq.${id},poster_id.eq.${id}`)
+        .eq("profile_id", id)
         .order("created_at", { ascending: false })
         .limit(10),
     ]);
@@ -633,7 +506,7 @@ async function timelineTab(id: string) {
     items.push({ at: m.created_at as string, text: m.title as string, group: "admin" });
   }
   for (const t of (threads ?? []) as Record<string, unknown>[]) {
-    items.push({ at: t.created_at as string, text: "Started a chat", group: "account" });
+    items.push({ at: t.created_at as string, text: "Sent an inquiry", group: "account" });
   }
 
   const { data: profile } = await db()
@@ -672,7 +545,7 @@ async function timelineTab(id: string) {
 
 /* ═══════════════════════════════════════════════════════ the actions ═══════ */
 
-/** template 1693 — Suspend user? Duration + reason, listings hidden, chats frozen. */
+/** template 1693 — Suspend user? Duration + reason, listings hidden, leads frozen. */
 export async function suspendUser(
   id: string,
   me: AdminIdentity,
@@ -724,8 +597,8 @@ export async function suspendUser(
     .update({ status: "hidden", hidden_at: hiddenAt })
     .eq("profile_id", id)
     .eq("status", "live");
-  // Frozen chats: every live session goes, so they cannot keep messaging from a
-  // tab that is already open.
+  // Every live session goes, so a suspended account cannot keep sending
+  // inquiries or working its leads from a tab that is already open.
   await revokeAllSessions(id).catch(() => undefined);
 
   await notify({
@@ -754,7 +627,7 @@ export async function suspendUser(
   };
 }
 
-/** template 1757 — Lift suspension? "Listings and chats will be restored." */
+/** template 1757 — Lift suspension? "Listings and leads will be restored." */
 export async function liftSuspension(id: string, me: AdminIdentity): Promise<UserActionResult> {
   const { data } = await db()
     .from("profiles")
@@ -805,7 +678,7 @@ export async function liftSuspension(id: string, me: AdminIdentity): Promise<Use
     profileId: id,
     type: "suspension_lifted",
     title: "Your account is active again",
-    body: "Your listings and chats have been restored.",
+    body: "Your listings and leads have been restored.",
     actorId: me.id,
   });
 

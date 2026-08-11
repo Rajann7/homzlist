@@ -52,7 +52,7 @@ const TABS: [string, string][] = [
   ["listings", "Listings"],
   ["requirements", "Requirements"],
   ["users", "Users"],
-  ["chats", "Chats"],
+  ["leads", "Leads"],
   ["photos", "Photos"],
   ["projects", "Projects"],
   ["coupons", "Coupons"],
@@ -106,7 +106,7 @@ export function TrashScreen() {
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           {r.entity_type === "user" ? (
             <Avatar initials={(r.label ?? "U").slice(0, 2).toUpperCase()} size={32} />
-          ) : r.entity_type === "chat" ? (
+          ) : r.entity_type === "lead" ? (
             <span style={{ color: "var(--ink3)" }}>
               <AdminIcon name="msg" size={20} />
             </span>

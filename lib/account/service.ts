@@ -216,11 +216,22 @@ export async function requestDataExport(profileId: string, format: "json" | "csv
  */
 async function collectUserData(profileId: string, format: "json" | "csv"): Promise<Buffer> {
   const d = db();
-  const [profile, listings, requirements, messages, payments, invoices, consents, tickets] = await Promise.all([
+  const [profile, listings, requirements, messages, inquiries, leadsSent, payments, invoices, consents, tickets] = await Promise.all([
     d.from("profiles").select("id, phone, name, username, email, role, bio, city_id, created_at").eq("id", profileId).maybeSingle(),
     d.from("listings").select("id, title, description, kind, price_paise, area_label, status, created_at").eq("profile_id", profileId),
     d.from("requirements").select("id, title, budget_min_paise, budget_max_paise, status, created_at").eq("profile_id", profileId),
     d.from("chat_messages").select("id, thread_id, body, created_at").eq("sender_id", profileId),
+    // Connections replaced chat: an export that stopped at old messages would
+    // be missing most of what this person actually did on HomzList.
+    d.from("inquiries")
+      .select("id, listing_id, project_id, wants, contact_pref, contact_number, when_token, preferred_on, consent_version, consent_at, created_at")
+      .eq("profile_id", profileId),
+    // Only the leads THEY created. A lead they received belongs to the other
+    // person's contact details as much as their own, so it is excluded for the
+    // same reason incoming messages are.
+    d.from("leads")
+      .select("id, listing_id, project_id, requirement_id, wants, contact_pref, when_token, preferred_on, stage, created_at")
+      .eq("lead_profile_id", profileId),
     d.from("payments").select("id, razorpay_payment_id, amount_paise, status, method, created_at").eq("profile_id", profileId),
     d.from("invoices").select("id, number, amount_paise, created_at").eq("profile_id", profileId),
     d.from("auth_consents").select("kind, version, accepted, accepted_at").eq("profile_id", profileId),
@@ -230,11 +241,13 @@ async function collectUserData(profileId: string, format: "json" | "csv"): Promi
   const bundle = {
     exported_at: new Date().toISOString(),
     notice:
-      "This export contains only your own data. Messages other people sent to you, and other users' contact details, are excluded to protect their privacy.",
+      "This export contains only your own data. Inquiries and messages other people sent to you, and other users' contact details, are excluded to protect their privacy.",
     profile: profile.data ?? null,
     listings: listings.data ?? [],
     requirements: requirements.data ?? [],
     messages_you_sent: messages.data ?? [],
+    inquiries_you_sent: inquiries.data ?? [],
+    connections_you_started: leadsSent.data ?? [],
     payments: payments.data ?? [],
     invoices: invoices.data ?? [],
     consents: consents.data ?? [],
@@ -257,6 +270,8 @@ async function collectUserData(profileId: string, format: "json" | "csv"): Promi
     "\n## listings\n", csv(bundle.listings as Record<string, unknown>[]),
     "\n## requirements\n", csv(bundle.requirements as Record<string, unknown>[]),
     "\n## messages_you_sent\n", csv(bundle.messages_you_sent as Record<string, unknown>[]),
+    "\n## inquiries_you_sent\n", csv(bundle.inquiries_you_sent as Record<string, unknown>[]),
+    "\n## connections_you_started\n", csv(bundle.connections_you_started as Record<string, unknown>[]),
     "\n## payments\n", csv(bundle.payments as Record<string, unknown>[]),
     "\n## invoices\n", csv(bundle.invoices as Record<string, unknown>[]),
     "\n## consents\n", csv(bundle.consents as Record<string, unknown>[]),

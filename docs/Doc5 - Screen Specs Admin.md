@@ -1,5 +1,27 @@
 # DOC 5 — SCREEN SPECS + UX FLOWS (PART B: ADMIN SCREENS A1–A31 + FLOW DIAGRAMS)
 
+> **SUPERSEDED — 11 Aug 2026 · chat removed, connections are leads.**
+>
+> Every passage below that describes chat threads, the message composer,
+> accept/decline before connecting, number requests (Allow/Deny), "waiting for
+> reply", or a proposal turning into a conversation is **no longer how HomzList
+> works**. Those tables still exist for dispute evidence, but nothing reads or
+> writes them.
+>
+> What replaced it: a sender answers three questions — **what** they want, **how**
+> they want to be contacted (call / WhatsApp, own or an OTP-verified alternate
+> number), and **when** — ticks the consent line, and that becomes a **lead** on
+> the receiving side. The receiver acts with Call or WhatsApp, and the tap is
+> recorded. A lead moves New → Contacted → Converted → Archived. Requirements are
+> answered with **I Have a Property** or **I Can Arrange It**, both quota'd, both
+> landing as the same lead.
+>
+> Surfaces: `/leads` (Received grouped by your own post, and Sent), the admin
+> read-only **Lead panel**, and reports with `subject_type = 'lead'` in the
+> existing reports queue. Implementation: migrations 0134-0136, `lib/inquiry/*`,
+> `lib/leads/*`, `components/inquiry/*`, `components/leads/*`.
+
+
 *Admin panel spec. Layout: desktop-first — sidebar 240px (collapsible→64px icons) + content max 1200px; fully mobile-responsive (sidebar→bottom drawer; tables→cards). Same legend as Doc 4. All screens: permission-gated server-side per role matrix (Doc 3 §1.1); every action → audit log; deep-drill principle (Doc 3 §1.3) applies globally — every entity name/ID anywhere is clickable to its detail panel. Side-panel pattern: 480px right slide-in (mobile: full-screen) — stacking allowed (panel over panel, breadcrumb trail on top).*
 
 **Sidebar structure**: Dashboard · Queues▾(Listings/Requirements/Boosts/Verifications/Appeals/Reports) · Users · Listings · Payments · Finance · Plans▾(Plans/Coupons/Grants) · Master Data · CMS · Templates · Support▾(Tickets/Disputes) · Staff · Analytics · Audit Log · System▾(Cron/Flags/Trash/Exports) · [bottom] admin avatar + role chip + logout.

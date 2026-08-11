@@ -2,6 +2,7 @@ import type { NextRequest } from "next/server";
 import { ok, fail } from "@/lib/api";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { getProfileById } from "@/lib/profile/service";
+import { listInquiryOptions } from "@/lib/inquiry/service";
 import { flagEnabled } from "@/lib/system/flags";
 import { rateLimit } from "@/lib/auth/rate-limit";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -68,14 +69,22 @@ export async function GET(req: NextRequest, props: { params: Promise<{ id: strin
 
   // Default: the sender's proposal sheet data.
   const db = createServiceClient();
-  const [{ data: listings }, balance, { data: dup }, canPropose] = await Promise.all([
+  const profile = await getProfileById(claims.sub);
+  if (!profile || profile.state !== "active") return fail("FORBIDDEN");
+  const [{ data: listings }, { data: projects }, balance, { data: dup }, canPropose, options] = await Promise.all([
     db.from("listings").select("id,title,price_paise,price_on_request,area_label,cover_url,attributes")
+      .eq("profile_id", claims.sub).eq("status", "live").order("created_at", { ascending: false }).limit(20),
+    // "I Have a Property" covers projects too — a builder answering a
+    // requirement offers a scheme, and the old sheet could not express that.
+    db.from("projects").select("id,name,area_label,cover_url")
       .eq("profile_id", claims.sub).eq("status", "live").order("created_at", { ascending: false }).limit(20),
     proposalBalance(claims.sub),
     db.from("proposals").select("id").eq("requirement_id", params.id).eq("sender_id", claims.sub).in("status", ["pending", "accepted"]).maybeSingle(),
     // Same answer the POST enforces, so the sheet can say WHY up front instead
     // of offering a Send button that is going to 403 (0087 builder rule).
     builderMayPropose(claims.sub),
+    // The chips and the consent wording are rows, never a hardcoded array.
+    listInquiryOptions("requirement"),
   ]);
 
   return ok({
@@ -89,10 +98,18 @@ export async function GET(req: NextRequest, props: { params: Promise<{ id: strin
       areaLabel: l.area_label,
       coverUrl: l.cover_url,
     })),
-    prefill: {
-      listing: "Hi, I have a property that matches your requirement. Take a look — happy to share more details or arrange a visit.",
-      chat: "Hi, I have a few options that match your requirement. Can we discuss your needs?",
-    },
+    projects: ((projects ?? []) as any[]).map((p) => ({
+      id: p.id,
+      title: p.name,
+      priceLabel: "Project",
+      areaLabel: p.area_label,
+      coverUrl: p.cover_url,
+    })),
+    offers: options.offers,
+    when: options.when,
+    consentText: options.consentText,
+    consentVersion: options.consentVersion,
+    myNumber: profile.phone ?? null,
   });
 }
 
@@ -114,10 +131,22 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
   let body: Record<string, unknown>;
   try { body = await req.json(); } catch { return fail("VALIDATION_ERROR"); }
 
+  // Sharing contact details needs consent here for exactly the reason it does
+  // on a property inquiry — the requirement owner gets the sender's number.
+  if (body.consent !== true) return fail("VALIDATION_ERROR", { field: "consent" });
+
   const res = await sendProposal(claims.sub, params.id, {
-    mode: body.mode === "listing" ? "listing" : "chat",
+    mode: body.mode === "listing" ? "listing" : "help",
     listingId: typeof body.listingId === "string" ? body.listingId : null,
+    projectId: typeof body.projectId === "string" ? body.projectId : null,
     message: typeof body.message === "string" ? body.message : null,
+    offers: Array.isArray(body.offers) ? body.offers.filter((o: unknown): o is string => typeof o === "string") : [],
+    contactPref: body.contactPref === "whatsapp" ? "whatsapp" : "call",
+    contactNumber: typeof body.contactNumber === "string" ? body.contactNumber : null,
+    whenToken: typeof body.whenToken === "string" ? body.whenToken : "anytime",
+    preferredDate: typeof body.preferredDate === "string" ? body.preferredDate : null,
+    consent: true,
+    ip: req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null,
   });
 
   if (!res.ok) {

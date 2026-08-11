@@ -24,7 +24,7 @@ export function ProposalsReceived({ requirementId }: { requirementId: string }) 
   const [offline, setOffline] = useState(false);
   const [notFound, setNotFound] = useState(false);
   const [filter, setFilter] = useState("all");
-  const [dialog, setDialog] = useState<{ kind: "decline" | "not_relevant"; id: string; name: string } | null>(null);
+  const [dialog, setDialog] = useState<{ kind: "not_relevant"; id: string; name: string } | null>(null);
 
   const load = useCallback(async () => {
     const res = await proposalsApi.received(requirementId);
@@ -35,22 +35,15 @@ export function ProposalsReceived({ requirementId }: { requirementId: string }) 
 
   useEffect(() => { void load(); }, [load]);
 
-  const accept = async (p: ReceivedProposal) => {
-    const res = await proposalsApi.accept(p.id);
-    if (res.ok) {
-      // "Accept & Chat" — open the thread the acceptance grew (Doc2 §8.1).
-      if (res.data.threadId) { router.push(`/messages/${res.data.threadId}`); return; }
-      toast.show(`Chat started with ${p.sender.name}`);
-      void load();
-    } else {
-      toast.show("Couldn't accept that");
-    }
-  };
+  // Nothing is accepted or declined any more: a proposal IS a lead the moment
+  // it is sent, and the poster works it from here or from the Leads screen.
+  // What is left is "not relevant", which hides it without pretending to be a
+  // verdict the sender is told about.
   const runDialog = async () => {
     if (!dialog) return;
-    const res = dialog.kind === "decline" ? await proposalsApi.decline(dialog.id) : await proposalsApi.notRelevant(dialog.id);
+    const res = await proposalsApi.notRelevant(dialog.id);
     setDialog(null);
-    toast.show(res.ok ? (dialog.kind === "decline" ? "Proposal declined" : "Marked not relevant") : "Couldn't update that");
+    toast.show(res.ok ? "Marked not relevant" : "Couldn't update that");
     void load();
   };
 
@@ -106,20 +99,11 @@ export function ProposalsReceived({ requirementId }: { requirementId: string }) 
       ) : (
         <div className="flex flex-col gap-3 p-4 pb-8">
           {shown.map((p) => (
-            <ProposalCard key={p.id} p={p} toast={toast} onAccept={() => void accept(p)} onDecline={() => setDialog({ kind: "decline", id: p.id, name: p.sender.name })} onNotRelevant={() => setDialog({ kind: "not_relevant", id: p.id, name: p.sender.name })} onOpenListing={(id) => router.push(`/property/${id}`)} onOpenChat={(tid) => router.push(`/messages/${tid}`)} />
+            <ProposalCard key={p.id} p={p} toast={toast} onNotRelevant={() => setDialog({ kind: "not_relevant", id: p.id, name: p.sender.name })} onOpenListing={(id) => router.push(`/property/${id}`)} />
           ))}
         </div>
       )}
 
-      <ConfirmDialog
-        open={dialog?.kind === "decline"}
-        onClose={() => setDialog(null)}
-        onConfirm={() => void runDialog()}
-        title="Decline this proposal?"
-        body="They'll be notified. You can still see this in your declined list."
-        confirmLabel="Decline"
-        destructive
-      />
       <ConfirmDialog
         open={dialog?.kind === "not_relevant"}
         onClose={() => setDialog(null)}
@@ -133,11 +117,11 @@ export function ProposalsReceived({ requirementId }: { requirementId: string }) 
 }
 
 function ProposalCard({
-  p, toast, onAccept, onDecline, onNotRelevant, onOpenListing, onOpenChat,
+  p, toast, onNotRelevant, onOpenListing,
 }: {
   p: ReceivedProposal;
   toast: { show: (m: string) => void };
-  onAccept: () => void; onDecline: () => void; onNotRelevant: () => void; onOpenListing: (id: string) => void; onOpenChat: (threadId: string) => void;
+  onNotRelevant: () => void; onOpenListing: (id: string) => void;
 }) {
   const accepted = p.status === "accepted";
   const closed = p.status === "declined" || p.status === "not_relevant";
@@ -198,13 +182,27 @@ function ProposalCard({
         </button>
       )}
 
-      {/* Action row */}
-      {accepted ? (
-        <Button variant="outline" fullWidth onClick={() => (p.threadId ? onOpenChat(p.threadId) : toast.show("Opening chat…"))}>Open chat</Button>
-      ) : closed ? null : (
-        <div className="flex items-center gap-3">
-          <Button variant="outline" className="flex-1" onClick={onDecline}>Decline</Button>
-          <Button className="flex-1" onClick={onAccept}>Accept & Chat</Button>
+      {/* Action row — the same one every lead carries. The number arrived with
+          the proposal, so there is nothing to unlock and nobody to wait for. */}
+      {closed ? null : (
+        <div className="flex items-center gap-2">
+          <Button
+            className="flex-1"
+            onClick={() => (p.sender.phone
+              ? (window.location.href = `tel:${p.sender.phone}`)
+              : toast.show("No number on this proposal"))}
+          >
+            <Icon name="phone" size={16} />Call
+          </Button>
+          <Button
+            variant="outline"
+            className="flex-1"
+            onClick={() => (p.sender.phone
+              ? (window.location.href = `https://wa.me/${p.sender.phone.replace(/[^\d]/g, "")}`)
+              : toast.show("No number on this proposal"))}
+          >
+            <Icon name="whatsapp" size={16} className="text-[#25D366]" />WhatsApp
+          </Button>
           <button className="shrink-0 px-1 text-11 font-semibold text-error" onClick={onNotRelevant}>Not relevant</button>
         </div>
       )}

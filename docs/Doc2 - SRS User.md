@@ -1,5 +1,27 @@
 # DOC 2 — HOMZLIST MASTER SRS (PART A: USER SIDE PLATFORM SPEC)
 
+> **SUPERSEDED — 11 Aug 2026 · chat removed, connections are leads.**
+>
+> Every passage below that describes chat threads, the message composer,
+> accept/decline before connecting, number requests (Allow/Deny), "waiting for
+> reply", or a proposal turning into a conversation is **no longer how HomzList
+> works**. Those tables still exist for dispute evidence, but nothing reads or
+> writes them.
+>
+> What replaced it: a sender answers three questions — **what** they want, **how**
+> they want to be contacted (call / WhatsApp, own or an OTP-verified alternate
+> number), and **when** — ticks the consent line, and that becomes a **lead** on
+> the receiving side. The receiver acts with Call or WhatsApp, and the tap is
+> recorded. A lead moves New → Contacted → Converted → Archived. Requirements are
+> answered with **I Have a Property** or **I Can Arrange It**, both quota'd, both
+> landing as the same lead.
+>
+> Surfaces: `/leads` (Received grouped by your own post, and Sent), the admin
+> read-only **Lead panel**, and reports with `subject_type = 'lead'` in the
+> existing reports queue. Implementation: migrations 0134-0136, `lib/inquiry/*`,
+> `lib/leads/*`, `components/inquiry/*`, `components/leads/*`.
+
+
 *Complete functional specification of the user-facing platform. Every rule, business logic, state machine, permission, and edge case. Doc 3 covers Admin/System/Security/SEO/Architecture. Screen-level UI lives in Doc 4; this doc defines WHAT the system does.*
 
 ---

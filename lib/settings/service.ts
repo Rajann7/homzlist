@@ -96,7 +96,7 @@ export async function getSettingsOverview(profileId: string): Promise<SettingsOv
     listDrafts(profileId),
     getActivePlans(profileId),
     db.from("saves").select("id", { count: "exact", head: true }).eq("profile_id", profileId),
-    db.from("chat_blocks").select("blocked_id", { count: "exact", head: true }).eq("blocker_id", profileId),
+    db.from("user_blocks").select("blocked_id", { count: "exact", head: true }).eq("blocker_id", profileId),
     getUserPrefs(profileId),
   ]);
 

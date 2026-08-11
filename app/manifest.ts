@@ -35,7 +35,7 @@ export default async function manifest(): Promise<MetadataRoute.Manifest> {
     // long-press menu on some launchers.
     shortcuts: [
       { name: "New listing", short_name: "New listing", url: "/create", icons: [{ src: "/icons/icon-192.png", sizes: "192x192", type: "image/png" }] },
-      { name: "Messages", short_name: "Messages", url: "/messages", icons: [{ src: "/icons/icon-192.png", sizes: "192x192", type: "image/png" }] },
+      { name: "Leads", short_name: "Leads", url: "/leads", icons: [{ src: "/icons/icon-192.png", sizes: "192x192", type: "image/png" }] },
       { name: "Search", short_name: "Search", url: "/search", icons: [{ src: "/icons/icon-192.png", sizes: "192x192", type: "image/png" }] },
     ],
   };

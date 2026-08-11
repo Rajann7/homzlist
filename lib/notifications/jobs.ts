@@ -30,6 +30,8 @@ export interface ScheduledReport {
   planGraceNotices: number;
   performanceNudges: number;
   digests: number;
+  leadDueToday: number;
+  leadUnanswered: number;
 }
 
 /** Claim one send. Returns false when it already went out. */
@@ -47,7 +49,101 @@ export async function runScheduledNotifications(): Promise<ScheduledReport> {
     planGraceNotices: await planGraceNotices(),
     performanceNudges: await performanceNudges(),
     digests: await weeklyDigests(),
+    leadDueToday: await leadDueTodayNudges(),
+    leadUnanswered: await leadUnansweredNudges(),
   };
+}
+
+// ---------------------------------------------------------------------------
+// Leads — the two nudges that make "when should they contact you?" mean
+// something. A promise with no job behind it is the failure mode CLAUDE.md's
+// hidden-issue hunt asks about: the sender picks a time, so something has to
+// act at that time.
+// ---------------------------------------------------------------------------
+
+/** Today in IST — "due today" must not flip at UTC midnight. */
+function istToday(): string {
+  return new Date(Date.now() + 5.5 * 3600_000).toISOString().slice(0, 10);
+}
+
+/** The sender asked to be contacted TODAY and nobody has yet. */
+async function leadDueTodayNudges(): Promise<number> {
+  const today = istToday();
+  const { data } = await db()
+    .from("leads")
+    .select("id,owner_id,lead_profile_id,subject_snapshot,contact_pref,preferred_on")
+    .eq("stage", "new")
+    .eq("is_relevant", true)
+    .eq("preferred_on", today)
+    .limit(500);
+
+  let sent = 0;
+  for (const l of ((data ?? []) as Record<string, any>[])) {
+    if (!(await claim(l.owner_id, "lead_due", l.id, today))) continue;
+    const who = await nameOfProfile(l.lead_profile_id);
+    const title = (l.subject_snapshot?.title as string | undefined) ?? "your listing";
+    await notify({
+      profileId: l.owner_id,
+      type: "inquiry_received",
+      title: `${who} asked to be contacted today`,
+      body: `About ${title} · by ${l.contact_pref === "whatsapp" ? "WhatsApp" : "call"}`,
+      actorId: l.lead_profile_id,
+      href: `/leads/lead/${l.id}`,
+      entityKind: "lead",
+      entityId: l.id,
+      groupKey: `lead-due:${l.owner_id}:${today}`,
+    });
+    sent += 1;
+  }
+  return sent;
+}
+
+/** Two days old, still New, and nobody has tapped Call or WhatsApp on it. */
+async function leadUnansweredNudges(): Promise<number> {
+  const cutoff = new Date(Date.now() - 2 * DAY).toISOString();
+  const { data } = await db()
+    .from("leads")
+    .select("id,owner_id,lead_profile_id,subject_snapshot,created_at")
+    .eq("stage", "new")
+    .eq("is_relevant", true)
+    .lt("created_at", cutoff)
+    .limit(500);
+
+  const rows = ((data ?? []) as Record<string, any>[]);
+  if (!rows.length) return 0;
+
+  // One read for every candidate rather than one per lead.
+  const { data: events } = await db()
+    .from("lead_contact_events")
+    .select("lead_id")
+    .in("lead_id", rows.map((r) => r.id));
+  const touched = new Set(((events ?? []) as { lead_id: string }[]).map((e) => e.lead_id));
+
+  let sent = 0;
+  for (const l of rows) {
+    if (touched.has(l.id)) continue;
+    if (!(await claim(l.owner_id, "lead_unanswered", l.id, "48h"))) continue;
+    const who = await nameOfProfile(l.lead_profile_id);
+    const title = (l.subject_snapshot?.title as string | undefined) ?? "your listing";
+    await notify({
+      profileId: l.owner_id,
+      type: "inquiry_received",
+      title: `${who} is still waiting to hear from you`,
+      body: `About ${title} · sent 2 days ago`,
+      actorId: l.lead_profile_id,
+      href: `/leads/lead/${l.id}`,
+      entityKind: "lead",
+      entityId: l.id,
+      groupKey: `lead-unanswered:${l.owner_id}`,
+    });
+    sent += 1;
+  }
+  return sent;
+}
+
+async function nameOfProfile(id: string): Promise<string> {
+  const { data } = await db().from("profiles").select("name").eq("id", id).maybeSingle();
+  return ((data as { name: string | null } | null)?.name ?? "Someone");
 }
 
 // ---------------------------------------------------------------------------

@@ -341,7 +341,7 @@ function StringsTab() {
       />
 
       <NoteStrip tone="neutral">
-        Only the interface is translated. User content (listings, chats) is never translated.
+        Only the interface is translated. User content (listings, inquiries) is never translated.
       </NoteStrip>
 
       {list.error ? (

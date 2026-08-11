@@ -4527,3 +4527,56 @@ counterparts, add their segments to that one set and nothing else changes.
 `hz_sh` (added 10 Aug) is domain-wide but **httpOnly**, so no client code can
 read it and `/api/v1/profile/me` is still how the feed asks who it is talking
 to. The non-httpOnly variant item 2 describes was deliberately NOT built.
+
+---
+
+# Inquiry → Lead connection system (11 Aug 2026)
+
+Chat was replaced by structured inquiries that become leads. Everything listed
+as open in the first pass of this section has since been built and verified;
+what remains is one environment limitation, recorded honestly rather than
+quietly closed.
+
+**Done and live-verified** (`npm run check:leads-live` — 54/54, every claim
+proved against a real row):
+
+* Schema — migrations 0134-0136: `inquiries` and `leads` extended, plus
+  `inquiry_options`, `verified_contact_numbers`, `user_blocks`,
+  `lead_contact_events` and the `lead_subject_counts` aggregate.
+* Send flow — 3-step sheet on property and project, quota'd
+  "I Have a Property" / "I Can Arrange It" on requirements, OTP-verified
+  alternate number reusable for 7 days, consent stored as a row.
+* Leads — Received grouped by the viewer's own post with live counts,
+  per-subject drill-in with Overdue, lead detail, Sent with a derived state that
+  never leaks the receiver's pipeline stage.
+* Chat removal — 12 pages, 8 components, 8 libs, 18 API routes deleted;
+  `/messages` 308-redirects; block/report moved to `lib/moderation/users.ts`.
+  The chat TABLES are intentionally kept for dispute evidence and no code reads
+  or writes them.
+* Admin — the chat panel and chat viewer are gone; a read-only **Lead panel**
+  (`/api/v1/admin/leads/:id`, audited as a sensitive read) replaced them, the
+  user panel's Leads rows open it, reports with `subject_type='lead'` render
+  their own card in the existing queue, and resolving one can act on the sender.
+* Jobs — `leadDueToday` and `leadUnanswered` run inside the existing hourly
+  notification cron, idempotent through `notification_sends`.
+* DPDP — the data export now includes `inquiries_you_sent` and
+  `connections_you_started` alongside the historic messages.
+* Out-of-scope fixes found on the way: admin report decisions can now act on
+  a reported lead (they had no owner to warn); the notification settings screen
+  no longer offers `New messages` / `Number requests` / `Message requests`,
+  three toggles that persisted values nothing would ever read (migration 0137,
+  hidden not deleted); and the admin user panel no longer reports
+  `show_number_default` as if it were a marketing opt-in.
+
+**Still open — one item:**
+
+**1. No hydrated visual pass of the new screens in this environment.**
+The Claude Browser pane runs hidden (`document.hidden === true`), so React never
+hydrates there and NO client effect fires — including pre-existing ones like the
+BottomNav badge. What WAS verified in the real browser, with real session
+cookies: SSR output of `/leads`, the guest gate, and the exact payload every
+screen renders from (Received 3 subjects / 10 leads, drill-in 8 leads with the
+scoped filters, detail with the full number, Sent, contact-numbers, options).
+What could not be verified there: tap-through of the sheets and the pixel
+rendering. → **Needs one pass in a normal browser; nothing is known to be
+wrong, it simply has not been looked at.**

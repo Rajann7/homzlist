@@ -24,7 +24,6 @@ const TABS = new Set<UserTab>([
   "listings",
   "requirements",
   "leads",
-  "chats",
   "communication",
   "notes",
   "timeline",
@@ -43,13 +42,15 @@ export async function GET(req: NextRequest, props: { params: Promise<{ id: strin
     const tab = TABS.has(asked) ? asked : "overview";
     const data = await userTab(params.id, tab);
 
-    if (tab === "chats") {
+    // The leads tab lists who contacted this user and about what, so it is the
+    // same sensitive read the chat list used to be, and is audited as one.
+    if (tab === "leads") {
       await writeAudit(me, {
-        action: "view_chats",
+        action: "view_leads",
         entityType: "user",
         entityId: params.id,
         entityLabel: header.name ?? params.id,
-        summary: "Opened the read-only chat list",
+        summary: "Opened the read-only lead list",
         sensitive: true,
       });
     }

@@ -2,7 +2,7 @@ import type { NextRequest } from "next/server";
 import { ok, fail } from "@/lib/api";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { rateLimit } from "@/lib/auth/rate-limit";
-import { blockUserById, reportUserById } from "@/lib/chat/service";
+import { blockUserById, reportUserById } from "@/lib/moderation/users";
 
 /**
  * POST /api/v1/profile/moderation — Block / Report a user from their PUBLIC

@@ -1,11 +1,14 @@
-import { Messages } from "@/components";
-import { getCurrentUser } from "@/lib/auth/current-user";
+import { redirect } from "next/navigation";
 
-/** P7 S1 — Messages Home for sellers (seller.homzlist.com). */
-export const metadata = { title: "Messages" };
+/**
+ * /messages is now /leads.
+ *
+ * Chat was removed from the product; every connection lands in Leads. Old push
+ * notifications, shared links and the installed PWA shortcut all still point
+ * here, so this redirects rather than 404s.
+ */
 export const dynamic = "force-dynamic";
 
-export default async function SellerMessagesPage() {
-  const me = await getCurrentUser();
-  return <Messages base="/messages" meId={me?.sub} seller />;
+export default function MessagesRedirect() {
+  redirect("/leads");
 }

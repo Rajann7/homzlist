@@ -104,9 +104,11 @@ export async function requirementProposalStats(requirementId: string): Promise<{
   return { total, newCount };
 }
 
-const PREFILL: Record<"listing" | "chat", string> = {
-  listing: "Hi, I have a property that matches your requirement. Take a look — happy to share more details or arrange a visit.",
-  chat: "Hi, I have a few options that match your requirement. Can we discuss your needs?",
+// There is no composer any more; these are the one-line summaries a proposal
+// carries when the sender adds no optional note of their own.
+const PREFILL: Record<"listing" | "help", string> = {
+  listing: "I have a property that matches this requirement.",
+  help: "I can help with this requirement.",
 };
 
 /**
@@ -117,7 +119,21 @@ const PREFILL: Record<"listing" | "chat", string> = {
 export async function sendProposal(
   senderId: string,
   requirementId: string,
-  input: { mode: "listing" | "chat"; listingId?: string | null; message?: string | null },
+  input: {
+    /** 'help' replaced 'chat': there is no conversation to open any more. */
+    mode: "listing" | "help" | "chat";
+    listingId?: string | null;
+    projectId?: string | null;
+    message?: string | null;
+    /** The three answers, same shape a property inquiry carries. */
+    offers?: string[];
+    contactPref?: "call" | "whatsapp";
+    contactNumber?: string | null;
+    whenToken?: string;
+    preferredDate?: string | null;
+    consent?: boolean;
+    ip?: string | null;
+  },
 ): Promise<SendResult> {
   // The requirement must be live AND receiving (Doc2 §7: OFF/expired stop
   // proposals). Reading the poster here also gives us the self-block target.
@@ -145,22 +161,27 @@ export async function sendProposal(
     .maybeSingle();
   if (dup) return { ok: false, reason: "duplicate" };
 
-  const mode = input.mode === "listing" ? "listing" : "chat";
+  const mode = input.mode === "listing" ? "listing" : "help";
   let listingId: string | null = null;
+  let projectId: string | null = null;
   if (mode === "listing") {
-    const raw = input.listingId ?? null;
-    if (!raw || !UUID_RE.test(raw)) return { ok: false, reason: "bad_listing" };
-    // The attached listing must be the SENDER's own live listing — never trust
-    // the id the client sent.
+    // "I Have a Property" can offer either a live listing or a live project —
+    // a builder answering a requirement offers a scheme, not a flat.
+    const rawListing = input.listingId ?? null;
+    const rawProject = input.projectId ?? null;
+    if (!!rawListing === !!rawProject) return { ok: false, reason: "bad_listing" };
+    const raw = (rawListing ?? rawProject) as string;
+    if (!UUID_RE.test(raw)) return { ok: false, reason: "bad_listing" };
+    // It must be the SENDER's own live post — never trust the id the client sent.
     const { data: own } = await db()
-      .from("listings")
+      .from(rawListing ? "listings" : "projects")
       .select("id")
       .eq("id", raw)
       .eq("profile_id", senderId)
       .eq("status", "live")
       .maybeSingle();
     if (!own) return { ok: false, reason: "bad_listing" };
-    listingId = raw;
+    if (rawListing) listingId = raw; else projectId = raw;
   }
 
   const message = (input.message ?? "").trim().slice(0, MESSAGE_MAX) || PREFILL[mode];
@@ -203,21 +224,27 @@ export async function sendProposal(
       .single();
     if (error) throw error;
 
-    // A proposal IS a chat request, exactly like an inquiry — so its thread is
-    // born HERE, not on accept. It used to be created only when the poster
-    // accepted, which meant three things silently didn't work:
-    //   • the poster was never notified a proposal had arrived (the
-    //     `proposal_received` notification lives in ensureProposalThread, so it
-    //     fired at accept-time, at the person who had just accepted it);
-    //   • a pending proposal never reached the Message Requests screen;
-    //   • "My Responses" reads chat threads, so the sender's own tab — and its
-    //     whole pending/declined/expired status strip — was permanently empty.
-    // Best-effort: the proposal itself is already committed and the unit spent,
-    // so a realtime/notification hiccup must not fail the send.
+    // A proposal IS a lead the moment it is sent — there is no conversation to
+    // open and nothing to accept first. Best-effort: the proposal is already
+    // committed and the unit spent, so a notification hiccup must not fail the
+    // send (the requirement's Leads screen reads the row either way).
     try {
-      const { ensureProposalThread } = await import("@/lib/chat/service");
-      await ensureProposalThread(data as any);
-    } catch { /* the P8 proposals screen still shows it; accept re-ensures */ }
+      const { leadFromProposal } = await import("@/lib/leads/from-proposal");
+      await leadFromProposal({
+        proposalId,
+        requirementId,
+        senderId,
+        posterId: req.profile_id,
+        offerListingId: listingId,
+        offerProjectId: projectId,
+        offers: input.offers ?? [],
+        contactPref: input.contactPref === "whatsapp" ? "whatsapp" : "call",
+        contactNumber: input.contactNumber ?? null,
+        whenToken: input.whenToken ?? "anytime",
+        preferredDate: input.preferredDate ?? null,
+        ip: input.ip ?? null,
+      });
+    } catch { /* the P8 proposals screen still shows it; the lead is re-derivable */ }
 
     return { ok: true, proposal: data as ProposalRow };
   } catch (e) {
@@ -423,23 +450,15 @@ async function actOnProposal(proposalId: string, posterId: string, status: "acce
 export async function acceptProposal(proposalId: string, posterId: string): Promise<ActResult> {
   const row = await actOnProposal(proposalId, posterId, "accepted");
   if (!row) return { ok: false, reason: "not_found" };
-  // Module 7: accept opens the chat. Grow (or revive) the thread from the proposal.
-  const { data: p } = await db()
-    .from("proposals")
-    .select("id,sender_id,poster_id,requirement_id,mode,listing_id,message,status")
-    .eq("id", proposalId)
-    .maybeSingle();
-  let threadId: string | null = null;
-  if (p) {
-    // The thread already exists (created at send time); this re-ensures it for
-    // any proposal predating that change, then opens it.
-    const { ensureProposalThread, upsertLeadFromThread } = await import("@/lib/chat/service");
-    threadId = await ensureProposalThread(p as any);
-    await db().from("chat_threads").update({ status: "accepted" }).eq("id", threadId);
-    // Accepting here must produce the same pipeline lead as accepting from the
-    // Messages screen — one behaviour, two doors.
-    await upsertLeadFromThread(threadId, { activity: "Proposal accepted" });
-  }
+  // There is no chat to open and nothing to accept INTO any more: the lead was
+  // created the moment the proposal was sent. Accepting is now just a status the
+  // poster records, so it moves their own lead forward and nothing else.
+  const threadId: string | null = null;
+  await db()
+    .from("leads")
+    .update({ stage: "contacted", last_activity: "Proposal accepted", last_activity_at: new Date().toISOString() })
+    .eq("proposal_id", proposalId)
+    .eq("owner_id", posterId);
   // Doc2 §14 catalog: "proposal received/accepted/declined/expired". The SENDER
   // has been waiting on this answer; without a notification the only way to
   // learn it was to keep re-opening the proposals screen.
@@ -454,15 +473,18 @@ export async function acceptProposal(proposalId: string, posterId: string): Prom
 }
 
 /**
- * Close the proposal's chat thread when the poster says no. Without this the
- * thread stayed `pending` forever: it kept sitting in the poster's Message
- * Requests after they had already declined it on the Proposals screen, and the
- * sender's "My Responses" row still read as waiting.
+ * Declining closes the LEAD the proposal created, with a reason. Without it the
+ * sender's Sent card sits on "Sent" forever — exactly the dead-end the chat-era
+ * pending thread used to be, rebuilt through a different door.
  */
 async function closeProposalThread(proposalId: string): Promise<void> {
-  const { data } = await db().from("chat_threads").select("id").eq("source_proposal_id", proposalId).maybeSingle();
-  const id = (data as { id: string } | null)?.id;
-  if (id) await db().from("chat_threads").update({ status: "declined" }).eq("id", id);
+  await db().from("leads").update({
+    stage: "archived",
+    is_relevant: false,
+    closed_reason: "Not taken forward",
+    last_activity: "Proposal declined",
+    last_activity_at: new Date().toISOString(),
+  }).eq("proposal_id", proposalId);
 }
 
 export async function declineProposal(proposalId: string, posterId: string): Promise<ActResult> {

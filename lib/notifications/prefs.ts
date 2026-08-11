@@ -63,7 +63,7 @@ const hhmm = (t: string | null | undefined, fallback: string) => (t ? String(t).
 export async function getPrefs(profileId: string): Promise<Prefs> {
   const [row, groups, values, settings] = await Promise.all([
     prefRow(profileId),
-    db().from("notification_pref_groups").select("code,section,label,sublabel,default_on,is_locked,sort_order").order("sort_order"),
+    db().from("notification_pref_groups").select("code,section,label,sublabel,default_on,is_locked,sort_order").eq("is_active", true).order("sort_order"),
     db().from("notification_pref_values").select("group_code,enabled").eq("profile_id", profileId),
     globalSettings(),
   ]);

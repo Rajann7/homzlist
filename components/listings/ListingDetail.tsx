@@ -84,19 +84,9 @@ export function ListingDetail({ id, isGuest = false }: { id: string; isGuest?: b
   // "Request Number" (owner withheld their number): the only way to reach them
   // is to start a chat request (Module 7). Sending the inquiry grows the pending
   // thread; the number exchange then happens inside it (Request → Allow).
-  const requestNumber = async () => {
-    if (isGuest) { setSheet("login"); return; }
-    setReqBusy(true);
-    const res = await interactionsApi.inquiry(id, {
-      message: "Hi, I'm interested in this property — could you please share your contact number?",
-      intents: [],
-      shareNumber: true,
-    });
-    setReqBusy(false);
-    if (res.ok) toast.show(res.data.alreadySent ? "Request updated — continue in Messages" : "Request sent — you'll be notified when they respond");
-    else if (res.error.code === "SELF_ACTION_BLOCKED") toast.show("This is your own listing");
-    else toast.show("Couldn't send that request");
-  };
+  // Number requests were removed with the chat: there is nobody to ask and
+  // nothing to wait for. The buyer states how they want to be contacted, the
+  // seller gets a lead with that number on it, and the call goes the other way.
 
   /**
    * Every owner action that changes the row, run against its real endpoint and
@@ -338,20 +328,14 @@ export function ListingDetail({ id, isGuest = false }: { id: string; isGuest?: b
               <Button fullWidth onClick={() => (isGuest ? setSheet("login") : setSheet("inquiry"))}>Send Inquiry</Button>
             </>
           ) : (
-            <>
-              {/* Both buttons are flex:1 with NO horizontal padding: the shared
-                  Button's default px-4 left 111px for a label needing 115px, so
-                  "Request Number" wrapped onto two lines. */}
-              <Button
-                variant="outline"
-                className="flex-1 px-0"
-                loading={reqBusy}
-                onClick={() => void requestNumber()}
-              >
-                <Icon name="phone" size={17} /> Request Number
-              </Button>
-              <Button className="flex-1 px-0" onClick={() => (isGuest ? setSheet("login") : setSheet("inquiry"))}>Send Inquiry</Button>
-            </>
+            /* "Request Number" is gone with the chat: a number is no longer
+               something you ask for and wait on. The seller either publishes
+               theirs (the branch above) or they don't — and either way the
+               buyer's route is the same one action, which also tells the seller
+               how and when to reach back. */
+            <Button fullWidth onClick={() => (isGuest ? setSheet("login") : setSheet("inquiry"))}>
+              <Icon name="zap" size={17} /> Send Inquiry
+            </Button>
           )}
         </div>
       </div>

@@ -59,7 +59,6 @@ const TABS = [
   "listings",
   "requirements",
   "leads",
-  "chats",
   "communication",
   "notes",
   "timeline",
@@ -351,9 +350,7 @@ export function UserPanelBody({ panel }: { panel: PanelEntry }) {
         ) : tab === "requirements" ? (
           <RequirementsTab data={data} onExpire={(id) => setExpireReq(id)} />
         ) : tab === "leads" ? (
-          <LeadsTab data={data} />
-        ) : tab === "chats" ? (
-          <ChatsTab data={data} onOpen={(id, who) => pushPanel("chat", { id, who })} />
+          <LeadsTab data={data} onOpen={(id, who) => pushPanel("lead", { id, who })} />
         ) : tab === "communication" ? (
           <CommunicationTab data={data} onSend={() => setOverlay("message")} />
         ) : tab === "notes" ? (
@@ -902,7 +899,13 @@ function RequirementsTab({
 
 /* ────────────────────────────────────────────────── template 1358 · Leads ── */
 
-function LeadsTab({ data }: { data: Record<string, unknown> }) {
+function LeadsTab({
+  data,
+  onOpen,
+}: {
+  data: Record<string, unknown>;
+  onOpen: (id: string, who: string) => void;
+}) {
   const groups = (data.groups ?? []) as {
     label: string;
     leads: Record<string, string | null>[];
@@ -919,12 +922,14 @@ function LeadsTab({ data }: { data: Record<string, unknown> }) {
           {g.leads.map((l) => (
             <div
               key={String(l.id)}
+              onClick={() => onOpen(String(l.id), String(l.lead_name ?? ""))}
               style={{
                 display: "flex",
                 alignItems: "center",
                 gap: 8,
                 padding: "8px 0",
                 borderTop: "1px solid var(--divider)",
+                cursor: "pointer",
               }}
             >
               <Avatar initials={(l.lead_name ?? "U").slice(0, 2).toUpperCase()} size={24} />
@@ -939,60 +944,6 @@ function LeadsTab({ data }: { data: Record<string, unknown> }) {
               </Badge>
             </div>
           ))}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-/* ────────────────────────────────────────────────── template 1362 · Chats ── */
-
-function ChatsTab({
-  data,
-  onOpen,
-}: {
-  data: Record<string, unknown>;
-  onOpen: (id: string, who: string) => void;
-}) {
-  const rows = (data.rows ?? []) as Record<string, string | number | null>[];
-  if (!rows.length)
-    return <div style={{ fontSize: 13, color: "var(--ink3)" }}>No chats.</div>;
-  return (
-    <div>
-      {rows.map((c, i) => (
-        <div
-          key={String(c.id)}
-          onClick={() => onOpen(String(c.id), String(c.other_name))}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 10,
-            padding: "12px 0",
-            borderTop: i ? "1px solid var(--divider)" : "none",
-            cursor: "pointer",
-          }}
-        >
-          <Thumb40 url={c.cover_url as string | null} />
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 13, fontWeight: 600 }}>{String(c.other_name)}</div>
-            <div
-              style={{
-                fontSize: 11,
-                color: "var(--ink3)",
-                whiteSpace: "nowrap",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-              }}
-            >
-              {String(c.subject)} · {String(c.preview ?? "")}
-            </div>
-          </div>
-          <div style={{ textAlign: "right" }}>
-            <div style={{ fontSize: 11, color: "var(--ink3)" }}>{ago(c.last_message_at as string)}</div>
-            <Badge bg="var(--s2)" fg="var(--ink3)" style={{ textTransform: "none", letterSpacing: 0 }}>
-              {String(c.message_count)}
-            </Badge>
-          </div>
         </div>
       ))}
     </div>

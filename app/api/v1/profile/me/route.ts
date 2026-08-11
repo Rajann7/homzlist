@@ -3,8 +3,8 @@ import { ok, fail } from "@/lib/api";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { getProfileById, getVerifications, getCityName, updateOwnProfile } from "@/lib/profile/service";
 import { getProfileCounts, countProfileRequirements } from "@/lib/listings/service";
-import { countProfileLeads } from "@/lib/listings/leads";
-import { countThreads } from "@/lib/chat/service";
+import { countProfileLeads } from "@/lib/leads/service";
+
 import { ownProfileDTO } from "@/lib/profile/dto";
 
 /**
@@ -28,7 +28,7 @@ async function loadOwn(id: string) {
     getProfileCounts(id, profile.role),
     countProfileLeads(id),
     countProfileRequirements(id),
-    countThreads(id),
+    Promise.resolve(0),
   ]);
   const stats = {
     listings: counts.listings,

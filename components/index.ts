@@ -44,12 +44,10 @@ export { Drafts } from "./listings/Drafts";
 export { ListingDetail } from "./listings/ListingDetail";
 
 // Chat, inquiry & number system (Module 7 — P7)
-export { Messages } from "./chat/Messages";
-export { Requests } from "./chat/Requests";
-export { Thread } from "./chat/Thread";
-export { Details as ChatDetails } from "./chat/Details";
-export { Archived as ArchivedChats } from "./chat/Archived";
-export { Blocked as BlockedUsers } from "./chat/Blocked";
+export { LeadsHub } from "./leads/LeadsHub";
+export { SubjectLeads } from "./leads/SubjectLeads";
+export { LeadDetail } from "./leads/LeadDetail";
+export { InquirySheet } from "./inquiry/InquirySheet";
 
 // Notifications (Module 10 — P11 S7 + P10 S7 prefs)
 export { Notifications } from "./notifications/Notifications";

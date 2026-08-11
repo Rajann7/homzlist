@@ -177,7 +177,7 @@ export function SuspendOverlay({
           color: "var(--ink2)",
         }}
       >
-        Their listings will be hidden and chats frozen.
+        Their listings will be hidden and their leads frozen.
       </div>
       <Err message={error} />
     </Modal>
@@ -220,7 +220,7 @@ export function LiftSuspendOverlay({
       }
     >
       <div style={{ fontSize: 13, color: "var(--ink2)" }}>
-        Listings and chats will be restored and the user notified.
+        Listings and leads will be restored and the user notified.
       </div>
       <Err message={error} />
     </Modal>

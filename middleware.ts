@@ -262,7 +262,7 @@ export async function middleware(request: NextRequest) {
       res.cookies.delete(POOL_COOKIE);
       return res;
     }
-    // /messages, /notifications and /saved are seller-only authenticated
+    // /leads, /notifications and /saved are seller-only authenticated
     // surfaces — they must not render their shell for an anonymous visitor on
     // the public host (Doc9 §28 guest gate).
     //
@@ -271,7 +271,7 @@ export async function middleware(request: NextRequest) {
     // header's bookmark icon, which renders for guests, opened a screen that
     // lied about a feature that exists. It goes through the same gate now and
     // the stale placeholder page is gone.
-    if (!user && (pathname.startsWith("/messages") || pathname.startsWith("/notifications") || pathname.startsWith("/saved"))) {
+    if (!user && (pathname.startsWith("/leads") || pathname.startsWith("/messages") || pathname.startsWith("/notifications") || pathname.startsWith("/saved"))) {
       // …and they come back here after signing in, rather than being dumped on
       // the feed having lost the screen they asked for.
       return loginRedirect(request, url, `seller.${host}`);

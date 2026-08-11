@@ -312,7 +312,19 @@ export async function actOnReport(
       .eq("id", subjectId)
       .maybeSingle();
     ownerId = (data as { profile_id: string } | null)?.profile_id ?? null;
+  } else if (subjectType === "lead") {
+    // A reported LEAD is reported BY the receiver, ABOUT the person who sent
+    // it — so the warning or suspension lands on the sender. Without this the
+    // moderator could resolve the report but never act on anyone, which is the
+    // whole point of the queue.
+    const { data } = await db()
+      .from("leads")
+      .select("lead_profile_id")
+      .eq("id", subjectId)
+      .maybeSingle();
+    ownerId = (data as { lead_profile_id: string } | null)?.lead_profile_id ?? null;
   } else if (subjectType === "message") {
+    // Historic rows only — chat was removed from the product.
     const { data } = await db()
       .from("chat_messages")
       .select("sender_id")

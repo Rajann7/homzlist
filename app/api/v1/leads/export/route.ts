@@ -3,7 +3,7 @@ import { fail } from "@/lib/api";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { getProfileById } from "@/lib/profile/service";
 import { rateLimit } from "@/lib/auth/rate-limit";
-import { exportLeadsCsv, CSV_FIELDS, type CsvField } from "@/lib/listings/leads";
+import { exportLeadsCsv, CSV_FIELDS, type CsvField } from "@/lib/leads/service";
 
 /**
  * GET /api/v1/leads/export?fields=name,phone,… (Doc7 §105) — CSV of the owner's

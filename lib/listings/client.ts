@@ -731,9 +731,29 @@ export const proposalsApi = {
       canPropose: boolean;
       alreadySent: boolean;
       listings: { id: string; title: string | null; priceLabel: string; areaLabel: string | null; coverUrl: string | null }[];
-      prefill: { listing: string; chat: string };
+      /** "I Have a Property" covers projects too — a builder offers a scheme. */
+      projects: { id: string; title: string | null; priceLabel: string; areaLabel: string | null; coverUrl: string | null }[];
+      /** Chips + consent wording come from inquiry_options, never hardcoded. */
+      offers: { code: string; label: string }[];
+      when: { code: string; label: string }[];
+      consentText: string;
+      consentVersion: string;
+      myNumber: string | null;
     }>(`/requirements/${requirementId}/proposals`, "GET"),
-  send: (requirementId: string, body: { mode: "listing" | "chat"; listingId?: string | null; message?: string | null }) =>
+  send: (
+    requirementId: string,
+    body: {
+      mode: "listing" | "help";
+      listingId?: string | null;
+      projectId?: string | null;
+      offers?: string[];
+      contactPref?: "call" | "whatsapp";
+      contactNumber?: string | null;
+      whenToken?: string;
+      preferredDate?: string | null;
+      consent: boolean;
+    },
+  ) =>
     req<{ proposal: { id: string }; balanceLeft: number }>(`/requirements/${requirementId}/proposals`, "POST", body),
   /** Poster view: proposals received on a requirement they own (numbers auto). */
   received: (requirementId: string) =>
@@ -787,17 +807,11 @@ export interface LeadView {
   threadId: string | null;
 }
 
+/**
+ * Leads moved to `lib/leads/client.ts` when the pipeline was rebuilt around
+ * subjects (my listing → its leads) instead of one flat list. What stays here
+ * is the CSV export, which the seller screens still link to.
+ */
 export const leadsApi = {
-  list: () =>
-    req<{
-      ownerVariant: boolean;
-      leads: LeadView[];
-      stageCounts: { key: string; label: string; count: number }[];
-      summary: { total: number; newThisWeek: number; conversionPct: number | null };
-    }>("/leads", "GET"),
-  moveStage: (id: string, stage: string, note: string | null) => req<{ updated: boolean }>(`/leads/${id}`, "PATCH", { action: "stage", stage, note }),
-  addNote: (id: string, text: string) => req<{ updated: boolean }>(`/leads/${id}`, "PATCH", { action: "note", text }),
-  notRelevant: (id: string) => req<{ updated: boolean }>(`/leads/${id}`, "PATCH", { action: "not_relevant" }),
-  /** CSV comes back as text; the caller triggers a download from the blob. */
   exportUrl: (fields: string[]) => `/api/v1/leads/export?fields=${fields.join(",")}`,
 };

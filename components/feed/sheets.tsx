@@ -1,5 +1,7 @@
 "use client";
 
+import { InquirySheet as ConnectSheet } from "@/components/inquiry/InquirySheet";
+
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { BottomSheet } from "@/components/ui/BottomSheet";
@@ -159,95 +161,24 @@ export function ReportSheet({ open, onClose, card }: { open: boolean; onClose: (
 }
 
 // ---- Inquiry sheet ---------------------------------------------------------
-const QUICK = [
-  { key: "site_visit", label: "Site visit?" },
-  { key: "negotiable", label: "Negotiable?" },
-  { key: "documents", label: "Documents ready?" },
-  { key: "loan", label: "Loan available?" },
-];
-export function InquirySheet({ open, onClose, card, unitId }: { open: boolean; onClose: () => void; card: FeedCard | null; unitId?: string }) {
-  const toast = useToast();
-  const router = useRouter();
-  const [message, setMessage] = useState("");
-  const [intents, setIntents] = useState<Set<string>>(new Set(["site_visit"]));
-  const [share, setShare] = useState(true);
-  const [busy, setBusy] = useState(false);
-
-  // A project is the third inquiry subject (migration 0084). The sheet is the
-  // same one buyers already know; only the two listing-only controls (intent
-  // chips and share-number, both stored on the `inquiries` row a project has
-  // no equivalent of) are absent rather than shown dead.
-  const isProject = card?.kind === "project";
-
-  const prefill = card
-    ? `Hi, I'm interested in your ${card.title ?? card.meta ?? "property"}${card.areaLabel ? ` at ${card.areaLabel}` : ""}${
-        card.price ? ` (${card.price})` : ""
-      }. Could you share more details?`
-    : "";
-
-  const send = async () => {
-    if (!card) return;
-    setBusy(true);
-    const res = isProject
-      ? await interactionsApi.projectInquiry(card.id, { message: message.trim() || prefill, unitId })
-      : await interactionsApi.inquiry(card.id, { message: message.trim() || prefill, intents: [...intents], shareNumber: share });
-    setBusy(false);
-    if (res.ok) {
-      onClose(); setMessage("");
-      // A project chat opens immediately (0086), so the sender lands in it
-      // rather than being told to wait for an accept that never comes.
-      const threadId = (res.data as { threadId?: string | null }).threadId;
-      if (isProject && threadId) { toast.show("Message sent"); router.push(`/messages/${threadId}`); return; }
-      toast.show(res.data.alreadySent ? "Inquiry updated" : "Inquiry sent — waiting for the owner to accept");
-    }
-    else if (res.error.code === "SELF_ACTION_BLOCKED") { toast.show(`This is your own ${isProject ? "project" : "listing"}`); onClose(); }
-    // The poster declined an earlier inquiry — say when it re-opens instead of a
-    // dead "couldn't send" the sender can only read as a bug.
-    else if (res.error.code === "INQUIRY_COOLDOWN") {
-      const until = (res.error as { until?: string }).until;
-      const when = until ? new Date(until).toLocaleDateString("en-IN", { day: "numeric", month: "short", timeZone: "Asia/Kolkata" }) : "";
-      toast.show(when ? `Inquiry declined — you can send a new one after ${when}` : "You can't inquire on this listing yet", { variant: "error" });
-      onClose();
-    }
-    else if (res.error.code === "PROFILE_INCOMPLETE") { toast.show("Add your name and city to your profile first", { variant: "error" }); onClose(); }
-    else if (res.error.code === "FORBIDDEN") { toast.show("You can't inquire on this listing", { variant: "error" }); onClose(); }
-    else toast.show("Couldn't send that inquiry");
-  };
-
+/**
+ * The feed's "Send Inquiry" is the SAME sheet the detail screens open — three
+ * taps (what / how / when), consent, send. It used to be a composer that grew a
+ * chat thread; that whole idea is gone, so this is now a thin adapter that keeps
+ * every existing call site working while there is exactly one inquiry UI in the
+ * product (a second copy is how the two drift apart).
+ *
+ * A feed card is only ever a property or a project here; a requirement is
+ * answered with a proposal, which is its own sheet.
+ */
+export function InquirySheet({ open, onClose, card }: { open: boolean; onClose: () => void; card: FeedCard | null; unitId?: string }) {
+  if (!card) return null;
   return (
-    <BottomSheet open={open} onClose={onClose} title="Send Inquiry">
-      <div className="flex flex-col gap-4 pb-2">
-        <textarea
-          value={message || prefill}
-          onChange={(e) => setMessage(e.target.value)}
-          rows={3}
-          className="w-full resize-none rounded-8 bg-surface-2 p-3 text-15 text-ink-primary outline-none"
-        />
-        {!isProject && (
-          <>
-            <div>
-              <div className="mb-2 text-13 font-semibold text-ink-secondary">Quick questions</div>
-              <div className="flex flex-wrap gap-2">
-                {QUICK.map((q) => {
-                  const on = intents.has(q.key);
-                  return (
-                    <button key={q.key} onClick={() => setIntents((s) => { const n = new Set(s); on ? n.delete(q.key) : n.add(q.key); return n; })}
-                      className={cn("rounded-full px-3 py-1.5 text-13 font-semibold", on ? "bg-accent-soft text-accent" : "bg-surface-2 text-ink-primary")}>
-                      {q.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-            <div className="flex items-center gap-3 rounded-8 bg-surface-2 p-3">
-              <span className="flex-1 text-13 text-ink-primary">Share my number with owner</span>
-              <Toggle checked={share} onChange={setShare} label="Share my number" />
-            </div>
-          </>
-        )}
-        <Button fullWidth loading={busy} onClick={() => void send()}>Send Inquiry</Button>
-      </div>
-    </BottomSheet>
+    <ConnectSheet
+      open={open}
+      onClose={onClose}
+      subject={card.kind === "project" ? { kind: "project", id: card.id } : { kind: "listing", id: card.id }}
+    />
   );
 }
 

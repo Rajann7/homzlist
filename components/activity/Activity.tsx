@@ -103,7 +103,7 @@ export function Activity({ base = "" }: { base?: string }) {
         <>
           <SectionHead>Inquiries sent</SectionHead>
           {inquiries.map((q) => (
-            <button key={q.id} onClick={() => go("/messages")} className="flex w-full items-center gap-3 px-4 py-2.5 text-left active:bg-surface-2">
+            <button key={q.id} onClick={() => go("/leads")} className="flex w-full items-center gap-3 px-4 py-2.5 text-left active:bg-surface-2">
               <span className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-8 bg-surface-3 text-ink-tertiary">
                 {q.coverUrl ? (
                   <Img src={q.coverUrl} alt="" className="h-full w-full object-cover" />

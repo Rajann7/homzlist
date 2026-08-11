@@ -136,7 +136,7 @@ export function SettingsHome({ base = "" }: { base?: string }) {
 
       <Section title="Security">
         <Row icon="device" label="Login activity" value={data.counts.devices ? `${data.counts.devices} device${data.counts.devices === 1 ? "" : "s"}` : undefined} onClick={() => go("/settings/login-activity")} />
-        <Row icon="shield-off" label="Blocked users" value={data.counts.blocked ? String(data.counts.blocked) : undefined} onClick={() => go("/messages/blocked")} />
+        <Row icon="shield-off" label="Blocked users" value={data.counts.blocked ? String(data.counts.blocked) : undefined} onClick={() => go("/settings/blocked")} />
       </Section>
 
       <Section title="Support">

@@ -219,11 +219,14 @@ export function OtherProfile({ username, isGuest = false }: { username: string; 
           <StatText value={p.memberSince} label="Member since" />
         </div>
 
-        {/* Message full-width (private number default — Call/WhatsApp gate on public number, Module 7) */}
+        {/* There is no messaging any more, so this slot points at the thing a
+            visitor can actually do: open one of this seller's posts and send an
+            inquiry on it. A connection always belongs to a property, project or
+            requirement — never to a person in the abstract. */}
         <div className="mt-3.5 flex items-center gap-2">
-          <Button fullWidth onClick={() => guard(() => show("Open a property below to send an inquiry and chat"))}>
-            <Icon name="message" size={18} strokeWidth={1.9} />
-            Message
+          <Button fullWidth onClick={() => guard(() => show("Open a property below to send an inquiry"))}>
+            <Icon name="zap" size={18} strokeWidth={1.9} />
+            Send Inquiry
           </Button>
           <button
             aria-label="About this account"

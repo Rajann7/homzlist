@@ -31,15 +31,18 @@ export interface NavItem {
   badge?: number;
 }
 
-// Canonical 5 (P3): home · search · plus (create) · message (chat) · user (profile).
-// (Messages sits in the nav; Saved moved to the feed header top-right.)
+// Canonical 5 (P3): home · search · plus (create) · leads · user (profile).
+// The fourth slot was Messages until chat was removed from the product; it now
+// opens Leads, which is where every connection lands. The icon name stays
+// `nav-message` because it IS the P3 glyph — renaming it would change the
+// design, not the destination.
 // Icons are the `nav-*` set (Instagram geometry) — nav-only names, so the shared
 // home/search/plus/message/user glyphs the rest of the app draws are untouched.
 export const DEFAULT_NAV: NavItem[] = [
   { name: "nav-home", href: "/", label: "Home", match: (p) => p === "/" },
   { name: "nav-search", href: "/search", label: "Search", match: (p) => p.startsWith("/search") },
   { name: "nav-create", href: "/create", label: "Create", match: (p) => p.startsWith("/create") },
-  { name: "nav-message", href: "/messages", label: "Messages", match: (p) => p.startsWith("/messages") },
+  { name: "nav-message", href: "/leads", label: "Leads", match: (p) => p.startsWith("/leads") },
   { name: "nav-profile", href: "/profile", label: "Profile", match: (p) => p.startsWith("/profile") },
 ];
 
@@ -56,11 +59,11 @@ export function BottomNav({ items }: { items?: NavItem[] }) {
   // the icon — which would have been the very first screen a builder opens.
   const base = (items ?? DEFAULT_NAV).filter((i) => !(role === "builder" && i.name === "nav-search"));
 
-  // Unread messages badge. The feed passes its own count (it already reads
+  // Unseen leads badge. The feed passes its own count (it already reads
   // /feed/badges for the header bell), so a caller-supplied `badge` always wins.
   // Every OTHER screen used to render the nav with no count at all — the icon
-  // was silently lying on profile, listings, search, chat. This fills that in
-  // from the same server count (unread threads + pending requests), re-read when
+  // was silently lying on profile, listings, search. This fills that in
+  // from the same server count (unseen leads), re-read when
   // the route changes and when the tab regains focus, so it clears after the
   // user has been through the inbox. Guests get 0 from the endpoint.
   const wantsFetch = base.some((i) => i.name === "nav-message" && i.badge === undefined);

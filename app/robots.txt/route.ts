@@ -18,6 +18,7 @@ const DISALLOW = [
   "/account",          // admin subdomain paths, if ever reached by path
   "/seller",
   "/messages",
+  "/leads",
   "/requirements",     // Doc3 §4 — requirement pages are not indexable
   "/notifications",
   "/saved",
