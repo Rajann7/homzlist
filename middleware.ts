@@ -23,6 +23,14 @@ const POOL_COOKIE = "hz_accts";
 /** The ADMIN session — a different cookie name on a different host (Doc9 §21). */
 const ADMIN_ACCESS_COOKIE = "hz_admin_at";
 const ADMIN_REFRESH_COOKIE = "hz_admin_rt";
+/**
+ * Set for 10s by the refresh bridge on a SUCCESSFUL rotation — the loop-breaker.
+ * If a bridged request comes back here still without a readable access token,
+ * something is wrong with cookie writing and bouncing it to the bridge again
+ * would spin forever; it goes to /login instead. Kept in step with
+ * app/api/v1/auth/refresh/route.ts.
+ */
+const REFRESH_BRIDGE_COOKIE = "hz_rf";
 
 type Zone = "public" | "seller" | "admin";
 function getZone(host: string): Zone {
@@ -67,6 +75,46 @@ function mirroredOnSeller(pathname: string): boolean {
 }
 
 /**
+ * EVERY first segment the seller host serves — app/(seller)/seller/* , which is
+ * a superset of the mirrored list above (`/saved`, `/leads`, `/dashboard`… are
+ * seller-only; they exist there but not on the public host).
+ *
+ * This is what a post-login `next` has to be checked against, and the two lists
+ * answer different questions — conflating them is how the bug below survived.
+ * Login runs on the seller host, so `?next=` is resolved there: a guest CTA on
+ * a PUBLIC-ONLY page (`/area/rajkot`, any `[landing]` SEO page) sent its own
+ * path along, and signing in landed the user on a 404 for a page that works
+ * perfectly one host over. A `next` the seller host cannot serve is dropped, so
+ * login ends on the feed instead of a dead end.
+ */
+const SELLER_SEGMENTS = new Set([
+  ...SELLER_MIRRORED_SEGMENTS,
+  "activity",
+  "archived",
+  "boost",
+  "checkout",
+  "dashboard",
+  "help",
+  "leads",
+  "listings",
+  "maintenance",
+  "payments",
+  "plans",
+  "proposals",
+  "saved",
+  "settings",
+  "visits",
+]);
+
+/** `sanitizeNext`, plus "and the seller host actually has this page". */
+function sellerNext(raw: string | null | undefined): string | null {
+  const n = sanitizeNext(raw);
+  if (!n) return null;
+  const seg = n.split(/[?#]/)[0].split("/")[1] ?? "";
+  return !seg || SELLER_SEGMENTS.has(seg) ? n : null;
+}
+
+/**
  * A redirect target on an EXPLICIT host.
  *
  * `new URL(request.url)` is not reliable for this: its host is the origin the
@@ -88,6 +136,38 @@ function redirectTo(request: NextRequest, host: string, pathname: string, search
 function loginRedirect(request: NextRequest, url: URL, host: string): NextResponse {
   const [path, query] = loginHref(`${url.pathname}${url.search}`).split("?");
   return redirectTo(request, host, path, query ? `?${query}` : "");
+}
+
+/**
+ * Send a stale-access page request through the Node refresh route and back.
+ *
+ * The access token lives 15 minutes; the session lives as long as the admin's
+ * "Session length" (7 days by default). Only the access token can be verified
+ * here — rotation needs KV, which the Edge cannot reach — so for 15 minutes'
+ * worth of activity out of every session, a perfectly valid login looked to
+ * this file exactly like a signed-out visitor. That is what put a login screen
+ * in front of signed-in users on the main domain and on pasted links.
+ */
+function refreshBridge(request: NextRequest, host: string, next: string, fromSharedLink = false): NextResponse {
+  const q = new URLSearchParams({ next });
+  // Tells the bridge that a FAILED revival must hand this visit back to the
+  // public host as a guest, not put a login screen in front of a shared link.
+  if (fromSharedLink) q.set(HINT_BOUNCE_PARAM, "1");
+  return redirectTo(request, host, "/api/v1/auth/refresh", `?${q}`);
+}
+
+/**
+ * Is there a session to revive? A refresh cookie the Edge cannot verify, on a
+ * navigation we can safely replay (a redirect would turn a POST into a GET and
+ * drop its body), that has not just come back from the bridge already.
+ */
+function canRefresh(request: NextRequest, user: unknown): boolean {
+  return (
+    !user &&
+    request.cookies.has(REFRESH_COOKIE) &&
+    !request.cookies.has(REFRESH_BRIDGE_COOKIE) &&
+    (request.method === "GET" || request.method === "HEAD")
+  );
 }
 
 export async function middleware(request: NextRequest) {
@@ -194,7 +274,7 @@ export async function middleware(request: NextRequest) {
       // before the login screen ever saw it. Only the two params that mean
       // something to the flow survive, re-sanitised — nothing else from a
       // public URL is carried onto the seller host.
-      const next = sanitizeNext(url.searchParams.get("next"));
+      const next = sellerNext(url.searchParams.get("next"));
       const carried = new URLSearchParams();
       if (next) carried.set("next", next);
       if (url.searchParams.get("add") === "1") carried.set("add", "1");
@@ -285,11 +365,38 @@ export async function middleware(request: NextRequest) {
     // they are deliberately signing a SECOND account into this device. Every
     // other authenticated hit on /login still bounces home.
     const addingAccount = url.searchParams.get("add") === "1";
+    const revivable = canRefresh(request, user) && !addingAccount;
+
+    /**
+     * A `next` this host cannot serve is stripped at the door, before anything —
+     * middleware, AuthFlow or the refresh bridge — can act on it. Otherwise the
+     * login screen keeps a promise it will break: the flow reads the raw param
+     * itself and navigates there once the OTP is in, landing the user on a 404.
+     */
+    const rawNext = url.searchParams.get("next");
+    if (isLogin && rawNext && !sellerNext(rawNext)) {
+      const clean = new URLSearchParams(url.search);
+      clean.delete("next");
+      return redirectTo(request, host, pathname, clean.toString() ? `?${clean}` : "");
+    }
+
+    /**
+     * Reached /login with a live session whose access token has merely gone
+     * stale — the shape of "I clicked Sign in on homzlist.com while already
+     * signed in". Revive it and go to `next`, instead of showing the login
+     * screen to a user who never logged out. (AuthFlow's splash also silent-
+     * refreshes, so this was eventually survivable — but only after the user
+     * had been shown a login screen, which is the bug being reported.)
+     */
+    if (isLogin && revivable) {
+      return refreshBridge(request, host, sellerNext(rawNext) ?? "/");
+    }
+
     if (isLogin && user && !addingAccount) {
       // Straight to where they were headed when the login screen was reached,
-      // not always the feed. Sanitised, so `next` can only ever be a path on
-      // this host — never somewhere else's origin.
-      const [nextPath, nextQuery] = (sanitizeNext(url.searchParams.get("next")) ?? "/").split("?");
+      // not always the feed. Sanitised, so `next` can only ever be a path this
+      // host actually serves — never somewhere else's origin, never a 404.
+      const [nextPath, nextQuery] = (sellerNext(rawNext) ?? "/").split("?");
       return redirectTo(request, host, nextPath, nextQuery ? `?${nextQuery}` : "");
     }
 
@@ -304,14 +411,25 @@ export async function middleware(request: NextRequest) {
       clean.delete(HINT_BOUNCE_PARAM);
       const query = clean.toString() ? `?${clean}` : "";
       if (user) return redirectTo(request, host, pathname, query);
-      // The hint lied — there is no session on this host. A shared link must
-      // not turn into a login wall, so hand the visit back to the public host,
-      // which clears the hint and renders the guest page.
+      // Stale access token, live session: revive it rather than declaring the
+      // hint a lie. Without this, every visit made 15 minutes after the last
+      // one boomeranged back to the public host AND deleted the hint — so the
+      // main domain then treated a signed-in user as a guest permanently.
+      if (revivable) return refreshBridge(request, host, `${pathname}${query}`, true);
+      // The hint really did lie — there is no session on this host. A shared
+      // link must not turn into a login wall, so hand the visit back to the
+      // public host, which clears the hint and renders the guest page.
       clean.set(HINT_BOUNCE_PARAM, "1");
       return redirectTo(request, host.replace(/^seller\./i, ""), pathname, `?${clean}`);
     }
 
-    if (!isLogin && !user) return loginRedirect(request, url, host);
+    if (!isLogin && !user) {
+      // Same idea for a direct seller-host visit (a pasted link, a bookmark, a
+      // reopened tab): a revivable session goes through the bridge, only a
+      // genuinely absent one goes to /login.
+      if (revivable) return refreshBridge(request, host, `${pathname}${url.search}`);
+      return loginRedirect(request, url, host);
+    }
     url.pathname = `/seller${pathname === "/" ? "" : pathname}`;
     return NextResponse.rewrite(url);
   }

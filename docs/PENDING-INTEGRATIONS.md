@@ -4630,3 +4630,22 @@ composites, so React hydration never gets a task slot there — the pane cannot
 answer "does the button work?" no matter what the code does. Use
 `npm run check:leads-ui`, which drives real Chrome over CDP
 (`scripts/lib/cdp.mjs`, no dependencies), instead of trusting the pane.
+
+---
+
+## Session revival across the two hosts (Aug 2026) — one thing left, deliberately
+
+Fixed: a 15-minute access token no longer reads as "signed out" to the router.
+Middleware sends a stale-access page request through
+`GET /api/v1/auth/refresh?next=`, so a signed-in user is never shown a login
+screen on the main domain, on a pasted link, or on a re-opened tab, and the
+cross-subdomain session hint is no longer destroyed by an ordinary idle gap.
+
+**Left undone on purpose:** signing in from a PUBLIC-ONLY page (`/area/*`, the
+`[landing]` SEO pages) returns the user to the seller feed, not to the page they
+came from. Login runs on the seller host and that host does not serve those
+paths — carrying the path across is exactly what used to land people on a 404.
+Sending them back to the public host after login needs a cross-host `next`,
+which the `?next=` contract deliberately does not allow (it is the whole
+open-redirect defence). Worth doing as its own change if the entry point starts
+mattering; it is not a dead end today.
