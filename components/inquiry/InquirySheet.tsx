@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { BottomSheet, Button, Chip, Icon, Skeleton, useToast } from "@/components/billing/ui";
 import { useRouter } from "next/navigation";
 import { cn, newIdempotencyKey } from "@/lib/utils";
+import { navigateAfterClose } from "@/lib/hooks/use-back-close";
 import { ago } from "@/components/leads/parts";
 import * as leadsApi from "@/lib/leads/client";
 import { NumberVerifySheet } from "./NumberVerifySheet";
@@ -302,7 +303,13 @@ function AlreadySent({
       </p>
 
       <div className="mt-3 flex gap-2">
-        <Button variant="outline" className="flex-1" onClick={() => { onClose(); router.push("/leads?tab=sent"); }}>
+        {/* Closing the sheet fires an async history.back(); a router.push() in the
+            same tick is swallowed by it and the button reads as dead. Ride the pop. */}
+        <Button
+          variant="outline"
+          className="flex-1"
+          onClick={() => { onClose(); navigateAfterClose(() => router.push("/leads?tab=sent")); }}
+        >
           View in Sent
         </Button>
         <Button

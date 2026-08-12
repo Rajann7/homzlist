@@ -6,7 +6,9 @@ import { useSearchParams } from "next/navigation";
 import { AppShell, BottomSheet, Header, Icon, Skeleton, EmptyState } from "@/components/billing/ui";
 import { cn } from "@/lib/utils";
 import * as leadsApi from "@/lib/leads/client";
+import { ConfirmDialog } from "@/components/ui/Dialog";
 import { KIND, StatusPill, SubjectThumb, ago } from "./parts";
+import { roleLabel } from "./SubjectLeads";
 
 /**
  * Leads — the screen that replaced Messages.
@@ -259,30 +261,41 @@ function Group({ label, items, base }: { label: string; items: leadsApi.LeadSubj
   );
 }
 
+/**
+ * One thing you sent.
+ *
+ * Three things were wrong with the first pass and all three were noise:
+ * the "cannot be recalled" line sat under EVERY card as permanent body text
+ * (it belongs in the confirm, at the moment it matters), the role printed
+ * lowercase mid-sentence, and Cancel fired on a single tap with no
+ * confirmation for something that cannot be undone.
+ */
 function SentCard({ sent, onChanged }: { sent: leadsApi.SentLead; onChanged: () => void }) {
   const [busy, setBusy] = useState(false);
+  const [confirm, setConfirm] = useState(false);
   const href = sent.subject.id
     ? sent.subject.kind === "requirement" ? `/requirements/${sent.subject.id}`
       : sent.subject.kind === "project" ? `/projects/${sent.subject.id}`
-      : `/p/${sent.subject.id}`
+      : `/property/${sent.subject.id}`
     : null;
+  const openLabel = sent.subject.kind === "requirement" ? "View requirement"
+    : sent.subject.kind === "project" ? "View project" : "View property";
 
   return (
     <div className={cn("border-b border-divider px-3 py-3", sent.state === "closed" && "opacity-70")}>
-      <div className="flex items-center gap-3">
+      <div className="flex items-start gap-3">
         <SubjectThumb kind={sent.subject.kind} coverUrl={sent.subject.coverUrl} size={44} />
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <span className="min-w-0 flex-1 truncate text-13 font-semibold text-ink-primary">{sent.subject.title}</span>
+          <div className="flex items-start gap-2">
+            <span className="min-w-0 flex-1 text-13 font-semibold leading-snug text-ink-primary">{sent.subject.title}</span>
             <StatusPill tone={sent.state}>{sent.stateLabel}</StatusPill>
           </div>
           <div className="mt-0.5 truncate text-12 text-ink-secondary">
-            To {sent.to.name}{sent.to.role ? ` · ${sent.to.role}` : ""} · {ago(sent.createdAt)}
+            To {sent.to.name}{sent.to.role ? ` · ${roleLabel(sent.to.role)}` : ""} · {ago(sent.createdAt)}
           </div>
+          {sent.summary && <div className="mt-1 text-12 text-ink-secondary">You asked: {sent.summary}</div>}
         </div>
       </div>
-
-      {sent.summary && <div className="mt-2 text-12 text-ink-secondary">You asked: {sent.summary}</div>}
 
       {/* The offer attached to a requirement proposal — "I Have a Property". */}
       {sent.offer && (
@@ -294,7 +307,7 @@ function SentCard({ sent, onChanged }: { sent: leadsApi.SentLead; onChanged: () 
               {sent.offer.title}{sent.offer.subtitle ? ` · ${sent.offer.subtitle}` : ""}
             </div>
           </div>
-          <span className={cn("rounded-full px-2 py-0.5 text-11 font-semibold", KIND[sent.offer.kind].chip)}>
+          <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-11 font-semibold", KIND[sent.offer.kind].chip)}>
             {KIND[sent.offer.kind].label}
           </span>
         </div>
@@ -302,9 +315,9 @@ function SentCard({ sent, onChanged }: { sent: leadsApi.SentLead; onChanged: () 
 
       {sent.closedReason && <div className="mt-2 text-11 text-ink-tertiary">{sent.closedReason}</div>}
 
-      {/* The other half of the evidence. The receiver tapping Call is what the
-          platform can see; whether the sender's phone actually rang is the only
-          thing that makes "response rate" a measurement rather than a guess. */}
+      {/* The other half of the evidence: the receiver tapping Call is what the
+          platform can see; whether the phone actually rang is what makes a
+          response rate a measurement rather than a guess. */}
       {sent.askAnswer && (
         <div className="mt-2.5 rounded-8 border border-divider bg-surface-2 p-2.5">
           <div className="text-12 font-semibold text-ink-primary">Did {sent.to.name} contact you?</div>
@@ -334,28 +347,43 @@ function SentCard({ sent, onChanged }: { sent: leadsApi.SentLead; onChanged: () 
         </div>
       )}
 
-      <div className="mt-2.5 flex gap-2">
+      <div className="mt-2.5 flex items-center gap-3">
         {href && (
-          <Link href={href} className="chrome flex h-9 flex-1 items-center justify-center rounded-8 border border-border text-13 font-semibold text-ink-primary active:bg-surface-2">
-            View {sent.subject.kind === "requirement" ? "requirement" : sent.subject.kind}
+          <Link
+            href={href}
+            className="chrome flex h-9 flex-1 items-center justify-center rounded-8 border border-border text-13 font-semibold text-ink-primary active:bg-surface-2"
+          >
+            {openLabel}
           </Link>
         )}
         {sent.canWithdraw && (
           <button
             type="button"
-            disabled={busy}
-            onClick={async () => { setBusy(true); await leadsApi.withdraw(sent.id); setBusy(false); onChanged(); }}
-            className="chrome flex h-9 flex-1 items-center justify-center rounded-8 border border-error/30 text-13 font-semibold text-error active:bg-error-soft disabled:opacity-50"
+            onClick={() => setConfirm(true)}
+            className="chrome shrink-0 px-1 text-12 font-semibold text-error"
           >
             Cancel request
           </button>
         )}
       </div>
-      {sent.canWithdraw && (
-        <p className="mt-1.5 text-11 text-ink-tertiary">
-          Cancelling stops further contact through HomzList. Details already shared cannot be recalled.
-        </p>
-      )}
+
+      {/* The warning belongs HERE, where it changes a decision. */}
+      <ConfirmDialog
+        open={confirm}
+        onClose={() => setConfirm(false)}
+        onConfirm={async () => {
+          setBusy(true);
+          await leadsApi.withdraw(sent.id);
+          setBusy(false);
+          setConfirm(false);
+          onChanged();
+        }}
+        title="Cancel this request?"
+        body={`${sent.to.name} will stop seeing this in their leads.`}
+        consequence="Your details have already been shared and cannot be recalled."
+        confirmLabel="Cancel request"
+        destructive
+      />
     </div>
   );
 }

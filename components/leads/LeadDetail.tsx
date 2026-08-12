@@ -35,7 +35,7 @@ export function LeadDetail({ id, base = "/leads" }: { id: string; base?: string 
   const subjectHref = lead?.subject.id
     ? lead.subject.kind === "requirement" ? `/requirements/${lead.subject.id}`
       : lead.subject.kind === "project" ? `/projects/${lead.subject.id}`
-      : `/p/${lead.subject.id}`
+      : `/property/${lead.subject.id}`
     : null;
 
   return (
@@ -118,7 +118,7 @@ export function LeadDetail({ id, base = "/leads" }: { id: string; base?: string 
             <div className="mt-3 rounded-12 border border-border bg-surface-1 p-3">
               <div className="text-11 font-bold tracking-wide text-ink-tertiary">THEY OFFERED</div>
               <Link
-                href={lead.offer.kind === "project" ? `/projects/${lead.offer.id}` : `/p/${lead.offer.id}`}
+                href={lead.offer.kind === "project" ? `/projects/${lead.offer.id}` : `/property/${lead.offer.id}`}
                 className="mt-2 flex items-center gap-3"
               >
                 <SubjectThumb kind={lead.offer.kind} coverUrl={lead.offer.coverUrl} size={44} />

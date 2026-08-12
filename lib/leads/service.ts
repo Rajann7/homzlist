@@ -307,17 +307,32 @@ async function hydrate(rows: Row[]): Promise<LeadView[]> {
     // The post's state TODAY. The title comes from the snapshot (so an edit
     // cannot rewrite history), but "is it still live?" has to be current or the
     // seller calls someone about a flat they took down last week.
-    subjListingIds.length ? db().from("listings").select("id,status").in("id", subjListingIds) : Promise.resolve({ data: [] as unknown[] }),
-    subjProjectIds.length ? db().from("projects").select("id,status").in("id", subjProjectIds) : Promise.resolve({ data: [] as unknown[] }),
-    subjReqIds.length ? db().from("requirements").select("id,status,expires_at").in("id", subjReqIds) : Promise.resolve({ data: [] as unknown[] }),
+    // The title is read too, but only as a FALLBACK: leads written before 0135
+    // have no snapshot, and those cards printed a bare em dash for a post that
+    // is sitting right there in the table.
+    subjListingIds.length ? db().from("listings").select("id,status,title,price_paise,price_on_request,area_label,cover_url").in("id", subjListingIds) : Promise.resolve({ data: [] as unknown[] }),
+    subjProjectIds.length ? db().from("projects").select("id,status,name,area_label,cover_url").in("id", subjProjectIds) : Promise.resolve({ data: [] as unknown[] }),
+    subjReqIds.length ? db().from("requirements").select("id,status,expires_at,bhk,kind,area_label").in("id", subjReqIds) : Promise.resolve({ data: [] as unknown[] }),
   ]);
 
   const subjState = new Map<string, { label: string; live: boolean }>();
-  for (const l of ((subjL ?? []) as any[])) subjState.set(l.id, { label: listingState(l.status), live: l.status === "live" });
-  for (const p of ((subjP ?? []) as any[])) subjState.set(p.id, { label: listingState(p.status), live: p.status === "live" });
+  const subjLive = new Map<string, { title: string; subtitle: string; coverUrl: string | null }>();
+  for (const l of ((subjL ?? []) as any[])) {
+    subjState.set(l.id, { label: listingState(l.status), live: l.status === "live" });
+    subjLive.set(l.id, {
+      title: l.title ?? "Property",
+      subtitle: [l.price_on_request ? "Price on request" : priceLabel(l.price_paise), l.area_label].filter(Boolean).join(" · "),
+      coverUrl: l.cover_url ?? null,
+    });
+  }
+  for (const p of ((subjP ?? []) as any[])) {
+    subjState.set(p.id, { label: listingState(p.status), live: p.status === "live" });
+    subjLive.set(p.id, { title: p.name ?? "Project", subtitle: areaLabelText(p.area_label) || "Project", coverUrl: p.cover_url ?? null });
+  }
   for (const r of ((subjR ?? []) as any[])) {
     const label = requirementState(r.status, r.expires_at);
     subjState.set(r.id, { label, live: r.status === "live" && label !== "Expired" });
+    subjLive.set(r.id, { title: requirementTitle(r), subtitle: "Requirement", coverUrl: null });
   }
 
   const profMap = new Map((profs ?? []).map((p: any) => [p.id, p]));
@@ -373,9 +388,9 @@ async function hydrate(rows: Row[]): Promise<LeadView[]> {
       subject: {
         kind: r.listing_id ? "listing" : r.project_id ? "project" : "requirement",
         id: r.listing_id ?? r.project_id ?? r.requirement_id,
-        title: snap.title ?? "—",
-        subtitle: snap.subtitle ?? "",
-        coverUrl: snap.coverUrl ?? null,
+        title: snap.title ?? subjLive.get((r.listing_id ?? r.project_id ?? r.requirement_id) ?? "")?.title ?? "This post is no longer available",
+        subtitle: snap.subtitle ?? subjLive.get((r.listing_id ?? r.project_id ?? r.requirement_id) ?? "")?.subtitle ?? "",
+        coverUrl: snap.coverUrl ?? subjLive.get((r.listing_id ?? r.project_id ?? r.requirement_id) ?? "")?.coverUrl ?? null,
         state: subjState.get((r.listing_id ?? r.project_id ?? r.requirement_id) ?? "")?.label ?? "Removed",
         isLive: subjState.get((r.listing_id ?? r.project_id ?? r.requirement_id) ?? "")?.live ?? false,
       },
@@ -441,9 +456,40 @@ export async function listSentLeads(profileId: string): Promise<SentLead[]> {
   const offerLMap = new Map((offerL ?? []).map((l: any) => [l.id, l]));
   const offerPMap = new Map((offerP ?? []).map((p: any) => [p.id, p]));
 
+  // Leads written before 0135 carry no subject_snapshot, and the card printed a
+  // bare em dash where the property name belongs — the post is still there, we
+  // just never looked it up. The snapshot stays the source of truth (it survives
+  // a deletion); this only fills the blanks it cannot cover.
+  const needs = rows.filter((r) => !((r.subject_snapshot ?? {}) as any).title);
+  const liveTitles = new Map<string, { title: string; subtitle: string; coverUrl: string | null }>();
+  if (needs.length) {
+    const lIds = needs.map((r) => r.listing_id).filter((x): x is string => Boolean(x));
+    const pIds = needs.map((r) => r.project_id).filter((x): x is string => Boolean(x));
+    const rIds = needs.map((r) => r.requirement_id).filter((x): x is string => Boolean(x));
+    const [{ data: ls }, { data: ps }, { data: rs }] = await Promise.all([
+      lIds.length ? db().from("listings").select("id,title,price_paise,price_on_request,area_label,cover_url").in("id", lIds) : Promise.resolve({ data: [] as any[] }),
+      pIds.length ? db().from("projects").select("id,name,area_label,cover_url").in("id", pIds) : Promise.resolve({ data: [] as any[] }),
+      rIds.length ? db().from("requirements").select("id,bhk,kind,area_label").in("id", rIds) : Promise.resolve({ data: [] as any[] }),
+    ]);
+    for (const l of (ls ?? []) as any[]) {
+      liveTitles.set(l.id, {
+        title: l.title ?? "Property",
+        subtitle: [l.price_on_request ? "Price on request" : priceLabel(l.price_paise), l.area_label].filter(Boolean).join(" · "),
+        coverUrl: l.cover_url ?? null,
+      });
+    }
+    for (const p of (ps ?? []) as any[]) {
+      liveTitles.set(p.id, { title: p.name ?? "Project", subtitle: areaLabelText(p.area_label) || "Project", coverUrl: p.cover_url ?? null });
+    }
+    for (const q of (rs ?? []) as any[]) {
+      liveTitles.set(q.id, { title: requirementTitle(q), subtitle: "Requirement", coverUrl: null });
+    }
+  }
+
   return rows.map((r) => {
     const status = statusOf(r.stage);
     const snap = (r.subject_snapshot ?? {}) as Record<string, string | null>;
+    const live = liveTitles.get((r.listing_id ?? r.project_id ?? r.requirement_id) ?? "");
     const o: any = ownerMap.get(r.owner_id) ?? {};
     // Closed is closed. The sender is never told they were "archived", which
     // reads as a rejection the owner did not necessarily mean.
@@ -475,9 +521,9 @@ export async function listSentLeads(profileId: string): Promise<SentLead[]> {
       subject: {
         kind: r.listing_id ? "listing" : r.project_id ? "project" : "requirement",
         id: r.listing_id ?? r.project_id ?? r.requirement_id,
-        title: snap.title ?? "—",
-        subtitle: snap.subtitle ?? "",
-        coverUrl: snap.coverUrl ?? null,
+        title: snap.title ?? live?.title ?? "This post is no longer available",
+        subtitle: snap.subtitle ?? live?.subtitle ?? "",
+        coverUrl: snap.coverUrl ?? live?.coverUrl ?? null,
       },
       to: { id: r.owner_id, name: o.name ?? "HomzList user", role: o.role ?? null, photoUrl: o.photo_url ?? null },
       offer: ol
@@ -723,7 +769,24 @@ function contactLinks(
 /** "3 BHK to buy in Kalawad Road" — requirements carry no title of their own. */
 export function requirementTitle(r: { bhk?: number | null; kind?: string | null; area_label?: string | null }): string {
   const head = [r.bhk ? `${r.bhk} BHK` : "Property", r.kind === "rent" ? "on rent" : "to buy"].join(" ");
-  return r.area_label ? `${head} in ${r.area_label}` : head;
+  const where = areaLabelText(r.area_label);
+  return where ? `${head} in ${where}` : head;
+}
+
+/**
+ * `area_label` stores extra areas as a bare suffix — "Para Pipaliya +2", and
+ * sometimes "+0" when there are none. Printed raw it reads like a typo in the
+ * middle of a sentence, so it is spelled out here and the empty case is
+ * dropped entirely.
+ */
+export function areaLabelText(raw: string | null | undefined): string {
+  const label = (raw ?? "").trim();
+  if (!label) return "";
+  const m = /^(.*?)\s*\+\s*(\d+)$/.exec(label);
+  if (!m) return label;
+  const [, base, n] = m;
+  const more = Number(n);
+  return more > 0 ? `${base} & ${more} more` : base;
 }
 
 function budgetLabel(min: number | null, max: number | null): string {
