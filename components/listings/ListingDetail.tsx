@@ -9,6 +9,7 @@ import { ConfirmDialog } from "@/components/ui/Dialog";
 import { listingsApi, type Photo, type MyListing } from "@/lib/listings/client";
 import { InquirySheet, MoreSheet, ShareSheet, ReportSheet, LoginSheet } from "@/components/feed/sheets";
 import { loginHref, currentPath } from "@/lib/auth/next-url";
+import { ConnectChoiceSheet } from "@/components/inquiry/PublicContact";
 import { interactionsApi, type FeedCard } from "@/lib/feed/client";
 import { DETAIL_PAD, DetailHero, DetailRow, DetailSection, DetailSeparator, PropertyDetailBody } from "./detailBody";
 import { useRole } from "@/components/nav/RoleContext";
@@ -47,7 +48,7 @@ export function ListingDetail({ id, isGuest = false }: { id: string; isGuest?: b
   // Which contact/action sheet is open. On the public host the viewer is always
   // a guest (middleware strips the session), so any action that writes to the
   // DB opens the login sheet instead of hitting a 401.
-  const [sheet, setSheet] = useState<null | "inquiry" | "more" | "share" | "report" | "login" | "manage">(null);
+  const [sheet, setSheet] = useState<null | "inquiry" | "connect" | "more" | "share" | "report" | "login" | "manage">(null);
   const [reqBusy, setReqBusy] = useState(false);
   /** The owner action awaiting confirmation — every one of them writes. */
   const [confirm, setConfirm] = useState<null | { action: OwnerAction; title: string; body: string; label: string; destructive?: boolean }>(null);
@@ -63,6 +64,17 @@ export function ListingDetail({ id, isGuest = false }: { id: string; isGuest?: b
   // sheet still refuses if it is reached any other way.
   const role = useRole();
   const cannotInquire = role === "builder";
+
+  const callPoster = () => {
+    if (listing?.contact?.number) window.location.href = `tel:${listing.contact.number}`;
+  };
+  const whatsappPoster = () => {
+    const n = listing?.contact?.whatsapp || listing?.contact?.number;
+    if (!n) return;
+    const digits = String(n).replace(/\D/g, "");
+    const text = encodeURIComponent(`Hi, I'm interested in ${listing?.title ?? "your property"} on HomzList.`);
+    window.open(`https://wa.me/${digits}?text=${text}`, "_blank", "noopener");
+  };
 
   const startInquiry = () => {
     if (!isGuest) { setSheet("inquiry"); return; }
@@ -257,6 +269,15 @@ export function ListingDetail({ id, isGuest = false }: { id: string; isGuest?: b
       )}
 
       <PropertyDetailBody
+        onCall={callPoster}
+        onWhatsapp={whatsappPoster}
+        // Design screen 1: when there is no number, say it is a choice. An
+        // absent number with no explanation reads as a broken screen.
+        privateNote={
+          !listing.contact?.number && !isOwner && !sold
+            ? "This owner keeps their number private. Send an inquiry and they'll contact you the way you choose."
+            : null
+        }
         listing={listing}
         onOpenProfile={(username) => router.push(`/profile/${username}`)}
         notice={
@@ -336,30 +357,6 @@ export function ListingDetail({ id, isGuest = false }: { id: string; isGuest?: b
             <Button variant="outline" fullWidth onClick={() => router.push("/search")}>
               Browse similar properties
             </Button>
-          ) : listing.contact ? (
-            <>
-              <button
-                aria-label="Call"
-                onClick={() => (window.location.href = `tel:${listing.contact.number}`)}
-                className="grid h-11 w-[52px] shrink-0 place-items-center rounded-4 border border-border bg-surface-1 text-ink-primary"
-              >
-                <Icon name="phone" size={20} />
-              </button>
-              {listing.contact.whatsapp && (
-                <a
-                  aria-label="WhatsApp"
-                  href={`https://wa.me/91${String(listing.contact.whatsapp).replace(/\D/g, "").slice(-10)}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="grid h-11 w-[52px] shrink-0 place-items-center rounded-4 border border-accent bg-accent-soft text-accent"
-                >
-                  <Icon name="whatsapp" size={20} />
-                </a>
-              )}
-              {cannotInquire
-                ? <BuilderRouteNote />
-                : <Button fullWidth onClick={startInquiry}>Send Inquiry</Button>}
-            </>
           ) : cannotInquire ? (
             <BuilderRouteNote />
           ) : (
@@ -368,7 +365,7 @@ export function ListingDetail({ id, isGuest = false }: { id: string; isGuest?: b
                theirs (the branch above) or they don't — and either way the
                buyer's route is the same one action, which also tells the seller
                how and when to reach back. */
-            <Button fullWidth onClick={startInquiry}>
+            <Button fullWidth onClick={() => (listing.contact?.number && !isGuest ? setSheet("connect") : startInquiry())}>
               <Icon name="zap" size={17} /> Send Inquiry
             </Button>
           )}
@@ -416,6 +413,17 @@ export function ListingDetail({ id, isGuest = false }: { id: string; isGuest?: b
             <ShareSheet open={sheet === "share"} onClose={() => setSheet(null)} card={card} />
             <ReportSheet open={sheet === "report"} onClose={() => setSheet(null)} card={card} />
             <InquirySheet open={sheet === "inquiry"} onClose={() => setSheet(null)} card={card} />
+            {listing.contact?.number && (
+              <ConnectChoiceSheet
+                open={sheet === "connect"}
+                onClose={() => setSheet(null)}
+                contact={{ number: String(listing.contact.number), whatsapp: listing.contact.whatsapp ?? null }}
+                subjectKind="listing"
+                onSendInquiry={() => setSheet("inquiry")}
+                onCall={callPoster}
+                onWhatsapp={whatsappPoster}
+              />
+            )}
             <LoginSheet open={sheet === "login"} onClose={() => setSheet(null)} />
           </>
         );

@@ -1,5 +1,7 @@
 "use client";
 
+import * as React from "react";
+
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "@/components/billing/ui";
 import type { IconName } from "@/components/ui/Icon";
@@ -374,12 +376,22 @@ function Amenities({ items, id }: { items: AmenityItem[]; id?: string }) {
  * as a plain row rather than a link that 404s.
  */
 export function PosterCard({
-  poster, title = "Posted by", id, onOpen,
+  poster, title = "Posted by", id, onOpen, contact, onCall, onWhatsapp, privateNote,
 }: {
   poster: { name: string | null; username: string | null; role: string | null; verified: boolean; avatarUrl: string | null } | null;
   title?: string;
   id?: string;
   onOpen?: (username: string) => void;
+  /**
+   * The number this person chose to PUBLISH, when they published one. It
+   * belongs here, on their card, under their name — a number floating in a
+   * button bar tells you nothing about whose phone will ring.
+   */
+  contact?: { number: string; whatsapp?: string | null } | null;
+  onCall?: () => void;
+  onWhatsapp?: () => void;
+  /** Why there is no number here, when there is none. */
+  privateNote?: string | null;
 }) {
   if (!poster) return null;
   const name = poster.name ?? "HomzList user";
@@ -430,8 +442,80 @@ export function PosterCard({
           </span>
           {tappable && <Icon name="chevron-right" size={18} className="shrink-0 text-ink-tertiary" />}
         </button>
+
+        {contact
+          ? <PublishedNumber contact={contact} onCall={onCall} onWhatsapp={onWhatsapp} />
+          : privateNote
+            ? (
+              <div className={cn("flex items-start gap-2 border-t border-divider py-3", PAD)}>
+                <Icon name="lock" size={14} className="mt-0.5 shrink-0 text-ink-tertiary" />
+                <span className="text-12 leading-snug text-ink-secondary">{privateNote}</span>
+              </div>
+            )
+            : null}
       </div>
     </Card>
+  );
+}
+
+/**
+ * The published number, in full.
+ *
+ * Not masked: publishing it is the whole point, and a masked number next to a
+ * Call button that dials it anyway is theatre. Copy is a real action because
+ * people write numbers down.
+ */
+function PublishedNumber({
+  contact, onCall, onWhatsapp,
+}: {
+  contact: { number: string; whatsapp?: string | null };
+  onCall?: () => void;
+  onWhatsapp?: () => void;
+}) {
+  const [copied, setCopied] = React.useState(false);
+  const copy = async () => {
+    try {
+      await navigator.clipboard?.writeText(contact.number);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1600);
+    } catch { /* clipboard blocked — the number is on screen to read anyway */ }
+  };
+
+  return (
+    <div className={cn("border-t border-divider py-3", PAD)}>
+      <div className="flex items-center gap-2">
+        <Tag tone="accent">Number public</Tag>
+        <button type="button" onClick={() => void copy()} className="chrome ml-auto text-11 font-semibold text-ink-tertiary">
+          {copied ? "Copied" : "Tap to copy"}
+        </button>
+      </div>
+      <button type="button" onClick={() => void copy()} className="chrome mt-2 flex w-full items-center gap-2 text-left">
+        <Icon name="phone" size={16} className="shrink-0 text-accent" />
+        <span className="text-15 font-semibold tracking-wide text-ink-primary">{contact.number}</span>
+      </button>
+      {(onCall || onWhatsapp) && (
+        <div className="mt-2.5 flex gap-2">
+          {onCall && (
+            <button
+              type="button"
+              onClick={onCall}
+              className="chrome flex h-10 flex-1 items-center justify-center gap-1.5 rounded-8 border border-border bg-surface-1 text-13 font-semibold text-ink-primary active:bg-surface-2"
+            >
+              <Icon name="phone" size={16} />Call
+            </button>
+          )}
+          {onWhatsapp && (
+            <button
+              type="button"
+              onClick={onWhatsapp}
+              className="chrome flex h-10 flex-1 items-center justify-center gap-1.5 rounded-8 border border-accent bg-accent-soft text-13 font-semibold text-accent active:brightness-95"
+            >
+              <Icon name="whatsapp" size={16} className="text-[#25D366]" />WhatsApp
+            </button>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -582,12 +666,17 @@ export function DetailHero({
  * neither, which is the whole difference between the two.
  */
 export function PropertyDetailBody({
-  listing, notice, footer, onOpenProfile,
+  listing, notice, footer, onOpenProfile, onCall, onWhatsapp, privateNote,
 }: {
   listing: any;
   notice?: React.ReactNode;
   footer?: React.ReactNode;
   onOpenProfile?: (username: string) => void;
+  /** Only passed when the poster published a number — see PosterCard. */
+  onCall?: () => void;
+  onWhatsapp?: () => void;
+  /** Shown INSTEAD of a number, so its absence reads as a choice, not a gap. */
+  privateNote?: string | null;
 }) {
   const specs = (listing.keySpecs ?? []) as KeySpec[];
   const highlights = (listing.highlights ?? []) as string[];
@@ -703,7 +792,17 @@ export function PropertyDetailBody({
       <Amenities id="sec-amenities" items={amenities} />
 
       {/* ---- Who posted it ----------------------------------------------- */}
-      {listing.poster && <PosterCard id="sec-contact" poster={listing.poster} onOpen={onOpenProfile} />}
+      {listing.poster && (
+        <PosterCard
+          id="sec-contact"
+          poster={listing.poster}
+          onOpen={onOpenProfile}
+          contact={listing.contact?.number ? { number: String(listing.contact.number), whatsapp: listing.contact.whatsapp ?? null } : null}
+          onCall={listing.contact?.number ? onCall : undefined}
+          onWhatsapp={listing.contact?.number ? onWhatsapp : undefined}
+          privateNote={listing.contact?.number ? null : privateNote}
+        />
+      )}
 
       {/* ---- Where it is ------------------------------------------------- */}
       {(listing.areaLabel || listing.pincode) && (
@@ -747,7 +846,7 @@ function amenityList(row: any): AmenityItem[] {
  * open, because a buyer's first question is always "what's in the 2 BHK".
  */
 export function ProjectDetailBody({
-  project: p, openUnit, onToggleUnit, onEnquireUnit, brochure, notice, footer, onOpenProfile,
+  project: p, openUnit, onToggleUnit, onEnquireUnit, brochure, notice, footer, onOpenProfile, onCall, onWhatsapp,
 }: {
   project: any;
   openUnit: string | null;
@@ -758,6 +857,9 @@ export function ProjectDetailBody({
   notice?: React.ReactNode;
   footer?: React.ReactNode;
   onOpenProfile?: (username: string) => void;
+  /** A builder's number is public by design (Doc2 §6), so this is the norm. */
+  onCall?: () => void;
+  onWhatsapp?: () => void;
 }) {
   const units: any[] = p.units ?? [];
   const priceBand = bandOf(units);
@@ -999,7 +1101,17 @@ export function ProjectDetailBody({
       )}
 
       {/* ---- The builder -------------------------------------------------- */}
-      {p.builder && <PosterCard id="sec-builder" poster={p.builder} title="Builder" onOpen={onOpenProfile} />}
+      {p.builder && (
+        <PosterCard
+          id="sec-builder"
+          poster={p.builder}
+          title="Builder"
+          onOpen={onOpenProfile}
+          contact={p.contact?.number ? { number: String(p.contact.number), whatsapp: p.contact.whatsapp ?? null } : null}
+          onCall={p.contact?.number ? onCall : undefined}
+          onWhatsapp={p.contact?.number ? onWhatsapp : undefined}
+        />
+      )}
 
       {footer}
     </div>

@@ -66,7 +66,8 @@
     "check:leads-live": "node scripts/check-leads-live.mjs",
     "check:leads-ui": "node scripts/check-leads-ui.mjs",
     "check:leads-roles": "node scripts/check-leads-roles.mjs",
-    "seed:leads-states": "node scripts/seed-leads-states.mjs"
+    "seed:leads-states": "node scripts/seed-leads-states.mjs",
+    "check:design-screens": "node scripts/check-design-screens.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1091.0",

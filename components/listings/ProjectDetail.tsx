@@ -191,6 +191,8 @@ export function ProjectDetail({ id, isGuest = false }: { id: string; isGuest?: b
         onEnquireUnit={(unitType, unitId) => askBuilder(unitType, unitId)}
         brochure={brochure}
         onOpenProfile={(username) => router.push(`/profile/${username}`)}
+        onCall={() => contactBuilder("call")}
+        onWhatsapp={() => contactBuilder("whatsapp")}
         notice={p.isOwner ? <OwnerNotice project={p} /> : null}
       />
 
