@@ -4623,29 +4623,21 @@ is the sender on a property or project. Every one predates the rule (newest
 in the chat era, so they are not deleted — but a builder will see them in their
 own Sent tab, and this is why.
 
-## Note for the next person
+## Note for the next person — testing this in a browser
 
-The in-app Browser pane runs its tab hidden and Chrome freezes a tab it never
-composites, so React hydration never gets a task slot there — the pane cannot
-answer "does the button work?" no matter what the code does. Use
-`npm run check:leads-ui`, which drives real Chrome over CDP
-(`scripts/lib/cdp.mjs`, no dependencies), instead of trusting the pane.
+Two different things made the app look dead in a browser, and both are fixed:
 
----
+1. **Next 16 answered dev assets with 403** on any host missing from
+   `allowedDevOrigins`. On `seller.lvh.me` every chunk was blocked, React never
+   hydrated and nothing was interactive. `next.config.mjs` now lists
+   `*.localhost` and `lvh.me` too.
+2. **The in-app Browser pane blocks `lvh.me` itself** (`ERR_BLOCKED_BY_CLIENT`).
+   Use **`http://seller.localhost:3000`** in the pane — there it hydrates, real
+   taps work and screenshots are real. `computer{left_click}` often times out in
+   the pane; `javascript_tool` with `el.click()` navigates fine.
 
-## Session revival across the two hosts (Aug 2026) — one thing left, deliberately
-
-Fixed: a 15-minute access token no longer reads as "signed out" to the router.
-Middleware sends a stale-access page request through
-`GET /api/v1/auth/refresh?next=`, so a signed-in user is never shown a login
-screen on the main domain, on a pasted link, or on a re-opened tab, and the
-cross-subdomain session hint is no longer destroyed by an ordinary idle gap.
-
-**Left undone on purpose:** signing in from a PUBLIC-ONLY page (`/area/*`, the
-`[landing]` SEO pages) returns the user to the seller feed, not to the page they
-came from. Login runs on the seller host and that host does not serve those
-paths — carrying the path across is exactly what used to land people on a 404.
-Sending them back to the public host after login needs a cross-host `next`,
-which the `?next=` contract deliberately does not allow (it is the whole
-open-redirect defence). Worth doing as its own change if the entry point starts
-mattering; it is not a dead end today.
+For unattended runs use the CDP harness (`scripts/lib/cdp.mjs`, no dependencies)
+behind `check:leads-ui`, `check:leads-roles` and `check:design-screens`. It
+detects hydration by looking for React fiber keys, because
+`__REACT_DEVTOOLS_GLOBAL_HOOK__.renderers` reads 0 in headless Chrome and will
+tell you a perfectly hydrated page is dead.
