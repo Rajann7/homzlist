@@ -24,14 +24,20 @@ let seq = 0;
 /** Read by components/nav/ScrollRestore — a pop this hook caused, not the user. */
 export const SYNTHETIC_POP = "hz-nav-synthetic";
 /**
- * Which layer's teardown fired the synthetic pop. Needed because a sheet that
- * opens another sheet tears down and builds up in the SAME commit: the closing
- * layer's cleanup calls history.back(), and the resulting popstate would
- * otherwise be read by the layer that just opened as "the user pressed Back",
- * closing it a frame after it appeared. Which is exactly what happened to the
- * "use a different number" popup — it opened and vanished, every time.
+ * Which layer's teardown fired the last synthetic pop, and when.
+ *
+ * Sheets stack: an inquiry sheet opens a number popup, and closing EITHER of
+ * them calls history.back() from its cleanup. That fires a real popstate, which
+ * the OTHER layer would read as "the user pressed Back" and close itself — so
+ * verifying a number closed the whole inquiry, and before that, opening the
+ * popup closed it a frame after it appeared.
+ *
+ * This deliberately does NOT live in sessionStorage: ScrollRestore consumes its
+ * marker on the same popstate, and listener order meant the flag was already
+ * gone by the time a sheet read it. Module scope is shared by every layer and
+ * cannot be cleared by anyone else.
  */
-export const SYNTHETIC_POP_LAYER = "hz-nav-synthetic-layer";
+let lastSyntheticPop: { marker: number; at: number } | null = null;
 
 /**
  * Navigate OUT of an open sheet/dialog. Use this instead of calling the router
@@ -79,13 +85,9 @@ export function useBackClose(open: boolean, onClose: () => void) {
     window.history.pushState({ ...(window.history.state ?? {}), hzLayer: marker }, "");
 
     const onPop = () => {
-      // Ignore a pop that another layer's teardown caused. Only a REAL Back
-      // should close this one.
-      try {
-        const at = Number(sessionStorage.getItem(SYNTHETIC_POP) ?? 0);
-        const from = sessionStorage.getItem(SYNTHETIC_POP_LAYER);
-        if (from && from !== String(marker) && Date.now() - at < 2000) return;
-      } catch { /* private mode — fall through and close, as before */ }
+      // Ignore a pop that ANOTHER layer's teardown caused; only a real Back
+      // closes this one.
+      if (lastSyntheticPop && lastSyntheticPop.marker !== marker && Date.now() - lastSyntheticPop.at < 2000) return;
       closeRef.current();
     };
     window.addEventListener("popstate", onPop);
@@ -102,10 +104,8 @@ export function useBackClose(open: boolean, onClose: () => void) {
         // the mark, closing a sheet and then tapping a link within the next
         // couple of seconds would restore the previous screen's scroll offset
         // onto the new one.
-        try {
-          sessionStorage.setItem(SYNTHETIC_POP, String(Date.now()));
-          sessionStorage.setItem(SYNTHETIC_POP_LAYER, String(marker));
-        } catch { /* private mode */ }
+        lastSyntheticPop = { marker, at: Date.now() };
+        try { sessionStorage.setItem(SYNTHETIC_POP, String(Date.now())); } catch { /* private mode */ }
         window.history.back();
       }
     };

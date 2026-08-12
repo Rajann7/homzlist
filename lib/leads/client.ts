@@ -50,6 +50,8 @@ export interface LeadView {
   wants: { code: string; label: string }[];
   contactPref: "call" | "whatsapp" | null;
   contactNumber: string | null;
+  callHref: string | null;
+  whatsappHref: string | null;
   whenLabel: string | null; preferredOn: string | null;
   notes: { text: string; at: string }[];
   closedReason: string | null;
@@ -57,7 +59,10 @@ export interface LeadView {
     id: string; name: string; role: string | null; photoUrl: string | null;
     verified: { phone: boolean; id: boolean; rera: boolean }; memberSince: string; profilePct: number;
   };
-  subject: { kind: SubjectKind; id: string | null; title: string; subtitle: string; coverUrl: string | null };
+  subject: {
+    kind: SubjectKind; id: string | null; title: string; subtitle: string; coverUrl: string | null;
+    state: string; isLive: boolean;
+  };
   offer: { kind: "listing" | "project"; id: string; title: string; subtitle: string; coverUrl: string | null } | null;
 }
 export interface SubjectLeads {

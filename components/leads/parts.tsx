@@ -81,65 +81,28 @@ export function PersonRow({
 }
 
 /**
- * Call / WhatsApp / more. The contact event is written first and awaited: if
- * the write fails we still hand off (never block the user from calling), but
- * the ordinary path leaves a record.
+ * The ⋯ on a lead card.
+ *
+ * The list screen shows LEADS, not a row of dial buttons per lead — reading
+ * eight cards should be reading eight people, not scanning sixteen buttons.
+ * Everything you can do to a lead lives behind this one control, and calling
+ * happens on the lead's own screen where you can see who you are calling.
  */
-export function LeadActions({
-  lead, onChanged, compact = false, quiet = false,
-}: {
-  lead: leadsApi.LeadView;
-  onChanged?: () => void;
-  compact?: boolean;
-  /** A lead already worked drops to three equal outline buttons (design 11). */
-  quiet?: boolean;
-}) {
-  const toast = useToast();
+export function LeadMenu({ lead, onChanged }: { lead: leadsApi.LeadView; onChanged?: () => void }) {
   const router = useRouter();
   const [menu, setMenu] = useState(false);
   const [report, setReport] = useState(false);
-  const number = lead.contactNumber;
-
-  async function go(channel: "call" | "whatsapp") {
-    if (!number) { toast.show("No number on this lead"); return; }
-    await leadsApi.recordContact(lead.id, channel);
-    onChanged?.();
-    const digits = number.replace(/[^\d]/g, "");
-    // The WhatsApp text is built here from the lead's own subject so it never
-    // arrives blank; wa.me needs the number without a +.
-    const text = encodeURIComponent(`Hi ${lead.person.name}, about ${lead.subject.title} on HomzList.`);
-    window.location.href = channel === "call" ? `tel:${number}` : `https://wa.me/${digits}?text=${text}`;
-  }
 
   return (
     <>
-      <div className="mt-2.5 flex gap-2">
-        <Button size="small" variant={quiet ? "outline" : "primary"} className="flex-1" onClick={() => void go("call")}>
-          {!quiet && <Icon name="phone" size={15} />}Call
-        </Button>
-        <Button size="small" variant="outline" className="flex-1" onClick={() => void go("whatsapp")}>
-          {!quiet && <Icon name="whatsapp" size={15} className="text-[#25D366]" />}WhatsApp
-        </Button>
-        {quiet ? (
-          <Button
-            size="small"
-            variant="outline"
-            className="flex-1"
-            onClick={() => { void leadsApi.recordContact(lead.id, "profile"); router.push(`/u/${lead.person.id}`); }}
-          >
-            Profile
-          </Button>
-        ) : !compact ? (
-          <Button size="small" variant="outline" className="w-11 px-0" aria-label="More" onClick={() => setMenu(true)}>
-            <Icon name="more" size={16} />
-          </Button>
-        ) : null}
-      </div>
-      {quiet && (
-        <button type="button" onClick={() => setMenu(true)} className="chrome mt-2 text-11 font-semibold text-ink-tertiary">
-          More options
-        </button>
-      )}
+      <button
+        type="button"
+        aria-label="Lead options"
+        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setMenu(true); }}
+        className="chrome -mr-1 grid h-9 w-9 shrink-0 place-items-center rounded-full text-ink-tertiary active:bg-surface-2"
+      >
+        <Icon name="more" size={18} />
+      </button>
 
       <BottomSheet open={menu} onClose={() => setMenu(false)} title="Lead options">
         <div className="flex flex-col pb-2">
@@ -153,6 +116,55 @@ export function LeadActions({
 
       <ReportLeadSheet open={report} onClose={() => setReport(false)} leadId={lead.id} onDone={() => onChanged?.()} />
     </>
+  );
+}
+
+/**
+ * How you actually reach this person — and ONLY how they asked to be reached.
+ *
+ * Offering both Call and WhatsApp ignores the one thing the sender told us.
+ * The other channel stays available behind the ⋯ for the case where the first
+ * one does not connect, but it is not the thing on the screen.
+ *
+ * Both links are built on the server (lib/leads/service) so the WhatsApp
+ * message is already written: who they are, which post, what they asked for.
+ */
+export function LeadContact({ lead, onChanged }: { lead: leadsApi.LeadView; onChanged?: () => void }) {
+  const toast = useToast();
+  const router = useRouter();
+  const prefersWhatsapp = lead.contactPref === "whatsapp";
+
+  const go = async (channel: "call" | "whatsapp") => {
+    const href = channel === "whatsapp" ? lead.whatsappHref : lead.callHref;
+    if (!href) { toast.show("No number on this lead"); return; }
+    await leadsApi.recordContact(lead.id, channel);
+    onChanged?.();
+    window.location.href = href;
+  };
+
+  return (
+    <div className="mt-3 flex gap-2">
+      <Button className="flex-1" onClick={() => void go(prefersWhatsapp ? "whatsapp" : "call")}>
+        <Icon name={prefersWhatsapp ? "whatsapp" : "phone"} size={17} />
+        {prefersWhatsapp ? "WhatsApp" : "Call"}
+      </Button>
+      <Button
+        variant="outline"
+        className="w-11 px-0"
+        aria-label="View profile"
+        onClick={() => { void leadsApi.recordContact(lead.id, "profile"); router.push(`/u/${lead.person.id}`); }}
+      >
+        <Icon name="user" size={17} />
+      </Button>
+      <Button
+        variant="outline"
+        className="w-11 px-0"
+        aria-label={prefersWhatsapp ? "Call instead" : "WhatsApp instead"}
+        onClick={() => void go(prefersWhatsapp ? "call" : "whatsapp")}
+      >
+        <Icon name={prefersWhatsapp ? "phone" : "whatsapp"} size={17} className={prefersWhatsapp ? undefined : "text-[#25D366]"} />
+      </Button>
+    </div>
   );
 }
 

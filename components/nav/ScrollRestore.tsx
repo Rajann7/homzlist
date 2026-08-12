@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
-import { SYNTHETIC_POP, SYNTHETIC_POP_LAYER } from "@/lib/hooks/use-back-close";
+import { SYNTHETIC_POP } from "@/lib/hooks/use-back-close";
 
 /**
  * Scroll-position restore for the app shell (Doc8 §193 — "position restore").
@@ -41,7 +41,6 @@ export function ScrollRestore() {
         // offset onto whatever they open next.
         if (sessionStorage.getItem(SYNTHETIC_POP)) {
           sessionStorage.removeItem(SYNTHETIC_POP);
-          sessionStorage.removeItem(SYNTHETIC_POP_LAYER);
           return;
         }
         sessionStorage.setItem(POP_FLAG, String(Date.now()));

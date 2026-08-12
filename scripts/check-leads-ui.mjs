@@ -120,15 +120,23 @@ try {
       path: location.pathname,
       head,
       chips: [...document.querySelectorAll("main button")].map(b => b.innerText.trim()).filter(Boolean).slice(0, 8),
-      hasCallRow: /Call/.test(t) && /WhatsApp/.test(t),
+      // The list is a list of PEOPLE now: no dial BUTTONS per card, one menu.
+      // (The words still appear inside a summary line — "Availability ·
+      // WhatsApp · Tomorrow" — so this counts controls, not text.)
+      dialButtons: [...document.querySelectorAll("main button")]
+        .filter(b => /^(call|whatsapp)$/i.test(b.innerText.trim())).length,
+      menus: document.querySelectorAll('main button[aria-label="Lead options"]').length,
+      cardLinks: document.querySelectorAll('main a[href*="/leads/lead/"]').length,
       hasWants: /Wants|Contact by|Best time/.test(t),
     };
   })()`);
   check("tapping a post opens its leads", Boolean(opened) && subject.path.includes("/leads/"), `${opened} → ${subject.path}`);
   check("filter chips render, scoped to this post", subject.chips.some((c) => /^All \d+/.test(c)), subject.chips.join(" | "));
-  check("a lead card shows its detail and the Call/WhatsApp row",
-    subject.hasCallRow && (subject.hasWants || /Contacted|Converted|Archived|New/.test(subject.chips.join(" ")) ),
-    `wants=${subject.hasWants} actions=${subject.hasCallRow}`);
+  check("the list shows leads only — no dial buttons on the cards",
+    subject.dialButtons === 0 && subject.cardLinks > 0,
+    `dialButtons=${subject.dialButtons} cards=${subject.cardLinks}`);
+  check("every card has its options menu", subject.menus === subject.cardLinks && subject.menus > 0,
+    `${subject.menus} menus for ${subject.cardLinks} cards`);
   await page.screenshot(path.join(SHOTS, "03-subject-leads.png"));
 
   // ---- 4. lead detail ------------------------------------------------------
@@ -147,6 +155,16 @@ try {
     };
   })()`);
   if (toDetail) {
+    const chosen = await page.eval(`(() => {
+      const t = document.querySelector("main")?.innerText ?? "";
+      const i = t.toLowerCase().indexOf("contact by");
+      const pref = i < 0 ? null : (t.slice(i, i + 40).match(/call|whatsapp/i) || [])[0] ?? null;
+      const primary = [...document.querySelectorAll("main button")].map(b => b.innerText.trim()).find(x => /^(Call|WhatsApp)$/i.test(x)) ?? null;
+      return { pref, primary };
+    })()`);
+    check("lead detail leads with the channel the sender chose",
+      chosen.pref && chosen.primary && chosen.pref.toLowerCase() === chosen.primary.toLowerCase(),
+      `chose=${chosen.pref} button=${chosen.primary}`);
     check("lead detail opens with the designed sections",
       detail.hasInquiryFor && detail.hasStatus, `INQUIRY FOR=${detail.hasInquiryFor} STATUS=${detail.hasStatus}`);
     check("the number is shown in full, unmasked", detail.hasNumber, detail.hasNumber ? "+91……… present" : "no number rendered");

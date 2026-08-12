@@ -302,7 +302,7 @@ function AlreadySent({
       </p>
 
       <div className="mt-3 flex gap-2">
-        <Button variant="outline" className="flex-1" onClick={() => { onClose(); router.push("/leads"); }}>
+        <Button variant="outline" className="flex-1" onClick={() => { onClose(); router.push("/leads?tab=sent"); }}>
           View in Sent
         </Button>
         <Button

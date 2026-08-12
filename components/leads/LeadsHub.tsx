@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { AppShell, BottomSheet, Header, Icon, Skeleton, EmptyState } from "@/components/billing/ui";
 import { cn } from "@/lib/utils";
 import * as leadsApi from "@/lib/leads/client";
@@ -22,7 +23,10 @@ import { KIND, StatusPill, SubjectThumb, ago } from "./parts";
  * client (CLAUDE.md §12).
  */
 export function LeadsHub({ base = "/leads" }: { base?: string }) {
-  const [tab, setTab] = useState<"received" | "sent">("received");
+  // ?tab=sent is how every "View in Sent" link arrives. Ignoring it dropped
+  // people on Received, looking at the wrong list, which reads as a dead link.
+  const params = useSearchParams();
+  const [tab, setTab] = useState<"received" | "sent">(params?.get("tab") === "sent" ? "sent" : "received");
   // The header's search searches THIS screen. It used to be a link to /search,
   // which threw the user out of their leads into property search — the single
   // most jarring thing on the screen.

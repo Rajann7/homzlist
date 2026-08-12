@@ -65,7 +65,8 @@
     "check:pwa": "node scripts/check-pwa-live.mjs",
     "check:leads-live": "node scripts/check-leads-live.mjs",
     "check:leads-ui": "node scripts/check-leads-ui.mjs",
-    "check:leads-roles": "node scripts/check-leads-roles.mjs"
+    "check:leads-roles": "node scripts/check-leads-roles.mjs",
+    "seed:leads-states": "node scripts/seed-leads-states.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1091.0",

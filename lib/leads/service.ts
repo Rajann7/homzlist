@@ -211,6 +211,9 @@ export interface LeadView {
   contactPref: "call" | "whatsapp" | null;
   /** Full number — never masked. Only ever served to the lead's owner. */
   contactNumber: string | null;
+  /** tel: and wa.me links, built here so every surface opens the same thing. */
+  callHref: string | null;
+  whatsappHref: string | null;
   whenLabel: string | null;
   preferredOn: string | null;
   notes: { text: string; at: string }[];
@@ -224,7 +227,13 @@ export interface LeadView {
     memberSince: string;
     profilePct: number;
   };
-  subject: { kind: SubjectKind; id: string | null; title: string; subtitle: string; coverUrl: string | null };
+  subject: {
+    kind: SubjectKind; id: string | null; title: string; subtitle: string; coverUrl: string | null;
+    /** Where the post stands TODAY — "Live", "Archived", "Expired", "Removed". */
+    state: string;
+    /** false once it is not live: the card says so instead of pretending. */
+    isLive: boolean;
+  };
   /** "I Have a Property" — what the sender offered against a requirement. */
   offer: { kind: "listing" | "project"; id: string; title: string; subtitle: string; coverUrl: string | null } | null;
 }
@@ -279,7 +288,12 @@ async function hydrate(rows: Row[]): Promise<LeadView[]> {
   const offerListingIds = rows.map((r) => r.offer_listing_id).filter((x): x is string => Boolean(x));
   const offerProjectIds = rows.map((r) => r.offer_project_id).filter((x): x is string => Boolean(x));
 
-  const [{ data: profs }, { data: vers }, { data: wantOpts }, { data: whenOpts }, { data: offerL }, { data: offerP }] = await Promise.all([
+  const subjListingIds = rows.map((r) => r.listing_id).filter((x): x is string => Boolean(x));
+  const subjProjectIds = rows.map((r) => r.project_id).filter((x): x is string => Boolean(x));
+  const subjReqIds = rows.map((r) => r.requirement_id).filter((x): x is string => Boolean(x));
+
+  const [{ data: profs }, { data: vers }, { data: wantOpts }, { data: whenOpts }, { data: offerL }, { data: offerP },
+         { data: subjL }, { data: subjP }, { data: subjR }] = await Promise.all([
     db().from("profiles").select("id,name,role,bio,photo_url,email,city_id,created_at").in("id", personIds),
     db().from("verifications").select("profile_id,level,status").in("profile_id", personIds),
     db().from("inquiry_options").select("code,label").in("kind", ["want", "offer"]),
@@ -290,7 +304,21 @@ async function hydrate(rows: Row[]): Promise<LeadView[]> {
     offerProjectIds.length
       ? db().from("projects").select("id,name,cover_url").in("id", offerProjectIds)
       : Promise.resolve({ data: [] as unknown[] }),
+    // The post's state TODAY. The title comes from the snapshot (so an edit
+    // cannot rewrite history), but "is it still live?" has to be current or the
+    // seller calls someone about a flat they took down last week.
+    subjListingIds.length ? db().from("listings").select("id,status").in("id", subjListingIds) : Promise.resolve({ data: [] as unknown[] }),
+    subjProjectIds.length ? db().from("projects").select("id,status").in("id", subjProjectIds) : Promise.resolve({ data: [] as unknown[] }),
+    subjReqIds.length ? db().from("requirements").select("id,status,expires_at").in("id", subjReqIds) : Promise.resolve({ data: [] as unknown[] }),
   ]);
+
+  const subjState = new Map<string, { label: string; live: boolean }>();
+  for (const l of ((subjL ?? []) as any[])) subjState.set(l.id, { label: listingState(l.status), live: l.status === "live" });
+  for (const p of ((subjP ?? []) as any[])) subjState.set(p.id, { label: listingState(p.status), live: p.status === "live" });
+  for (const r of ((subjR ?? []) as any[])) {
+    const label = requirementState(r.status, r.expires_at);
+    subjState.set(r.id, { label, live: r.status === "live" && label !== "Expired" });
+  }
 
   const profMap = new Map((profs ?? []).map((p: any) => [p.id, p]));
   const verMap = new Map<string, { phone: boolean; id: boolean; rera: boolean }>();
@@ -323,6 +351,12 @@ async function hydrate(rows: Row[]): Promise<LeadView[]> {
       wants: (r.wants ?? []).map((code) => ({ code, label: wantMap.get(code) ?? code })),
       contactPref: (r.contact_pref === "call" || r.contact_pref === "whatsapp") ? r.contact_pref : null,
       contactNumber: r.contact_number ?? p.phone ?? null,
+      ...contactLinks(r.contact_number ?? p.phone ?? null, {
+        who: p.name ?? null,
+        subject: (snap.title as string | null) ?? null,
+        wants: (r.wants ?? []).map((c) => wantMap.get(c) ?? c),
+        isProposal: Boolean(r.proposal_id),
+      }),
       whenLabel: r.when_token ? whenMap.get(r.when_token) ?? null : null,
       preferredOn: r.preferred_on,
       notes: r.notes ?? [],
@@ -342,6 +376,8 @@ async function hydrate(rows: Row[]): Promise<LeadView[]> {
         title: snap.title ?? "—",
         subtitle: snap.subtitle ?? "",
         coverUrl: snap.coverUrl ?? null,
+        state: subjState.get((r.listing_id ?? r.project_id ?? r.requirement_id) ?? "")?.label ?? "Removed",
+        isLive: subjState.get((r.listing_id ?? r.project_id ?? r.requirement_id) ?? "")?.live ?? false,
       },
       offer: ol
         ? { kind: "listing", id: ol.id, title: ol.title ?? "Property",
@@ -657,6 +693,31 @@ export function priceLabel(paise: number | null): string {
   if (r >= 1_00_00_000) return `₹${+(r / 1_00_00_000).toFixed(2)} Cr`;
   if (r >= 1_00_000) return `₹${+(r / 1_00_000).toFixed(2)} L`;
   return `₹${Math.round(r)}`;
+}
+
+/**
+ * The two links a lead is acted on with.
+ *
+ * The WhatsApp text is written here, once, from the lead's own facts: who they
+ * are, which post it is about and what they asked for. A blank wa.me window
+ * makes the seller compose the first line themselves, which is the thing this
+ * whole system exists to remove.
+ */
+function contactLinks(
+  number: string | null,
+  ctx: { who: string | null; subject: string | null; wants: string[]; isProposal: boolean },
+): { callHref: string | null; whatsappHref: string | null } {
+  if (!number) return { callHref: null, whatsappHref: null };
+  const digits = number.replace(/[^\d]/g, "");
+  const about = ctx.subject ? ` about ${ctx.subject}` : "";
+  const asked = ctx.wants.length ? ` You asked about ${ctx.wants.join(", ").toLowerCase()}.` : "";
+  const opener = ctx.isProposal
+    ? `Hi ${ctx.who ?? "there"}, thanks for answering my requirement${about ? ` with ${ctx.subject}` : ""} on HomzList.`
+    : `Hi ${ctx.who ?? "there"}, this is regarding your inquiry${about} on HomzList.${asked}`;
+  return {
+    callHref: `tel:${number}`,
+    whatsappHref: `https://wa.me/${digits}?text=${encodeURIComponent(opener)}`,
+  };
 }
 
 /** "3 BHK to buy in Kalawad Road" — requirements carry no title of their own. */

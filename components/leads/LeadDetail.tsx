@@ -7,7 +7,7 @@ import { AppShell, Header, Icon, Skeleton, EmptyState, Chip } from "@/components
 import { Avatar } from "@/components/ui/Avatar";
 import { cn } from "@/lib/utils";
 import * as leadsApi from "@/lib/leads/client";
-import { LeadActions, StatusPill, SubjectThumb, ago } from "./parts";
+import { LeadContact, LeadMenu, StatusPill, SubjectThumb, ago } from "./parts";
 import { roleLabel } from "./SubjectLeads";
 
 /**
@@ -48,6 +48,7 @@ export function LeadDetail({ id, base = "/leads" }: { id: string; base?: string 
             </button>
           }
           title="Lead"
+          right={lead ? <LeadMenu lead={lead} onChanged={() => void load()} /> : undefined}
         />
       }
     >
@@ -87,7 +88,17 @@ export function LeadDetail({ id, base = "/leads" }: { id: string; base?: string 
                 <SubjectThumb kind={lead.subject.kind} coverUrl={lead.subject.coverUrl} size={44} />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-13 font-semibold text-ink-primary">{lead.subject.title}</span>
-                  <span className="mt-0.5 block truncate text-12 text-ink-secondary">{lead.subject.subtitle}</span>
+                  <span className="mt-0.5 block truncate text-12 text-ink-secondary">
+                    {[lead.subject.subtitle, lead.subject.state].filter(Boolean).join(" · ")}
+                  </span>
+                  {/* A lead outlives its post. Saying so here is the difference
+                      between calling someone back and calling them about a flat
+                      that came down last week. */}
+                  {!lead.subject.isLive && (
+                    <span className="mt-1 inline-block rounded-full bg-warning-soft px-2 py-0.5 text-11 font-semibold text-warning">
+                      This {lead.subject.kind === "requirement" ? "requirement" : "post"} is no longer live
+                    </span>
+                  )}
                 </span>
                 <Icon name="chevron-right" size={16} className="text-ink-tertiary" />
               </Link>
@@ -158,7 +169,7 @@ export function LeadDetail({ id, base = "/leads" }: { id: string; base?: string 
             </>
           )}
 
-          <LeadActions lead={lead} onChanged={() => void load()} />
+          <LeadContact lead={lead} onChanged={() => void load()} />
         </div>
       )}
     </AppShell>

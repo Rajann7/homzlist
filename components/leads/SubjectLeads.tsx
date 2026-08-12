@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { AppShell, Header, Icon, Skeleton, EmptyState, Chip } from "@/components/billing/ui";
 import { cn } from "@/lib/utils";
 import * as leadsApi from "@/lib/leads/client";
-import { LeadActions, PersonRow, StatusPill, ago } from "./parts";
+import { LeadMenu, PersonRow, StatusPill, ago } from "./parts";
 
 /**
  * Every lead on ONE of my posts.
@@ -96,7 +96,7 @@ export function SubjectLeads({
         <EmptyState
           title={filter === "all" ? "No leads on this yet" : "Nothing in this filter"}
           subtitle={filter === "all"
-            ? "When someone sends an inquiry on this post, their card lands here with Call and WhatsApp ready."
+            ? "When someone sends an inquiry on this post, they land here — open one to see what they asked for and reach them."
             : "Try another filter to see the rest of your leads."}
           cta={filter === "all" ? undefined : { label: "Show all", onClick: () => setFilter("all") }}
         />
@@ -123,8 +123,7 @@ export function LeadCard({
   const closed = lead.status === "archived";
   // Only say something when there is something to say. A lead from before the
   // connection system has no wants and no time, so this used to collapse to the
-  // bare word "Call" sitting above the Call button — which reads as a stray
-  // label, not as a summary.
+  // bare word "Call" — which read as a stray label, not as a summary.
   const wantsText = lead.wants.map((w) => w.label).join(", ");
   const summary = wantsText
     ? [
@@ -137,15 +136,14 @@ export function LeadCard({
   return (
     <div
       className={cn(
-        "border-b border-divider px-3 py-3",
+        "relative border-b border-divider",
         !lead.seen && "bg-accent-soft/30 shadow-[inset_3px_0_0_var(--accent)]",
         closed && "opacity-60",
       )}
     >
-      {/* The person row is the door into the lead. It has to be, because a
-          worked lead with nothing captured on it has no summary line to hang a
-          link on — and a card you cannot open is a dead end. */}
-      <Link href={`${base}/lead/${lead.id}`} className="block">
+      {/* The whole card opens the lead. Calling happens THERE, where you can
+          see who you are about to ring — this screen is a list of people. */}
+      <Link href={`${base}/lead/${lead.id}`} className="block px-3 py-3 active:bg-surface-2">
         <PersonRow
           person={lead.person}
           meta={`${roleLabel(lead.person.role)} · ${ago(lead.createdAt)}`}
@@ -156,23 +154,24 @@ export function LeadCard({
             </>
           }
         />
+
+        {fresh ? (
+          <div className="mt-2.5 rounded-8 border border-divider bg-surface-2 px-3">
+            <Row k="Wants" v={lead.wants.map((w) => w.label).join(" · ") || "—"} />
+            <Row k="Contact by" v={`${lead.contactPref === "whatsapp" ? "WhatsApp" : "Call"}${lead.contactNumber ? ` · ${lead.contactNumber}` : ""}`} />
+            <Row k="Best time" v={lead.preferredOn ? `${lead.whenLabel ?? ""} · ${lead.preferredOn}`.replace(/^ · /, "") : (lead.whenLabel ?? "—")} last />
+          </div>
+        ) : summary ? (
+          <div className="mt-2 truncate text-12 text-ink-secondary">{summary}</div>
+        ) : null}
+
+        {lead.closedReason && <p className="mt-2 text-11 text-ink-tertiary">{lead.closedReason}</p>}
       </Link>
 
-      {fresh ? (
-        <Link href={`${base}/lead/${lead.id}`} className="mt-2.5 block rounded-8 border border-divider bg-surface-2 px-3">
-          <Row k="Wants" v={lead.wants.map((w) => w.label).join(" · ") || "—"} />
-          <Row k="Contact by" v={`${lead.contactPref === "whatsapp" ? "WhatsApp" : "Call"}${lead.contactNumber ? ` · ${lead.contactNumber}` : ""}`} />
-          <Row k="Best time" v={lead.preferredOn ? `${lead.whenLabel ?? ""} · ${lead.preferredOn}`.replace(/^ · /, "") : (lead.whenLabel ?? "—")} last />
-        </Link>
-      ) : summary ? (
-        <Link href={`${base}/lead/${lead.id}`} className="mt-2 block truncate text-12 text-ink-secondary">
-          {summary}
-        </Link>
-      ) : null}
-
-      {lead.closedReason && <p className="mt-2 text-11 text-ink-tertiary">{lead.closedReason}</p>}
-
-      {!closed && <LeadActions lead={lead} onChanged={onChanged} quiet={!fresh} />}
+      {/* Sits above the link, so tapping ⋯ never opens the lead. */}
+      <div className="absolute right-2 top-2.5">
+        <LeadMenu lead={lead} onChanged={onChanged} />
+      </div>
     </div>
   );
 }
