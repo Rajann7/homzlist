@@ -4,6 +4,7 @@ import { loginHref, sanitizeNext } from "@/lib/auth/next-url";
 import { HINT_BOUNCE_PARAM, SESSION_HINT_COOKIE, sessionHintDomain } from "@/lib/auth/session-hint";
 import { verifyAdminAccessEdge } from "@/lib/admin/edge";
 import { edgeMaintenanceState } from "@/lib/system/maintenance-edge";
+import { GATE_COOKIE, UNLOCK_PATH, gateHtml, gatePassword, gateToken, isUnlocked, unlockCookie } from "@/lib/system/site-gate";
 
 /**
  * Subdomain routing + session isolation + login-bypass sealing (Doc6 §4, Doc9 §28).
@@ -175,6 +176,53 @@ export async function middleware(request: NextRequest) {
   const { pathname } = url;
   const host = request.headers.get("host") ?? "";
   const zone = getZone(host);
+
+  /**
+   * Test-time site password wall (lib/system/site-gate).
+   *
+   * A no-op unless SITE_GATE_PASSWORD is set — so local dev and production are
+   * untouched, and a test deploy is sealed simply by setting that env var. It
+   * runs BEFORE every other branch below because it must cover every host, page
+   * and API route with no exception, and the app's own login sits behind it.
+   *
+   * The one carve-out is /api/v1/cron/* : Vercel Cron carries no unlock cookie,
+   * so gating it would 401 every scheduled job for the whole test window. Those
+   * routes are already guarded by their own CRON_SECRET, so skipping the
+   * password wall for them opens nothing a browser could reach.
+   */
+  const gatePw = gatePassword();
+  if (gatePw && !pathname.startsWith("/api/v1/cron/")) {
+    const secure = url.protocol === "https:";
+    // The one open door: the unlock form's own POST. Check the password, drop
+    // the cookie, and send them back to where they were headed.
+    if (request.method === "POST" && pathname === UNLOCK_PATH) {
+      const form = await request.formData().catch(() => null);
+      const pw = String(form?.get("pw") ?? "");
+      const next = String(form?.get("next") ?? "/");
+      // Same-origin path only. Must be "/" or "/<non-slash>" — this rejects
+      // "//host" and "/\host" (WHATWG URL treats "\" as "/", so both are
+      // protocol-relative and would be open redirects), as well as absolute
+      // and scheme URLs. Everything questionable falls back to the feed.
+      const safeNext = next === "/" || /^\/[^/\\]/.test(next) ? next : "/";
+      if (pw === gatePw) {
+        const res = NextResponse.redirect(new URL(safeNext, request.url), 303);
+        res.cookies.set(unlockCookie(await gateToken(gatePw), secure));
+        return res;
+      }
+      return new NextResponse(gateHtml({ nextPath: safeNext, error: true }), {
+        status: 401,
+        headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" },
+      });
+    }
+    // Anyone without a valid unlock cookie sees only the password screen.
+    if (!(await isUnlocked(request.cookies.get(GATE_COOKIE)?.value, gatePw))) {
+      const nextPath = `${pathname}${url.search}`;
+      return new NextResponse(gateHtml({ nextPath }), {
+        status: 401,
+        headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" },
+      });
+    }
+  }
 
   const user = await verifyAccessEdge(request.cookies.get(ACCESS_COOKIE)?.value);
 
