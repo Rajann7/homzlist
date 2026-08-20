@@ -69,3 +69,12 @@ cA.txt
 
 # Upgrade before/after captures (screenshots + API payloads)
 /_upgrade/
+
+# Mobile screen reference set — every screen of the live app as a PNG, the
+# input for the tablet/desktop layouts. Hundreds of images and fully
+# regenerable: `node scripts/shot-screens.mjs`. The harness is tracked, the
+# output is not.
+/_screens/
+
+# Shell geometry probes (scripts/shell-geometry.mjs) — regenerable.
+/.shell-geo-*.json

@@ -8,11 +8,17 @@ import { Icon } from "@/components/ui/Icon";
  * S8 Coach Marks (P1). Dimmed simplified-feed + 3-step highlight tour (city →
  * requirements → messages), dark #262626 tooltip + sequence dots. → into the app.
  */
-const STEPS = [
+/**
+ * Exported because the desktop login's left pane says the same three things
+ * (designs/desktop-tablet/02-auth-entry.html) — one definition, so the promise
+ * a visitor reads before signing up and the tour they get after cannot drift.
+ */
+export const COACH_STEPS = [
   { text: "Change your city anytime — your feed and stories update instantly" },
   { text: "Post what you need — matching properties find you" },
   { text: "All inquiries and leads live here" },
 ];
+const STEPS = COACH_STEPS;
 
 export function Coach({ city, onDone }: { city?: string; onDone: () => void }) {
   const [step, setStep] = useState(0);

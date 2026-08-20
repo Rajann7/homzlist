@@ -1,0 +1,382 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>HomzList — 05 · Property detail (desktop + tablet)</title>
+<link rel="stylesheet" href="_kit.css" />
+<style>
+.gal{display:grid;gap:8px;grid-template-columns:1fr}
+.gal .main{aspect-ratio:4/3;border-radius:14px}
+.gal .thumbs{display:none}
+.crumb{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--ink-tertiary);margin:0 0 12px;flex-wrap:wrap}
+.dcols{display:block}
+.price{font-size:26px;font-weight:700;letter-spacing:-.02em}
+.ptitle{font-size:16px;color:var(--ink-secondary);margin-top:3px}
+.specs{display:flex;gap:0;margin-top:14px;border:1px solid var(--border);border-radius:12px;overflow:hidden;background:var(--surface-1)}
+.specs div{flex:1;padding:12px 10px;text-align:center;border-right:1px solid var(--divider)}
+.specs div:last-child{border-right:0}
+.specs b{display:block;font-size:14px}
+.specs span{font-size:11px;color:var(--ink-tertiary)}
+.srail{display:flex;gap:20px;border-bottom:1px solid var(--border);margin:20px 0 18px;overflow-x:auto;scrollbar-width:none;position:sticky;top:56px;background:var(--bg-page-desktop);z-index:10}
+.srail::-webkit-scrollbar{display:none}
+.srail a{padding:11px 0;font-size:13px;font-weight:600;color:var(--ink-tertiary);white-space:nowrap;border-bottom:2px solid transparent}
+.srail a[aria-current]{color:var(--ink-primary);border-bottom-color:var(--ink-primary)}
+.blk{background:var(--surface-1);border:1px solid var(--border);border-radius:14px;padding:16px;margin:0 0 14px}
+.blkhead{display:flex;align-items:center;gap:9px;margin:0 0 12px}
+.blkhead .bi{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent);flex:0 0 30px}
+.blkhead h3{margin:0;font-size:15px;font-weight:700}
+.answers{display:grid;grid-template-columns:1fr;gap:0}
+.answers div{display:flex;justify-content:space-between;gap:14px;padding:9px 0;border-bottom:1px solid var(--divider);font-size:13px}
+.answers div:last-child{border-bottom:0}
+.answers span:first-child{color:var(--ink-tertiary)}
+.answers span:last-child{font-weight:600;text-align:right}
+.amen{display:flex;flex-wrap:wrap;gap:8px}
+.amen span{display:inline-flex;align-items:center;gap:7px;padding:8px 12px;border-radius:10px;background:var(--surface-2);font-size:13px}
+.actpanel{background:var(--surface-1);border:1px solid var(--border);border-radius:16px;padding:18px}
+.poster{display:flex;align-items:center;gap:11px;margin-bottom:14px}
+.poster .nm{font-size:15px;font-weight:700}
+.poster .rl{font-size:12px;color:var(--ink-tertiary)}
+.stat3{display:flex;border:1px solid var(--border);border-radius:12px;overflow:hidden;background:var(--surface-1);margin-bottom:14px}
+.stat3 div{flex:1;padding:11px;text-align:center;border-right:1px solid var(--divider)}
+.stat3 div:last-child{border-right:0}
+.stat3 b{display:block;font-size:16px}
+.stat3 span{font-size:11px;color:var(--ink-tertiary)}
+.mobbar{display:flex;gap:10px;padding:12px 16px;border-top:1px solid var(--border);background:var(--surface-1);position:sticky;bottom:52px}
+@container (min-width:768px){
+  .gal{grid-template-columns:2fr 1fr;gap:10px}
+  .gal .main{aspect-ratio:16/11}
+  .gal .thumbs{display:grid;gap:10px;grid-template-rows:1fr 1fr}
+  .gal .thumbs .t{border-radius:12px;position:relative}
+  .srail{top:62px}
+  .answers{grid-template-columns:1fr 1fr;column-gap:26px}
+  .price{font-size:30px}
+}
+@container (min-width:1200px){
+  .srail{top:64px}
+  .dcols{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:28px;align-items:start}
+  .actwrap{position:sticky;top:120px;display:grid;gap:14px}
+  .mobbar{display:none}
+  .gal .main{aspect-ratio:16/10}
+}
+</style>
+</head>
+<body>
+
+<div class="bar">
+  <b>05 · Property detail</b>
+  <div class="seg"><button data-dark aria-pressed="false">Dark</button></div>
+  <div class="sp"></div>
+  <span class="note">Real structure from <code>detailBody.tsx</code>: spec strip → section rail (Overview · About ·
+  field groups · Amenities · Seller) → About this property → the seller's own answer groups → Amenities →
+  Posted by → Location (Area · Pincode · Property type) → Similar properties. No map, as in the app.</span>
+</div>
+
+<div class="stage">
+
+  <div>
+    <p class="caption">A · Buyer view — Desktop 1440 (sticky contact panel)</p>
+    <div class="scaler"><div class="frame" data-w="1440" style="width:1440px" data-tpl="detail"></div></div>
+  </div>
+
+  <div class="annot">
+    <h3>Decisions</h3>
+    <ul>
+      <li><b>Gallery, not a full-bleed hero.</b> Mobile shows one swipeable photo. Desktop shows the primary
+      photo plus two thumbs and an "All 14 photos" button that opens the same lightbox the app already has —
+      a 9:16-era hero stretched to 1440 is the exact failure this set exists to avoid.</li>
+      <li><b>The contact box becomes a sticky panel (360).</b> On mobile the Call / WhatsApp / Request Number
+      buttons live in a bottom bar because the page is one long scroll. On desktop they pin beside the
+      content, so the decision is reachable from any point in a very long detail page. Below 1200 the mobile
+      bottom bar comes back exactly as it is.</li>
+      <li><b>The section rail becomes a sticky sub-nav.</b> It already exists in the app
+      (<code>SectionRail</code>) — here it stays visible while scrolling, which is what makes a
+      twenty-seven-field Flat readable on desktop.</li>
+      <li><b>Answer groups run two columns.</b> The seller's answers are short label/value pairs; one column
+      on a 1000px content area would be a ribbon of white space. The groups, their icons and their order
+      still come from the server (<code>field_groups</code>), untouched.</li>
+      <li><b>Similar properties is a carousel</b>, like every other section in this set.</li>
+    </ul>
+  </div>
+
+  <div>
+    <p class="caption">B · Owner view — Desktop 1440 (own listing: stats, edit, Mark as Sold)</p>
+    <div class="scaler"><div class="frame" data-w="1440" style="width:1440px" data-tpl="owner"></div></div>
+  </div>
+
+  <div class="annot">
+    <h3>Owner view</h3>
+    <ul>
+      <li>The same page. The contact panel is replaced by the owner panel: Views · Saves · Leads (the app's
+      own three counts), Edit, Boost, Mark as Sold, and the status chip (Live / Under Review / Sold).</li>
+      <li>Nothing about the buyer-facing body changes, so an owner always sees exactly what a buyer sees —
+      which is the point of the app's "view as visitor" affordance.</li>
+    </ul>
+  </div>
+
+  <div>
+    <p class="caption">C · Tablet 1024 — panel unpins, mobile action bar returns</p>
+    <div class="scaler"><div class="frame" data-w="1024" style="width:1024px" data-tpl="detail"></div></div>
+  </div>
+
+  <div>
+    <p class="caption">D · Tablet 768</p>
+    <div class="scaler"><div class="frame" data-w="768" style="width:768px" data-tpl="detail"></div></div>
+  </div>
+
+</div>
+
+<template id="tpl-detail">
+  <div class="app">
+    <div data-part="header" data-active="Buy"></div>
+    <div class="container" style="padding-top:16px">
+      <div class="crumb">
+        <a href="#">Home</a><svg class="i s14"><use href="#i-right"/></svg>
+        <a href="#">Surat</a><svg class="i s14"><use href="#i-right"/></svg>
+        <a href="#">Vesu</a><svg class="i s14"><use href="#i-right"/></svg>
+        <span>2 BHK Flat</span>
+      </div>
+
+      <div class="gal">
+        <div class="main ph" data-l="PHOTO 1"></div>
+        <div class="thumbs">
+          <div class="t ph" data-l="PHOTO 2"></div>
+          <div class="t ph" data-l="+ 12 more">
+            <span class="btn sm" style="position:absolute;right:10px;bottom:10px"><svg class="i s14"><use href="#i-image"/></svg>All 14 photos</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="srail">
+        <a href="#" aria-current="page">Overview</a><a href="#">About</a><a href="#">Property details</a>
+        <a href="#">Area &amp; pricing</a><a href="#">Amenities</a><a href="#">Seller</a>
+      </div>
+
+      <div class="dcols">
+        <div>
+          <div class="blk">
+            <div style="display:flex;align-items:flex-start;gap:12px">
+              <div style="flex:1">
+                <div class="price">₹ 62 Lakh</div>
+                <div class="ptitle">2 BHK Flat for sale · Vesu, Surat</div>
+                <div style="display:flex;gap:7px;margin-top:10px;flex-wrap:wrap">
+                  <span class="tag ok">Verified seller</span><span class="tag mute">Ready to move</span><span class="tag info">Price negotiable</span>
+                </div>
+              </div>
+              <span class="hicon"><svg class="i s24"><use href="#i-heart"/></svg></span>
+              <span class="hicon"><svg class="i s24"><use href="#i-share"/></svg></span>
+            </div>
+            <div class="specs">
+              <div><b>2 BHK</b><span>Configuration</span></div>
+              <div><b>1150 sq.ft</b><span>Built-up area</span></div>
+              <div><b>2nd</b><span>Floor of 7</span></div>
+              <div><b>Semi</b><span>Furnishing</span></div>
+              <div><b>₹ 5,391</b><span>per sq.ft</span></div>
+            </div>
+          </div>
+
+          <div class="blk">
+            <div class="blkhead"><span class="bi"><svg class="i s18"><use href="#i-file"/></svg></span><h3>About this property</h3></div>
+            <p style="margin:0;font-size:14px;line-height:1.65;color:var(--ink-secondary)">
+              Well-maintained 2 BHK on the second floor of a seven-storey building in Vesu, walking distance from
+              the main road and daily needs. East-facing, cross-ventilated, with covered parking and a lift.
+              Society has 24×7 security and a children's play area. <a class="link" href="#">Read more</a>
+            </p>
+          </div>
+
+          <div class="blk">
+            <div class="blkhead"><span class="bi"><svg class="i s18"><use href="#i-home"/></svg></span><h3>Property details</h3></div>
+            <div class="answers">
+              <div><span>Bedrooms</span><span>2</span></div>
+              <div><span>Bathrooms</span><span>2</span></div>
+              <div><span>Balconies</span><span>1</span></div>
+              <div><span>Facing</span><span>East</span></div>
+              <div><span>Floor</span><span>2 of 7</span></div>
+              <div><span>Age of property</span><span>4 years</span></div>
+              <div><span>Furnishing</span><span>Semi-furnished</span></div>
+              <div><span>Parking</span><span>1 covered</span></div>
+              <div><span>Water supply</span><span>Corporation + borewell</span></div>
+              <div><span>Power backup</span><span>Lift &amp; common area</span></div>
+            </div>
+          </div>
+
+          <div class="blk">
+            <div class="blkhead"><span class="bi" style="background:var(--info-soft);color:var(--tone-blue)"><svg class="i s18"><use href="#i-receipt"/></svg></span><h3>Area &amp; pricing</h3></div>
+            <div class="answers">
+              <div><span>Built-up area</span><span>1150 sq.ft</span></div>
+              <div><span>Carpet area</span><span>980 sq.ft</span></div>
+              <div><span>Expected price</span><span>₹ 62,00,000</span></div>
+              <div><span>Price per sq.ft</span><span>₹ 5,391</span></div>
+              <div><span>Maintenance</span><span>₹ 1,800 / month</span></div>
+              <div><span>Negotiable</span><span>Yes</span></div>
+            </div>
+          </div>
+
+          <div class="blk">
+            <div class="blkhead"><span class="bi"><svg class="i s18"><use href="#i-star"/></svg></span><h3>Amenities</h3></div>
+            <div class="amen">
+              <span><svg class="i s16"><use href="#i-check"/></svg>Lift</span>
+              <span><svg class="i s16"><use href="#i-check"/></svg>Covered parking</span>
+              <span><svg class="i s16"><use href="#i-check"/></svg>24×7 security</span>
+              <span><svg class="i s16"><use href="#i-check"/></svg>Children's play area</span>
+              <span><svg class="i s16"><use href="#i-check"/></svg>Power backup</span>
+              <span><svg class="i s16"><use href="#i-check"/></svg>Water storage</span>
+              <span><svg class="i s16"><use href="#i-check"/></svg>Garden</span>
+              <span><svg class="i s16"><use href="#i-check"/></svg>CCTV</span>
+            </div>
+          </div>
+
+          <div class="blk">
+            <div class="blkhead"><span class="bi"><svg class="i s18"><use href="#i-pin"/></svg></span><h3>Location</h3></div>
+            <div class="answers">
+              <div><span>Area</span><span>Vesu, Surat</span></div>
+              <div><span>Pincode</span><span>395007</span></div>
+              <div><span>Property type</span><span>Flat</span></div>
+            </div>
+          </div>
+
+          <section class="sec carousel" style="margin-top:22px">
+            <div class="sechead"><div><h2 class="h2">Similar properties</h2><div class="sub">2 BHK in Vesu under ₹70 Lakh</div></div><div class="sp"></div>
+              <div class="arrows"><span class="arrow" aria-disabled="true"><svg class="i s16"><use href="#i-left"/></svg></span><span class="arrow"><svg class="i s16"><use href="#i-right"/></svg></span></div></div>
+            <div class="rail">
+              <div class="pcard"><div class="shot ph" data-l="PHOTO"></div><div class="ttl">₹ 58 Lakh</div><div class="sub">2 BHK Flat · Vesu</div></div>
+              <div class="pcard"><div class="shot ph" data-l="PHOTO"></div><div class="ttl">₹ 66 Lakh</div><div class="sub">2 BHK Flat · Vesu</div></div>
+              <div class="pcard"><div class="shot ph" data-l="PHOTO"></div><div class="ttl">₹ 61 Lakh</div><div class="sub">2 BHK Flat · Piplod</div></div>
+              <div class="pcard"><div class="shot ph" data-l="PHOTO"></div><div class="ttl">₹ 69 Lakh</div><div class="sub">2 BHK Flat · Adajan</div></div>
+            </div>
+          </section>
+        </div>
+
+        <aside>
+          <div class="actwrap">
+            <div class="actpanel">
+              <div class="poster">
+                <span class="avatar" style="background:var(--avatar-3);width:44px;height:44px;font-size:17px">R</span>
+                <span style="flex:1"><span class="nm">Rajesh Patel</span><br><span class="rl">Broker · 28 live listings</span></span>
+              </div>
+              <div style="display:grid;gap:9px">
+                <a class="btn pri block" href="#"><svg class="i s16"><use href="#i-phone"/></svg>Request Number</a>
+                <a class="btn block" href="#"><svg class="i s16"><use href="#i-send"/></svg>Send enquiry</a>
+                <a class="btn block" href="#"><svg class="i s16"><use href="#i-pin"/></svg>Schedule a visit</a>
+              </div>
+              <p class="muted" style="margin:12px 0 0;text-align:center">Your number is shared with the seller only after you ask.</p>
+            </div>
+            <div class="actpanel">
+              <div class="h3" style="margin-bottom:8px">Safety</div>
+              <p class="muted" style="margin:0">Never pay a token amount before visiting the property and checking documents.
+              <a class="link" href="#">Report this listing</a></p>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </div>
+
+    <div class="mobbar">
+      <a class="btn block" href="#"><svg class="i s16"><use href="#i-send"/></svg>Enquiry</a>
+      <a class="btn pri block" href="#"><svg class="i s16"><use href="#i-phone"/></svg>Request Number</a>
+    </div>
+
+    <div data-part="footer"></div>
+    <div data-part="bnav" data-active="search"></div>
+  </div>
+</template>
+
+<template id="tpl-owner">
+  <div class="app">
+    <div data-part="header" data-active="Buy"></div>
+    <div class="container" style="padding-top:16px">
+      <div class="crumb"><a href="#">My Listings</a><svg class="i s14"><use href="#i-right"/></svg><span>2 BHK Flat · Vesu</span></div>
+
+      <div class="gal">
+        <div class="main ph" data-l="PHOTO 1"></div>
+        <div class="thumbs"><div class="t ph" data-l="PHOTO 2"></div><div class="t ph" data-l="+ 12 more"></div></div>
+      </div>
+
+      <div class="srail">
+        <a href="#" aria-current="page">Overview</a><a href="#">About</a><a href="#">Property details</a>
+        <a href="#">Area &amp; pricing</a><a href="#">Amenities</a>
+      </div>
+
+      <div class="dcols">
+        <div>
+          <div class="blk">
+            <div style="display:flex;align-items:flex-start;gap:12px">
+              <div style="flex:1">
+                <div class="price">₹ 62 Lakh</div>
+                <div class="ptitle">2 BHK Flat for sale · Vesu, Surat</div>
+                <div style="display:flex;gap:7px;margin-top:10px;flex-wrap:wrap">
+                  <span class="tag ok">Live</span><span class="tag mute">Posted 12 Jan</span><span class="tag warn">Boost ends in 4 days</span>
+                </div>
+              </div>
+            </div>
+            <div class="specs">
+              <div><b>2 BHK</b><span>Configuration</span></div>
+              <div><b>1150 sq.ft</b><span>Built-up area</span></div>
+              <div><b>2nd</b><span>Floor of 7</span></div>
+              <div><b>Semi</b><span>Furnishing</span></div>
+              <div><b>₹ 5,391</b><span>per sq.ft</span></div>
+            </div>
+          </div>
+
+          <div class="blk">
+            <div class="blkhead"><span class="bi"><svg class="i s18"><use href="#i-file"/></svg></span><h3>About this property</h3></div>
+            <p style="margin:0;font-size:14px;line-height:1.65;color:var(--ink-secondary)">
+              Well-maintained 2 BHK on the second floor of a seven-storey building in Vesu, walking distance from
+              the main road and daily needs. <a class="link" href="#">Read more</a>
+            </p>
+          </div>
+
+          <div class="blk">
+            <div class="blkhead"><span class="bi"><svg class="i s18"><use href="#i-home"/></svg></span><h3>Property details</h3></div>
+            <div class="answers">
+              <div><span>Bedrooms</span><span>2</span></div><div><span>Bathrooms</span><span>2</span></div>
+              <div><span>Balconies</span><span>1</span></div><div><span>Facing</span><span>East</span></div>
+              <div><span>Floor</span><span>2 of 7</span></div><div><span>Age of property</span><span>4 years</span></div>
+            </div>
+          </div>
+        </div>
+
+        <aside>
+          <div class="actwrap">
+            <div class="actpanel">
+              <div class="stat3">
+                <div><b>412</b><span>Views</span></div><div><b>37</b><span>Saves</span></div><div><b>6</b><span>Leads</span></div>
+              </div>
+              <div style="display:grid;gap:9px">
+                <a class="btn pri block" href="#"><svg class="i s16"><use href="#i-rocket"/></svg>Boost this listing</a>
+                <a class="btn block" href="#"><svg class="i s16"><use href="#i-edit"/></svg>Edit listing</a>
+                <a class="btn block" href="#"><svg class="i s16"><use href="#i-eye"/></svg>View as visitor</a>
+                <a class="btn block" href="#"><svg class="i s16"><use href="#i-check"/></svg>Mark as Sold</a>
+              </div>
+            </div>
+            <div class="actpanel">
+              <div class="h3" style="margin-bottom:8px">Leads on this listing</div>
+              <div style="display:grid;gap:10px">
+                <div style="display:flex;align-items:center;gap:9px">
+                  <span class="avatar" style="background:var(--avatar-1);width:28px;height:28px;font-size:12px">A</span>
+                  <span style="flex:1;font-size:13px">Amit R. · asked for number</span><span class="muted">2h</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:9px">
+                  <span class="avatar" style="background:var(--avatar-5);width:28px;height:28px;font-size:12px">N</span>
+                  <span style="flex:1;font-size:13px">Nisha P. · visit requested</span><span class="muted">1d</span>
+                </div>
+              </div>
+              <a class="btn sm block" href="#" style="margin-top:12px">Open Leads</a>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </div>
+
+    <div class="mobbar">
+      <a class="btn block" href="#">Edit</a><a class="btn pri block" href="#">Boost</a>
+    </div>
+
+    <div data-part="footer"></div>
+    <div data-part="bnav" data-active="profile"></div>
+  </div>
+</template>
+
+<script src="_kit.js"></script>
+</body>
+</html>

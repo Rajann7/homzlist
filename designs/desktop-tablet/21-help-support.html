@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>HomzList — 21 · Help &amp; support (desktop + tablet)</title>
+<link rel="stylesheet" href="_kit.css" />
+<style>
+.hhero{background:var(--surface-2);border:1px solid var(--divider);border-radius:16px;padding:26px 20px;text-align:center;margin-bottom:22px}
+.hhero h2{margin:0;font-size:24px;font-weight:700;letter-spacing:-.02em}
+.hsearch{max-width:560px;margin:16px auto 0;height:48px;border:1px solid var(--border);border-radius:12px;background:var(--surface-1);display:flex;align-items:center;gap:10px;padding:0 15px;font-size:14px;color:var(--ink-tertiary)}
+.cat{padding:16px;text-align:left}
+.cat .ic{width:40px;height:40px;border-radius:11px;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent);margin-bottom:11px}
+.cat .nm{font-size:15px;font-weight:700}
+.cat .ct{font-size:12px;color:var(--ink-tertiary);margin-top:3px}
+.arow{display:flex;align-items:center;gap:12px;padding:13px 0;border-bottom:1px solid var(--divider);font-size:14px}
+.arow:last-child{border-bottom:0}
+.artcols{display:block}
+.toc{background:var(--surface-1);border:1px solid var(--border);border-radius:14px;padding:16px;position:sticky;top:88px}
+.toc a{display:block;font-size:13px;color:var(--ink-secondary);padding:6px 0}
+.toc a[aria-current]{color:var(--accent);font-weight:600}
+.prose{background:var(--surface-1);border:1px solid var(--border);border-radius:14px;padding:22px;max-width:760px}
+.prose h2{margin:0 0 12px;font-size:22px;font-weight:700;letter-spacing:-.01em}
+.prose h3{margin:22px 0 8px;font-size:16px;font-weight:700}
+.prose p{margin:0 0 12px;font-size:14px;line-height:1.7;color:var(--ink-secondary)}
+.prose ul{margin:0 0 12px;padding-left:20px;font-size:14px;line-height:1.7;color:var(--ink-secondary)}
+.helpful{display:flex;align-items:center;gap:12px;padding:16px;border:1px solid var(--border);border-radius:14px;background:var(--surface-1);margin-top:16px;flex-wrap:wrap}
+.tsplit{display:block}
+.tcol{border:1px solid var(--border);border-radius:14px;background:var(--surface-1);overflow:hidden}
+.titem{display:flex;gap:11px;padding:13px 14px;border-top:1px solid var(--divider);align-items:flex-start}
+.titem:first-child{border-top:0}
+.titem.on{background:var(--accent-soft)}
+.msg{max-width:78%;padding:12px 14px;border-radius:14px;font-size:13px;line-height:1.55;margin-bottom:12px}
+.msg.them{background:var(--surface-2)}
+.msg.me{background:var(--accent-soft);margin-left:auto}
+.composer{display:flex;gap:10px;padding:14px;border-top:1px solid var(--divider);align-items:center}
+.composer .f{flex:1;height:44px;border:1px solid var(--border);border-radius:10px;display:flex;align-items:center;padding:0 13px;font-size:13px;color:var(--ink-tertiary)}
+@container (min-width:1200px){
+  .artcols{display:grid;grid-template-columns:minmax(0,1fr) 260px;gap:28px;align-items:start}
+  .tsplit{display:grid;grid-template-columns:360px minmax(0,1fr);gap:20px;align-items:start}
+  .tcol{position:sticky;top:88px}
+}
+</style>
+</head>
+<body>
+
+<div class="bar">
+  <b>21 · Help &amp; support</b>
+  <div class="seg"><button data-dark aria-pressed="false">Dark</button></div>
+  <div class="sp"></div>
+  <span class="note">Real copy: Help centre · Search help articles · Popular articles · Still need help? ·
+  Was this helpful? · From the HomzList help centre; tickets — New ticket · Choose a category ·
+  One line about your issue · Add screenshot · Raise a grievance · Replied · Closed.</span>
+</div>
+
+<div class="stage">
+
+  <div>
+    <p class="caption">A · Help centre — Desktop 1440</p>
+    <div class="scaler"><div class="frame" data-w="1440" style="width:1440px" data-tpl="help"></div></div>
+  </div>
+
+  <div class="annot">
+    <h3>Decisions</h3>
+    <ul>
+      <li><b>Search leads, categories follow as a carousel</b>, then popular articles as a plain list — the
+      order a person actually uses a help centre in.</li>
+      <li><b>An article gets a table of contents</b> on the right at ≥1200. Help articles are the longest text
+      in the product and the mobile screen has no way to skim them.</li>
+      <li><b>"Was this helpful?" keeps its place</b> at the end of the article, and "Still need help?" leads
+      straight into a new ticket with the article pre-attached.</li>
+      <li><b>Tickets become a split view</b> — the list on the left, the thread on the right, with the app's
+      own states (Replied · Closed) and its own empty lines ("No ticket is waiting on your reply.",
+      "Every ticket you raised has been answered.").</li>
+      <li><b>Raise a grievance stays a distinct category</b>, not a generic contact form — it is a compliance
+      path and must remain findable.</li>
+    </ul>
+  </div>
+
+  <div>
+    <p class="caption">B · Help article — Desktop 1440</p>
+    <div class="scaler"><div class="frame" data-w="1440" style="width:1440px" data-tpl="article"></div></div>
+  </div>
+
+  <div>
+    <p class="caption">C · Tickets — Desktop 1440</p>
+    <div class="scaler"><div class="frame" data-w="1440" style="width:1440px" data-tpl="tickets"></div></div>
+  </div>
+
+  <div>
+    <p class="caption">D · Help centre — Tablet 1024</p>
+    <div class="scaler"><div class="frame" data-w="1024" style="width:1024px" data-tpl="help"></div></div>
+  </div>
+
+  <div>
+    <p class="caption">E · Help centre — Tablet 768</p>
+    <div class="scaler"><div class="frame" data-w="768" style="width:768px" data-tpl="help"></div></div>
+  </div>
+
+</div>
+
+<template id="tpl-help">
+  <div class="app">
+    <div class="shell">
+      <div data-part="sidebar" data-active="Help"></div>
+      <div class="mainwrap">
+        <div class="ctop"><div><h1>Help centre</h1></div><div class="sp"></div>
+          <a class="btn" href="#">My tickets</a><a class="btn pri" href="#">Contact support</a></div>
+        <div class="content">
+          <div class="hhero">
+            <h2>How can we help?</h2>
+            <div class="hsearch"><svg class="i s18"><use href="#i-search"/></svg>Search help articles</div>
+          </div>
+
+          <section class="sec carousel">
+            <div class="sechead"><div><h2 class="h2">Browse by topic</h2></div><div class="sp"></div>
+              <div class="arrows"><span class="arrow" aria-disabled="true"><svg class="i s16"><use href="#i-left"/></svg></span><span class="arrow"><svg class="i s16"><use href="#i-right"/></svg></span></div></div>
+            <div class="rail">
+              <a class="card cat" href="#"><span class="ic"><svg class="i s24"><use href="#i-plus-b"/></svg></span><div class="nm">Posting a listing</div><div class="ct">9 articles</div></a>
+              <a class="card cat" href="#"><span class="ic"><svg class="i s24"><use href="#i-filter"/></svg></span><div class="nm">Leads &amp; enquiries</div><div class="ct">7 articles</div></a>
+              <a class="card cat" href="#"><span class="ic"><svg class="i s24"><use href="#i-card"/></svg></span><div class="nm">Plans &amp; payments</div><div class="ct">11 articles</div></a>
+              <a class="card cat" href="#"><span class="ic"><svg class="i s24"><use href="#i-rocket"/></svg></span><div class="nm">Boost</div><div class="ct">5 articles</div></a>
+              <a class="card cat" href="#"><span class="ic"><svg class="i s24"><use href="#i-shield"/></svg></span><div class="nm">Verification</div><div class="ct">6 articles</div></a>
+              <a class="card cat" href="#"><span class="ic"><svg class="i s24"><use href="#i-user"/></svg></span><div class="nm">Account &amp; privacy</div><div class="ct">8 articles</div></a>
+            </div>
+          </section>
+
+          <div class="cols">
+            <div>
+              <div class="sechead"><h2 class="h2">Popular articles</h2></div>
+              <div class="card pad">
+                <div class="arow"><svg class="i s18" style="color:var(--ink-tertiary)"><use href="#i-file"/></svg><span style="flex:1">Why is my listing still under review?</span><svg class="i s18" style="color:var(--ink-tertiary)"><use href="#i-right"/></svg></div>
+                <div class="arow"><svg class="i s18" style="color:var(--ink-tertiary)"><use href="#i-file"/></svg><span style="flex:1">How does boost work, and when does it start?</span><svg class="i s18" style="color:var(--ink-tertiary)"><use href="#i-right"/></svg></div>
+                <div class="arow"><svg class="i s18" style="color:var(--ink-tertiary)"><use href="#i-file"/></svg><span style="flex:1">What does the verified seller badge mean?</span><svg class="i s18" style="color:var(--ink-tertiary)"><use href="#i-right"/></svg></div>
+                <div class="arow"><svg class="i s18" style="color:var(--ink-tertiary)"><use href="#i-file"/></svg><span style="flex:1">My payment failed but money was deducted</span><svg class="i s18" style="color:var(--ink-tertiary)"><use href="#i-right"/></svg></div>
+                <div class="arow"><svg class="i s18" style="color:var(--ink-tertiary)"><use href="#i-file"/></svg><span style="flex:1">How do I get a buyer's phone number?</span><svg class="i s18" style="color:var(--ink-tertiary)"><use href="#i-right"/></svg></div>
+                <div class="arow"><svg class="i s18" style="color:var(--ink-tertiary)"><use href="#i-file"/></svg><span style="flex:1">Listing slots explained</span><svg class="i s18" style="color:var(--ink-tertiary)"><use href="#i-right"/></svg></div>
+              </div>
+            </div>
+
+            <aside class="rail-side">
+              <div class="card pad">
+                <div class="h3" style="margin-bottom:8px">Still need help?</div>
+                <p class="muted" style="margin:0 0 12px">Raise a ticket and we reply by email, usually within a working day.</p>
+                <a class="btn pri sm block" href="#">New ticket</a>
+                <a class="btn sm block" href="#" style="margin-top:8px">My tickets</a>
+              </div>
+              <div class="card pad">
+                <div class="h3" style="margin-bottom:8px">Grievance Officer</div>
+                <p class="muted" style="margin:0 0 10px">For complaints that need a formal response under Indian IT rules.</p>
+                <a class="btn sm block" href="#">Raise a grievance</a>
+              </div>
+            </aside>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div data-part="bnav" data-active="profile"></div>
+  </div>
+</template>
+
+<template id="tpl-article">
+  <div class="app">
+    <div class="shell">
+      <div data-part="sidebar" data-active="Help"></div>
+      <div class="mainwrap">
+        <div class="ctop"><div><h1>Boost</h1><div class="sub">Help centre · article</div></div><div class="sp"></div>
+          <a class="btn" href="#"><svg class="i s16"><use href="#i-share"/></svg>Share</a></div>
+        <div class="content">
+          <div class="artcols">
+            <div>
+              <div class="prose">
+                <h2>How does boost work, and when does it start?</h2>
+                <p>A boost lifts one listing above others for a fixed number of days. It does not change the
+                listing itself — the same photos, price and details are shown, just to more people.</p>
+
+                <h3 id="a1">Where a boosted listing appears</h3>
+                <ul>
+                  <li>In <b>HomzList top picks</b> on the home feed</li>
+                  <li>Above non-boosted results in search, within the area you picked</li>
+                  <li>With a <b>Boosted</b> tag, so buyers know what they are seeing</li>
+                </ul>
+
+                <h3 id="a2">This area only, or All India</h3>
+                <p>"This area only" shows your listing to people browsing that area and the ones next to it.
+                "All India" shows it everywhere. Most sellers get better enquiries from the area option,
+                because buyers searching a specific area are further along.</p>
+
+                <h3 id="a3">When it starts</h3>
+                <p><b>Boosts start after admin approval.</b> We check the listing before spending your money on
+                it. Approval usually takes a few hours. Your days only begin counting once it is live — a boost
+                waiting for approval is not using up its time.</p>
+
+                <h3 id="a4">If it is not approved</h3>
+                <p>You are refunded in full, and the payment shows as refunded in Payments. We tell you why in
+                a notification.</p>
+
+                <h3 id="a5">If you mark the listing sold</h3>
+                <p>The boost stops automatically. There is no point paying to promote something that is gone,
+                so we end it rather than letting it run out.</p>
+
+                <p class="muted" style="margin-top:20px">From the HomzList help centre</p>
+              </div>
+
+              <div class="helpful">
+                <b style="font-size:14px">Was this helpful?</b>
+                <a class="btn sm" href="#">Yes</a>
+                <a class="btn sm" href="#">No</a>
+                <div style="flex:1"></div>
+                <span class="muted">Still need help?</span>
+                <a class="btn pri sm" href="#">New ticket</a>
+              </div>
+            </div>
+
+            <aside>
+              <div class="toc">
+                <div class="h3" style="margin-bottom:8px">On this page</div>
+                <a href="#a1" aria-current="true">Where a boosted listing appears</a>
+                <a href="#a2">This area only, or All India</a>
+                <a href="#a3">When it starts</a>
+                <a href="#a4">If it is not approved</a>
+                <a href="#a5">If you mark the listing sold</a>
+              </div>
+            </aside>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div data-part="bnav" data-active="profile"></div>
+  </div>
+</template>
+
+<template id="tpl-tickets">
+  <div class="app">
+    <div class="shell">
+      <div data-part="sidebar" data-active="Help"></div>
+      <div class="mainwrap">
+        <div class="ctop"><div><h1>Support</h1><div class="sub">1 replied · 3 closed</div></div><div class="sp"></div>
+          <a class="btn pri" href="#"><svg class="i s16"><use href="#i-plus-b"/></svg>New ticket</a></div>
+        <div class="content">
+          <div class="tsplit">
+            <div class="tcol">
+              <div class="titem on">
+                <span class="hicon" style="background:var(--accent-soft);color:var(--accent)"><svg class="i s18"><use href="#i-card"/></svg></span>
+                <span style="flex:1;min-width:0"><b style="font-size:14px">Payment failed but money deducted</b>
+                  <div class="muted">Plans &amp; payments · #TK-2841</div></span>
+                <span class="tag ok">Replied</span>
+              </div>
+              <div class="titem">
+                <span class="hicon" style="background:var(--surface-2);color:var(--ink-tertiary)"><svg class="i s18"><use href="#i-rocket"/></svg></span>
+                <span style="flex:1;min-width:0"><b style="font-size:14px">Boost not approved — why?</b>
+                  <div class="muted">Boost · #TK-2790</div></span>
+                <span class="tag mute">Closed</span>
+              </div>
+              <div class="titem">
+                <span class="hicon" style="background:var(--surface-2);color:var(--ink-tertiary)"><svg class="i s18"><use href="#i-shield"/></svg></span>
+                <span style="flex:1;min-width:0"><b style="font-size:14px">ID verification rejected</b>
+                  <div class="muted">Verification · #TK-2712</div></span>
+                <span class="tag mute">Closed</span>
+              </div>
+              <div class="titem">
+                <span class="hicon" style="background:var(--surface-2);color:var(--ink-tertiary)"><svg class="i s18"><use href="#i-alert"/></svg></span>
+                <span style="flex:1;min-width:0"><b style="font-size:14px">Fake broker on a listing</b>
+                  <div class="muted">Report · #TK-2655</div></span>
+                <span class="tag mute">Closed</span>
+              </div>
+              <div style="padding:14px;text-align:center" class="muted">No ticket is waiting on your reply.</div>
+            </div>
+
+            <div class="tcol" style="position:static">
+              <div style="padding:16px;border-bottom:1px solid var(--divider);display:flex;align-items:center;gap:12px">
+                <span style="flex:1"><b style="font-size:16px">Payment failed but money deducted</b>
+                  <div class="muted">#TK-2841 · Plans &amp; payments · raised 11 Aug 2026</div></span>
+                <span class="tag ok">Replied</span>
+              </div>
+              <div style="padding:16px">
+                <div class="msg them">
+                  <b>You</b><br>
+                  I tried to top up 5 listing slots on 11 Aug. The payment failed on the page but ₹499 was
+                  deducted from my account. Payment ID pay_QdX55vNb1.
+                  <div style="margin-top:10px;padding:9px 11px;border-radius:9px;background:var(--surface-3);font-size:12px;display:flex;align-items:center;gap:8px">
+                    <svg class="i s16"><use href="#i-image"/></svg>Attached screenshot
+                  </div>
+                </div>
+                <div class="msg me">
+                  <b>HomzList support</b><br>
+                  Thanks for the payment ID. The bank authorised it but our gateway did not receive the
+                  confirmation, so the top-up was not applied. We have raised a refund — it lands back in
+                  3–5 working days and will show as refunded in Payments. Your slots have also been added
+                  manually so you are not blocked in the meantime.
+                </div>
+                <div class="msg them">
+                  <b>You</b><br>Got it, slots are showing now. Thank you.
+                </div>
+              </div>
+              <div class="composer">
+                <span class="f">Write a reply…</span>
+                <a class="btn sm" href="#"><svg class="i s16"><use href="#i-image"/></svg>Add screenshot</a>
+                <a class="btn pri sm" href="#"><svg class="i s16"><use href="#i-send"/></svg>Send</a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div data-part="bnav" data-active="profile"></div>
+  </div>
+</template>
+
+<script src="_kit.js"></script>
+</body>
+</html>

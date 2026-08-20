@@ -66,8 +66,8 @@ export function Details({ role, onBack, onDone }: { role: string; onBack: () => 
   }
 
   return (
-    <div className="flex min-h-[100dvh] flex-col bg-page px-4">
-      <div className="mt-6 flex items-center gap-3">
+    <div className="flex min-h-[100dvh] flex-col bg-page px-4 md:min-h-0 md:bg-transparent md:px-0">
+      <div className="mt-6 flex items-center gap-3 md:mt-0">
         <button aria-label="Back" onClick={onBack} className="grid h-11 w-11 -ml-2 place-items-center text-ink-primary">
           <Icon name="arrow-left" size={24} strokeWidth={1.7} />
         </button>

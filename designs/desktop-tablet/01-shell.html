@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>HomzList — 01 · The shell (desktop + tablet)</title>
+<link rel="stylesheet" href="_kit.css" />
+<style>
+.tile{display:flex;gap:12px;padding:14px;border-radius:14px;background:var(--surface-1);border:1px solid var(--border)}
+.tile .ic{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;flex:0 0 38px}
+.tile .lb{font-size:14px;font-weight:600;line-height:1.25}
+.tile .sb{font-size:12px;color:var(--ink-tertiary);margin-top:2px}
+.tile .ct{margin-left:auto;align-self:flex-start;min-width:22px;height:20px;padding:0 7px;border-radius:999px;
+  background:var(--accent-soft);color:var(--accent);font-size:11px;font-weight:700;display:grid;place-items:center}
+.tile .ct.urgent{background:var(--ink-primary);color:var(--ink-inverse)}
+.t-green{background:var(--accent-soft);color:var(--tone-green)}
+.t-amber{background:var(--warning-soft);color:var(--tone-amber)}
+.t-blue{background:var(--info-soft);color:var(--tone-blue)}
+.t-violet{background:#f3ecfd;color:var(--tone-violet)}
+.t-teal{background:#e3f4f2;color:var(--tone-teal)}
+.t-pink{background:#fdeaf1;color:var(--tone-pink)}
+.t-indigo{background:#ecebfd;color:var(--tone-indigo)}
+.t-cyan{background:#e2f2f6;color:var(--tone-cyan)}
+.t-orange{background:#fdeee5;color:var(--tone-orange)}
+.dark .t-violet,.dark .t-teal,.dark .t-pink,.dark .t-indigo,.dark .t-cyan,.dark .t-orange{background:var(--surface-3)}
+.rail.tiles{grid-auto-columns:80%}
+.mob-hdr{display:flex;align-items:center;gap:8px;height:56px;padding:0 16px;background:var(--surface-1);border-bottom:1px solid var(--border)}
+.citychip{display:inline-flex;align-items:center;gap:5px;height:30px;padding:0 11px;border-radius:999px;background:var(--surface-2);font-size:13px;font-weight:600}
+.iconbtn{width:44px;height:44px;display:grid;place-items:center;position:relative;margin-left:auto}
+.iconbtn+.iconbtn{margin-left:0}
+.dot{position:absolute;top:9px;right:9px;min-width:16px;height:16px;padding:0 4px;border-radius:999px;background:var(--error);color:#fff;font-size:10px;font-weight:700;display:grid;place-items:center}
+@container (min-width:768px){ .rail.tiles{grid-auto-columns:calc(50% - 9px)} }
+@container (min-width:1200px){ .rail.tiles{grid-auto-columns:calc(33.333% - 14px)} }
+</style>
+</head>
+<body>
+
+<div class="bar">
+  <b>01 · The shell</b>
+  <div class="seg"><button data-dark aria-pressed="false">Dark</button></div>
+  <div class="sp"></div>
+  <span class="note">Two chromes. Public pages get the current project's header, ported as-is. Signed-in work gets a
+  240px sidebar carrying the live app's own destinations — the Dashboard hub's nine
+  (<code>lib/dashboard/items.ts</code>) plus the profile sheet's rows. Bottom nav retires at 768.</span>
+</div>
+
+<div class="stage">
+
+  <div>
+    <p class="caption">A · Console chrome — Desktop 1440 (seller signed in, role: owner)</p>
+    <div class="scaler"><div class="frame" data-w="1440" style="width:1440px" data-tpl="console"></div></div>
+  </div>
+
+  <div class="annot">
+    <h3>What changed, and why</h3>
+    <ul>
+      <li><b>Every entry gate is visible at once.</b> On mobile the destinations hide in two sheets — the
+      Dashboard hub (the feed header's grid icon) and the profile sheet. A sheet is right on a phone and wrong
+      on a 1440 screen, so the sidebar simply shows them: all nine hub destinations plus Saved, Your activity,
+      Drafts, Archived, Help and Settings. No sheet, no hub screen, no extra tap.</li>
+      <li><b>The bottom nav retires above 768.</b> Its five destinations are re-homed — Home and Search at the
+      top of the sidebar, Create as the accent button in the top bar, Leads in Inventory, Profile in the user
+      block. Nothing becomes unreachable.</li>
+      <li><b>The counts stay honest.</b> Same badges the mobile hub shows, same <code>/feed/badges</code> call,
+      and the two "waiting on you" ones (Leads, My visits) keep the solid ink pill instead of the accent one,
+      exactly as <code>lib/dashboard/items.ts</code> defines with <code>urgent</code>.</li>
+      <li><b>Right rail (320).</b> Plan usage and quick actions sit below the fold on mobile because there is
+      nowhere else; on desktop they belong beside the content, sticky.</li>
+      <li><b>Role rule preserved.</b> A <code>builder</code> loses Search here exactly as the bottom nav
+      already drops it. The nine tiles stay unfiltered and entitlement-gated, as the code comment requires.</li>
+      <li><b>Tiles are a carousel, not a grid</b> — the owner rule applies to the console too.</li>
+    </ul>
+  </div>
+
+  <div>
+    <p class="caption">B · Console chrome — Tablet 1024 (same markup, 72px icon rail)</p>
+    <div class="scaler"><div class="frame" data-w="1024" style="width:1024px" data-tpl="console"></div></div>
+  </div>
+
+  <div class="annot">
+    <h3>Tablet is not a small desktop</h3>
+    <ul>
+      <li>The sidebar collapses to a <b>72px icon rail</b> — same order, same badges, labels on hover. A 240px
+      sidebar on a 1024 screen spends a quarter of the width on text the user already knows.</li>
+      <li>The right rail folds back into the content column, so plan usage stays above the fold instead of
+      being pushed to the bottom.</li>
+      <li>Carousels show 2 cards instead of 3–4; nothing is stretched to fill.</li>
+    </ul>
+  </div>
+
+  <div>
+    <p class="caption">C · Public chrome — Desktop 1440 (the current project's header, ported)</p>
+    <div class="scaler"><div class="frame" data-w="1440" style="width:1440px" data-tpl="browse"></div></div>
+  </div>
+
+  <div class="annot">
+    <h3>The public header</h3>
+    <ul>
+      <li>Ported straight from <code>components/shell/Header.tsx</code> in the current project: logo + city on
+      the left, the primary nav centred, and on the right Dashboard · bell · saved · avatar · the accent
+      Post Property. Guests get "Log in" and Post Property with the FREE* flag, same as there.</li>
+      <li>The nav items are the live app's own categories — Buy · Rent · Projects · Commercial · Plots · PG ·
+      Requirements — from <code>lib/listings/type-icon.ts</code> and the Buy/Rent filter.</li>
+      <li><b>Under 1080 the nav folds into the hamburger</b>, exactly as the current header does; the drawer
+      carries the same list plus the account rows.</li>
+      <li><b>Stories.</b> A 9:16 story stretched across a 1440 screen looks broken, so opening one gives a
+      centred 400×710 player on a dimmed page, previous/next posters as small cards either side, arrow keys
+      wired. Detail in <code>07-story-viewer.html</code>.</li>
+      <li><b>Guest gate.</b> Any gated action opens the log-in as a centred modal instead of a route jump, so
+      the visitor never loses the page they were on. Detail in <code>02-auth-entry.html</code>.</li>
+    </ul>
+  </div>
+
+  <div>
+    <p class="caption">D · Public chrome — Tablet 768 (guest)</p>
+    <div class="scaler"><div class="frame" data-w="768" style="width:768px" data-tpl="guest"></div></div>
+  </div>
+
+  <div>
+    <p class="caption">E · Mobile 390 — the live shell, unchanged (reference only)</p>
+    <div class="scaler"><div class="frame" data-w="390" style="width:390px" data-tpl="mobile"></div></div>
+  </div>
+
+  <div class="annot">
+    <h3>Implementation order</h3>
+    <ul>
+      <li><code>components/nav/AppShell.tsx</code> — <code>max-w-column</code> becomes
+      <code>max-w-column md:max-w-none</code>, and the shell becomes a flex row at <code>md:</code> with the
+      sidebar as the first child. Mobile classes untouched.</li>
+      <li><code>components/nav/Header.tsx</code> — same <code>max-w-column</code> release; the public header
+      and the console top bar are new siblings rendered <code>hidden md:flex</code>.</li>
+      <li><code>components/nav/BottomNav.tsx</code> — add <code>md:hidden</code>. Its item list stays the
+      source for the sidebar's first group, so the builder rule keeps working from one place.</li>
+      <li>New: <code>components/nav/SideNav.tsx</code>, fed by <code>lib/dashboard/items.ts</code>, so the
+      sidebar and the mobile hub can never drift apart.</li>
+      <li><code>app/layout.tsx</code> — drop <code>maximumScale:1</code> / <code>userScalable:false</code>;
+      they block desktop zoom.</li>
+    </ul>
+  </div>
+
+</div>
+
+<template id="tpl-console">
+  <div class="app">
+    <div class="shell">
+      <div data-part="sidebar" data-active="Dashboard"></div>
+      <div class="mainwrap">
+        <div class="ctop">
+          <div><h1>Dashboard</h1><div class="sub">Everything on your account, in one place</div></div>
+          <div class="sp"></div>
+          <span class="hicon"><svg class="i s24"><use href="#i-help"/></svg></span>
+          <span class="hicon"><svg class="i s24"><use href="#i-bell"/></svg><span class="badge">3</span></span>
+          <a class="btn pri" href="#"><svg class="i s16"><use href="#i-plus-b"/></svg>Post property</a>
+        </div>
+
+        <div class="content">
+          <div class="cols">
+            <div>
+              <section class="sec carousel">
+                <div class="sechead"><h2 class="h2">Inventory</h2><div class="sp"></div>
+                  <div class="arrows"><span class="arrow" aria-disabled="true"><svg class="i s16"><use href="#i-left"/></svg></span><span class="arrow"><svg class="i s16"><use href="#i-right"/></svg></span></div>
+                  <a class="link" href="#">My Listings</a></div>
+                <div class="rail tiles">
+                  <a class="tile" href="#"><span class="ic t-green"><svg class="i"><use href="#i-home"/></svg></span><span><span class="lb">My Listings</span><span class="sb">Live right now</span></span><span class="ct">12</span></a>
+                  <a class="tile" href="#"><span class="ic t-amber"><svg class="i"><use href="#i-filter"/></svg></span><span><span class="lb">Leads</span><span class="sb">New enquiries</span></span><span class="ct urgent">3</span></a>
+                  <a class="tile" href="#"><span class="ic t-blue"><svg class="i"><use href="#i-search"/></svg></span><span><span class="lb">Browse requirements</span><span class="sb">Buyers looking now</span></span><span class="ct">24</span></a>
+                </div>
+              </section>
+
+              <section class="sec carousel">
+                <div class="sechead"><h2 class="h2">Requirements</h2><div class="sp"></div>
+                  <div class="arrows"><span class="arrow" aria-disabled="true"><svg class="i s16"><use href="#i-left"/></svg></span><span class="arrow"><svg class="i s16"><use href="#i-right"/></svg></span></div></div>
+                <div class="rail tiles">
+                  <a class="tile" href="#"><span class="ic t-violet"><svg class="i"><use href="#i-file"/></svg></span><span><span class="lb">My requirements</span><span class="sb">Live right now</span></span><span class="ct">2</span></a>
+                  <a class="tile" href="#"><span class="ic t-teal"><svg class="i"><use href="#i-send"/></svg></span><span><span class="lb">My proposals</span><span class="sb">Awaiting a reply</span></span><span class="ct">5</span></a>
+                  <a class="tile" href="#"><span class="ic t-pink"><svg class="i"><use href="#i-pin"/></svg></span><span><span class="lb">My visits</span><span class="sb">Coming up</span></span><span class="ct urgent">1</span></a>
+                </div>
+              </section>
+
+              <section class="sec carousel">
+                <div class="sechead"><h2 class="h2">Billing &amp; growth</h2><div class="sp"></div>
+                  <div class="arrows"><span class="arrow" aria-disabled="true"><svg class="i s16"><use href="#i-left"/></svg></span><span class="arrow"><svg class="i s16"><use href="#i-right"/></svg></span></div></div>
+                <div class="rail tiles">
+                  <a class="tile" href="#"><span class="ic t-indigo"><svg class="i"><use href="#i-card"/></svg></span><span><span class="lb">My plan</span><span class="sb">Plan and renewal</span></span></a>
+                  <a class="tile" href="#"><span class="ic t-cyan"><svg class="i"><use href="#i-receipt"/></svg></span><span><span class="lb">Payments</span><span class="sb">Invoices and history</span></span></a>
+                  <a class="tile" href="#"><span class="ic t-orange"><svg class="i"><use href="#i-rocket"/></svg></span><span><span class="lb">Boosts</span><span class="sb">Running now</span></span><span class="ct">2</span></a>
+                </div>
+              </section>
+            </div>
+
+            <aside class="rail-side">
+              <div class="card pad">
+                <div class="h3" style="margin-bottom:10px">Owner Pro</div>
+                <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--ink-tertiary)"><span>Listings used</span><span>12 / 25</span></div>
+                <div style="height:6px;border-radius:999px;background:var(--surface-3);margin:7px 0 12px;overflow:hidden"><span style="display:block;width:48%;height:100%;background:var(--accent)"></span></div>
+                <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--ink-tertiary)"><span>Renews</span><span style="color:var(--ink-primary);font-weight:600">14 Sep 2026</span></div>
+                <a class="btn block sm" href="#" style="margin-top:12px">Manage plan</a>
+              </div>
+              <div class="card pad">
+                <div class="h3" style="margin-bottom:10px">Quick actions</div>
+                <div style="display:grid;gap:8px">
+                  <a class="btn sm block" href="#"><svg class="i s16"><use href="#i-plus-b"/></svg>Post a property</a>
+                  <a class="btn sm block" href="#"><svg class="i s16"><use href="#i-rocket"/></svg>Boost a listing</a>
+                  <a class="btn sm block" href="#"><svg class="i s16"><use href="#i-file"/></svg>Post a requirement</a>
+                </div>
+              </div>
+              <div class="card pad">
+                <div class="h3" style="margin-bottom:8px">Verification</div>
+                <p class="muted" style="margin:0 0 10px">Verified sellers get more enquiries.</p>
+                <span class="tag ok">Verified</span>
+              </div>
+            </aside>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div data-part="bnav" data-active="home"></div>
+  </div>
+</template>
+
+<template id="tpl-browse">
+  <div class="app">
+    <div data-part="header" data-active="Buy"></div>
+    <div class="container" style="padding-top:22px">
+      <section class="sec carousel">
+        <div class="sechead"><div><h2 class="h2">Newly-added properties</h2><div class="sub">126 properties in Surat</div></div><div class="sp"></div>
+          <div class="arrows"><span class="arrow" aria-disabled="true"><svg class="i s16"><use href="#i-left"/></svg></span><span class="arrow"><svg class="i s16"><use href="#i-right"/></svg></span></div>
+          <a class="link" href="#">View all</a></div>
+        <div class="rail">
+          <div class="pcard"><div class="shot ph" data-l="PHOTO"></div><div class="ttl">₹ 62 Lakh</div><div class="sub">2 BHK Flat · Vesu</div><div class="facts"><span>1150 sq.ft</span></div></div>
+          <div class="pcard"><div class="shot ph" data-l="PHOTO"></div><div class="ttl">₹ 1.15 Cr</div><div class="sub">3 BHK Flat · Adajan</div><div class="facts"><span>1780 sq.ft</span></div></div>
+          <div class="pcard"><div class="shot ph" data-l="PHOTO"></div><div class="ttl">₹ 38 Lakh</div><div class="sub">Residential plot · Pal</div><div class="facts"><span>2000 sq.ft</span></div></div>
+          <div class="pcard"><div class="shot ph" data-l="PHOTO"></div><div class="ttl">₹ 24,000 / mo</div><div class="sub">2 BHK Flat · Piplod</div><div class="facts"><span>1080 sq.ft</span></div></div>
+          <div class="pcard"><div class="shot ph" data-l="PHOTO"></div><div class="ttl">₹ 78 Lakh</div><div class="sub">3 BHK Flat · Katargam</div><div class="facts"><span>1420 sq.ft</span></div></div>
+        </div>
+      </section>
+    </div>
+    <div data-part="footer"></div>
+    <div data-part="bnav" data-active="home"></div>
+  </div>
+</template>
+
+<template id="tpl-guest">
+  <div class="app">
+    <div data-part="header" data-guest="1" data-active="Buy"></div>
+    <div class="container" style="padding-top:20px">
+      <div class="card pad" style="display:flex;align-items:center;gap:12px;margin-bottom:18px">
+        <svg class="i s24" style="color:var(--accent)"><use href="#i-heart"/></svg>
+        <div style="flex:1"><b style="font-size:14px">Browsing as guest</b><div class="muted">Saved items merge into your account when you log in.</div></div>
+        <a class="btn sm" href="#">Log in</a>
+      </div>
+      <section class="sec carousel">
+        <div class="sechead"><div><h2 class="h2">HomzList top picks</h2><div class="sub">18 live projects in Surat</div></div><div class="sp"></div>
+          <div class="arrows"><span class="arrow" aria-disabled="true"><svg class="i s16"><use href="#i-left"/></svg></span><span class="arrow"><svg class="i s16"><use href="#i-right"/></svg></span></div></div>
+        <div class="rail">
+          <div class="pcard"><div class="shot ph" data-l="PROJECT"></div><div class="ttl">Shreeji Heights</div><div class="sub">Vesu · 2, 3 BHK</div><div class="facts"><span>₹ 58 L – 1.2 Cr</span><span class="tag ok">RERA</span></div></div>
+          <div class="pcard"><div class="shot ph" data-l="PROJECT"></div><div class="ttl">Sunrise Residency</div><div class="sub">Adajan · 3, 4 BHK</div><div class="facts"><span>₹ 92 L – 1.8 Cr</span><span class="tag ok">RERA</span></div></div>
+          <div class="pcard"><div class="shot ph" data-l="PROJECT"></div><div class="ttl">Green Valley</div><div class="sub">Pal · Plots</div><div class="facts"><span>₹ 28 – 60 L</span></div></div>
+        </div>
+      </section>
+    </div>
+    <div data-part="footer"></div>
+    <div data-part="bnav" data-active="home"></div>
+  </div>
+</template>
+
+<template id="tpl-mobile">
+  <div class="app">
+    <div class="mob-hdr">
+      <span class="wordmark">Homz<i>List</i></span>
+      <span class="citychip"><svg class="i s16" style="color:var(--accent)"><use href="#i-pin"/></svg>Surat<svg class="i s16" style="color:var(--ink-tertiary)"><use href="#i-chevron"/></svg></span>
+      <span class="iconbtn"><svg class="i s24"><use href="#i-bell"/></svg><span class="dot">3</span></span>
+      <span class="iconbtn"><svg class="i s24"><use href="#i-grid"/></svg></span>
+    </div>
+    <div style="padding:14px">
+      <div style="display:flex;gap:14px;margin-bottom:16px">
+        <div style="text-align:center"><div style="width:62px;height:62px;border-radius:999px;background:var(--ring-unseen-grad);display:grid;place-items:center"><div style="width:56px;height:56px;border-radius:999px;background:var(--avatar-2);display:grid;place-items:center;color:#fff;font-weight:700">R</div></div><div style="font-size:11px;margin-top:5px;color:var(--ink-secondary)">Rajesh</div></div>
+        <div style="text-align:center"><div style="width:62px;height:62px;border-radius:999px;background:var(--ring-unseen-grad);display:grid;place-items:center"><div style="width:56px;height:56px;border-radius:999px;background:var(--avatar-4);display:grid;place-items:center;color:#fff;font-weight:700">S</div></div><div style="font-size:11px;margin-top:5px;color:var(--ink-secondary)">Shreeji</div></div>
+        <div style="text-align:center"><div style="width:62px;height:62px;border-radius:999px;background:var(--ring-unseen-grad);display:grid;place-items:center"><div style="width:56px;height:56px;border-radius:999px;background:var(--avatar-6);display:grid;place-items:center;color:#fff;font-weight:700">A</div></div><div style="font-size:11px;margin-top:5px;color:var(--ink-secondary)">Anand</div></div>
+      </div>
+      <div class="h2" style="margin-bottom:10px">HomzList top picks</div>
+      <div class="pcard"><div class="shot ph" data-l="PHOTO"></div><div class="ttl">₹ 62 Lakh</div><div class="sub">2 BHK Flat · Vesu</div><div class="facts"><span>1150 sq.ft</span><span>·</span><span>Ready to move</span></div></div>
+    </div>
+    <div data-part="bnav" data-active="home"></div>
+  </div>
+</template>
+
+<script src="_kit.js"></script>
+</body>
+</html>

@@ -1,0 +1,453 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>HomzList — 08 · Create flow (desktop + tablet)</title>
+<link rel="stylesheet" href="_kit.css" />
+<style>
+.wizard{display:block}
+.form{max-width:none}
+.fblk{background:var(--surface-1);border:1px solid var(--border);border-radius:14px;padding:16px;margin:0 0 14px}
+.fblk h3{margin:0 0 4px;font-size:15px;font-weight:700}
+.fblk .hint{font-size:12px;color:var(--ink-tertiary);margin:0 0 14px}
+.frow{display:grid;grid-template-columns:1fr;gap:12px;margin-bottom:12px}
+.lab{display:block;font-size:13px;font-weight:600;color:var(--ink-secondary);margin-bottom:6px}
+.inp{height:44px;border:1px solid var(--border);border-radius:10px;background:var(--surface-2);display:flex;align-items:center;justify-content:space-between;padding:0 13px;font-size:14px;color:var(--ink-primary)}
+.inp.empty{color:var(--ink-tertiary)}
+.inp.ta{height:96px;align-items:flex-start;padding-top:11px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.typecard{aspect-ratio:1;border:1px solid var(--border);border-radius:12px;background:var(--surface-2);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;font-size:12px;font-weight:600;color:var(--ink-primary)}
+.typecard.on{border:1.5px solid var(--accent);background:var(--accent-soft);color:var(--accent)}
+.rail.types{grid-auto-columns:31%}
+.pv{background:var(--surface-1);border:1px solid var(--border);border-radius:16px;padding:16px;position:sticky;top:120px}
+.pvhead{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+.pvhead .sp{flex:1}
+.seg2{display:flex;background:var(--surface-2);border-radius:999px;padding:3px;gap:2px}
+.seg2 span{padding:6px 12px;border-radius:999px;font-size:12px;font-weight:600;color:var(--ink-tertiary)}
+.seg2 span[aria-selected="true"]{background:var(--surface-1);color:var(--ink-primary);box-shadow:var(--shadow-sm)}
+.phgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.phcell{aspect-ratio:1;border-radius:10px;background:var(--surface-3);position:relative;display:grid;place-items:center;color:var(--ink-disabled);font-size:11px;font-weight:600}
+.phcell .cov{position:absolute;top:6px;left:6px;background:var(--ink-primary);color:var(--ink-inverse);font-size:9px;font-weight:700;padding:2px 6px;border-radius:5px}
+.phadd{aspect-ratio:1;border:1.5px dashed var(--border);border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:var(--ink-tertiary);font-size:12px;font-weight:600}
+.tips{display:flex;flex-wrap:wrap;gap:8px}
+.tips span{font-size:12px;padding:7px 11px;border-radius:9px;background:var(--info-soft);color:var(--ink-secondary)}
+.barbtns{display:flex;gap:10px;padding:12px 16px;border-top:1px solid var(--border);background:var(--surface-1);position:sticky;bottom:52px}
+.slotline{display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:12px;background:var(--accent-soft);font-size:13px;margin-bottom:16px}
+.dcard{display:flex;gap:12px;padding:13px;border:1px solid var(--border);border-radius:12px;background:var(--surface-1);align-items:center}
+.okwrap{max-width:520px;margin:0 auto;text-align:center;padding:40px 0}
+.okwrap .ring{width:86px;height:86px;border-radius:999px;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;margin:0 auto 18px}
+@container (min-width:768px){
+  .frow.two{grid-template-columns:1fr 1fr;gap:14px}
+  .frow.three{grid-template-columns:1fr 1fr 1fr;gap:14px}
+  .rail.types{grid-auto-columns:calc(16.666% - 15px)}
+  .phgrid{grid-template-columns:repeat(5,1fr)}
+}
+@container (min-width:1200px){
+  .wizard{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:28px;align-items:start}
+  .form{max-width:760px}
+  .barbtns{display:none}
+  .rail.types{grid-auto-columns:calc(12.5% - 18px)}
+  .phgrid{grid-template-columns:repeat(4,1fr)}
+}
+</style>
+</head>
+<body>
+
+<div class="bar">
+  <b>08 · Create flow</b>
+  <div class="seg"><button data-dark aria-pressed="false">Dark</button></div>
+  <div class="sp"></div>
+  <span class="note">Real flow and real copy: Create → Property type (step dots 1–4) → Form → Photos
+  ("Add photos", "Set as cover", "Continue to Preview") → Preview ("Feed card" / "Full listing",
+  "Submit for Review") → "Listing submitted". Type codes are the app's own.</span>
+</div>
+
+<div class="stage">
+
+  <div>
+    <p class="caption">A · Create → what are you posting — Desktop 1440</p>
+    <div class="scaler"><div class="frame" data-w="1440" style="width:1440px" data-tpl="entry"></div></div>
+  </div>
+
+  <div class="annot">
+    <h3>Decisions</h3>
+    <ul>
+      <li><b>The 4-step flow becomes a visible stepper.</b> Mobile shows four dots in the header; desktop
+      shows the named steps — Type · Details · Photos · Preview — so the seller knows how much is left before
+      they start typing. Same four steps, same routes.</li>
+      <li><b>Form on the left, live preview on the right (380).</b> This is the single biggest thing desktop
+      can add: the seller sees the feed card and the full listing building itself as they type. It uses the
+      app's existing Preview component, which already renders both — nothing new to build, just mounted
+      beside the form instead of behind a Continue button.</li>
+      <li><b>Fields go two-up, never wider.</b> The form column caps at 760 because a 1200px-wide text input
+      is unusable. Short pairs (Bedrooms / Bathrooms, Built-up / Carpet) sit side by side; long ones stay
+      full width. Field order, labels and validation stay exactly as the server's
+      <code>field_definitions</code> defines them.</li>
+      <li><b>Photos gets a real grid of thumbs</b> — this is the one place a fixed tile layout is correct,
+      because it is an upload tray, not a content list. Cover badge, "Set as cover" and the retry state are
+      the app's own.</li>
+      <li><b>The slot line stays visible.</b> "1 listing slot left on Owner Pro" rides the top of the flow,
+      because running out mid-form is the worst moment to find out.</li>
+    </ul>
+  </div>
+
+  <div>
+    <p class="caption">B · Form + live preview — Desktop 1440</p>
+    <div class="scaler"><div class="frame" data-w="1440" style="width:1440px" data-tpl="form"></div></div>
+  </div>
+
+  <div>
+    <p class="caption">C · Photos — Desktop 1440</p>
+    <div class="scaler"><div class="frame" data-w="1440" style="width:1440px" data-tpl="photos"></div></div>
+  </div>
+
+  <div>
+    <p class="caption">D · Preview &amp; submit — Desktop 1440</p>
+    <div class="scaler"><div class="frame" data-w="1440" style="width:1440px" data-tpl="preview"></div></div>
+  </div>
+
+  <div>
+    <p class="caption">E · Submitted + Drafts — Desktop 1440</p>
+    <div class="scaler"><div class="frame" data-w="1440" style="width:1440px" data-tpl="done"></div></div>
+  </div>
+
+  <div>
+    <p class="caption">F · Form — Tablet 1024 (preview unpins to the bottom, action bar returns)</p>
+    <div class="scaler"><div class="frame" data-w="1024" style="width:1024px" data-tpl="form"></div></div>
+  </div>
+
+  <div>
+    <p class="caption">G · Form — Tablet 768</p>
+    <div class="scaler"><div class="frame" data-w="768" style="width:768px" data-tpl="form"></div></div>
+  </div>
+
+</div>
+
+<template id="tpl-entry">
+  <div class="app">
+    <div class="shell">
+      <div data-part="sidebar" data-active="Dashboard"></div>
+      <div class="mainwrap">
+        <div class="ctop"><div><h1>Create</h1><div class="sub">What are you posting?</div></div><div class="sp"></div>
+          <div class="stepper">
+            <span class="st" data-on><span class="n">1</span>Type</span><span class="bar"></span>
+            <span class="st"><span class="n">2</span>Details</span><span class="bar"></span>
+            <span class="st"><span class="n">3</span>Photos</span><span class="bar"></span>
+            <span class="st"><span class="n">4</span>Preview</span>
+          </div>
+        </div>
+        <div class="content">
+          <div class="slotline"><svg class="i s18" style="color:var(--accent)"><use href="#i-alert"/></svg>
+            <span style="flex:1"><b>1 listing slot left</b> on Owner Pro · renews 14 Sep 2026</span>
+            <a class="btn sm" href="#">See plans</a></div>
+
+          <section class="sec">
+            <div class="sechead"><h2 class="h2">What do you want to post?</h2></div>
+            <div style="display:grid;gap:12px;max-width:760px">
+              <a class="dcard" href="#"><span class="hicon" style="background:var(--accent-soft);color:var(--accent)"><svg class="i s24"><use href="#i-home"/></svg></span>
+                <span style="flex:1"><b style="font-size:15px">Sell a property</b><br><span class="muted">List a property for sale</span></span>
+                <svg class="i s18" style="color:var(--ink-tertiary)"><use href="#i-right"/></svg></a>
+              <a class="dcard" href="#"><span class="hicon" style="background:var(--info-soft);color:var(--tone-blue)"><svg class="i s24"><use href="#i-card"/></svg></span>
+                <span style="flex:1"><b style="font-size:15px">Rent out a property</b><br><span class="muted">List a property to rent</span></span>
+                <svg class="i s18" style="color:var(--ink-tertiary)"><use href="#i-right"/></svg></a>
+              <a class="dcard" href="#"><span class="hicon" style="background:#f3ecfd;color:var(--tone-violet)"><svg class="i s24"><use href="#i-file"/></svg></span>
+                <span style="flex:1"><b style="font-size:15px">Post a requirement</b><br><span class="muted">Tell us what you need — matching properties find you</span></span>
+                <svg class="i s18" style="color:var(--ink-tertiary)"><use href="#i-right"/></svg></a>
+            </div>
+          </section>
+
+          <section class="sec carousel">
+            <div class="sechead"><div><h2 class="h2">Property type</h2><div class="sub">Step 2 of 4 · pick one, then Continue</div></div><div class="sp"></div>
+              <div class="arrows"><span class="arrow" aria-disabled="true"><svg class="i s16"><use href="#i-left"/></svg></span><span class="arrow"><svg class="i s16"><use href="#i-right"/></svg></span></div></div>
+            <div style="font-size:11px;font-weight:600;letter-spacing:.3px;text-transform:uppercase;color:var(--ink-tertiary);margin-bottom:10px">Residential</div>
+            <div class="rail types">
+              <span class="typecard on"><svg class="i s24"><use href="#i-home"/></svg>Flat</span>
+              <span class="typecard"><svg class="i s24"><use href="#i-home"/></svg>Bungalow</span>
+              <span class="typecard"><svg class="i s24"><use href="#i-home"/></svg>Tenement</span>
+              <span class="typecard"><svg class="i s24"><use href="#i-home"/></svg>Farmhouse</span>
+              <span class="typecard"><svg class="i s24"><use href="#i-user"/></svg>PG</span>
+              <span class="typecard"><svg class="i s24"><use href="#i-building"/></svg>Office</span>
+              <span class="typecard"><svg class="i s24"><use href="#i-briefcase"/></svg>Shop</span>
+              <span class="typecard"><svg class="i s24"><use href="#i-building"/></svg>Showroom</span>
+              <span class="typecard"><svg class="i s24"><use href="#i-archive"/></svg>Godown</span>
+              <span class="typecard"><svg class="i s24"><use href="#i-pin"/></svg>Res. plot</span>
+              <span class="typecard"><svg class="i s24"><use href="#i-pin"/></svg>Com. plot</span>
+              <span class="typecard"><svg class="i s24"><use href="#i-pin"/></svg>Agri. plot</span>
+            </div>
+            <div style="margin-top:16px;max-width:760px"><a class="btn pri block" href="#">Continue</a></div>
+          </section>
+        </div>
+      </div>
+    </div>
+    <div data-part="bnav" data-active="create"></div>
+  </div>
+</template>
+
+<template id="tpl-form">
+  <div class="app">
+    <div class="shell">
+      <div data-part="sidebar" data-active="Dashboard"></div>
+      <div class="mainwrap">
+        <div class="ctop"><div><h1>Flat for sale</h1><div class="sub">Vesu, Surat · draft saved 2 min ago</div></div><div class="sp"></div>
+          <div class="stepper">
+            <span class="st" data-on><span class="n">1</span>Type</span><span class="bar"></span>
+            <span class="st" data-on><span class="n">2</span>Details</span><span class="bar"></span>
+            <span class="st"><span class="n">3</span>Photos</span><span class="bar"></span>
+            <span class="st"><span class="n">4</span>Preview</span>
+          </div>
+          <a class="btn" href="#">Save draft</a>
+          <a class="btn pri" href="#">Continue</a>
+        </div>
+
+        <div class="content">
+          <div class="wizard">
+            <div class="form">
+              <div class="fblk">
+                <h3>Location</h3>
+                <p class="hint">Buyers search by area first, so this decides who sees your listing.</p>
+                <div class="frow two">
+                  <div><span class="lab">City</span><div class="inp">Surat<svg class="i s16"><use href="#i-chevron"/></svg></div></div>
+                  <div><span class="lab">Area</span><div class="inp">Vesu<svg class="i s16"><use href="#i-chevron"/></svg></div></div>
+                </div>
+                <div class="frow two">
+                  <div><span class="lab">Society / building name</span><div class="inp empty">e.g. Shreeji Heights</div></div>
+                  <div><span class="lab">Pincode</span><div class="inp">395007</div></div>
+                </div>
+              </div>
+
+              <div class="fblk">
+                <h3>Property details</h3>
+                <p class="hint">Every answer here becomes a row on your listing page.</p>
+                <div class="frow three">
+                  <div><span class="lab">Bedrooms</span><div class="inp">2<svg class="i s16"><use href="#i-chevron"/></svg></div></div>
+                  <div><span class="lab">Bathrooms</span><div class="inp">2<svg class="i s16"><use href="#i-chevron"/></svg></div></div>
+                  <div><span class="lab">Balconies</span><div class="inp">1<svg class="i s16"><use href="#i-chevron"/></svg></div></div>
+                </div>
+                <div class="frow three">
+                  <div><span class="lab">Floor</span><div class="inp">2</div></div>
+                  <div><span class="lab">Total floors</span><div class="inp">7</div></div>
+                  <div><span class="lab">Facing</span><div class="inp">East<svg class="i s16"><use href="#i-chevron"/></svg></div></div>
+                </div>
+                <div class="frow two">
+                  <div><span class="lab">Furnishing</span><div class="inp">Semi-furnished<svg class="i s16"><use href="#i-chevron"/></svg></div></div>
+                  <div><span class="lab">Age of property</span><div class="inp">4 years<svg class="i s16"><use href="#i-chevron"/></svg></div></div>
+                </div>
+              </div>
+
+              <div class="fblk">
+                <h3>Area &amp; pricing</h3>
+                <div class="frow two">
+                  <div><span class="lab">Built-up area (sq.ft)</span><div class="inp">1150</div></div>
+                  <div><span class="lab">Carpet area (sq.ft)</span><div class="inp">980</div></div>
+                </div>
+                <div class="frow two">
+                  <div><span class="lab">Expected price</span><div class="inp">₹ 62,00,000</div></div>
+                  <div><span class="lab">Maintenance (per month)</span><div class="inp">₹ 1,800</div></div>
+                </div>
+                <div style="display:flex;align-items:center;justify-content:space-between;font-size:13px;padding-top:4px">
+                  Price negotiable<span style="width:38px;height:22px;border-radius:999px;background:var(--accent);position:relative"><span style="position:absolute;top:3px;left:19px;width:16px;height:16px;border-radius:999px;background:#fff"></span></span>
+                </div>
+              </div>
+
+              <div class="fblk">
+                <h3>Amenities</h3>
+                <div class="chips">
+                  <span class="pill" aria-pressed="true">Lift</span><span class="pill" aria-pressed="true">Covered parking</span>
+                  <span class="pill" aria-pressed="true">24×7 security</span><span class="pill">Gym</span>
+                  <span class="pill" aria-pressed="true">Garden</span><span class="pill">Swimming pool</span>
+                  <span class="pill" aria-pressed="true">Power backup</span><span class="pill">CCTV</span>
+                </div>
+              </div>
+
+              <div class="fblk">
+                <h3>Description</h3>
+                <p class="hint">What a buyer should know that the fields above don't say.</p>
+                <div class="inp ta">Well-maintained 2 BHK on the second floor, east-facing and cross-ventilated…</div>
+              </div>
+            </div>
+
+            <aside>
+              <div class="pv">
+                <div class="pvhead"><b style="font-size:14px">Live preview</b><div class="sp"></div>
+                  <span class="seg2"><span aria-selected="true">Feed card</span><span>Full listing</span></span></div>
+                <div class="pcard">
+                  <div class="shot ph" data-l="COVER PHOTO"></div>
+                  <div class="ttl">₹ 62 Lakh</div>
+                  <div class="sub">2 BHK Flat · Vesu, Surat</div>
+                  <div class="facts"><span>1150 sq.ft</span><span>·</span><span>Semi-furnished</span></div>
+                  <div style="display:flex;align-items:center;gap:8px;margin-top:11px">
+                    <span class="avatar" style="background:var(--avatar-2);width:24px;height:24px;font-size:10px">R</span>
+                    <span class="muted">Rajan Patel · Owner</span><span class="tag ok">Verified</span>
+                  </div>
+                </div>
+                <p class="muted" style="margin:14px 0 0">This is exactly how your listing appears in the feed. It updates as you type.</p>
+              </div>
+            </aside>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="barbtns"><a class="btn block" href="#">Save draft</a><a class="btn pri block" href="#">Continue</a></div>
+    <div data-part="bnav" data-active="create"></div>
+  </div>
+</template>
+
+<template id="tpl-photos">
+  <div class="app">
+    <div class="shell">
+      <div data-part="sidebar" data-active="Dashboard"></div>
+      <div class="mainwrap">
+        <div class="ctop"><div><h1>Photos</h1><div class="sub">7 of 20 added</div></div><div class="sp"></div>
+          <div class="stepper">
+            <span class="st" data-on><span class="n">1</span>Type</span><span class="bar"></span>
+            <span class="st" data-on><span class="n">2</span>Details</span><span class="bar"></span>
+            <span class="st" data-on><span class="n">3</span>Photos</span><span class="bar"></span>
+            <span class="st"><span class="n">4</span>Preview</span>
+          </div>
+          <a class="btn pri" href="#">Continue to Preview</a>
+        </div>
+        <div class="content">
+          <div class="wizard">
+            <div class="form">
+              <div class="fblk">
+                <h3>Add photos</h3>
+                <p class="hint">Drag to reorder. The first photo is the cover buyers see in the feed.</p>
+                <div class="phgrid">
+                  <div class="phcell">PHOTO<span class="cov">COVER</span></div>
+                  <div class="phcell">PHOTO</div>
+                  <div class="phcell">PHOTO</div>
+                  <div class="phcell">PHOTO</div>
+                  <div class="phcell">PHOTO</div>
+                  <div class="phcell">PHOTO</div>
+                  <div class="phcell" style="color:var(--error)">Retry</div>
+                  <div class="phadd"><svg class="i s24"><use href="#i-plus-b"/></svg>Add photos</div>
+                </div>
+                <div style="display:flex;gap:10px;margin-top:14px">
+                  <a class="btn sm" href="#"><svg class="i s16"><use href="#i-star"/></svg>Set as cover</a>
+                  <a class="btn sm" href="#"><svg class="i s16"><use href="#i-trash"/></svg>Remove</a>
+                </div>
+              </div>
+
+              <div class="fblk">
+                <h3>Suggested shots</h3>
+                <p class="hint">Listings with these three get more enquiries.</p>
+                <div class="tips"><span>Living room</span><span>Kitchen</span><span>Bedroom</span></div>
+                <div class="tips" style="margin-top:10px"><span>Shoot in daylight</span><span>Keep the room tidy</span></div>
+              </div>
+            </div>
+
+            <aside>
+              <div class="pv">
+                <div class="pvhead"><b style="font-size:14px">Live preview</b><div class="sp"></div>
+                  <span class="seg2"><span aria-selected="true">Feed card</span><span>Full listing</span></span></div>
+                <div class="pcard">
+                  <div class="shot ph" data-l="COVER PHOTO"></div>
+                  <div class="ttl">₹ 62 Lakh</div><div class="sub">2 BHK Flat · Vesu, Surat</div>
+                  <div class="facts"><span>1150 sq.ft</span><span>·</span><span>7 photos</span></div>
+                </div>
+              </div>
+            </aside>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="barbtns"><a class="btn pri block" href="#">Continue to Preview</a></div>
+    <div data-part="bnav" data-active="create"></div>
+  </div>
+</template>
+
+<template id="tpl-preview">
+  <div class="app">
+    <div class="shell">
+      <div data-part="sidebar" data-active="Dashboard"></div>
+      <div class="mainwrap">
+        <div class="ctop"><div><h1>Preview</h1><div class="sub">This is what buyers will see</div></div><div class="sp"></div>
+          <div class="stepper">
+            <span class="st" data-on><span class="n">1</span>Type</span><span class="bar"></span>
+            <span class="st" data-on><span class="n">2</span>Details</span><span class="bar"></span>
+            <span class="st" data-on><span class="n">3</span>Photos</span><span class="bar"></span>
+            <span class="st" data-on><span class="n">4</span>Preview</span>
+          </div>
+          <a class="btn pri" href="#">Submit for Review</a>
+        </div>
+        <div class="content">
+          <div class="wizard">
+            <div class="form">
+              <div class="fblk">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+                  <h3 style="margin:0">Full listing</h3><div style="flex:1"></div>
+                  <span class="seg2"><span>Feed card</span><span aria-selected="true">Full listing</span></span>
+                </div>
+                <div class="ph" style="aspect-ratio:16/9;border-radius:12px" data-l="COVER PHOTO"></div>
+                <div style="font-size:24px;font-weight:700;margin-top:14px">₹ 62 Lakh</div>
+                <div style="font-size:15px;color:var(--ink-secondary)">2 BHK Flat for sale · Vesu, Surat</div>
+                <div style="display:flex;gap:7px;margin-top:10px;flex-wrap:wrap">
+                  <span class="tag mute">Ready to move</span><span class="tag info">Price negotiable</span>
+                </div>
+                <div style="margin-top:14px;display:grid;gap:0">
+                  <div style="display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--divider);font-size:13px"><span style="color:var(--ink-tertiary)">Built-up area</span><span style="font-weight:600">1150 sq.ft</span></div>
+                  <div style="display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--divider);font-size:13px"><span style="color:var(--ink-tertiary)">Carpet area</span><span style="font-weight:600">980 sq.ft</span></div>
+                  <div style="display:flex;justify-content:space-between;padding:9px 0;font-size:13px"><span style="color:var(--ink-tertiary)">Floor</span><span style="font-weight:600">2 of 7</span></div>
+                </div>
+                <p class="muted" style="margin-top:14px">Share and report open here for buyers. This opens your public profile in the feed.</p>
+              </div>
+            </div>
+
+            <aside>
+              <div class="pv">
+                <div class="h3" style="margin-bottom:10px">Before you submit</div>
+                <div style="display:grid;gap:10px;font-size:13px">
+                  <div style="display:flex;gap:9px"><svg class="i s18" style="color:var(--accent)"><use href="#i-check"/></svg><span>7 photos added, cover set</span></div>
+                  <div style="display:flex;gap:9px"><svg class="i s18" style="color:var(--accent)"><use href="#i-check"/></svg><span>All required fields answered</span></div>
+                  <div style="display:flex;gap:9px"><svg class="i s18" style="color:var(--accent)"><use href="#i-check"/></svg><span>1 listing slot will be used</span></div>
+                </div>
+                <a class="btn pri block" href="#" style="margin-top:16px">Submit for Review</a>
+                <p class="muted" style="margin:12px 0 0">Reviews usually finish within 24 hours. You'll get a notification either way.</p>
+              </div>
+            </aside>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="barbtns"><a class="btn pri block" href="#">Submit for Review</a></div>
+    <div data-part="bnav" data-active="create"></div>
+  </div>
+</template>
+
+<template id="tpl-done">
+  <div class="app">
+    <div class="shell">
+      <div data-part="sidebar" data-active="Drafts"></div>
+      <div class="mainwrap">
+        <div class="ctop"><div><h1>Listing submitted</h1></div><div class="sp"></div><a class="btn" href="#">Go to My Listings</a></div>
+        <div class="content">
+          <div class="okwrap">
+            <div class="ring"><svg class="i s32"><use href="#i-check"/></svg></div>
+            <h2 style="margin:0;font-size:22px;font-weight:700">Listing submitted</h2>
+            <p style="margin:10px 0 0;color:var(--ink-secondary);font-size:14px">
+              We review every listing before it goes <b>Live on HomzList</b>. This usually takes under 24 hours.
+            </p>
+            <div style="display:flex;gap:10px;justify-content:center;margin-top:20px;flex-wrap:wrap">
+              <a class="btn pri" href="#">Go to My Listings</a>
+              <a class="btn" href="#"><svg class="i s16"><use href="#i-rocket"/></svg>Boost it now</a>
+            </div>
+          </div>
+
+          <section class="sec carousel" style="max-width:1000px;margin:20px auto 0">
+            <div class="sechead"><div><h2 class="h2">Drafts</h2><div class="sub">1 unfinished listing</div></div><div class="sp"></div>
+              <div class="arrows"><span class="arrow" aria-disabled="true"><svg class="i s16"><use href="#i-left"/></svg></span><span class="arrow"><svg class="i s16"><use href="#i-right"/></svg></span></div></div>
+            <div class="rail">
+              <div class="pcard"><div class="shot ph" data-l="NO PHOTOS"></div><div class="ttl" style="font-size:15px">3 BHK Flat · Adajan</div><div class="muted">Step 2 of 4 · saved 3 days ago</div><a class="btn sm block" href="#" style="margin-top:10px">Continue</a></div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+    <div data-part="bnav" data-active="create"></div>
+  </div>
+</template>
+
+<script src="_kit.js"></script>
+</body>
+</html>

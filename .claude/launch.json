@@ -4,10 +4,15 @@
     {
       "name": "homzlist-dev",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev:warm"],
+      "runtimeArgs": [
+        "run",
+        "dev:warm"
+      ],
       "port": 3000,
       "autoPort": true,
-      "env": { "NEXT_DIST_DIR": ".next-claude" }
+      "env": {
+        "NEXT_DIST_DIR": ".next-claude"
+      }
     },
     {
       "name": "homzlist-attach",
@@ -17,7 +22,13 @@
     {
       "name": "homzlist-prod",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "start", "--", "-p", "3000"],
+      "runtimeArgs": [
+        "run",
+        "start",
+        "--",
+        "-p",
+        "3000"
+      ],
       "port": 3000
     },
     {
@@ -29,6 +40,14 @@
       "name": "homzlist-admin",
       "url": "http://account.localhost:3000",
       "port": 3000
+    },
+    {
+      "name": "homzlist-designs",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "scripts/serve-designs.mjs"
+      ],
+      "port": 4173
     }
   ]
 }

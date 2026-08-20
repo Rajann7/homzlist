@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>HomzList — 09 · Project create &amp; insights (desktop + tablet)</title>
+<link rel="stylesheet" href="_kit.css" />
+<style>
+.wizard{display:block}
+.form{max-width:none}
+.fblk{background:var(--surface-1);border:1px solid var(--border);border-radius:14px;padding:16px;margin:0 0 14px}
+.fblk h3{margin:0 0 4px;font-size:15px;font-weight:700}
+.fblk .hint{font-size:12px;color:var(--ink-tertiary);margin:0 0 14px}
+.frow{display:grid;grid-template-columns:1fr;gap:12px;margin-bottom:12px}
+.lab{display:block;font-size:13px;font-weight:600;color:var(--ink-secondary);margin-bottom:6px}
+.inp{height:44px;border:1px solid var(--border);border-radius:10px;background:var(--surface-2);display:flex;align-items:center;justify-content:space-between;padding:0 13px;font-size:14px}
+.inp.empty{color:var(--ink-tertiary)}
+.inp.ta{height:96px;align-items:flex-start;padding-top:11px}
+.unitform{border:1px solid var(--border);border-radius:12px;padding:14px;background:var(--surface-2);margin-bottom:10px}
+.unitform .uh{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.unitform .uh b{font-size:14px}
+.unitform .uh .sp{flex:1}
+.pv{background:var(--surface-1);border:1px solid var(--border);border-radius:16px;padding:16px;position:sticky;top:120px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.kpi{display:flex;border:1px solid var(--border);border-radius:14px;overflow:hidden;background:var(--surface-1)}
+.kpi div{flex:1;padding:15px 12px;border-right:1px solid var(--divider)}
+.kpi div:last-child{border-right:0}
+.kpi b{display:block;font-size:22px;font-weight:700;letter-spacing:-.01em}
+.kpi span{font-size:12px;color:var(--ink-tertiary)}
+.chart{height:180px;border:1px solid var(--border);border-radius:14px;background:var(--surface-1);padding:14px;display:flex;align-items:flex-end;gap:6px}
+.chart i{flex:1;background:var(--accent-soft);border-radius:5px 5px 0 0;display:block}
+.chart i.hi{background:var(--accent)}
+.barbtns{display:flex;gap:10px;padding:12px 16px;border-top:1px solid var(--border);background:var(--surface-1);position:sticky;bottom:52px}
+@container (min-width:768px){
+  .frow.two{grid-template-columns:1fr 1fr;gap:14px}
+  .frow.three{grid-template-columns:1fr 1fr 1fr;gap:14px}
+}
+@container (min-width:1200px){
+  .wizard{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:28px;align-items:start}
+  .form{max-width:760px}
+  .barbtns{display:none}
+}
+</style>
+</head>
+<body>
+
+<div class="bar">
+  <b>09 · Project create &amp; insights</b>
+  <div class="seg"><button data-dark aria-pressed="false">Dark</button></div>
+  <div class="sp"></div>
+  <span class="note">Builder-only, exactly as the app gates it: "New Project" appears because only a Builder can buy
+  the ₹9,999 plan behind it, and project slots are their own counter. Unit types carry the app's own fields —
+  Built-up area · Carpet area · Price from · Units available.</span>
+</div>
+
+<div class="stage">
+
+  <div>
+    <p class="caption">A · New project — Desktop 1440 (form + live preview)</p>
+    <div class="scaler"><div class="frame" data-w="1440" style="width:1440px" data-tpl="newproj"></div></div>
+  </div>
+
+  <div class="annot">
+    <h3>Decisions</h3>
+    <ul>
+      <li><b>Unit types are the hard part, so desktop gives them room.</b> On mobile each unit type is a
+      separate sheet; here they stack as inline sub-forms with their four real fields side by side, and the
+      preview shows the unit carousel a buyer will see. A builder entering six unit types on a phone is the
+      single most painful flow in the app, and this is where desktop pays for itself.</li>
+      <li><b>RERA is a first-class block</b>, not a field buried in "more": registration number, exemption
+      toggle, and the document rows the project page renders under Approvals &amp; documents.</li>
+      <li><b>Project slots, not listing slots.</b> The counter line says "1 project slot left" and reads the
+      builder's own counter — the app keeps these separate (migration 0065) and so does this.</li>
+      <li>Below 1200 the preview unpins to the bottom and the mobile action bar returns; the form itself is
+      identical.</li>
+    </ul>
+  </div>
+
+  <div>
+    <p class="caption">B · Project insights — Desktop 1440</p>
+    <div class="scaler"><div class="frame" data-w="1440" style="width:1440px" data-tpl="insights"></div></div>
+  </div>
+
+  <div class="annot">
+    <h3>Insights</h3>
+    <ul>
+      <li>The same three counts the app already computes — Views · Saves · Leads — plus the per-unit split,
+      which is the question a builder actually asks ("which unit type is moving?").</li>
+      <li>The trend is a plain bar series, no library and no new colours: <code>--accent</code> and
+      <code>--accent-soft</code> only. It is <b>not</b> a map and not a new metric — nothing here is invented
+      data.</li>
+      <li>Listing insights (<code>/listings/[id]/insights</code>) use the same composition with one subject
+      instead of unit types.</li>
+    </ul>
+  </div>
+
+  <div>
+    <p class="caption">C · New project — Tablet 1024</p>
+    <div class="scaler"><div class="frame" data-w="1024" style="width:1024px" data-tpl="newproj"></div></div>
+  </div>
+
+  <div>
+    <p class="caption">D · New project — Tablet 768</p>
+    <div class="scaler"><div class="frame" data-w="768" style="width:768px" data-tpl="newproj"></div></div>
+  </div>
+
+</div>
+
+<template id="tpl-newproj">
+  <div class="app">
+    <div class="shell">
+      <div data-part="sidebar" data-active="My Listings"></div>
+      <div class="mainwrap">
+        <div class="ctop"><div><h1>New project</h1><div class="sub">1 project slot left · Builder plan</div></div><div class="sp"></div>
+          <div class="stepper">
+            <span class="st" data-on><span class="n">1</span>Basics</span><span class="bar"></span>
+            <span class="st" data-on><span class="n">2</span>Units</span><span class="bar"></span>
+            <span class="st"><span class="n">3</span>Photos</span><span class="bar"></span>
+            <span class="st"><span class="n">4</span>Preview</span>
+          </div>
+          <a class="btn" href="#">Save draft</a><a class="btn pri" href="#">Continue</a>
+        </div>
+
+        <div class="content">
+          <div class="wizard">
+            <div class="form">
+              <div class="fblk">
+                <h3>Project basics</h3>
+                <p class="hint">This is the name and location buyers search for.</p>
+                <div class="frow two">
+                  <div><span class="lab">Project name</span><div class="inp">Shreeji Heights</div></div>
+                  <div><span class="lab">Builder</span><div class="inp">Shreeji Group</div></div>
+                </div>
+                <div class="frow two">
+                  <div><span class="lab">City</span><div class="inp">Surat<svg class="i s16"><use href="#i-chevron"/></svg></div></div>
+                  <div><span class="lab">Area</span><div class="inp">Vesu<svg class="i s16"><use href="#i-chevron"/></svg></div></div>
+                </div>
+                <div class="frow three">
+                  <div><span class="lab">Towers</span><div class="inp">2</div></div>
+                  <div><span class="lab">Floors per tower</span><div class="inp">7</div></div>
+                  <div><span class="lab">Total units</span><div class="inp">96</div></div>
+                </div>
+                <div class="frow two">
+                  <div><span class="lab">Status</span><div class="inp">Under construction<svg class="i s16"><use href="#i-chevron"/></svg></div></div>
+                  <div><span class="lab">Possession</span><div class="inp">Dec 2027<svg class="i s16"><use href="#i-chevron"/></svg></div></div>
+                </div>
+              </div>
+
+              <div class="fblk">
+                <h3>RERA</h3>
+                <p class="hint">Buyers check this number on the state portal. It shows as a chip on your project page.</p>
+                <div class="frow two">
+                  <div><span class="lab">RERA registration number</span><div class="inp">PR/GJ/SURAT/2024/00812</div></div>
+                  <div><span class="lab">Status</span><div class="inp">RERA Approved<svg class="i s16"><use href="#i-chevron"/></svg></div></div>
+                </div>
+                <div style="display:flex;align-items:center;justify-content:space-between;font-size:13px">
+                  This project is RERA exempt
+                  <span style="width:38px;height:22px;border-radius:999px;background:var(--surface-3);position:relative"><span style="position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:999px;background:#fff"></span></span>
+                </div>
+              </div>
+
+              <div class="fblk">
+                <h3>Unit types</h3>
+                <p class="hint">Each type becomes a card buyers can enquire about.</p>
+
+                <div class="unitform">
+                  <div class="uh"><b>Unit type 1</b><div class="sp"></div><span class="tag ok">18 available</span><svg class="i s18" style="color:var(--ink-tertiary)"><use href="#i-trash"/></svg></div>
+                  <div class="frow two">
+                    <div><span class="lab">Configuration</span><div class="inp">2 BHK<svg class="i s16"><use href="#i-chevron"/></svg></div></div>
+                    <div><span class="lab">Tower / label</span><div class="inp">Tower A · Type 1</div></div>
+                  </div>
+                  <div class="frow two">
+                    <div><span class="lab">Built-up area (sq.ft)</span><div class="inp">1150</div></div>
+                    <div><span class="lab">Carpet area (sq.ft)</span><div class="inp">980</div></div>
+                  </div>
+                  <div class="frow two">
+                    <div><span class="lab">Price from</span><div class="inp">₹ 58,00,000</div></div>
+                    <div><span class="lab">Units available</span><div class="inp">18</div></div>
+                  </div>
+                </div>
+
+                <div class="unitform">
+                  <div class="uh"><b>Unit type 2</b><div class="sp"></div><span class="tag ok">15 available</span><svg class="i s18" style="color:var(--ink-tertiary)"><use href="#i-trash"/></svg></div>
+                  <div class="frow two">
+                    <div><span class="lab">Configuration</span><div class="inp">3 BHK<svg class="i s16"><use href="#i-chevron"/></svg></div></div>
+                    <div><span class="lab">Tower / label</span><div class="inp">Tower A · Type 2</div></div>
+                  </div>
+                  <div class="frow two">
+                    <div><span class="lab">Built-up area (sq.ft)</span><div class="inp">1620</div></div>
+                    <div><span class="lab">Carpet area (sq.ft)</span><div class="inp">1380</div></div>
+                  </div>
+                  <div class="frow two">
+                    <div><span class="lab">Price from</span><div class="inp">₹ 92,00,000</div></div>
+                    <div><span class="lab">Units available</span><div class="inp">15</div></div>
+                  </div>
+                </div>
+
+                <a class="btn block" href="#"><svg class="i s16"><use href="#i-plus-b"/></svg>Add another unit type</a>
+              </div>
+
+              <div class="fblk">
+                <h3>Amenities</h3>
+                <div class="chips">
+                  <span class="pill" aria-pressed="true">Clubhouse</span><span class="pill" aria-pressed="true">Gym</span>
+                  <span class="pill" aria-pressed="true">Swimming pool</span><span class="pill" aria-pressed="true">Landscaped podium</span>
+                  <span class="pill">Jogging track</span><span class="pill" aria-pressed="true">24×7 security</span>
+                  <span class="pill" aria-pressed="true">Covered parking</span><span class="pill">Indoor games</span>
+                </div>
+              </div>
+
+              <div class="fblk">
+                <h3>Home loan approved by</h3>
+                <div class="chips">
+                  <span class="pill" aria-pressed="true">HDFC Bank</span><span class="pill" aria-pressed="true">SBI</span>
+                  <span class="pill" aria-pressed="true">ICICI Bank</span><span class="pill">Axis Bank</span>
+                  <span class="pill" aria-pressed="true">LIC Housing</span><span class="pill">Bajaj Housing</span>
+                </div>
+              </div>
+
+              <div class="fblk">
+                <h3>About this project</h3>
+                <div class="inp ta">Two-tower residential project in Vesu with 2 and 3 BHK homes, a landscaped podium and a clubhouse…</div>
+              </div>
+            </div>
+
+            <aside>
+              <div class="pv">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px"><b style="font-size:14px">Live preview</b><div style="flex:1"></div><span class="tag ok">RERA</span></div>
+                <div class="pcard">
+                  <div class="shot ph" data-l="COVER"></div>
+                  <div class="ttl">Shreeji Heights</div>
+                  <div class="sub">Vesu, Surat · 2, 3 BHK</div>
+                  <div class="facts"><span>₹ 58 L – 92 L</span><span>·</span><span>33 units available</span></div>
+                </div>
+                <div class="h3" style="margin:16px 0 8px">Units buyers will see</div>
+                <div style="display:grid;gap:8px">
+                  <div style="display:flex;justify-content:space-between;font-size:13px;padding:9px 11px;border:1px solid var(--border);border-radius:10px"><span>2 BHK · 1150 sq.ft</span><b>₹ 58 L</b></div>
+                  <div style="display:flex;justify-content:space-between;font-size:13px;padding:9px 11px;border:1px solid var(--border);border-radius:10px"><span>3 BHK · 1620 sq.ft</span><b>₹ 92 L</b></div>
+                </div>
+                <p class="muted" style="margin:14px 0 0">Updates as you type. Submitting sends the project for review.</p>
+              </div>
+            </aside>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="barbtns"><a class="btn block" href="#">Save draft</a><a class="btn pri block" href="#">Continue</a></div>
+    <div data-part="bnav" data-active="create"></div>
+  </div>
+</template>
+
+<template id="tpl-insights">
+  <div class="app">
+    <div class="shell">
+      <div data-part="sidebar" data-active="My Listings"></div>
+      <div class="mainwrap">
+        <div class="ctop"><div><h1>Shreeji Heights</h1><div class="sub">Project insights · last 30 days</div></div><div class="sp"></div>
+          <a class="btn" href="#"><svg class="i s16"><use href="#i-eye"/></svg>View project</a>
+          <a class="btn pri" href="#"><svg class="i s16"><use href="#i-rocket"/></svg>Boost</a></div>
+
+        <div class="content">
+          <div class="cols">
+            <div>
+              <div class="kpi" style="margin-bottom:18px">
+                <div><b>2,140</b><span>Views</span></div>
+                <div><b>186</b><span>Saves</span></div>
+                <div><b>34</b><span>Leads</span></div>
+                <div><b>1.6%</b><span>Views → leads</span></div>
+              </div>
+
+              <section class="sec">
+                <div class="sechead"><div><h2 class="h2">Views</h2><div class="sub">last 30 days</div></div><div class="sp"></div><span class="pill">30 days <svg class="i s14"><use href="#i-chevron"/></svg></span></div>
+                <div class="chart">
+                  <i style="height:34%"></i><i style="height:48%"></i><i style="height:40%"></i><i style="height:62%"></i>
+                  <i style="height:55%"></i><i style="height:71%"></i><i class="hi" style="height:88%"></i><i style="height:66%"></i>
+                  <i style="height:74%"></i><i style="height:52%"></i><i style="height:60%"></i><i style="height:45%"></i>
+                  <i style="height:69%"></i><i class="hi" style="height:92%"></i><i style="height:58%"></i>
+                </div>
+              </section>
+
+              <section class="sec carousel">
+                <div class="sechead"><div><h2 class="h2">By unit type</h2><div class="sub">which type is moving</div></div><div class="sp"></div>
+                  <div class="arrows"><span class="arrow" aria-disabled="true"><svg class="i s16"><use href="#i-left"/></svg></span><span class="arrow"><svg class="i s16"><use href="#i-right"/></svg></span></div></div>
+                <div class="rail">
+                  <div class="card pad"><b style="font-size:15px">2 BHK</b><div class="muted" style="margin-bottom:10px">Tower A · Type 1</div>
+                    <div style="display:flex;justify-content:space-between;font-size:13px;padding:6px 0"><span class="muted">Leads</span><b>18</b></div>
+                    <div style="display:flex;justify-content:space-between;font-size:13px;padding:6px 0"><span class="muted">Available</span><b>18</b></div></div>
+                  <div class="card pad"><b style="font-size:15px">3 BHK</b><div class="muted" style="margin-bottom:10px">Tower A · Type 2</div>
+                    <div style="display:flex;justify-content:space-between;font-size:13px;padding:6px 0"><span class="muted">Leads</span><b>11</b></div>
+                    <div style="display:flex;justify-content:space-between;font-size:13px;padding:6px 0"><span class="muted">Available</span><b>15</b></div></div>
+                  <div class="card pad"><b style="font-size:15px">3 BHK Large</b><div class="muted" style="margin-bottom:10px">Tower B · Type 3</div>
+                    <div style="display:flex;justify-content:space-between;font-size:13px;padding:6px 0"><span class="muted">Leads</span><b>5</b></div>
+                    <div style="display:flex;justify-content:space-between;font-size:13px;padding:6px 0"><span class="muted">Available</span><b>8</b></div></div>
+                  <div class="card pad" style="opacity:.65"><b style="font-size:15px">2 BHK Compact</b><div class="muted" style="margin-bottom:10px">Tower B · Type 4</div>
+                    <div style="display:flex;justify-content:space-between;font-size:13px;padding:6px 0"><span class="muted">Leads</span><b>0</b></div>
+                    <div style="display:flex;justify-content:space-between;font-size:13px;padding:6px 0"><span class="muted">Available</span><b>Sold out</b></div></div>
+                </div>
+              </section>
+            </div>
+
+            <aside class="rail-side">
+              <div class="card pad">
+                <div class="h3" style="margin-bottom:10px">Recent leads</div>
+                <div style="display:grid;gap:11px">
+                  <div style="display:flex;align-items:center;gap:9px"><span class="avatar" style="background:var(--avatar-1);width:28px;height:28px;font-size:12px">A</span><span style="flex:1;font-size:13px">Amit R. · 3 BHK</span><span class="muted">2h</span></div>
+                  <div style="display:flex;align-items:center;gap:9px"><span class="avatar" style="background:var(--avatar-5);width:28px;height:28px;font-size:12px">N</span><span style="flex:1;font-size:13px">Nisha P. · 2 BHK</span><span class="muted">5h</span></div>
+                  <div style="display:flex;align-items:center;gap:9px"><span class="avatar" style="background:var(--avatar-7);width:28px;height:28px;font-size:12px">K</span><span style="flex:1;font-size:13px">Kunal S. · site visit</span><span class="muted">1d</span></div>
+                </div>
+                <a class="btn sm block" href="#" style="margin-top:12px">Open Leads</a>
+              </div>
+              <div class="card pad">
+                <div class="h3" style="margin-bottom:8px">Boost</div>
+                <p class="muted" style="margin:0 0 10px">Boosted projects appear in top picks and get more enquiries.</p>
+                <a class="btn pri sm block" href="#">Boost this project</a>
+              </div>
+            </aside>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div data-part="bnav" data-active="profile"></div>
+  </div>
+</template>
+
+<script src="_kit.js"></script>
+</body>
+</html>

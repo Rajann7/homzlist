@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>HomzList — 23 · Components at desktop size</title>
+<link rel="stylesheet" href="_kit.css" />
+<style>
+.gal{background:var(--surface-1);border:1px solid var(--border);border-radius:14px;padding:18px;margin:0 0 16px}
+.gal h3{margin:0 0 4px;font-size:15px;font-weight:700}
+.gal .hint{font-size:12px;color:var(--ink-tertiary);margin:0 0 14px}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.spec{font-size:11px;color:var(--ink-tertiary);font-family:ui-monospace,Menlo,Consolas,monospace}
+.swatch{width:100%;height:52px;border-radius:10px;border:1px solid var(--border)}
+.swrap{width:132px}
+.swrap .nm{font-size:12px;font-weight:600;margin-top:7px}
+.inp{height:44px;border:1px solid var(--border);border-radius:10px;background:var(--surface-2);display:flex;align-items:center;padding:0 13px;font-size:14px;color:var(--ink-tertiary);width:280px}
+.inp.focus{border:1.5px solid var(--accent);background:var(--surface-1)}
+.inp.err{border:1.5px solid var(--error)}
+.sw{width:38px;height:22px;border-radius:999px;background:var(--surface-3);position:relative;flex:0 0 38px}
+.sw.on{background:var(--accent)}
+.sw::after{content:"";position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:999px;background:#fff}
+.sw.on::after{left:19px}
+.skel{height:14px;border-radius:6px;background:var(--surface-3);margin-bottom:9px}
+.toast{display:inline-flex;align-items:center;gap:10px;padding:12px 15px;border-radius:12px;background:var(--ink-primary);color:var(--ink-inverse);font-size:13px;font-weight:600}
+.dlg{width:380px;border-radius:18px;background:var(--surface-1);border:1px solid var(--border);padding:20px;box-shadow:var(--shadow-lg)}
+.strip{display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:12px;font-size:13px}
+.tblwrap{overflow-x:auto}
+table.t{width:100%;border-collapse:collapse;font-size:13px;min-width:520px}
+table.t th{text-align:left;padding:10px 12px;font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-tertiary);border-bottom:1px solid var(--border)}
+table.t td{padding:12px;border-bottom:1px solid var(--divider)}
+.icons{display:flex;flex-wrap:wrap;gap:14px}
+.icons span{width:64px;text-align:center;font-size:10px;color:var(--ink-tertiary)}
+.icons svg{margin:0 auto 5px;color:var(--ink-primary)}
+</style>
+</head>
+<body>
+
+<div class="bar">
+  <b>23 · Components at desktop size</b>
+  <div class="seg"><button data-dark aria-pressed="false">Dark</button></div>
+  <div class="sp"></div>
+  <span class="note">The primitives every other file in this folder is built from, at their desktop and tablet
+  sizes, in both themes. Colours are <code>app/globals.css</code> tokens only — no new hex anywhere in this set.</span>
+</div>
+
+<div class="stage">
+
+  <div>
+    <p class="caption">A · Component gallery — Desktop 1440 (toggle Dark above to check both themes)</p>
+    <div class="scaler"><div class="frame" data-w="1440" style="width:1440px" data-tpl="gal"></div></div>
+  </div>
+
+  <div class="annot">
+    <h3>What this file is for</h3>
+    <ul>
+      <li>It is the checklist for the port. If a component here matches the app after the change, every screen
+      built from it matches too.</li>
+      <li><b>Sizes are the desktop ones</b>: buttons 40 (32 small), inputs 44, radius 10–16, card radius 14–16,
+      carousel gap 20 at desktop and 24 at 1600.</li>
+      <li><b>Every colour is a token.</b> Dark mode is a token swap and nothing else — that is why the toggle
+      changes the whole gallery without a single component-level override.</li>
+      <li><b>Tables appear only here and in Payments.</b> Everywhere else the app uses cards or rows, per the
+      owner's carousel rule.</li>
+    </ul>
+  </div>
+
+  <div>
+    <p class="caption">B · Component gallery — Tablet 768</p>
+    <div class="scaler"><div class="frame" data-w="768" style="width:768px" data-tpl="gal"></div></div>
+  </div>
+
+</div>
+
+<template id="tpl-gal">
+  <div class="app">
+    <div class="shell">
+      <div data-part="sidebar" data-active="Settings"></div>
+      <div class="mainwrap">
+        <div class="ctop"><div><h1>Components</h1><div class="sub">Desktop and tablet sizes · light and dark</div></div><div class="sp"></div></div>
+        <div class="content">
+
+          <div class="gal">
+            <h3>Colour tokens</h3>
+            <p class="hint">From <code>app/globals.css</code>. Nothing in this design set adds a colour.</p>
+            <div class="row">
+              <div class="swrap"><div class="swatch" style="background:var(--accent)"></div><div class="nm">--accent</div><div class="spec">#0f9d58</div></div>
+              <div class="swrap"><div class="swatch" style="background:var(--accent-soft)"></div><div class="nm">--accent-soft</div><div class="spec">#e6f4ec</div></div>
+              <div class="swrap"><div class="swatch" style="background:var(--surface-1)"></div><div class="nm">--surface-1</div><div class="spec">#ffffff</div></div>
+              <div class="swrap"><div class="swatch" style="background:var(--surface-2)"></div><div class="nm">--surface-2</div><div class="spec">#f5f5f5</div></div>
+              <div class="swrap"><div class="swatch" style="background:var(--surface-3)"></div><div class="nm">--surface-3</div><div class="spec">#efefef</div></div>
+              <div class="swrap"><div class="swatch" style="background:var(--error)"></div><div class="nm">--error</div><div class="spec">#ed4956</div></div>
+              <div class="swrap"><div class="swatch" style="background:var(--warning)"></div><div class="nm">--warning</div><div class="spec">#f5a623</div></div>
+              <div class="swrap"><div class="swatch" style="background:var(--info)"></div><div class="nm">--info</div><div class="spec">#0095f6</div></div>
+            </div>
+          </div>
+
+          <div class="gal">
+            <h3>Buttons</h3>
+            <p class="hint">40px default, 32px small, radius 10.</p>
+            <div class="row">
+              <a class="btn pri" href="#">Primary</a>
+              <a class="btn" href="#">Secondary</a>
+              <a class="btn ghost" href="#">Ghost</a>
+              <a class="btn pri" href="#"><svg class="i s16"><use href="#i-plus-b"/></svg>With icon</a>
+              <span class="btn" style="color:var(--ink-disabled);border-color:var(--border)">Disabled</span>
+              <a class="btn sm" href="#">Small</a>
+              <a class="btn pri sm" href="#">Small primary</a>
+              <a class="btn sm" href="#" style="color:var(--error);border-color:var(--error)">Destructive</a>
+            </div>
+          </div>
+
+          <div class="gal">
+            <h3>Pills, chips and tags</h3>
+            <div class="row" style="margin-bottom:12px">
+              <span class="pill">Default</span><span class="pill" aria-pressed="true">Selected</span>
+              <span class="pill">With chevron <svg class="i s14"><use href="#i-chevron"/></svg></span>
+              <span class="pill">Vesu <svg class="i s14"><use href="#i-close"/></svg></span>
+            </div>
+            <div class="row">
+              <span class="tag ok">Verified</span><span class="tag warn">Boosted</span><span class="tag err">Failed</span>
+              <span class="tag info">Under Review</span><span class="tag mute">Hidden</span>
+            </div>
+          </div>
+
+          <div class="gal">
+            <h3>Inputs</h3>
+            <div class="row" style="align-items:flex-start">
+              <div><div class="inp">Placeholder</div><div class="spec" style="margin-top:6px">rest</div></div>
+              <div><div class="inp focus" style="color:var(--ink-primary)">Typing…</div><div class="spec" style="margin-top:6px">focus</div></div>
+              <div><div class="inp err" style="color:var(--ink-primary)">98250</div><div class="spec" style="margin-top:6px;color:var(--error)">Enter a valid number</div></div>
+              <div style="display:flex;align-items:center;gap:10px;height:44px">Toggle off <span class="sw"></span></div>
+              <div style="display:flex;align-items:center;gap:10px;height:44px">Toggle on <span class="sw on"></span></div>
+            </div>
+          </div>
+
+          <div class="gal">
+            <h3>Cards in a carousel</h3>
+            <p class="hint">The only card container in this set. 4 up at 1440, 5 at 1600, 2 at tablet.</p>
+            <div class="carousel">
+              <div class="rail">
+                <div class="pcard"><div class="shot ph" data-l="PHOTO"></div><div class="ttl">₹ 62 Lakh</div><div class="sub">2 BHK Flat · Vesu</div><div class="facts"><span>1150 sq.ft</span><span class="tag ok">Verified</span></div></div>
+                <div class="pcard"><div class="shot ph" data-l="PHOTO"></div><div class="ttl">₹ 1.15 Cr</div><div class="sub">3 BHK Flat · Adajan</div><div class="facts"><span>1780 sq.ft</span></div></div>
+                <div class="pcard"><div class="shot ph" data-l="PROJECT"></div><div class="ttl">Shreeji Heights</div><div class="sub">Vesu · 2, 3 BHK</div><div class="facts"><span class="tag ok">RERA</span></div></div>
+                <div class="pcard"><div class="shot ph" data-l="PHOTO"></div><div class="ttl">₹ 24,000 / mo</div><div class="sub">2 BHK Flat · Piplod</div></div>
+                <div class="card person"><div class="av" style="background:var(--avatar-1)">S</div><div class="nm">Shreeji Group</div><div class="rl">6 projects</div></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="gal">
+            <h3>Section header</h3>
+            <div class="sechead">
+              <div><h2 class="h2">HomzList top picks</h2><div class="sub">18 live projects in Surat</div></div>
+              <div class="sp"></div>
+              <div class="arrows" style="display:flex"><span class="arrow" aria-disabled="true"><svg class="i s16"><use href="#i-left"/></svg></span><span class="arrow"><svg class="i s16"><use href="#i-right"/></svg></span></div>
+              <a class="link" href="#">View all</a>
+            </div>
+          </div>
+
+          <div class="gal">
+            <h3>Tabs and stepper</h3>
+            <div class="tabs" style="margin-bottom:18px">
+              <button aria-selected="true">All</button><button>Properties</button><button>Projects</button>
+              <button>Brokers &amp; Builders</button><button>Areas</button>
+            </div>
+            <div class="stepper" style="display:flex">
+              <span class="st" data-on><span class="n">1</span>Type</span><span class="bar"></span>
+              <span class="st" data-on><span class="n">2</span>Details</span><span class="bar"></span>
+              <span class="st"><span class="n">3</span>Photos</span><span class="bar"></span>
+              <span class="st"><span class="n">4</span>Preview</span>
+            </div>
+          </div>
+
+          <div class="gal">
+            <h3>Strips, toast and dialog</h3>
+            <div class="row" style="align-items:flex-start;margin-bottom:14px">
+              <span class="strip" style="background:var(--info-soft);color:var(--ink-secondary)"><svg class="i s18" style="color:var(--info)"><use href="#i-alert"/></svg>Under review — usually within 24 hours</span>
+              <span class="strip" style="background:var(--warning-soft);color:var(--ink-secondary)"><svg class="i s18" style="color:var(--warning)"><use href="#i-alert"/></svg>Too many attempts. Try again in 1 hour.</span>
+              <span class="strip" style="background:var(--error-soft);color:var(--error)"><svg class="i s18"><use href="#i-alert"/></svg>This number is locked for 24 hours.</span>
+            </div>
+            <div class="row" style="align-items:flex-start">
+              <span class="toast"><svg class="i s18"><use href="#i-check"/></svg>Listing updated</span>
+              <div class="dlg">
+                <b style="font-size:16px">Mark as sold?</b>
+                <p class="muted" style="margin:8px 0 16px">Buyers will no longer see this listing, and any running boost stops.</p>
+                <div style="display:flex;gap:10px"><a class="btn" href="#" style="flex:1">Cancel</a><a class="btn pri" href="#" style="flex:1">Confirm</a></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="gal">
+            <h3>Table</h3>
+            <p class="hint">Used only in Payments. Everywhere else: rows or carousels.</p>
+            <div class="tblwrap">
+              <table class="t">
+                <tr><th>What for</th><th>Date</th><th>Method</th><th>Status</th><th>Amount</th><th></th></tr>
+                <tr><td>Owner Pro · 12 months</td><td>20 Aug 2026</td><td>UPI</td><td><span class="tag ok">Paid</span></td><td><b>₹ 2,745</b></td><td><a class="link" href="#">Invoice</a></td></tr>
+                <tr><td>Boost · 2 BHK, Vesu</td><td>14 Aug 2026</td><td>Card</td><td><span class="tag ok">Paid</span></td><td><b>₹ 499</b></td><td><a class="link" href="#">Invoice</a></td></tr>
+                <tr><td>Top up · +5 slots</td><td>11 Aug 2026</td><td>Net Banking</td><td><span class="tag err">Failed</span></td><td><b>₹ 499</b></td><td><a class="link" href="#">Check status</a></td></tr>
+              </table>
+            </div>
+          </div>
+
+          <div class="gal">
+            <h3>Loading and empty</h3>
+            <div class="row" style="align-items:flex-start">
+              <div style="width:280px">
+                <div class="skel" style="height:150px;border-radius:12px"></div>
+                <div class="skel" style="width:60%"></div>
+                <div class="skel" style="width:85%"></div>
+              </div>
+              <div style="width:340px;text-align:center;padding:28px 20px;border:1px dashed var(--border);border-radius:16px">
+                <svg class="i s32" style="color:var(--ink-disabled);margin:0 auto 12px"><use href="#i-heart"/></svg>
+                <b style="font-size:15px">Nothing saved yet</b>
+                <p class="muted" style="margin:6px 0 14px">Tap the heart on any property.</p>
+                <a class="btn pri sm" href="#">Explore properties</a>
+              </div>
+            </div>
+          </div>
+
+          <div class="gal">
+            <h3>Icons</h3>
+            <p class="hint">Drawn from the app's own <code>Icon</code> set. 20px default, 24 in headers, 26 in the bottom nav.</p>
+            <div class="icons">
+              <span><svg class="i s24"><use href="#i-home"/></svg>home</span>
+              <span><svg class="i s24"><use href="#i-search"/></svg>search</span>
+              <span><svg class="i s24"><use href="#i-plus"/></svg>create</span>
+              <span><svg class="i s24"><use href="#i-leads"/></svg>leads</span>
+              <span><svg class="i s24"><use href="#i-user"/></svg>profile</span>
+              <span><svg class="i s24"><use href="#i-bell"/></svg>bell</span>
+              <span><svg class="i s24"><use href="#i-heart"/></svg>saved</span>
+              <span><svg class="i s24"><use href="#i-grid"/></svg>dashboard</span>
+              <span><svg class="i s24"><use href="#i-pin"/></svg>pin</span>
+              <span><svg class="i s24"><use href="#i-file"/></svg>file</span>
+              <span><svg class="i s24"><use href="#i-send"/></svg>send</span>
+              <span><svg class="i s24"><use href="#i-card"/></svg>card</span>
+              <span><svg class="i s24"><use href="#i-receipt"/></svg>receipt</span>
+              <span><svg class="i s24"><use href="#i-rocket"/></svg>boost</span>
+              <span><svg class="i s24"><use href="#i-shield"/></svg>verified</span>
+              <span><svg class="i s24"><use href="#i-building"/></svg>builder</span>
+              <span><svg class="i s24"><use href="#i-briefcase"/></svg>broker</span>
+              <span><svg class="i s24"><use href="#i-settings"/></svg>settings</span>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+    <div data-part="bnav" data-active="profile"></div>
+  </div>
+</template>
+
+<script src="_kit.js"></script>
+</body>
+</html>

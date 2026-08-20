@@ -1,0 +1,388 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>HomzList — 17 · Profile (desktop + tablet)</title>
+<link rel="stylesheet" href="_kit.css" />
+<style>
+.phero{display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap;padding:20px;background:var(--surface-1);border:1px solid var(--border);border-radius:16px;margin-bottom:20px}
+.phero .av{width:88px;height:88px;border-radius:999px;display:grid;place-items:center;color:#fff;font-size:34px;font-weight:700;flex:0 0 88px}
+.phero .nm{font-size:23px;font-weight:700;letter-spacing:-.01em}
+.phero .rl{font-size:14px;color:var(--ink-secondary);margin-top:3px}
+.pstats{display:flex;gap:0;border:1px solid var(--border);border-radius:12px;overflow:hidden;background:var(--surface-1);margin-top:14px}
+.pstats div{padding:11px 18px;border-right:1px solid var(--divider);text-align:center}
+.pstats div:last-child{border-right:0}
+.pstats b{display:block;font-size:18px;font-weight:700}
+.pstats span{font-size:11px;color:var(--ink-tertiary)}
+.tabsrow{display:flex;gap:22px;border-bottom:1px solid var(--border);margin:0 0 18px;overflow-x:auto;scrollbar-width:none}
+.tabsrow::-webkit-scrollbar{display:none}
+.tabsrow a{padding:11px 0;font-size:14px;font-weight:500;color:var(--ink-tertiary);white-space:nowrap;border-bottom:2px solid transparent;margin-bottom:-1px}
+.tabsrow a[aria-current]{color:var(--ink-primary);font-weight:600;border-bottom-color:var(--ink-primary)}
+.fblk{background:var(--surface-1);border:1px solid var(--border);border-radius:14px;padding:16px;margin:0 0 14px}
+.fblk h3{margin:0 0 4px;font-size:15px;font-weight:700}
+.fblk .hint{font-size:12px;color:var(--ink-tertiary);margin:0 0 14px}
+.frow{display:grid;grid-template-columns:1fr;gap:12px;margin-bottom:12px}
+.lab{display:block;font-size:13px;font-weight:600;color:var(--ink-secondary);margin-bottom:6px}
+.inp{height:44px;border:1px solid var(--border);border-radius:10px;background:var(--surface-2);display:flex;align-items:center;justify-content:space-between;padding:0 13px;font-size:14px}
+.inp.ta{height:92px;align-items:flex-start;padding-top:11px}
+.wizard{display:block}
+.form{max-width:none}
+.pv{background:var(--surface-1);border:1px solid var(--border);border-radius:16px;padding:16px;position:sticky;top:120px}
+.vstep{display:flex;gap:12px;padding:14px 0;border-bottom:1px solid var(--divider)}
+.vstep:last-child{border-bottom:0}
+.vstep .n{width:28px;height:28px;border-radius:999px;background:var(--surface-2);color:var(--ink-tertiary);display:grid;place-items:center;font-size:12px;font-weight:700;flex:0 0 28px}
+.vstep.done .n{background:var(--accent);color:var(--on-accent)}
+.drop{border:1.5px dashed var(--border);border-radius:12px;padding:22px;text-align:center;color:var(--ink-tertiary);font-size:13px}
+.collrow{display:flex;gap:14px;overflow-x:auto;scrollbar-width:none}
+.collrow::-webkit-scrollbar{display:none}
+.circ{width:96px;flex:0 0 96px;text-align:center}
+.circ .r{width:76px;height:76px;border-radius:999px;background:var(--surface-3);margin:0 auto;border:1px solid var(--border)}
+.circ .n{font-size:12px;margin-top:7px}
+@container (min-width:768px){ .frow.two{grid-template-columns:1fr 1fr;gap:14px} .phero .av{width:104px;height:104px;flex:0 0 104px} }
+@container (min-width:1200px){
+  .wizard{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:28px;align-items:start}
+  .form{max-width:760px}
+}
+</style>
+</head>
+<body>
+
+<div class="bar">
+  <b>17 · Profile</b>
+  <div class="seg"><button data-dark aria-pressed="false">Dark</button></div>
+  <div class="sp"></div>
+  <span class="note">Real copy: Member since · Listings · Projects · Requirements · Featured · Add listing ·
+  Post Requirement · Block user · Copy link · Report; edit fields (Business details · Company details ·
+  Established year · Projects completed); verification (Aadhaar · Driving licence · Electricity bill ·
+  Property tax receipt · Index copy · RERA number).</span>
+</div>
+
+<div class="stage">
+
+  <div>
+    <p class="caption">A · My profile — Desktop 1440</p>
+    <div class="scaler"><div class="frame" data-w="1440" style="width:1440px" data-tpl="own"></div></div>
+  </div>
+
+  <div class="annot">
+    <h3>Decisions</h3>
+    <ul>
+      <li><b>The profile is a page, not a sheet.</b> On mobile the account rows hide behind the profile sheet;
+      on desktop those rows are already in the sidebar, so this page is what a <i>visitor</i> sees — which is
+      exactly what the owner should be looking at when they edit it.</li>
+      <li><b>Header, stats and tabs across the top</b> — Listings · Projects · Requirements · Featured, with
+      the app's own counts and its own empty states ("No listings yet", "Nothing here yet").</li>
+      <li><b>Featured collections keep their circles</b>, as a carousel.</li>
+      <li><b>Edit is form + live profile preview</b>: the seller sees the public card change as they type,
+      which is the same pattern as the create flow, so there is one idea to learn, not two.</li>
+      <li><b>Verification becomes a visible checklist</b> instead of a stack of screens: Phone · ID · RERA,
+      each with its state, its document type list and its re-upload path. The app's own review copy
+      ("Under review — usually within 24 hours", "Please re-upload") is kept word for word.</li>
+      <li><b>Other people's profiles</b> use the same page minus the owner actions, plus Copy link, Block user
+      and the report reasons the app already defines.</li>
+    </ul>
+  </div>
+
+  <div>
+    <p class="caption">B · Edit profile — Desktop 1440</p>
+    <div class="scaler"><div class="frame" data-w="1440" style="width:1440px" data-tpl="edit"></div></div>
+  </div>
+
+  <div>
+    <p class="caption">C · Verification — Desktop 1440</p>
+    <div class="scaler"><div class="frame" data-w="1440" style="width:1440px" data-tpl="verify"></div></div>
+  </div>
+
+  <div>
+    <p class="caption">D · Public profile (someone else's) — Desktop 1440</p>
+    <div class="scaler"><div class="frame" data-w="1440" style="width:1440px" data-tpl="other"></div></div>
+  </div>
+
+  <div>
+    <p class="caption">E · My profile — Tablet 1024</p>
+    <div class="scaler"><div class="frame" data-w="1024" style="width:1024px" data-tpl="own"></div></div>
+  </div>
+
+  <div>
+    <p class="caption">F · My profile — Tablet 768</p>
+    <div class="scaler"><div class="frame" data-w="768" style="width:768px" data-tpl="own"></div></div>
+  </div>
+
+</div>
+
+<template id="tpl-own">
+  <div class="app">
+    <div class="shell">
+      <div data-part="sidebar" data-active="Settings"></div>
+      <div class="mainwrap">
+        <div class="ctop"><div><h1>My profile</h1><div class="sub">This is what buyers see</div></div><div class="sp"></div>
+          <a class="btn" href="#"><svg class="i s16"><use href="#i-eye"/></svg>View as visitor</a>
+          <a class="btn" href="#"><svg class="i s16"><use href="#i-share"/></svg>Copy link</a>
+          <a class="btn pri" href="#"><svg class="i s16"><use href="#i-edit"/></svg>Edit profile</a></div>
+
+        <div class="content">
+          <div class="phero">
+            <span class="av" style="background:var(--avatar-2)">R</span>
+            <span style="flex:1;min-width:220px">
+              <span class="nm">Rajan Patel</span>
+              <div class="rl">Owner · Surat · Member since Jan 2025</div>
+              <div style="display:flex;gap:7px;margin-top:10px;flex-wrap:wrap">
+                <span class="tag ok">Phone verified</span><span class="tag ok">ID verified</span><span class="tag mute">RERA not applicable</span>
+              </div>
+              <div class="pstats">
+                <div><b>12</b><span>Listings</span></div>
+                <div><b>2</b><span>Requirements</span></div>
+                <div><b>4</b><span>Featured</span></div>
+                <div><b>Jan 2025</b><span>Member since</span></div>
+              </div>
+            </span>
+          </div>
+
+          <div class="tabsrow">
+            <a href="#" aria-current="page">Listings</a><a href="#">Requirements</a><a href="#">Featured</a>
+          </div>
+
+          <section class="sec carousel">
+            <div class="sechead"><div><h2 class="h2">Featured</h2><div class="sub">4 collections on your public profile</div></div><div class="sp"></div>
+              <a class="link" href="#">Create featured</a></div>
+            <div class="collrow">
+              <div class="circ"><div class="r"></div><div class="n">Ready to move</div></div>
+              <div class="circ"><div class="r"></div><div class="n">Vesu</div></div>
+              <div class="circ"><div class="r"></div><div class="n">Rent</div></div>
+              <div class="circ"><div class="r"></div><div class="n">Plots</div></div>
+              <div class="circ"><div class="r" style="border-style:dashed;display:grid;place-items:center;color:var(--ink-tertiary)"><svg class="i s24"><use href="#i-plus-b"/></svg></div><div class="n">New</div></div>
+            </div>
+          </section>
+
+          <section class="sec carousel">
+            <div class="sechead"><div><h2 class="h2">Listings</h2><div class="sub">12 live</div></div><div class="sp"></div>
+              <div class="arrows"><span class="arrow" aria-disabled="true"><svg class="i s16"><use href="#i-left"/></svg></span><span class="arrow"><svg class="i s16"><use href="#i-right"/></svg></span></div>
+              <a class="link" href="#">Add listing</a></div>
+            <div class="rail">
+              <div class="pcard"><div class="shot ph" data-l="PHOTO"></div><div class="ttl">₹ 62 Lakh</div><div class="sub">2 BHK Flat · Vesu</div><div class="facts"><span class="tag warn">Boosted</span></div></div>
+              <div class="pcard"><div class="shot ph" data-l="PHOTO"></div><div class="ttl">₹ 24,000 / mo</div><div class="sub">2 BHK Flat · Piplod</div></div>
+              <div class="pcard"><div class="shot ph" data-l="PHOTO"></div><div class="ttl">₹ 38 Lakh</div><div class="sub">Plot · Pal</div></div>
+              <div class="pcard"><div class="shot ph" data-l="PHOTO"></div><div class="ttl">₹ 78 Lakh</div><div class="sub">3 BHK Flat · Katargam</div></div>
+              <div class="pcard"><div class="shot ph" data-l="PHOTO"></div><div class="ttl">₹ 1.35 Cr</div><div class="sub">Bungalow · Pal</div></div>
+            </div>
+          </section>
+
+          <section class="sec carousel">
+            <div class="sechead"><div><h2 class="h2">Requirements</h2><div class="sub">2 live</div></div><div class="sp"></div>
+              <a class="link" href="#">Post Requirement</a></div>
+            <div class="rail">
+              <div class="card pad"><b style="font-size:14px">3 BHK Flat to buy · Adajan</b><div class="muted" style="margin-top:4px">₹ 90 L – 1.2 Cr · 5 proposals</div></div>
+              <div class="card pad"><b style="font-size:14px">Shop on rent · Ring Road</b><div class="muted" style="margin-top:4px">500 – 800 sq.ft · 1 proposal</div></div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+    <div data-part="bnav" data-active="profile"></div>
+  </div>
+</template>
+
+<template id="tpl-edit">
+  <div class="app">
+    <div class="shell">
+      <div data-part="sidebar" data-active="Settings"></div>
+      <div class="mainwrap">
+        <div class="ctop"><div><h1>Edit profile</h1></div><div class="sp"></div>
+          <a class="btn" href="#">Discard</a><a class="btn pri" href="#">Save changes</a></div>
+        <div class="content">
+          <div class="wizard">
+            <div class="form">
+              <div class="fblk">
+                <h3>Photo</h3>
+                <div style="display:flex;align-items:center;gap:16px">
+                  <span class="avatar" style="background:var(--avatar-2);width:76px;height:76px;font-size:30px">R</span>
+                  <div style="display:flex;gap:9px;flex-wrap:wrap">
+                    <a class="btn sm" href="#">Change photo</a>
+                    <a class="btn sm" href="#">Take photo</a>
+                    <a class="btn sm ghost" href="#" style="color:var(--error)">Remove photo</a>
+                  </div>
+                </div>
+              </div>
+
+              <div class="fblk">
+                <h3>Basic details</h3>
+                <div class="frow two">
+                  <div><span class="lab">Full name</span><div class="inp">Rajan Patel</div></div>
+                  <div><span class="lab">Email</span><div class="inp">rajan@example.com</div></div>
+                </div>
+                <div class="frow two">
+                  <div><span class="lab">Phone</span><div class="inp">+91 98250 12345 <span class="tag ok">Verified</span></div></div>
+                  <div><span class="lab">City</span><div class="inp">Surat<svg class="i s16"><use href="#i-chevron"/></svg></div></div>
+                </div>
+                <div><span class="lab">About</span><div class="inp ta">Owner listing flats and plots across Vesu and Pal.</div></div>
+              </div>
+
+              <div class="fblk">
+                <h3>Business details</h3>
+                <p class="hint">Shown on your public profile. Brokers and builders only.</p>
+                <div class="frow two">
+                  <div><span class="lab">Business name</span><div class="inp">—</div></div>
+                  <div><span class="lab">Established year</span><div class="inp">—</div></div>
+                </div>
+                <div class="frow two">
+                  <div><span class="lab">Projects completed</span><div class="inp">—</div></div>
+                  <div><span class="lab">RERA number</span><div class="inp">Not verified</div></div>
+                </div>
+              </div>
+            </div>
+
+            <aside>
+              <div class="pv">
+                <b style="font-size:14px">Live preview</b>
+                <p class="muted" style="margin:4px 0 12px">How buyers see you.</p>
+                <div class="card pad" style="text-align:center">
+                  <span class="avatar" style="background:var(--avatar-2);width:64px;height:64px;font-size:25px;margin:0 auto">R</span>
+                  <div style="font-size:16px;font-weight:700;margin-top:10px">Rajan Patel</div>
+                  <div class="muted">Owner · Surat</div>
+                  <div style="display:flex;gap:6px;justify-content:center;margin-top:10px;flex-wrap:wrap">
+                    <span class="tag ok">Phone verified</span><span class="tag ok">ID verified</span>
+                  </div>
+                  <div class="pstats" style="margin-top:12px">
+                    <div><b>12</b><span>Listings</span></div><div><b>2</b><span>Requirements</span></div><div><b>4</b><span>Featured</span></div>
+                  </div>
+                </div>
+                <a class="btn sm block" href="#" style="margin-top:12px"><svg class="i s16"><use href="#i-shield"/></svg>Get verified</a>
+              </div>
+            </aside>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div data-part="bnav" data-active="profile"></div>
+  </div>
+</template>
+
+<template id="tpl-verify">
+  <div class="app">
+    <div class="shell">
+      <div data-part="sidebar" data-active="Settings"></div>
+      <div class="mainwrap">
+        <div class="ctop"><div><h1>Verification</h1><div class="sub">Verified sellers get more enquiries</div></div><div class="sp"></div></div>
+        <div class="content">
+          <div class="wizard">
+            <div class="form">
+              <div class="fblk">
+                <h3>Your verification</h3>
+                <div class="vstep done">
+                  <span class="n"><svg class="i s16"><use href="#i-check"/></svg></span>
+                  <span style="flex:1"><b style="font-size:14px">Phone</b><div class="muted">+91 98250 12345 · verified Jan 2025</div></span>
+                  <span class="tag ok">Verified</span>
+                </div>
+                <div class="vstep done">
+                  <span class="n"><svg class="i s16"><use href="#i-check"/></svg></span>
+                  <span style="flex:1"><b style="font-size:14px">ID verification</b><div class="muted">Aadhaar · verified Feb 2025</div></span>
+                  <span class="tag ok">Verified</span>
+                </div>
+                <div class="vstep">
+                  <span class="n">3</span>
+                  <span style="flex:1"><b style="font-size:14px">RERA verification</b><div class="muted">Brokers and builders only</div></span>
+                  <span class="tag mute">Not applicable</span>
+                </div>
+              </div>
+
+              <div class="fblk">
+                <h3>Submit a document</h3>
+                <p class="hint">One clear photo or PDF. We check it manually, usually within 24 hours.</p>
+                <div class="frow two">
+                  <div><span class="lab">Document type</span><div class="inp">Select document type<svg class="i s16"><use href="#i-chevron"/></svg></div></div>
+                  <div><span class="lab">Number</span><div class="inp">—</div></div>
+                </div>
+                <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px">
+                  <span class="pill" aria-pressed="true">Aadhaar</span><span class="pill">Driving licence</span>
+                  <span class="pill">Electricity bill</span><span class="pill">Property tax receipt</span><span class="pill">Index copy</span>
+                </div>
+                <div class="drop">
+                  <svg class="i s32" style="color:var(--ink-disabled);margin:0 auto 10px"><use href="#i-image"/></svg>
+                  Drag a file here, or <a class="link" href="#">browse</a><br>
+                  <span class="muted">JPG, PNG or PDF · up to 5 MB</span>
+                </div>
+                <a class="btn pri block" href="#" style="margin-top:14px">Submit for verification</a>
+              </div>
+            </div>
+
+            <aside>
+              <div class="pv">
+                <div style="display:flex;align-items:center;gap:9px;padding:12px;border-radius:12px;background:var(--info-soft);font-size:13px;margin-bottom:14px">
+                  <svg class="i s18" style="color:var(--info)"><use href="#i-alert"/></svg>
+                  <span style="flex:1">Under review — usually within 24 hours</span>
+                </div>
+                <a class="btn sm block" href="#">Cancel request</a>
+                <div class="h3" style="margin:18px 0 8px">Why verify</div>
+                <div style="display:grid;gap:9px;font-size:13px">
+                  <div style="display:flex;gap:9px"><svg class="i s18" style="color:var(--accent)"><use href="#i-check"/></svg><span>A verified badge on every listing</span></div>
+                  <div style="display:flex;gap:9px"><svg class="i s18" style="color:var(--accent)"><use href="#i-check"/></svg><span>Buyers filter for verified sellers</span></div>
+                  <div style="display:flex;gap:9px"><svg class="i s18" style="color:var(--accent)"><use href="#i-check"/></svg><span>Higher placement in top picks</span></div>
+                </div>
+              </div>
+            </aside>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div data-part="bnav" data-active="profile"></div>
+  </div>
+</template>
+
+<template id="tpl-other">
+  <div class="app">
+    <div data-part="header" data-active="Buy"></div>
+    <div class="container" style="padding-top:20px">
+      <div class="phero">
+        <span class="av" style="background:var(--avatar-1)">S</span>
+        <span style="flex:1;min-width:220px">
+          <span class="nm">Shreeji Group</span>
+          <div class="rl">Builder · Surat · Member since Mar 2023</div>
+          <div style="display:flex;gap:7px;margin-top:10px;flex-wrap:wrap">
+            <span class="tag ok">RERA verified</span><span class="tag ok">Phone verified</span>
+          </div>
+          <div class="pstats">
+            <div><b>6</b><span>Projects</span></div>
+            <div><b>218</b><span>Units available</span></div>
+            <div><b>2023</b><span>Established</span></div>
+            <div><b>14</b><span>Projects completed</span></div>
+          </div>
+        </span>
+        <span style="display:flex;gap:9px;flex-wrap:wrap">
+          <a class="btn pri" href="#"><svg class="i s16"><use href="#i-phone"/></svg>Request Number</a>
+          <a class="btn" href="#"><svg class="i s16"><use href="#i-share"/></svg>Copy link</a>
+          <span class="hicon"><svg class="i s24"><use href="#i-menu"/></svg></span>
+        </span>
+      </div>
+
+      <div class="tabsrow"><a href="#" aria-current="page">Projects</a><a href="#">Listings</a><a href="#">Featured</a></div>
+
+      <section class="sec carousel">
+        <div class="sechead"><div><h2 class="h2">Projects</h2><div class="sub">6 live in Surat</div></div><div class="sp"></div>
+          <div class="arrows"><span class="arrow" aria-disabled="true"><svg class="i s16"><use href="#i-left"/></svg></span><span class="arrow"><svg class="i s16"><use href="#i-right"/></svg></span></div></div>
+        <div class="rail">
+          <div class="pcard"><div class="shot ph" data-l="PROJECT"></div><div class="ttl">Shreeji Heights</div><div class="sub">Vesu · 2, 3 BHK</div><div class="facts"><span class="tag ok">RERA</span></div></div>
+          <div class="pcard"><div class="shot ph" data-l="PROJECT"></div><div class="ttl">Shreeji Aura</div><div class="sub">Adajan · 3 BHK</div><div class="facts"><span class="tag ok">RERA</span></div></div>
+          <div class="pcard"><div class="shot ph" data-l="PROJECT"></div><div class="ttl">Shreeji Elite</div><div class="sub">Pal · Plots</div></div>
+          <div class="pcard"><div class="shot ph" data-l="PROJECT"></div><div class="ttl">Shreeji Vista</div><div class="sub">Athwa · 4 BHK</div></div>
+          <div class="pcard"><div class="shot ph" data-l="PROJECT"></div><div class="ttl">Shreeji Bloom</div><div class="sub">Katargam · 2 BHK</div></div>
+        </div>
+      </section>
+
+      <div class="card pad" style="max-width:560px">
+        <b style="font-size:14px">About this account</b>
+        <p class="muted" style="margin:8px 0 0">Joined March 2023 · 6 projects posted · Based in Surat</p>
+        <div style="display:flex;gap:9px;margin-top:12px;flex-wrap:wrap">
+          <a class="btn sm ghost" href="#">Block user</a>
+          <a class="btn sm ghost" href="#" style="color:var(--error)">Report</a>
+        </div>
+      </div>
+    </div>
+    <div data-part="footer"></div>
+    <div data-part="bnav" data-active="profile"></div>
+  </div>
+</template>
+
+<script src="_kit.js"></script>
+</body>
+</html>

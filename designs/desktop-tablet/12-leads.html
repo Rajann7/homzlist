@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>HomzList — 12 · Leads, visits &amp; proposals (desktop + tablet)</title>
+<link rel="stylesheet" href="_kit.css" />
+<style>
+.split{display:block}
+.lcol{border:1px solid var(--border);border-radius:14px;background:var(--surface-1);overflow:hidden}
+.lsearch{display:flex;align-items:center;gap:9px;height:42px;margin:12px;padding:0 12px;border:1px solid var(--border);border-radius:10px;font-size:13px;color:var(--ink-tertiary)}
+.litem{display:flex;gap:11px;padding:13px 14px;border-top:1px solid var(--divider);align-items:flex-start}
+.litem.on{background:var(--accent-soft)}
+.litem .nm{font-size:14px;font-weight:600}
+.litem .ms{font-size:12px;color:var(--ink-secondary);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.litem .tm{font-size:11px;color:var(--ink-tertiary);white-space:nowrap}
+.unread{width:8px;height:8px;border-radius:999px;background:var(--accent);flex:0 0 8px;margin-top:6px}
+.dpanel{border:1px solid var(--border);border-radius:14px;background:var(--surface-1);padding:0;overflow:hidden}
+.dhead{padding:16px;border-bottom:1px solid var(--divider);display:flex;gap:12px;align-items:center}
+.dbody{padding:16px}
+.qa{display:flex;justify-content:space-between;gap:14px;padding:10px 0;border-bottom:1px solid var(--divider);font-size:13px}
+.qa:last-child{border-bottom:0}
+.qa span:first-child{color:var(--ink-tertiary)}
+.qa span:last-child{font-weight:600;text-align:right}
+.subj{display:flex;gap:11px;padding:12px;border:1px solid var(--border);border-radius:12px;background:var(--surface-2);align-items:center;margin-bottom:16px}
+.subj .sh{width:56px;height:44px;border-radius:8px;background:var(--surface-3);flex:0 0 56px}
+.chiprow{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;margin-bottom:14px}
+.chiprow::-webkit-scrollbar{display:none}
+.vrow{display:flex;gap:12px;padding:14px;border:1px solid var(--border);border-radius:14px;background:var(--surface-1);align-items:center}
+.vdate{width:56px;flex:0 0 56px;text-align:center;border-right:1px solid var(--divider);padding-right:12px}
+.vdate b{display:block;font-size:20px;font-weight:700;line-height:1.1}
+.vdate span{font-size:11px;color:var(--ink-tertiary)}
+@container (min-width:1200px){
+  .split{display:grid;grid-template-columns:380px minmax(0,1fr);gap:20px;align-items:start}
+  .lcol{position:sticky;top:88px;max-height:calc(100vh - 120px)}
+}
+</style>
+</head>
+<body>
+
+<div class="bar">
+  <b>12 · Leads, visits &amp; proposals</b>
+  <div class="seg"><button data-dark aria-pressed="false">Dark</button></div>
+  <div class="sp"></div>
+  <span class="note">Real copy from <code>components/leads/*</code>: Search your leads · Only unopened ·
+  Most new leads · Newest activity · Received · Contacted · Converted · Archived · Wants · Contact by ·
+  Best time · Number · WhatsApp · Mark as converted · Report this lead.</span>
+</div>
+
+<div class="stage">
+
+  <div>
+    <p class="caption">A · Leads — Desktop 1440 (list + detail, one screen)</p>
+    <div class="scaler"><div class="frame" data-w="1440" style="width:1440px" data-tpl="leads"></div></div>
+  </div>
+
+  <div class="annot">
+    <h3>Decisions</h3>
+    <ul>
+      <li><b>Split view.</b> Mobile is a list that pushes to <code>/leads/lead/[id]</code>. On desktop the
+      list stays at 380 on the left and the lead opens on the right — a seller working through eight enquiries
+      stops paying a back-navigation each time. The detail route still exists and still deep-links.</li>
+      <li><b>The lead's answers stay verbatim</b> — Wants, Contact by, Best time, Number — because those four
+      lines are the entire product of a lead. Nothing is summarised away.</li>
+      <li><b>The subject sits above the answers</b>: which listing or project this lead is about, with a link
+      through. On mobile that context is a header; here it is a card, so the seller never answers about the
+      wrong property.</li>
+      <li><b>Status is a chip row, not a hidden filter</b>: Received · Contacted · Converted · Archived, plus
+      the app's own "Only unopened" toggle and its two sorts (Most new leads · Newest activity).</li>
+      <li><b>Visits and Proposals are the same screen</b> with a different subject: a visit leads with its
+      date block and Overdue state, a proposal with its requirement and reply status.</li>
+    </ul>
+  </div>
+
+  <div>
+    <p class="caption">B · My visits — Desktop 1440</p>
+    <div class="scaler"><div class="frame" data-w="1440" style="width:1440px" data-tpl="visits"></div></div>
+  </div>
+
+  <div>
+    <p class="caption">C · Leads — Tablet 1024 (list only; a row opens the detail route, as on mobile)</p>
+    <div class="scaler"><div class="frame" data-w="1024" style="width:1024px" data-tpl="leads"></div></div>
+  </div>
+
+  <div>
+    <p class="caption">D · Leads — Tablet 768</p>
+    <div class="scaler"><div class="frame" data-w="768" style="width:768px" data-tpl="leads"></div></div>
+  </div>
+
+</div>
+
+<template id="tpl-leads">
+  <div class="app">
+    <div class="shell">
+      <div data-part="sidebar" data-active="Leads"></div>
+      <div class="mainwrap">
+        <div class="ctop"><div><h1>Leads</h1><div class="sub">3 new · 14 total</div></div><div class="sp"></div>
+          <span class="pill">Only unopened</span>
+          <span class="pill"><svg class="i s14"><use href="#i-sort"/></svg>Newest activity</span></div>
+
+        <div class="content">
+          <div class="chiprow">
+            <span class="chip2 pill" aria-pressed="true">Received · 3</span>
+            <span class="pill">Contacted · 6</span>
+            <span class="pill">Converted · 4</span>
+            <span class="pill">Archived · 1</span>
+            <span style="width:1px;height:22px;background:var(--border);margin:0 4px"></span>
+            <span class="pill">Properties</span><span class="pill">Projects</span><span class="pill">Requirements</span>
+          </div>
+
+          <div class="split">
+            <div class="lcol">
+              <div class="lsearch"><svg class="i s16"><use href="#i-search"/></svg>Search your leads</div>
+              <div class="litem on">
+                <span class="unread"></span>
+                <span class="avatar" style="background:var(--avatar-1)">A</span>
+                <span style="flex:1;min-width:0"><span class="nm">Amit Rathod</span><div class="ms">Wants 2 BHK · Vesu · site visit this week</div></span>
+                <span class="tm">2h</span>
+              </div>
+              <div class="litem">
+                <span class="unread"></span>
+                <span class="avatar" style="background:var(--avatar-5)">N</span>
+                <span style="flex:1;min-width:0"><span class="nm">Nisha Patel</span><div class="ms">Visit requested · 2 BHK Flat, Piplod</div></span>
+                <span class="tm">5h</span>
+              </div>
+              <div class="litem">
+                <span class="unread"></span>
+                <span class="avatar" style="background:var(--avatar-7)">K</span>
+                <span style="flex:1;min-width:0"><span class="nm">Kunal Shah</span><div class="ms">Asked for number · Plot, Pal</div></span>
+                <span class="tm">1d</span>
+              </div>
+              <div class="litem">
+                <span style="width:8px;flex:0 0 8px"></span>
+                <span class="avatar" style="background:var(--avatar-3)">D</span>
+                <span style="flex:1;min-width:0"><span class="nm">Divya Mehta</span><div class="ms">Contacted · 3 BHK Flat, Katargam</div></span>
+                <span class="tm">2d</span>
+              </div>
+              <div class="litem">
+                <span style="width:8px;flex:0 0 8px"></span>
+                <span class="avatar" style="background:var(--avatar-6)">P</span>
+                <span style="flex:1;min-width:0"><span class="nm">Paras Joshi</span><div class="ms">Converted · Bungalow, Pal</div></span>
+                <span class="tm">6d</span>
+              </div>
+              <div class="litem">
+                <span style="width:8px;flex:0 0 8px"></span>
+                <span class="avatar" style="background:var(--avatar-8)">V</span>
+                <span style="flex:1;min-width:0"><span class="nm">Viral Desai</span><div class="ms">Contacted · 2 BHK Flat, Vesu</div></span>
+                <span class="tm">8d</span>
+              </div>
+            </div>
+
+            <div class="dpanel">
+              <div class="dhead">
+                <span class="avatar" style="background:var(--avatar-1);width:46px;height:46px;font-size:18px">A</span>
+                <span style="flex:1;min-width:0">
+                  <b style="font-size:17px">Amit Rathod</b>
+                  <div class="muted">Buyer · Received 2 hours ago</div>
+                </span>
+                <span class="tag info">Received</span>
+                <span class="hicon"><svg class="i s24"><use href="#i-menu"/></svg></span>
+              </div>
+
+              <div class="dbody">
+                <div class="subj">
+                  <span class="sh ph" data-l=""></span>
+                  <span style="flex:1;min-width:0"><b style="font-size:14px">₹ 62 Lakh · 2 BHK Flat</b><div class="muted">Vesu, Surat · your listing</div></span>
+                  <a class="btn sm" href="#">Open listing</a>
+                </div>
+
+                <div class="qa"><span>Wants</span><span>2 BHK Flat to buy in Vesu</span></div>
+                <div class="qa"><span>Budget</span><span>₹ 55 – 70 Lakh</span></div>
+                <div class="qa"><span>Contact by</span><span>WhatsApp</span></div>
+                <div class="qa"><span>Best time</span><span>Evening (6 – 9 pm)</span></div>
+                <div class="qa"><span>Number</span><span>+91 98250 •••••  <a class="link" href="#">Tap to copy</a></span></div>
+
+                <div style="display:flex;gap:10px;margin-top:18px;flex-wrap:wrap">
+                  <a class="btn pri" href="#"><svg class="i s16"><use href="#i-phone"/></svg>WhatsApp</a>
+                  <a class="btn" href="#"><svg class="i s16"><use href="#i-phone"/></svg>Call instead</a>
+                  <a class="btn" href="#"><svg class="i s16"><use href="#i-check"/></svg>Mark as converted</a>
+                  <a class="btn" href="#"><svg class="i s16"><use href="#i-user"/></svg>View profile</a>
+                </div>
+
+                <div style="margin-top:18px;padding-top:16px;border-top:1px solid var(--divider);display:flex;gap:10px;flex-wrap:wrap">
+                  <a class="btn sm ghost" href="#"><svg class="i s16"><use href="#i-archive"/></svg>Archive lead</a>
+                  <a class="btn sm ghost" href="#" style="color:var(--error)"><svg class="i s16"><use href="#i-alert"/></svg>Report this lead</a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div data-part="bnav" data-active="leads"></div>
+  </div>
+</template>
+
+<template id="tpl-visits">
+  <div class="app">
+    <div class="shell">
+      <div data-part="sidebar" data-active="My visits"></div>
+      <div class="mainwrap">
+        <div class="ctop"><div><h1>My visits</h1><div class="sub">1 coming up · 1 overdue</div></div><div class="sp"></div>
+          <span class="pill">Upcoming</span><span class="pill">Past</span></div>
+        <div class="content">
+          <div style="display:grid;gap:14px;max-width:1000px">
+            <div class="vrow">
+              <div class="vdate"><b>24</b><span>Aug</span></div>
+              <div style="flex:1;min-width:0">
+                <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap"><b style="font-size:15px">₹ 62 Lakh · 2 BHK Flat</b><span class="tag ok">Confirmed</span></div>
+                <div class="muted" style="margin-top:3px">Vesu, Surat · 5:30 pm · with Amit Rathod</div>
+              </div>
+              <div style="display:flex;gap:8px"><a class="btn sm" href="#">Reschedule</a><a class="btn sm" href="#">Cancel</a></div>
+            </div>
+
+            <div class="vrow" style="border-color:var(--error)">
+              <div class="vdate"><b>18</b><span>Aug</span></div>
+              <div style="flex:1;min-width:0">
+                <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap"><b style="font-size:15px">₹ 38 Lakh · Residential plot</b><span class="tag err">Overdue</span></div>
+                <div class="muted" style="margin-top:3px">Pal, Surat · 11:00 am · with Kunal Shah</div>
+              </div>
+              <div style="display:flex;gap:8px"><a class="btn pri sm" href="#">Mark done</a><a class="btn sm" href="#">Reschedule</a></div>
+            </div>
+
+            <div class="vrow" style="opacity:.72">
+              <div class="vdate"><b>09</b><span>Aug</span></div>
+              <div style="flex:1;min-width:0">
+                <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap"><b style="font-size:15px">₹ 1.35 Cr · Bungalow</b><span class="tag mute">Completed</span></div>
+                <div class="muted" style="margin-top:3px">Pal, Surat · 4:00 pm · with Paras Joshi</div>
+              </div>
+              <div style="display:flex;gap:8px"><a class="btn sm" href="#">Open lead</a></div>
+            </div>
+          </div>
+
+          <section class="sec carousel" style="max-width:1000px;margin-top:26px">
+            <div class="sechead"><div><h2 class="h2">My proposals</h2><div class="sub">5 awaiting a reply</div></div><div class="sp"></div>
+              <div class="arrows"><span class="arrow" aria-disabled="true"><svg class="i s16"><use href="#i-left"/></svg></span><span class="arrow"><svg class="i s16"><use href="#i-right"/></svg></span></div>
+              <a class="link" href="#">View all</a></div>
+            <div class="rail">
+              <div class="card pad"><span class="tag info">Sent</span><b style="display:block;font-size:14px;margin-top:9px">2 BHK · Vesu · under ₹70 L</b><div class="muted" style="margin-top:4px">Sent 2 days ago · no reply yet</div></div>
+              <div class="card pad"><span class="tag ok">Accepted</span><b style="display:block;font-size:14px;margin-top:9px">3 BHK · Adajan · under ₹1.2 Cr</b><div class="muted" style="margin-top:4px">Accepted · number shared</div></div>
+              <div class="card pad"><span class="tag mute">Declined</span><b style="display:block;font-size:14px;margin-top:9px">Plot · Pal · 2000 sq.ft</b><div class="muted" style="margin-top:4px">Buyer picked another option</div></div>
+              <div class="card pad"><span class="tag info">Sent</span><b style="display:block;font-size:14px;margin-top:9px">Shop · Ring Road</b><div class="muted" style="margin-top:4px">Sent 6 hours ago</div></div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+    <div data-part="bnav" data-active="leads"></div>
+  </div>
+</template>
+
+<script src="_kit.js"></script>
+</body>
+</html>

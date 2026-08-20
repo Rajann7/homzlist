@@ -20,8 +20,8 @@ export interface SavedAccount {
 
 export function SavedAccounts({ accounts, onPick, onUseAnother }: { accounts: SavedAccount[]; onPick: (a: SavedAccount) => void; onUseAnother: () => void }) {
   return (
-    <div className="flex min-h-[100dvh] flex-col items-center bg-page px-4">
-      <div className="mt-12">
+    <div className="flex min-h-[100dvh] flex-col items-center bg-page px-4 md:min-h-0 md:bg-transparent md:px-0">
+      <div className="mt-12 md:mt-0">
         <Wordmark className="text-24" />
       </div>
       <p className="chrome mt-8 self-start text-13 font-semibold text-ink-secondary">Continue as</p>

@@ -88,7 +88,10 @@ export function BottomNav({ items }: { items?: NavItem[] }) {
       className={cn(
         // In normal flow (shrink-0) at the bottom of a fixed-height shell → always
         // visible, never scrolls, mobile-address-bar-proof (CLAUDE.md rule 6).
-        "chrome z-nav flex h-[calc(52px+env(safe-area-inset-bottom))] w-full shrink-0",
+        // Retired at 768 (00-SPEC.md §2): its five destinations are re-homed in
+        // the sidebar / top bar, so nothing becomes unreachable. `md:hidden` only
+        // — the mobile row is untouched.
+        "chrome z-nav flex h-[calc(52px+env(safe-area-inset-bottom))] w-full shrink-0 md:hidden",
         "items-start border-t border-border bg-surface-1 pb-[env(safe-area-inset-bottom)]",
       )}
     >

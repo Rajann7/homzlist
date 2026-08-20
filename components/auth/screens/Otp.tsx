@@ -134,8 +134,8 @@ export function Otp({
   }
 
   return (
-    <div className="flex min-h-[100dvh] flex-col bg-page px-4">
-      <div className="flex h-header items-center">
+    <div className="flex min-h-[100dvh] flex-col bg-page px-4 md:min-h-0 md:bg-transparent md:px-0">
+      <div className="flex h-header items-center md:h-auto md:mb-2">
         <button aria-label="Back" onClick={onEdit} className="grid h-11 w-11 -ml-2 place-items-center text-ink-primary">
           <Icon name="arrow-left" size={24} strokeWidth={1.7} />
         </button>
@@ -192,7 +192,7 @@ export function Otp({
         </div>
       </div>
 
-      <Button className="mb-4" fullWidth loading={loading} disabled={code.length !== 6 || exhausted} onClick={verify}>
+      <Button className="mb-4 md:mb-0 md:mt-5" fullWidth loading={loading} disabled={code.length !== 6 || exhausted} onClick={verify}>
         Verify
       </Button>
 

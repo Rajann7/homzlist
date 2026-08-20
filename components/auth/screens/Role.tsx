@@ -24,8 +24,8 @@ export function Role({ onContinue }: { onContinue: (role: Role) => void }) {
   const [info, setInfo] = useState<(typeof ROLES)[number]["info"] | null>(null);
 
   return (
-    <div className="flex min-h-[100dvh] flex-col bg-page px-4">
-      <div className="mt-6 flex gap-2">
+    <div className="flex min-h-[100dvh] flex-col bg-page px-4 md:min-h-0 md:bg-transparent md:px-0">
+      <div className="mt-6 flex gap-2 md:mt-0">
         <span className="h-1 w-5 rounded-full bg-accent" />
         <span className="h-1 w-5 rounded-full bg-surface-3" />
       </div>
@@ -42,7 +42,7 @@ export function Role({ onContinue }: { onContinue: (role: Role) => void }) {
               onClick={() => setSelected(r.id)}
               className={cn(
                 "relative flex items-center gap-3 rounded-8 border p-4 text-left transition-colors",
-                isSel ? "border-[1.5px] border-accent bg-accent-soft" : "border-transparent bg-surface-1 shadow-l1 dark:border dark:border-border dark:shadow-none",
+                isSel ? "border-[1.5px] border-accent bg-accent-soft" : "border-transparent bg-surface-1 shadow-l1 md:border-border md:shadow-none dark:border dark:border-border dark:shadow-none",
               )}
             >
               <span className="grid h-12 w-12 shrink-0 place-items-center rounded-8 bg-accent-soft">

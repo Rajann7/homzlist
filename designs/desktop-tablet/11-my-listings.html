@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>HomzList — 11 · My Listings (desktop + tablet)</title>
+<link rel="stylesheet" href="_kit.css" />
+<style>
+.lrow{display:flex;gap:14px;padding:14px;background:var(--surface-1);border:1px solid var(--border);border-radius:14px;align-items:center}
+.lrow .shot{width:120px;flex:0 0 120px;aspect-ratio:4/3;border-radius:10px;background:var(--surface-3)}
+.lrow .bd{flex:1;min-width:0}
+.lrow .ttl{font-size:16px;font-weight:700}
+.lrow .sub{font-size:13px;color:var(--ink-secondary);margin-top:2px}
+.lrow .st{display:flex;gap:22px;margin-top:10px}
+.lrow .st div{font-size:12px;color:var(--ink-tertiary)}
+.lrow .st b{display:block;font-size:15px;color:var(--ink-primary)}
+.lrow .acts{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.lstack{display:grid;gap:14px}
+.frail{background:var(--surface-1);border:1px solid var(--border);border-radius:14px;padding:4px 16px;align-self:start;position:sticky;top:88px}
+.listcols{display:block}
+.trow{display:flex;align-items:center;justify-content:space-between;padding:9px 0;font-size:13px}
+.sw{width:38px;height:22px;border-radius:999px;background:var(--surface-3);position:relative;flex:0 0 38px}
+.sw.on{background:var(--accent)}
+.sw::after{content:"";position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:999px;background:#fff}
+.sw.on::after{left:19px}
+.emptybox{text-align:center;padding:44px 20px;border:1px dashed var(--border);border-radius:16px;background:var(--surface-1)}
+@container (min-width:768px){ .lrow .shot{width:160px;flex:0 0 160px} }
+@container (min-width:1200px){
+  .listcols{display:grid;grid-template-columns:280px minmax(0,1fr);gap:24px;align-items:start}
+  .lrow .shot{width:190px;flex:0 0 190px}
+}
+</style>
+</head>
+<body>
+
+<div class="bar">
+  <b>11 · My Listings</b>
+  <div class="seg"><button data-dark aria-pressed="false">Dark</button></div>
+  <div class="sp"></div>
+  <span class="note">Real actions from <code>MyListings.tsx</code>: Edit listing · Boost this listing ·
+  Hide temporarily · Mark as sold · Mark as rented · Delete, with the app's own confirm copy. Trash and Archived
+  are the same screen with a different filter.</span>
+</div>
+
+<div class="stage">
+
+  <div>
+    <p class="caption">A · My Listings — Desktop 1440</p>
+    <div class="scaler"><div class="frame" data-w="1440" style="width:1440px" data-tpl="list"></div></div>
+  </div>
+
+  <div class="annot">
+    <h3>Decisions</h3>
+    <ul>
+      <li><b>Rows, not cards.</b> This is the seller's working screen: they need status, views, saves, leads
+      and the actions visible at once. A row gives all of it on one line; a card hides half of it behind a
+      menu. (The public feed keeps its carousels — this is the console.)</li>
+      <li><b>The options sheet becomes inline actions.</b> Mobile hides Edit / Boost / Hide / Mark as sold /
+      Delete behind a "Listing options" sheet. On desktop the two common ones (Edit, Boost) sit on the row and
+      the destructive ones stay in a menu — still with the app's own confirm dialogs
+      ("Mark as sold?", "Hide this listing?").</li>
+      <li><b>Status filters become a rail</b>: Live · Under Review · Hidden · Sold / Rented · Drafts · Trash,
+      plus type and sort. Below 1200 they collapse back into the mobile chip row and sheet.</li>
+      <li><b>Trash and Archived are this screen with a filter</b> — same rows, restore instead of edit, and
+      the retention line the app shows.</li>
+      <li>The empty state keeps the app's own "Create a listing" call.</li>
+    </ul>
+  </div>
+
+  <div>
+    <p class="caption">B · Trash — Desktop 1440</p>
+    <div class="scaler"><div class="frame" data-w="1440" style="width:1440px" data-tpl="trash"></div></div>
+  </div>
+
+  <div>
+    <p class="caption">C · Tablet 1024</p>
+    <div class="scaler"><div class="frame" data-w="1024" style="width:1024px" data-tpl="list"></div></div>
+  </div>
+
+  <div>
+    <p class="caption">D · Tablet 768</p>
+    <div class="scaler"><div class="frame" data-w="768" style="width:768px" data-tpl="list"></div></div>
+  </div>
+
+</div>
+
+<template id="tpl-list">
+  <div class="app">
+    <div class="shell">
+      <div data-part="sidebar" data-active="My Listings"></div>
+      <div class="mainwrap">
+        <div class="ctop"><div><h1>My Listings</h1><div class="sub">12 live · 1 under review · 2 hidden</div></div><div class="sp"></div>
+          <a class="btn" href="#"><svg class="i s16"><use href="#i-archive"/></svg>Archived</a>
+          <a class="btn" href="#"><svg class="i s16"><use href="#i-trash"/></svg>Trash</a>
+          <a class="btn pri" href="#"><svg class="i s16"><use href="#i-plus-b"/></svg>Create a listing</a></div>
+
+        <div class="content">
+          <div class="listcols">
+            <aside class="frail">
+              <div class="fgrp">
+                <h4>Status</h4>
+                <div style="display:flex;flex-wrap:wrap;gap:7px">
+                  <span class="pill" aria-pressed="true">Live · 12</span><span class="pill">Under review · 1</span>
+                  <span class="pill">Hidden · 2</span><span class="pill">Sold · 4</span><span class="pill">Rented · 1</span>
+                </div>
+              </div>
+              <div class="fgrp">
+                <h4>Type</h4>
+                <div style="display:flex;flex-wrap:wrap;gap:7px">
+                  <span class="pill">Flat</span><span class="pill">Bungalow</span><span class="pill">Plot</span><span class="pill">Shop</span>
+                </div>
+              </div>
+              <div class="fgrp">
+                <h4>Intent</h4>
+                <div style="display:flex;flex-wrap:wrap;gap:7px"><span class="pill">Sale</span><span class="pill">Rent</span></div>
+              </div>
+              <div class="fgrp">
+                <h4>Sort</h4>
+                <div style="display:flex;flex-wrap:wrap;gap:7px">
+                  <span class="pill" aria-pressed="true">Newest</span><span class="pill">Most viewed</span><span class="pill">Most leads</span>
+                </div>
+              </div>
+              <div class="fgrp">
+                <div class="trow">Boosted only <span class="sw"></span></div>
+                <div class="trow">Needs attention <span class="sw on"></span></div>
+              </div>
+            </aside>
+
+            <div>
+              <div class="sechead"><b style="font-size:15px">12 listings</b><div class="sp"></div>
+                <span class="pill"><svg class="i s14"><use href="#i-sort"/></svg>Newest</span></div>
+
+              <div class="lstack">
+                <div class="lrow">
+                  <div class="shot ph" data-l="PHOTO"></div>
+                  <div class="bd">
+                    <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap">
+                      <span class="ttl">₹ 62 Lakh</span><span class="tag ok">Live</span><span class="tag warn">Boosted · 4d left</span>
+                    </div>
+                    <div class="sub">2 BHK Flat · Vesu, Surat · posted 12 Jan</div>
+                    <div class="st"><div><b>412</b>Views</div><div><b>37</b>Saves</div><div><b>6</b>Leads</div></div>
+                  </div>
+                  <div class="acts">
+                    <a class="btn sm" href="#"><svg class="i s16"><use href="#i-edit"/></svg>Edit</a>
+                    <a class="btn pri sm" href="#"><svg class="i s16"><use href="#i-rocket"/></svg>Boost</a>
+                    <span class="hicon"><svg class="i s24"><use href="#i-menu"/></svg></span>
+                  </div>
+                </div>
+
+                <div class="lrow">
+                  <div class="shot ph" data-l="PHOTO"></div>
+                  <div class="bd">
+                    <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap">
+                      <span class="ttl">₹ 24,000 / mo</span><span class="tag ok">Live</span>
+                    </div>
+                    <div class="sub">2 BHK Flat · Piplod, Surat · posted 04 Jan</div>
+                    <div class="st"><div><b>288</b>Views</div><div><b>21</b>Saves</div><div><b>3</b>Leads</div></div>
+                  </div>
+                  <div class="acts">
+                    <a class="btn sm" href="#"><svg class="i s16"><use href="#i-edit"/></svg>Edit</a>
+                    <a class="btn pri sm" href="#"><svg class="i s16"><use href="#i-rocket"/></svg>Boost</a>
+                    <span class="hicon"><svg class="i s24"><use href="#i-menu"/></svg></span>
+                  </div>
+                </div>
+
+                <div class="lrow">
+                  <div class="shot ph" data-l="PHOTO"></div>
+                  <div class="bd">
+                    <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap">
+                      <span class="ttl">₹ 38 Lakh</span><span class="tag info">Under Review</span>
+                    </div>
+                    <div class="sub">Residential plot · Pal, Surat · submitted 2 hours ago</div>
+                    <div class="st"><div><b>—</b>Views</div><div><b>—</b>Saves</div><div><b>—</b>Leads</div></div>
+                  </div>
+                  <div class="acts">
+                    <a class="btn sm" href="#"><svg class="i s16"><use href="#i-eye"/></svg>Preview</a>
+                    <span class="hicon"><svg class="i s24"><use href="#i-menu"/></svg></span>
+                  </div>
+                </div>
+
+                <div class="lrow" style="opacity:.7">
+                  <div class="shot ph" data-l="PHOTO"></div>
+                  <div class="bd">
+                    <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap">
+                      <span class="ttl">₹ 78 Lakh</span><span class="tag mute">Hidden</span>
+                    </div>
+                    <div class="sub">3 BHK Flat · Katargam, Surat · hidden 18 Jan</div>
+                    <div class="st"><div><b>154</b>Views</div><div><b>9</b>Saves</div><div><b>1</b>Lead</div></div>
+                  </div>
+                  <div class="acts">
+                    <a class="btn sm" href="#">Make live</a>
+                    <span class="hicon"><svg class="i s24"><use href="#i-menu"/></svg></span>
+                  </div>
+                </div>
+
+                <div class="lrow" style="opacity:.7">
+                  <div class="shot ph" data-l="PHOTO"></div>
+                  <div class="bd">
+                    <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap">
+                      <span class="ttl">₹ 1.35 Cr</span><span class="tag mute">Sold</span>
+                    </div>
+                    <div class="sub">Bungalow · Pal, Surat · marked sold 09 Jan</div>
+                    <div class="st"><div><b>836</b>Views</div><div><b>64</b>Saves</div><div><b>12</b>Leads</div></div>
+                  </div>
+                  <div class="acts">
+                    <a class="btn sm" href="#">Repost</a>
+                    <span class="hicon"><svg class="i s24"><use href="#i-menu"/></svg></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div data-part="bnav" data-active="profile"></div>
+  </div>
+</template>
+
+<template id="tpl-trash">
+  <div class="app">
+    <div class="shell">
+      <div data-part="sidebar" data-active="My Listings"></div>
+      <div class="mainwrap">
+        <div class="ctop"><div><h1>Trash</h1><div class="sub">Deleted listings are removed for good after 30 days</div></div><div class="sp"></div>
+          <a class="btn" href="#">Back to My Listings</a></div>
+        <div class="content">
+          <div class="lstack" style="max-width:1000px">
+            <div class="lrow" style="opacity:.8">
+              <div class="shot ph" data-l="PHOTO"></div>
+              <div class="bd">
+                <div style="display:flex;align-items:center;gap:9px"><span class="ttl">₹ 45 Lakh</span><span class="tag err">Deleted</span></div>
+                <div class="sub">1 BHK Flat · Varachha, Surat</div>
+                <div class="muted" style="margin-top:8px">Deleted 3 days ago · removed for good in 27 days</div>
+              </div>
+              <div class="acts"><a class="btn sm" href="#">Restore</a><a class="btn sm" href="#" style="color:var(--error)">Delete now</a></div>
+            </div>
+            <div class="lrow" style="opacity:.8">
+              <div class="shot ph" data-l="PHOTO"></div>
+              <div class="bd">
+                <div style="display:flex;align-items:center;gap:9px"><span class="ttl">₹ 18,500 / mo</span><span class="tag err">Deleted</span></div>
+                <div class="sub">2 BHK Flat · Vesu, Surat</div>
+                <div class="muted" style="margin-top:8px">Deleted 11 days ago · removed for good in 19 days</div>
+              </div>
+              <div class="acts"><a class="btn sm" href="#">Restore</a><a class="btn sm" href="#" style="color:var(--error)">Delete now</a></div>
+            </div>
+          </div>
+
+          <div class="emptybox" style="max-width:1000px;margin-top:20px">
+            <svg class="i s32" style="color:var(--ink-disabled);margin:0 auto 12px"><use href="#i-archive"/></svg>
+            <b style="font-size:15px">Nothing else in Trash</b>
+            <p class="muted" style="margin:6px 0 14px">Archived listings live on their own screen.</p>
+            <a class="btn sm" href="#">Go to Archived</a>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div data-part="bnav" data-active="profile"></div>
+  </div>
+</template>
+
+<script src="_kit.js"></script>
+</body>
+</html>

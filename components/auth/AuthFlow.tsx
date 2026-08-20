@@ -9,6 +9,7 @@ import { Role } from "./screens/Role";
 import { Details } from "./screens/Details";
 import { Coach } from "./screens/Coach";
 import { BrowserUnsupported, OfflineBanner, SavedAccounts } from "./screens/Misc";
+import { AuthPageShell } from "./AuthPageShell";
 import { publicHref } from "@/lib/utils";
 import { sanitizeNext } from "@/lib/auth/next-url";
 import { authApi } from "@/lib/auth/client";
@@ -221,12 +222,31 @@ export function AuthFlow() {
     }
   };
 
+  /**
+   * Splash, onboarding and the coach marks are full-bleed experiences on every
+   * device — a slide carousel or a dimmed tour inside a 420px card would be
+   * nonsense. Everything else is a FORM, and a form is what the desktop set
+   * puts in a centred card beside the product pane (02-auth-entry.html).
+   */
+  const carded = screen !== "splash" && screen !== "onboarding" && screen !== "coach" && screen !== "browserUnsupported";
+  const Shell = carded ? AuthPageShell : Passthrough;
+
+  /**
+   * The card's ✕ — never a dead control: it does what "Browse as Guest" right
+   * below it does, and goes to the public feed. `hidden md:grid`, so the phone
+   * never sees it (the mobile design has no close button).
+   */
+  const close = () => leaveTo("/");
+
   return (
-    <div className="mx-auto w-full max-w-column">
+    // `md:max-w-none` releases the 470 column at 768+ (00-SPEC.md §1). Below
+    // that this is the same centred column it has always been.
+    <div className="mx-auto w-full max-w-column md:max-w-none">
       {offline && screen !== "splash" && <OfflineBanner onRetry={() => setOffline(!navigator.onLine)} />}
 
       {screen === "splash" && <Splash />}
       {screen === "onboarding" && <Onboarding onDone={finishOnboarding} />}
+      <Shell wide={screen === "role"} onClose={close}>
       {screen === "savedAccounts" && <SavedAccounts accounts={saved} onPick={pickSaved} onUseAnother={() => go("login")} />}
       {screen === "login" && (
         <Login
@@ -276,8 +296,14 @@ export function AuthFlow() {
           }}
         />
       )}
+      </Shell>
       {screen === "coach" && <Coach city={city} onDone={goHome} />}
       {screen === "browserUnsupported" && <BrowserUnsupported />}
     </div>
   );
+}
+
+/** No shell — the full-bleed screens render exactly as they always have. */
+function Passthrough({ children }: { wide?: boolean; onClose?: () => void; children: React.ReactNode }) {
+  return <>{children}</>;
 }

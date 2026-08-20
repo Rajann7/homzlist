@@ -50,17 +50,29 @@ export function Login({
   }
 
   return (
-    <div className="flex min-h-[100dvh] flex-col bg-page">
+    <div className="flex min-h-[100dvh] flex-col bg-page md:min-h-0 md:bg-transparent">
       {banner && (
         <div className={cn("chrome px-4 py-3 text-13", banner.kind === "locked" ? "bg-error-soft text-error" : "bg-warning-soft text-warning")}>
           {banner.text}
         </div>
       )}
 
-      <div className="flex flex-1 flex-col px-4">
-        <div className="mt-12 flex justify-center">
+      <div className="flex flex-1 flex-col px-4 md:px-0">
+        <div className="mt-12 flex justify-center md:mt-0 md:justify-start">
           <Wordmark className="text-24" />
         </div>
+
+        {/* Desktop/tablet only (designs/desktop-tablet/02-auth-entry.html). On a
+            phone the card IS the screen and the field speaks for itself; in a
+            420px popup over a page the visitor needs to be told what opened and
+            what is about to happen. `hidden md:block` — the mobile design is
+            byte-for-byte untouched. */}
+        <h1 className="hidden text-24 font-bold tracking-[-0.02em] text-ink-primary md:mt-5 md:block">
+          Log in or sign up
+        </h1>
+        <p className="hidden text-15 text-ink-secondary md:mt-2 md:block">
+          We&rsquo;ll send a one-time code to your mobile number.
+        </p>
 
         <div className="mt-8 flex flex-col gap-2">
           <label htmlFor="phone" className="chrome text-13 font-semibold text-ink-secondary">

@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>HomzList — 20 · Settings (desktop + tablet)</title>
+<link rel="stylesheet" href="_kit.css" />
+<style>
+.setcols{display:block}
+.setnav{background:var(--surface-1);border:1px solid var(--border);border-radius:14px;padding:8px;margin-bottom:16px}
+.setnav h4{margin:12px 10px 6px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-tertiary)}
+.setnav a{display:flex;align-items:center;gap:10px;height:38px;padding:0 10px;border-radius:9px;font-size:14px;color:var(--ink-secondary)}
+.setnav a[aria-current]{background:var(--accent-soft);color:var(--accent);font-weight:600}
+.setnav a .ic{flex:0 0 18px;display:grid;place-items:center}
+.blk{background:var(--surface-1);border:1px solid var(--border);border-radius:14px;padding:16px;margin:0 0 14px}
+.blk h3{margin:0 0 4px;font-size:15px;font-weight:700}
+.blk .hint{font-size:12px;color:var(--ink-tertiary);margin:0 0 14px}
+.srow{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:12px 0;border-bottom:1px solid var(--divider);font-size:14px}
+.srow:last-child{border-bottom:0}
+.srow .sd{font-size:12px;color:var(--ink-tertiary);margin-top:2px}
+.sw{width:38px;height:22px;border-radius:999px;background:var(--surface-3);position:relative;flex:0 0 38px}
+.sw.on{background:var(--accent)}
+.sw::after{content:"";position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:999px;background:#fff}
+.sw.on::after{left:19px}
+.seg3{display:flex;background:var(--surface-2);border-radius:10px;padding:3px;gap:2px}
+.seg3 span{padding:7px 14px;border-radius:8px;font-size:13px;font-weight:600;color:var(--ink-tertiary)}
+.seg3 span[aria-selected="true"]{background:var(--surface-1);color:var(--ink-primary);box-shadow:var(--shadow-sm)}
+.danger{border-color:var(--error)}
+.danger h3{color:var(--error)}
+.dev{display:flex;align-items:center;gap:12px;padding:13px 0;border-bottom:1px solid var(--divider)}
+.dev:last-child{border-bottom:0}
+.dev .ic{width:36px;height:36px;border-radius:10px;background:var(--surface-2);display:grid;place-items:center;flex:0 0 36px}
+@container (min-width:1200px){
+  .setcols{display:grid;grid-template-columns:260px minmax(0,1fr);gap:24px;align-items:start}
+  .setnav{position:sticky;top:88px;margin-bottom:0}
+  .setbody{max-width:760px}
+}
+</style>
+</head>
+<body>
+
+<div class="bar">
+  <b>20 · Settings</b>
+  <div class="seg"><button data-dark aria-pressed="false">Dark</button></div>
+  <div class="sp"></div>
+  <span class="note">Every row is the app's own: Account · Preferences · Privacy · Security · Your content ·
+  Support · About · Danger zone, with Language (English · Hindi · Gujarati), Appearance (Light · Dark · System),
+  Login activity, Download your data, Deactivate account, Delete account.</span>
+</div>
+
+<div class="stage">
+
+  <div>
+    <p class="caption">A · Settings — Desktop 1440 (section nav + panel)</p>
+    <div class="scaler"><div class="frame" data-w="1440" style="width:1440px" data-tpl="settings"></div></div>
+  </div>
+
+  <div class="annot">
+    <h3>Decisions</h3>
+    <ul>
+      <li><b>Settings stops being a stack of screens.</b> On mobile every section is its own route reached by
+      tapping a row. On desktop the sections become a 260px nav and the content shows in place — the routes
+      still exist and still deep-link, so <code>/settings/privacy</code> opens with Privacy selected.</li>
+      <li><b>The rows keep their exact labels and their exact grouping</b>, including "You can change this per
+      listing" under the number-visibility toggle, which is the one place a user could otherwise misread a
+      global switch.</li>
+      <li><b>Danger zone stays last and stays red-bordered</b>, with the app's own two actions separated —
+      deactivate is reversible, delete is not, and they must never look like the same button.</li>
+      <li><b>Login activity gets a real device list</b> with the app's own device labels (Chrome · Safari ·
+      Firefox · Android · Linux · Unknown device) and its single action, "Log out this device?".</li>
+      <li>Legal pages, Account status and Blocked users stay links out — they are their own routes and their
+      own screens.</li>
+    </ul>
+  </div>
+
+  <div>
+    <p class="caption">B · Privacy + Login activity — Desktop 1440</p>
+    <div class="scaler"><div class="frame" data-w="1440" style="width:1440px" data-tpl="privacy"></div></div>
+  </div>
+
+  <div>
+    <p class="caption">C · Tablet 1024 (nav folds above the panel)</p>
+    <div class="scaler"><div class="frame" data-w="1024" style="width:1024px" data-tpl="settings"></div></div>
+  </div>
+
+  <div>
+    <p class="caption">D · Tablet 768</p>
+    <div class="scaler"><div class="frame" data-w="768" style="width:768px" data-tpl="settings"></div></div>
+  </div>
+
+</div>
+
+<template id="tpl-settings">
+  <div class="app">
+    <div class="shell">
+      <div data-part="sidebar" data-active="Settings"></div>
+      <div class="mainwrap">
+        <div class="ctop"><div><h1>Settings</h1></div><div class="sp"></div><a class="btn" href="#">Log out</a></div>
+        <div class="content">
+          <div class="setcols">
+            <aside class="setnav">
+              <h4 style="margin-top:6px">Account</h4>
+              <a href="#" aria-current="page"><span class="ic"><svg class="i s18"><use href="#i-user"/></svg></span>Account</a>
+              <a href="#"><span class="ic"><svg class="i s18"><use href="#i-shield"/></svg></span>Verification</a>
+              <a href="#"><span class="ic"><svg class="i s18"><use href="#i-card"/></svg></span>Plans &amp; billing</a>
+              <h4>Preferences</h4>
+              <a href="#"><span class="ic"><svg class="i s18"><use href="#i-bell"/></svg></span>Notifications</a>
+              <a href="#"><span class="ic"><svg class="i s18"><use href="#i-eye"/></svg></span>Appearance</a>
+              <a href="#"><span class="ic"><svg class="i s18"><use href="#i-file"/></svg></span>Language</a>
+              <h4>Privacy &amp; security</h4>
+              <a href="#"><span class="ic"><svg class="i s18"><use href="#i-shield"/></svg></span>Privacy</a>
+              <a href="#"><span class="ic"><svg class="i s18"><use href="#i-clock"/></svg></span>Login activity</a>
+              <a href="#"><span class="ic"><svg class="i s18"><use href="#i-user"/></svg></span>Blocked users</a>
+              <h4>Your content</h4>
+              <a href="#"><span class="ic"><svg class="i s18"><use href="#i-home"/></svg></span>My listings</a>
+              <a href="#"><span class="ic"><svg class="i s18"><use href="#i-file"/></svg></span>Drafts</a>
+              <a href="#"><span class="ic"><svg class="i s18"><use href="#i-archive"/></svg></span>Archived</a>
+              <a href="#"><span class="ic"><svg class="i s18"><use href="#i-trash"/></svg></span>Recently deleted</a>
+              <a href="#"><span class="ic"><svg class="i s18"><use href="#i-download"/></svg></span>Download your data</a>
+              <h4>Support &amp; about</h4>
+              <a href="#"><span class="ic"><svg class="i s18"><use href="#i-help"/></svg></span>Help centre</a>
+              <a href="#"><span class="ic"><svg class="i s18"><use href="#i-send"/></svg></span>My tickets</a>
+              <a href="#"><span class="ic"><svg class="i s18"><use href="#i-alert"/></svg></span>Report a problem</a>
+              <a href="#"><span class="ic"><svg class="i s18"><use href="#i-file"/></svg></span>About HomzList</a>
+            </aside>
+
+            <div class="setbody">
+              <div class="blk">
+                <h3>Account</h3>
+                <p class="hint">Your sign-in details and account state.</p>
+                <div class="srow"><span>Phone number<div class="sd">+91 98250 12345</div></span><span class="tag ok">Verified</span></div>
+                <div class="srow"><span>Email<div class="sd">rajan@example.com</div></span><a class="btn sm" href="#">Change</a></div>
+                <div class="srow"><span>Edit profile<div class="sd">Name, photo, city, about</div></span><svg class="i s18" style="color:var(--ink-tertiary)"><use href="#i-right"/></svg></div>
+                <div class="srow"><span>Account status<div class="sd">Active · in good standing</div></span><svg class="i s18" style="color:var(--ink-tertiary)"><use href="#i-right"/></svg></div>
+              </div>
+
+              <div class="blk">
+                <h3>Preferences</h3>
+                <div class="srow"><span>Appearance</span>
+                  <span class="seg3"><span aria-selected="true">Light</span><span>Dark</span><span>System</span></span></div>
+                <div class="srow"><span>Language</span>
+                  <span class="seg3"><span aria-selected="true">English</span><span>हिन्दी</span><span>ગુજરાતી</span></span></div>
+                <div class="srow"><span>Notifications<div class="sd">Leads, matches, billing</div></span><span class="tag ok">Enabled</span></div>
+              </div>
+
+              <div class="blk">
+                <h3>Your content</h3>
+                <div class="srow"><span>My listings<div class="sd">12 live · 2 hidden</div></span><svg class="i s18" style="color:var(--ink-tertiary)"><use href="#i-right"/></svg></div>
+                <div class="srow"><span>Drafts<div class="sd">1 unfinished</div></span><svg class="i s18" style="color:var(--ink-tertiary)"><use href="#i-right"/></svg></div>
+                <div class="srow"><span>Archived<div class="sd">4 listings</div></span><svg class="i s18" style="color:var(--ink-tertiary)"><use href="#i-right"/></svg></div>
+                <div class="srow"><span>Recently deleted<div class="sd">Removed for good after 30 days</div></span><svg class="i s18" style="color:var(--ink-tertiary)"><use href="#i-right"/></svg></div>
+                <div class="srow"><span>Download your data<div class="sd">A copy of your listings, leads and payments</div></span><a class="btn sm" href="#">Request</a></div>
+              </div>
+
+              <div class="blk">
+                <h3>Support &amp; about</h3>
+                <div class="srow"><span>Help centre</span><svg class="i s18" style="color:var(--ink-tertiary)"><use href="#i-right"/></svg></div>
+                <div class="srow"><span>My tickets<div class="sd">1 replied</div></span><svg class="i s18" style="color:var(--ink-tertiary)"><use href="#i-right"/></svg></div>
+                <div class="srow"><span>Contact support</span><svg class="i s18" style="color:var(--ink-tertiary)"><use href="#i-right"/></svg></div>
+                <div class="srow"><span>Grievance Officer</span><svg class="i s18" style="color:var(--ink-tertiary)"><use href="#i-right"/></svg></div>
+                <div class="srow"><span>All legal pages<div class="sd">Terms of Service · Privacy Policy · Refund Policy</div></span><svg class="i s18" style="color:var(--ink-tertiary)"><use href="#i-right"/></svg></div>
+                <div class="srow"><span>Rate us on Google</span><svg class="i s18" style="color:var(--ink-tertiary)"><use href="#i-right"/></svg></div>
+              </div>
+
+              <div class="blk danger">
+                <h3>Danger zone</h3>
+                <p class="hint">Deactivating hides your account and listings. Deleting is permanent.</p>
+                <div class="srow"><span>Deactivate account<div class="sd">You can come back any time</div></span><a class="btn sm" href="#">Deactivate</a></div>
+                <div class="srow"><span>Delete account<div class="sd">Permanent — listings, leads and history go with it</div></span><a class="btn sm" href="#" style="color:var(--error);border-color:var(--error)">Delete</a></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div data-part="bnav" data-active="profile"></div>
+  </div>
+</template>
+
+<template id="tpl-privacy">
+  <div class="app">
+    <div class="shell">
+      <div data-part="sidebar" data-active="Settings"></div>
+      <div class="mainwrap">
+        <div class="ctop"><div><h1>Privacy &amp; security</h1></div><div class="sp"></div></div>
+        <div class="content">
+          <div class="setcols">
+            <aside class="setnav">
+              <h4 style="margin-top:6px">Account</h4>
+              <a href="#"><span class="ic"><svg class="i s18"><use href="#i-user"/></svg></span>Account</a>
+              <a href="#"><span class="ic"><svg class="i s18"><use href="#i-card"/></svg></span>Plans &amp; billing</a>
+              <h4>Privacy &amp; security</h4>
+              <a href="#" aria-current="page"><span class="ic"><svg class="i s18"><use href="#i-shield"/></svg></span>Privacy</a>
+              <a href="#"><span class="ic"><svg class="i s18"><use href="#i-clock"/></svg></span>Login activity</a>
+              <a href="#"><span class="ic"><svg class="i s18"><use href="#i-user"/></svg></span>Blocked users</a>
+            </aside>
+
+            <div class="setbody">
+              <div class="blk">
+                <h3>Privacy</h3>
+                <div class="srow"><span>Show my number by default on new listings<div class="sd">You can change this per listing</div></span><span class="sw"></span></div>
+                <div class="srow"><span>Allow others to find me by phone number</span><span class="sw on"></span></div>
+                <div class="srow"><span>Show activity status</span><span class="sw on"></span></div>
+                <div class="srow"><span>Show last seen</span><span class="sw"></span></div>
+              </div>
+
+              <div class="blk">
+                <h3>Login activity</h3>
+                <p class="hint">Devices signed in to your account. Log out anything you do not recognise.</p>
+                <div class="dev">
+                  <span class="ic"><svg class="i s18"><use href="#i-eye"/></svg></span>
+                  <span style="flex:1"><b style="font-size:14px">Chrome · Windows</b><div class="sd">Surat, India · this device · active now</div></span>
+                  <span class="tag ok">Current</span>
+                </div>
+                <div class="dev">
+                  <span class="ic"><svg class="i s18"><use href="#i-phone"/></svg></span>
+                  <span style="flex:1"><b style="font-size:14px">Chrome · Android</b><div class="sd">Surat, India · last active 2 hours ago</div></span>
+                  <a class="btn sm" href="#">Log out</a>
+                </div>
+                <div class="dev">
+                  <span class="ic"><svg class="i s18"><use href="#i-eye"/></svg></span>
+                  <span style="flex:1"><b style="font-size:14px">Safari · iPhone</b><div class="sd">Ahmedabad, India · last active 6 days ago</div></span>
+                  <a class="btn sm" href="#">Log out</a>
+                </div>
+                <div class="dev">
+                  <span class="ic"><svg class="i s18"><use href="#i-alert"/></svg></span>
+                  <span style="flex:1"><b style="font-size:14px">Unknown device</b><div class="sd">Firefox · Linux · last active 14 days ago</div></span>
+                  <a class="btn sm" href="#" style="color:var(--error);border-color:var(--error)">Log out</a>
+                </div>
+              </div>
+
+              <div class="blk">
+                <h3>Blocked users</h3>
+                <p class="hint">Blocked accounts cannot see your listings or contact you.</p>
+                <div class="srow"><span style="display:flex;align-items:center;gap:10px"><span class="avatar" style="background:var(--avatar-6);width:30px;height:30px;font-size:12px">S</span>Suresh K.</span><a class="btn sm" href="#">Unblock</a></div>
+                <div class="srow"><span style="display:flex;align-items:center;gap:10px"><span class="avatar" style="background:var(--avatar-4);width:30px;height:30px;font-size:12px">M</span>Manoj T.</span><a class="btn sm" href="#">Unblock</a></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div data-part="bnav" data-active="profile"></div>
+  </div>
+</template>
+
+<script src="_kit.js"></script>
+</body>
+</html>

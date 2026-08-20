@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>HomzList — 13 · Requirements (desktop + tablet)</title>
+<link rel="stylesheet" href="_kit.css" />
+<style>
+.split{display:block}
+.lcol{border:1px solid var(--border);border-radius:14px;background:var(--surface-1);overflow:hidden}
+.litem{display:flex;gap:11px;padding:13px 14px;border-top:1px solid var(--divider);align-items:flex-start}
+.litem:first-child{border-top:0}
+.litem.on{background:var(--accent-soft)}
+.litem .nm{font-size:14px;font-weight:600}
+.litem .ms{font-size:12px;color:var(--ink-secondary);margin-top:2px}
+.litem .tm{font-size:11px;color:var(--ink-tertiary);white-space:nowrap}
+.dpanel{border:1px solid var(--border);border-radius:14px;background:var(--surface-1);overflow:hidden}
+.dhead{padding:16px;border-bottom:1px solid var(--divider);display:flex;gap:12px;align-items:center}
+.dbody{padding:16px}
+.qa{display:flex;justify-content:space-between;gap:14px;padding:10px 0;border-bottom:1px solid var(--divider);font-size:13px}
+.qa:last-child{border-bottom:0}
+.qa span:first-child{color:var(--ink-tertiary)}
+.qa span:last-child{font-weight:600;text-align:right}
+.chiprow{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;margin-bottom:14px}
+.chiprow::-webkit-scrollbar{display:none}
+.fblk{background:var(--surface-1);border:1px solid var(--border);border-radius:14px;padding:16px;margin:0 0 14px}
+.fblk h3{margin:0 0 4px;font-size:15px;font-weight:700}
+.fblk .hint{font-size:12px;color:var(--ink-tertiary);margin:0 0 14px}
+.frow{display:grid;grid-template-columns:1fr;gap:12px;margin-bottom:12px}
+.lab{display:block;font-size:13px;font-weight:600;color:var(--ink-secondary);margin-bottom:6px}
+.inp{height:44px;border:1px solid var(--border);border-radius:10px;background:var(--surface-2);display:flex;align-items:center;justify-content:space-between;padding:0 13px;font-size:14px}
+.inp.ta{height:92px;align-items:flex-start;padding-top:11px}
+.wizard{display:block}
+.form{max-width:none}
+.pv{background:var(--surface-1);border:1px solid var(--border);border-radius:16px;padding:16px;position:sticky;top:120px}
+.upsell{display:flex;gap:11px;align-items:center;padding:14px;border-radius:14px;background:var(--accent-soft);margin-bottom:16px}
+@container (min-width:768px){ .frow.two{grid-template-columns:1fr 1fr;gap:14px} }
+@container (min-width:1200px){
+  .split{display:grid;grid-template-columns:400px minmax(0,1fr);gap:20px;align-items:start}
+  .lcol{position:sticky;top:88px}
+  .wizard{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:28px;align-items:start}
+  .form{max-width:760px}
+}
+</style>
+</head>
+<body>
+
+<div class="bar">
+  <b>13 · Requirements</b>
+  <div class="seg"><button data-dark aria-pressed="false">Dark</button></div>
+  <div class="sp"></div>
+  <span class="note">Real copy from <code>RequirementsBrowse.tsx</code> / <code>ProposalSheet</code>:
+  "I Have a Property" · "Instant match alerts for your areas" · "Direct chat after acceptance" ·
+  "No requirements in your area yet" · "Change city" · My requirements · My proposals.</span>
+</div>
+
+<div class="stage">
+
+  <div>
+    <p class="caption">A · Browse requirements — Desktop 1440 (list + detail, propose from the panel)</p>
+    <div class="scaler"><div class="frame" data-w="1440" style="width:1440px" data-tpl="browse"></div></div>
+  </div>
+
+  <div class="annot">
+    <h3>Decisions</h3>
+    <ul>
+      <li><b>Split view again</b>, for the same reason as Leads: a broker scanning twenty-four buyer
+      requirements decides in seconds and should never pay a page load per look. The
+      <code>/requirements/[id]</code> route still works on its own.</li>
+      <li><b>"I Have a Property" is the panel's primary action.</b> That is the app's own label and the whole
+      commercial point of the screen, so it does not become an icon on a row — it sits full-width in the
+      detail panel, where the requirement it answers is visible.</li>
+      <li><b>The entitlement wall keeps its place.</b> A seller without the requirement plan sees the app's own
+      locked state with "Instant match alerts for your areas" and "Direct chat after acceptance" — this is the
+      upsell, and hiding it on desktop would remove the reason to buy.</li>
+      <li><b>Posting a requirement is form + live preview</b>, same as posting a listing, so the buyer sees the
+      card sellers will answer.</li>
+      <li><b>My requirements and My proposals are the same list</b> with their own status chips.</li>
+    </ul>
+  </div>
+
+  <div>
+    <p class="caption">B · Post a requirement — Desktop 1440</p>
+    <div class="scaler"><div class="frame" data-w="1440" style="width:1440px" data-tpl="new"></div></div>
+  </div>
+
+  <div>
+    <p class="caption">C · Locked state (no requirement plan) — Desktop 1440</p>
+    <div class="scaler"><div class="frame" data-w="1440" style="width:1440px" data-tpl="locked"></div></div>
+  </div>
+
+  <div>
+    <p class="caption">D · Browse — Tablet 1024</p>
+    <div class="scaler"><div class="frame" data-w="1024" style="width:1024px" data-tpl="browse"></div></div>
+  </div>
+
+  <div>
+    <p class="caption">E · Browse — Tablet 768</p>
+    <div class="scaler"><div class="frame" data-w="768" style="width:768px" data-tpl="browse"></div></div>
+  </div>
+
+</div>
+
+<template id="tpl-browse">
+  <div class="app">
+    <div class="shell">
+      <div data-part="sidebar" data-active="Browse requirements"></div>
+      <div class="mainwrap">
+        <div class="ctop"><div><h1>Browse requirements</h1><div class="sub">24 buyers looking in Surat</div></div><div class="sp"></div>
+          <a class="btn" href="#"><svg class="i s16"><use href="#i-pin"/></svg>Change city</a>
+          <a class="btn pri" href="#"><svg class="i s16"><use href="#i-plus-b"/></svg>Post a requirement</a></div>
+
+        <div class="content">
+          <div class="chiprow">
+            <span class="pill" aria-pressed="true">All · 24</span><span class="pill">Buy · 17</span><span class="pill">Rent · 7</span>
+            <span style="width:1px;height:22px;background:var(--border);margin:0 4px"></span>
+            <span class="pill">Vesu</span><span class="pill">Adajan</span><span class="pill">Pal</span>
+            <span class="pill">Hide posts you have already been through</span>
+          </div>
+
+          <div class="split">
+            <div class="lcol">
+              <div class="litem on">
+                <span class="avatar" style="background:var(--avatar-1)">A</span>
+                <span style="flex:1;min-width:0"><span class="nm">2 BHK Flat · Vesu</span><div class="ms">₹ 55 – 70 Lakh · ready to move</div></span>
+                <span class="tm">2h</span>
+              </div>
+              <div class="litem">
+                <span class="avatar" style="background:var(--avatar-5)">N</span>
+                <span style="flex:1;min-width:0"><span class="nm">3 BHK Flat · Adajan</span><div class="ms">₹ 90 L – 1.2 Cr · any status</div></span>
+                <span class="tm">6h</span>
+              </div>
+              <div class="litem">
+                <span class="avatar" style="background:var(--avatar-7)">K</span>
+                <span style="flex:1;min-width:0"><span class="nm">Residential plot · Pal</span><div class="ms">1500 – 2500 sq.ft · ₹ 25 – 45 L</div></span>
+                <span class="tm">1d</span>
+              </div>
+              <div class="litem">
+                <span class="avatar" style="background:var(--avatar-3)">D</span>
+                <span style="flex:1;min-width:0"><span class="nm">2 BHK on rent · Piplod</span><div class="ms">₹ 18 – 25k / month · furnished</div></span>
+                <span class="tm">1d</span>
+              </div>
+              <div class="litem">
+                <span class="avatar" style="background:var(--avatar-6)">P</span>
+                <span style="flex:1;min-width:0"><span class="nm">Shop · Ring Road</span><div class="ms">500 – 800 sq.ft · rent</div></span>
+                <span class="tm">3d</span>
+              </div>
+              <div class="litem">
+                <span class="avatar" style="background:var(--avatar-8)">V</span>
+                <span style="flex:1;min-width:0"><span class="nm">4 BHK Flat · Athwa</span><div class="ms">₹ 1.8 – 2.4 Cr · new construction</div></span>
+                <span class="tm">4d</span>
+              </div>
+            </div>
+
+            <div class="dpanel">
+              <div class="dhead">
+                <span class="avatar" style="background:var(--avatar-1);width:46px;height:46px;font-size:18px">A</span>
+                <span style="flex:1;min-width:0"><b style="font-size:17px">2 BHK Flat to buy · Vesu</b>
+                  <div class="muted">Posted by Amit R. · Buyer · 2 hours ago</div></span>
+                <span class="tag ok">Live</span>
+              </div>
+              <div class="dbody">
+                <div class="qa"><span>Looking to</span><span>Buy</span></div>
+                <div class="qa"><span>Property type</span><span>Flat</span></div>
+                <div class="qa"><span>Configuration</span><span>2 BHK</span></div>
+                <div class="qa"><span>Areas</span><span>Vesu, Piplod</span></div>
+                <div class="qa"><span>Budget</span><span>₹ 55 – 70 Lakh</span></div>
+                <div class="qa"><span>Built-up area</span><span>1000 – 1300 sq.ft</span></div>
+                <div class="qa"><span>Possession</span><span>Ready to move</span></div>
+                <div class="qa"><span>Furnishing</span><span>Semi or full</span></div>
+
+                <div style="margin-top:16px;padding:14px;border-radius:12px;background:var(--surface-2);font-size:13px;color:var(--ink-secondary)">
+                  Looking for an east-facing flat with covered parking and a lift. Can close within 45 days.
+                </div>
+
+                <div style="display:flex;gap:10px;margin-top:18px;flex-wrap:wrap">
+                  <a class="btn pri" href="#" style="flex:1;min-width:200px"><svg class="i s16"><use href="#i-home"/></svg>I Have a Property</a>
+                  <a class="btn" href="#"><svg class="i s16"><use href="#i-user"/></svg>View profile</a>
+                  <a class="btn ghost" href="#"><svg class="i s16"><use href="#i-alert"/></svg>Report</a>
+                </div>
+                <p class="muted" style="margin:12px 0 0">Your number is shared only after the buyer accepts your proposal.</p>
+
+                <section class="sec carousel" style="margin-top:22px">
+                  <div class="sechead"><div><h2 class="h2">Your matching listings</h2><div class="sub">3 of your 12 listings fit this</div></div><div class="sp"></div>
+                    <div class="arrows"><span class="arrow" aria-disabled="true"><svg class="i s16"><use href="#i-left"/></svg></span><span class="arrow"><svg class="i s16"><use href="#i-right"/></svg></span></div></div>
+                  <div class="rail">
+                    <div class="pcard"><div class="shot ph" data-l="PHOTO"></div><div class="ttl">₹ 62 Lakh</div><div class="sub">2 BHK · Vesu</div><a class="btn pri sm block" href="#" style="margin-top:9px">Propose</a></div>
+                    <div class="pcard"><div class="shot ph" data-l="PHOTO"></div><div class="ttl">₹ 66 Lakh</div><div class="sub">2 BHK · Piplod</div><a class="btn pri sm block" href="#" style="margin-top:9px">Propose</a></div>
+                    <div class="pcard"><div class="shot ph" data-l="PHOTO"></div><div class="ttl">₹ 58 Lakh</div><div class="sub">2 BHK · Vesu</div><a class="btn pri sm block" href="#" style="margin-top:9px">Propose</a></div>
+                  </div>
+                </section>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div data-part="bnav" data-active="leads"></div>
+  </div>
+</template>
+
+<template id="tpl-new">
+  <div class="app">
+    <div class="shell">
+      <div data-part="sidebar" data-active="My requirements"></div>
+      <div class="mainwrap">
+        <div class="ctop"><div><h1>Post a requirement</h1><div class="sub">Tell us what you need — matching properties find you</div></div><div class="sp"></div>
+          <a class="btn pri" href="#">Post requirement</a></div>
+        <div class="content">
+          <div class="wizard">
+            <div class="form">
+              <div class="fblk">
+                <h3>What are you looking for?</h3>
+                <div class="frow two">
+                  <div><span class="lab">Looking to</span><div class="inp">Buy<svg class="i s16"><use href="#i-chevron"/></svg></div></div>
+                  <div><span class="lab">Property type</span><div class="inp">Flat<svg class="i s16"><use href="#i-chevron"/></svg></div></div>
+                </div>
+                <div class="frow two">
+                  <div><span class="lab">Configuration</span><div class="inp">2 BHK<svg class="i s16"><use href="#i-chevron"/></svg></div></div>
+                  <div><span class="lab">Possession</span><div class="inp">Ready to move<svg class="i s16"><use href="#i-chevron"/></svg></div></div>
+                </div>
+              </div>
+              <div class="fblk">
+                <h3>Where</h3>
+                <p class="hint">Sellers in these areas get an alert the moment you post.</p>
+                <div class="frow two">
+                  <div><span class="lab">City</span><div class="inp">Surat<svg class="i s16"><use href="#i-chevron"/></svg></div></div>
+                  <div><span class="lab">Areas</span><div class="inp">Vesu, Piplod<svg class="i s16"><use href="#i-chevron"/></svg></div></div>
+                </div>
+              </div>
+              <div class="fblk">
+                <h3>Budget &amp; size</h3>
+                <div class="frow two">
+                  <div><span class="lab">Budget from</span><div class="inp">₹ 55,00,000</div></div>
+                  <div><span class="lab">Budget to</span><div class="inp">₹ 70,00,000</div></div>
+                </div>
+                <div class="frow two">
+                  <div><span class="lab">Built-up area from</span><div class="inp">1000 sq.ft</div></div>
+                  <div><span class="lab">Built-up area to</span><div class="inp">1300 sq.ft</div></div>
+                </div>
+              </div>
+              <div class="fblk">
+                <h3>Anything else</h3>
+                <div class="inp ta">East-facing, covered parking and a lift. Can close within 45 days.</div>
+              </div>
+            </div>
+            <aside>
+              <div class="pv">
+                <b style="font-size:14px">Live preview</b>
+                <p class="muted" style="margin:4px 0 12px">This is the card sellers will answer.</p>
+                <div class="card pad">
+                  <div style="display:flex;align-items:center;gap:9px;margin-bottom:9px">
+                    <span class="avatar" style="background:var(--avatar-2);width:30px;height:30px;font-size:12px">R</span>
+                    <span style="font-size:12px;color:var(--ink-secondary)">Rajan Patel · Buyer</span>
+                  </div>
+                  <b style="font-size:15px">2 BHK Flat to buy · Vesu</b>
+                  <div class="muted" style="margin-top:4px">₹ 55 – 70 Lakh · 1000 – 1300 sq.ft · ready to move</div>
+                </div>
+                <div style="margin-top:14px;display:grid;gap:9px;font-size:13px">
+                  <div style="display:flex;gap:9px"><svg class="i s18" style="color:var(--accent)"><use href="#i-check"/></svg><span>Instant match alerts for your areas</span></div>
+                  <div style="display:flex;gap:9px"><svg class="i s18" style="color:var(--accent)"><use href="#i-check"/></svg><span>Direct chat after acceptance</span></div>
+                </div>
+              </div>
+            </aside>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div data-part="bnav" data-active="create"></div>
+  </div>
+</template>
+
+<template id="tpl-locked">
+  <div class="app">
+    <div class="shell">
+      <div data-part="sidebar" data-active="Browse requirements"></div>
+      <div class="mainwrap">
+        <div class="ctop"><div><h1>Browse requirements</h1><div class="sub">24 buyers looking in Surat</div></div><div class="sp"></div>
+          <a class="btn pri" href="#">See plans</a></div>
+        <div class="content">
+          <div class="upsell" style="max-width:1000px">
+            <span class="hicon" style="background:var(--accent);color:var(--on-accent)"><svg class="i s24"><use href="#i-shield"/></svg></span>
+            <span style="flex:1"><b style="font-size:15px">Unlock buyer requirements</b>
+              <div class="muted">Instant match alerts for your areas · Direct chat after acceptance</div></span>
+            <a class="btn pri" href="#">See plans</a>
+          </div>
+
+          <div style="max-width:1000px;position:relative">
+            <div class="lcol" style="filter:blur(3px);pointer-events:none">
+              <div class="litem"><span class="avatar" style="background:var(--avatar-1)">A</span>
+                <span style="flex:1"><span class="nm">2 BHK Flat · Vesu</span><div class="ms">₹ 55 – 70 Lakh · ready to move</div></span><span class="tm">2h</span></div>
+              <div class="litem"><span class="avatar" style="background:var(--avatar-5)">N</span>
+                <span style="flex:1"><span class="nm">3 BHK Flat · Adajan</span><div class="ms">₹ 90 L – 1.2 Cr</div></span><span class="tm">6h</span></div>
+              <div class="litem"><span class="avatar" style="background:var(--avatar-7)">K</span>
+                <span style="flex:1"><span class="nm">Residential plot · Pal</span><div class="ms">1500 – 2500 sq.ft</div></span><span class="tm">1d</span></div>
+              <div class="litem"><span class="avatar" style="background:var(--avatar-3)">D</span>
+                <span style="flex:1"><span class="nm">2 BHK on rent · Piplod</span><div class="ms">₹ 18 – 25k / month</div></span><span class="tm">1d</span></div>
+            </div>
+            <div style="position:absolute;inset:0;display:grid;place-items:center">
+              <div class="card pad" style="text-align:center;max-width:380px">
+                <svg class="i s32" style="color:var(--accent);margin:0 auto 10px"><use href="#i-shield"/></svg>
+                <b style="font-size:16px">24 buyers are looking right now</b>
+                <p class="muted" style="margin:8px 0 14px">A requirement plan shows you every one of them and lets you propose your listings.</p>
+                <a class="btn pri block" href="#">See plans</a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div data-part="bnav" data-active="leads"></div>
+  </div>
+</template>
+
+<script src="_kit.js"></script>
+</body>
+</html>

@@ -1,0 +1,348 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>HomzList — 04 · Search (desktop + tablet)</title>
+<link rel="stylesheet" href="_kit.css" />
+<style>
+.sbar{background:var(--surface-1);border-bottom:1px solid var(--border);position:sticky;top:56px;z-index:20}
+.sbar .container{display:flex;align-items:center;gap:10px;padding-top:12px;padding-bottom:12px;flex-wrap:wrap}
+.sfield{display:flex;align-items:center;gap:9px;height:44px;flex:1;min-width:220px;padding:0 14px;border:1px solid var(--border);border-radius:12px;background:var(--surface-1);font-size:14px}
+.sfield .q{color:var(--ink-primary);font-weight:600}
+.sgo{height:44px;padding:0 22px;border-radius:12px;background:var(--accent);color:var(--on-accent);font-weight:700;font-size:14px;display:grid;place-items:center}
+.sfbtn{display:inline-flex}
+.countline{display:flex;align-items:center;gap:10px;margin:0 0 14px;flex-wrap:wrap}
+.countline b{font-size:15px}
+.countline .sp{flex:1}
+.results{display:grid;gap:14px}
+.frail{background:var(--surface-1);border:1px solid var(--border);border-radius:14px;padding:4px 16px;align-self:start;position:sticky;top:132px}
+.frail .fhead{display:flex;align-items:center;padding:14px 0 0}
+.frail .fhead .sp{flex:1}
+.fchips{display:flex;flex-wrap:wrap;gap:7px}
+.fsel{display:flex;align-items:center;justify-content:space-between;height:40px;border:1px solid var(--border);border-radius:10px;padding:0 12px;font-size:13px;color:var(--ink-secondary)}
+.trow{display:flex;align-items:center;justify-content:space-between;padding:9px 0;font-size:13px}
+.sw{width:38px;height:22px;border-radius:999px;background:var(--surface-3);position:relative;flex:0 0 38px}
+.sw.on{background:var(--accent)}
+.sw::after{content:"";position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:999px;background:#fff}
+.sw.on::after{left:19px}
+.searchcols{display:block}
+.mapless{display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:12px;background:var(--info-soft);color:var(--ink-secondary);font-size:13px}
+.area .shot{aspect-ratio:16/10;border-radius:12px}
+@container (min-width:768px){
+  .sbar{top:62px}
+}
+@container (min-width:1200px){
+  .sbar{top:64px}
+  .searchcols{display:grid;grid-template-columns:280px minmax(0,1fr);gap:24px;align-items:start}
+  .sfbtn{display:none}   /* the rail is always open — no sheet needed */
+}
+</style>
+</head>
+<body>
+
+<div class="bar">
+  <b>04 · Search</b>
+  <div class="seg"><button data-dark aria-pressed="false">Dark</button></div>
+  <div class="sp"></div>
+  <span class="note">Real tabs (All · Properties · Projects · Brokers &amp; Builders · Areas), real sort
+  (Latest · Nearby · Price ↑ · Price ↓) and the real filter sections from <code>FilterSheet</code>:
+  Looking to · Property type · Budget · Location · Amenities · More. No maps anywhere, as in the app.</span>
+</div>
+
+<div class="stage">
+
+  <div>
+    <p class="caption">A · Search results — Desktop 1440 (filters as a rail, results as rows)</p>
+    <div class="scaler"><div class="frame" data-w="1440" style="width:1440px" data-tpl="results"></div></div>
+  </div>
+
+  <div class="annot">
+    <h3>Decisions</h3>
+    <ul>
+      <li><b>The filter sheet becomes a rail.</b> On mobile, filters live in a bottom sheet because there is
+      no room; on desktop that sheet is a modal standing between the user and the thing they came for. At
+      ≥1200 the same sections — Looking to, Property type, Budget, Location, Amenities, More — sit open in a
+      280px rail, and every change re-runs the search live. The "Filters" button disappears because there is
+      nothing left for it to open. Below 1200 the button and the sheet come back, unchanged.</li>
+      <li><b>Results are rows, not a grid.</b> A wide row shows what a grid card cannot: the full title, the
+      area, all the facts, the poster and the actions on one line. This is also the honest reading of "no
+      grids" — the page scrolls one list, exactly like the mobile feed, just wider.</li>
+      <li><b>The tabs stay the app's five</b> and keep their server-computed badge counts. The cascade
+      sections under the All tab ("Also in Adajan", "Projects near you") become carousels.</li>
+      <li><b>No map.</b> The app has none, so neither does this: the space a portal would give a map goes to
+      the rail and to wider rows.</li>
+      <li>The search field itself moves into a sticky sub-bar under the header, so scrolling a long result
+      list never loses the query.</li>
+    </ul>
+  </div>
+
+  <div>
+    <p class="caption">B · Search results — Tablet 1024 (filters return to a sheet, opened by the button)</p>
+    <div class="scaler"><div class="frame" data-w="1024" style="width:1024px" data-tpl="results"></div></div>
+  </div>
+
+  <div>
+    <p class="caption">C · Search home — Desktop 1440 (the entry screen: recent, popular areas, browse by type)</p>
+    <div class="scaler"><div class="frame" data-w="1440" style="width:1440px" data-tpl="shome"></div></div>
+  </div>
+
+  <div class="annot">
+    <h3>Search home, and the area / landing pages</h3>
+    <ul>
+      <li>Mobile's Search screen is a field plus recent searches. On desktop the field is already in the
+      header and the hero, so this screen earns its keep by being a <b>browse index</b>: recent searches,
+      popular areas as a carousel, and browse-by-type from the app's own type codes (Flat, Bungalow,
+      Tenement, Farmhouse, Office, Shop, Showroom, Godown, Plots, PG).</li>
+      <li><code>/area/[slug]</code> and <code>/[landing]</code> use the same composition with the area's own
+      title, count line and description — one design, three routes.</li>
+      <li><code>/search/coming-soon</code> keeps its message centred with the city picker beneath, no rail.</li>
+    </ul>
+  </div>
+
+  <div>
+    <p class="caption">D · Search results — Tablet 768</p>
+    <div class="scaler"><div class="frame" data-w="768" style="width:768px" data-tpl="results"></div></div>
+  </div>
+
+</div>
+
+<template id="tpl-results">
+  <div class="app">
+    <div data-part="header" data-active="Buy"></div>
+
+    <div class="sbar">
+      <div class="container">
+        <span class="sfield"><svg class="i s16" style="color:var(--ink-tertiary)"><use href="#i-search"/></svg><span class="q">Vesu, Surat</span></span>
+        <span class="sgo">Search</span>
+        <span class="btn sfbtn"><svg class="i s16"><use href="#i-filter"/></svg>Filters · 3</span>
+      </div>
+    </div>
+
+    <div class="container" style="padding-top:18px">
+      <div class="tabs">
+        <button aria-selected="true">All</button><button>Properties</button><button>Projects</button>
+        <button>Brokers &amp; Builders</button><button>Areas</button>
+      </div>
+
+      <div class="searchcols">
+        <aside class="frail">
+          <div class="fgrp">
+            <h4>Looking to</h4>
+            <div class="fchips"><span class="pill" aria-pressed="true">Buy</span><span class="pill">Rent</span></div>
+          </div>
+          <div class="fgrp">
+            <h4>Property type</h4>
+            <div class="fchips">
+              <span class="pill" aria-pressed="true">Flat</span><span class="pill">Bungalow</span><span class="pill">Tenement</span>
+              <span class="pill">Farmhouse</span><span class="pill">Shop</span><span class="pill">Office</span>
+              <span class="pill">Showroom</span><span class="pill">Godown</span><span class="pill">Plot</span><span class="pill">PG</span>
+            </div>
+          </div>
+          <div class="fgrp">
+            <h4>BHK</h4>
+            <div class="fchips"><span class="pill">1</span><span class="pill" aria-pressed="true">2</span><span class="pill" aria-pressed="true">3</span><span class="pill">4</span><span class="pill">4+</span></div>
+          </div>
+          <div class="fgrp">
+            <h4>Budget</h4>
+            <div style="display:grid;gap:8px">
+              <span class="fsel">Min · ₹ 40 Lakh<svg class="i s16"><use href="#i-chevron"/></svg></span>
+              <span class="fsel">Max · ₹ 1.2 Cr<svg class="i s16"><use href="#i-chevron"/></svg></span>
+            </div>
+          </div>
+          <div class="fgrp">
+            <div style="display:flex;align-items:center"><h4 style="margin:0">Location</h4><div style="flex:1"></div><a class="link" href="#">Add areas</a></div>
+            <div class="fchips" style="margin-top:9px"><span class="pill" aria-pressed="true">Vesu <svg class="i s14"><use href="#i-close"/></svg></span><span class="pill">All areas</span></div>
+          </div>
+          <div class="fgrp">
+            <h4>Amenities</h4>
+            <div class="fchips"><span class="pill">Lift</span><span class="pill">Parking</span><span class="pill">Security</span><span class="pill">Garden</span><span class="pill">Gym</span></div>
+          </div>
+          <div class="fgrp">
+            <h4>More</h4>
+            <div class="trow">Price negotiable only <span class="sw"></span></div>
+            <div class="trow">Ready to move <span class="sw on"></span></div>
+            <div class="trow">New construction <span class="sw"></span></div>
+            <div class="trow">Verified sellers only <span class="sw on"></span></div>
+          </div>
+          <div class="fgrp" style="display:flex;gap:10px">
+            <a class="btn sm" href="#" style="flex:1">Clear all</a>
+            <a class="btn pri sm" href="#" style="flex:1">Apply</a>
+          </div>
+        </aside>
+
+        <div>
+          <div class="countline">
+            <b>84 properties in Vesu, Surat</b>
+            <div class="sp"></div>
+            <span class="pill"><svg class="i s14"><use href="#i-sort"/></svg>Latest</span>
+            <span class="pill">Save this search</span>
+          </div>
+
+          <div class="results">
+            <div class="row">
+              <div class="shot ph" data-l="PHOTO"></div>
+              <div class="bd">
+                <div style="display:flex;align-items:flex-start;gap:10px">
+                  <div style="flex:1">
+                    <div style="font-size:17px;font-weight:700">₹ 62 Lakh</div>
+                    <div style="font-size:14px;color:var(--ink-secondary);margin-top:2px">2 BHK Flat · Vesu, Surat</div>
+                  </div>
+                  <span class="hicon"><svg class="i s24"><use href="#i-heart"/></svg></span>
+                </div>
+                <div class="facts" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;font-size:12px;color:var(--ink-tertiary)">
+                  <span>1150 sq.ft</span><span>·</span><span>Ready to move</span><span>·</span><span>2nd floor</span><span>·</span><span>Semi-furnished</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:10px;margin-top:12px">
+                  <span class="avatar" style="background:var(--avatar-3);width:26px;height:26px;font-size:11px">R</span>
+                  <span style="font-size:12px;color:var(--ink-secondary)">Rajesh Patel · Broker</span>
+                  <span class="tag ok">Verified</span>
+                  <div style="flex:1"></div>
+                  <a class="btn sm" href="#">View</a>
+                  <a class="btn pri sm" href="#">Contact</a>
+                </div>
+              </div>
+            </div>
+
+            <div class="row">
+              <div class="shot ph" data-l="PHOTO"></div>
+              <div class="bd">
+                <div style="display:flex;align-items:flex-start;gap:10px">
+                  <div style="flex:1">
+                    <div style="font-size:17px;font-weight:700">₹ 1.15 Cr</div>
+                    <div style="font-size:14px;color:var(--ink-secondary);margin-top:2px">3 BHK Flat · Vesu, Surat</div>
+                  </div>
+                  <span class="hicon"><svg class="i s24"><use href="#i-heart"/></svg></span>
+                </div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;font-size:12px;color:var(--ink-tertiary)">
+                  <span>1780 sq.ft</span><span>·</span><span>Under construction</span><span>·</span><span>7th floor</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:10px;margin-top:12px">
+                  <span class="avatar" style="background:var(--avatar-1);width:26px;height:26px;font-size:11px">S</span>
+                  <span style="font-size:12px;color:var(--ink-secondary)">Shreeji Group · Builder</span>
+                  <span class="tag warn">Boosted</span>
+                  <div style="flex:1"></div>
+                  <a class="btn sm" href="#">View</a>
+                  <a class="btn pri sm" href="#">Contact</a>
+                </div>
+              </div>
+            </div>
+
+            <div class="row">
+              <div class="shot ph" data-l="PHOTO"></div>
+              <div class="bd">
+                <div style="display:flex;align-items:flex-start;gap:10px">
+                  <div style="flex:1">
+                    <div style="font-size:17px;font-weight:700">₹ 24,000 / mo</div>
+                    <div style="font-size:14px;color:var(--ink-secondary);margin-top:2px">2 BHK Flat · Vesu, Surat</div>
+                  </div>
+                  <span class="hicon"><svg class="i s24"><use href="#i-heart"/></svg></span>
+                </div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;font-size:12px;color:var(--ink-tertiary)">
+                  <span>1080 sq.ft</span><span>·</span><span>Semi-furnished</span><span>·</span><span>Family preferred</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:10px;margin-top:12px">
+                  <span class="avatar" style="background:var(--avatar-6);width:26px;height:26px;font-size:11px">P</span>
+                  <span style="font-size:12px;color:var(--ink-secondary)">Paras Shah · Broker</span>
+                  <div style="flex:1"></div>
+                  <a class="btn sm" href="#">View</a>
+                  <a class="btn pri sm" href="#">Contact</a>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- cascade sections: carousels, never grids -->
+          <section class="sec carousel" style="margin-top:26px">
+            <div class="sechead"><div><h2 class="h2">Also in Adajan</h2><div class="sub">32 properties nearby</div></div><div class="sp"></div>
+              <div class="arrows"><span class="arrow" aria-disabled="true"><svg class="i s16"><use href="#i-left"/></svg></span><span class="arrow"><svg class="i s16"><use href="#i-right"/></svg></span></div></div>
+            <div class="rail">
+              <div class="pcard"><div class="shot ph" data-l="PHOTO"></div><div class="ttl">₹ 88 Lakh</div><div class="sub">3 BHK Flat · Adajan</div></div>
+              <div class="pcard"><div class="shot ph" data-l="PHOTO"></div><div class="ttl">₹ 54 Lakh</div><div class="sub">2 BHK Flat · Adajan</div></div>
+              <div class="pcard"><div class="shot ph" data-l="PHOTO"></div><div class="ttl">₹ 1.4 Cr</div><div class="sub">4 BHK Flat · Adajan</div></div>
+              <div class="pcard"><div class="shot ph" data-l="PHOTO"></div><div class="ttl">₹ 32,000 / mo</div><div class="sub">3 BHK Flat · Adajan</div></div>
+            </div>
+          </section>
+
+          <section class="sec carousel">
+            <div class="sechead"><div><h2 class="h2">Projects near you</h2><div class="sub">12 RERA projects in Surat</div></div><div class="sp"></div>
+              <div class="arrows"><span class="arrow" aria-disabled="true"><svg class="i s16"><use href="#i-left"/></svg></span><span class="arrow"><svg class="i s16"><use href="#i-right"/></svg></span></div></div>
+            <div class="rail">
+              <div class="pcard"><div class="shot ph" data-l="PROJECT"></div><div class="ttl">Shreeji Heights</div><div class="sub">Vesu · 2, 3 BHK</div><div class="facts"><span class="tag ok">RERA</span></div></div>
+              <div class="pcard"><div class="shot ph" data-l="PROJECT"></div><div class="ttl">Aarohi Skyline</div><div class="sub">Piplod · 3 BHK</div><div class="facts"><span class="tag ok">RERA</span></div></div>
+              <div class="pcard"><div class="shot ph" data-l="PROJECT"></div><div class="ttl">Green Valley</div><div class="sub">Pal · Plots</div></div>
+              <div class="pcard"><div class="shot ph" data-l="PROJECT"></div><div class="ttl">Riverfront One</div><div class="sub">Athwa · 4 BHK</div></div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+
+    <div data-part="footer"></div>
+    <div data-part="bnav" data-active="search"></div>
+  </div>
+</template>
+
+<template id="tpl-shome">
+  <div class="app">
+    <div data-part="header" data-active="Buy"></div>
+
+    <div class="sbar">
+      <div class="container">
+        <span class="sfield"><svg class="i s16" style="color:var(--ink-tertiary)"><use href="#i-search"/></svg><span style="color:var(--ink-tertiary)">Search area, project or builder</span></span>
+        <span class="sgo">Search</span>
+      </div>
+    </div>
+
+    <div class="container" style="padding-top:20px">
+      <section class="sec">
+        <div class="sechead"><h2 class="h2">Recent searches</h2><div class="sp"></div><a class="link" href="#">Clear</a></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <span class="pill"><svg class="i s14"><use href="#i-clock"/></svg>Vesu · 2 BHK · under ₹70 L</span>
+          <span class="pill"><svg class="i s14"><use href="#i-clock"/></svg>Adajan · Rent · 3 BHK</span>
+          <span class="pill"><svg class="i s14"><use href="#i-clock"/></svg>Pal · Plots</span>
+          <span class="pill"><svg class="i s14"><use href="#i-clock"/></svg>Shreeji Heights</span>
+        </div>
+      </section>
+
+      <section class="sec carousel">
+        <div class="sechead"><div><h2 class="h2">Popular areas in Surat</h2><div class="sub">by live listings</div></div><div class="sp"></div>
+          <div class="arrows"><span class="arrow" aria-disabled="true"><svg class="i s16"><use href="#i-left"/></svg></span><span class="arrow"><svg class="i s16"><use href="#i-right"/></svg></span></div></div>
+        <div class="rail">
+          <div class="pcard area"><div class="shot ph" data-l="AREA"></div><div class="ttl" style="font-size:15px">Vesu</div><div class="muted">84 properties</div></div>
+          <div class="pcard area"><div class="shot ph" data-l="AREA"></div><div class="ttl" style="font-size:15px">Adajan</div><div class="muted">62 properties</div></div>
+          <div class="pcard area"><div class="shot ph" data-l="AREA"></div><div class="ttl" style="font-size:15px">Piplod</div><div class="muted">48 properties</div></div>
+          <div class="pcard area"><div class="shot ph" data-l="AREA"></div><div class="ttl" style="font-size:15px">Pal</div><div class="muted">39 properties</div></div>
+          <div class="pcard area"><div class="shot ph" data-l="AREA"></div><div class="ttl" style="font-size:15px">Katargam</div><div class="muted">27 properties</div></div>
+          <div class="pcard area"><div class="shot ph" data-l="AREA"></div><div class="ttl" style="font-size:15px">Athwa</div><div class="muted">21 properties</div></div>
+        </div>
+      </section>
+
+      <section class="sec carousel">
+        <div class="sechead"><div><h2 class="h2">Browse by type</h2><div class="sub">the app's own property types</div></div><div class="sp"></div>
+          <div class="arrows"><span class="arrow" aria-disabled="true"><svg class="i s16"><use href="#i-left"/></svg></span><span class="arrow"><svg class="i s16"><use href="#i-right"/></svg></span></div></div>
+        <div class="rail people">
+          <div class="card person"><div class="av" style="background:var(--surface-2);color:var(--accent)"><svg class="i s24"><use href="#i-home"/></svg></div><div class="nm">Flat</div><div class="rl">96 live</div></div>
+          <div class="card person"><div class="av" style="background:var(--surface-2);color:var(--accent)"><svg class="i s24"><use href="#i-home"/></svg></div><div class="nm">Bungalow</div><div class="rl">18 live</div></div>
+          <div class="card person"><div class="av" style="background:var(--surface-2);color:var(--accent)"><svg class="i s24"><use href="#i-home"/></svg></div><div class="nm">Tenement</div><div class="rl">12 live</div></div>
+          <div class="card person"><div class="av" style="background:var(--surface-2);color:var(--accent)"><svg class="i s24"><use href="#i-building"/></svg></div><div class="nm">Office</div><div class="rl">9 live</div></div>
+          <div class="card person"><div class="av" style="background:var(--surface-2);color:var(--accent)"><svg class="i s24"><use href="#i-briefcase"/></svg></div><div class="nm">Shop</div><div class="rl">14 live</div></div>
+          <div class="card person"><div class="av" style="background:var(--surface-2);color:var(--accent)"><svg class="i s24"><use href="#i-pin"/></svg></div><div class="nm">Plots</div><div class="rl">31 live</div></div>
+          <div class="card person"><div class="av" style="background:var(--surface-2);color:var(--accent)"><svg class="i s24"><use href="#i-user"/></svg></div><div class="nm">PG</div><div class="rl">6 live</div></div>
+          <div class="card person"><div class="av" style="background:var(--surface-2);color:var(--accent)"><svg class="i s24"><use href="#i-home"/></svg></div><div class="nm">Farmhouse</div><div class="rl">4 live</div></div>
+        </div>
+      </section>
+
+      <section class="sec">
+        <div class="mapless"><svg class="i s18"><use href="#i-alert"/></svg>Not in your city yet? Pick another city from the header — new cities open every month.</div>
+      </section>
+    </div>
+
+    <div data-part="footer"></div>
+    <div data-part="bnav" data-active="search"></div>
+  </div>
+</template>
+
+<script src="_kit.js"></script>
+</body>
+</html>

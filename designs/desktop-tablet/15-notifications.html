@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>HomzList — 15 · Notifications (desktop + tablet)</title>
+<link rel="stylesheet" href="_kit.css" />
+<style>
+.split{display:block}
+.ncol{border:1px solid var(--border);border-radius:14px;background:var(--surface-1);overflow:hidden}
+.ngroup{padding:11px 16px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-tertiary);background:var(--surface-2)}
+.nrow{display:flex;gap:12px;padding:14px 16px;border-top:1px solid var(--divider);align-items:flex-start}
+.nrow.unread{background:var(--accent-soft)}
+.nrow .ic{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;flex:0 0 36px}
+.nrow .tx{flex:1;min-width:0;font-size:13px;line-height:1.5}
+.nrow .tx b{font-weight:700}
+.nrow .tm{font-size:11px;color:var(--ink-tertiary);white-space:nowrap}
+.nrow .th{width:44px;height:44px;border-radius:9px;background:var(--surface-3);flex:0 0 44px}
+.t-green{background:var(--accent-soft);color:var(--tone-green)}
+.t-amber{background:var(--warning-soft);color:var(--tone-amber)}
+.t-blue{background:var(--info-soft);color:var(--tone-blue)}
+.t-violet{background:#f3ecfd;color:var(--tone-violet)}
+.t-pink{background:#fdeaf1;color:var(--tone-pink)}
+.dark .t-violet,.dark .t-pink{background:var(--surface-3)}
+.prefcard{background:var(--surface-1);border:1px solid var(--border);border-radius:14px;padding:16px}
+.trow{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:11px 0;border-bottom:1px solid var(--divider);font-size:13px}
+.trow:last-child{border-bottom:0}
+.sw{width:38px;height:22px;border-radius:999px;background:var(--surface-3);position:relative;flex:0 0 38px}
+.sw.on{background:var(--accent)}
+.sw::after{content:"";position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:999px;background:#fff}
+.sw.on::after{left:19px}
+.pop{width:400px;border:1px solid var(--border);border-radius:16px;background:var(--surface-1);box-shadow:var(--shadow-lg);overflow:hidden;position:absolute;right:24px;top:64px;z-index:40}
+.pophead{display:flex;align-items:center;gap:10px;padding:13px 16px;border-bottom:1px solid var(--divider)}
+.relwrap{position:relative}
+@container (min-width:1200px){
+  .split{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:24px;align-items:start}
+  .prefwrap{position:sticky;top:88px;display:grid;gap:14px}
+}
+</style>
+</head>
+<body>
+
+<div class="bar">
+  <b>15 · Notifications</b>
+  <div class="seg"><button data-dark aria-pressed="false">Dark</button></div>
+  <div class="sp"></div>
+  <span class="note">Real groups (Today · This week · Earlier), real actions (Mark all as read · Clear all ·
+  Notification settings) and the real preference rows (Quiet hours · Weekly digest · Marketing messages off ·
+  Blocked / Enabled), from <code>components/notifications/*</code>.</span>
+</div>
+
+<div class="stage">
+
+  <div>
+    <p class="caption">A · Notifications — Desktop 1440 (list + preferences rail)</p>
+    <div class="scaler"><div class="frame" data-w="1440" style="width:1440px" data-tpl="notif"></div></div>
+  </div>
+
+  <div class="annot">
+    <h3>Decisions</h3>
+    <ul>
+      <li><b>Preferences move beside the list.</b> On mobile, notification settings are a separate screen
+      behind the header's gear. On desktop they are five toggles — small enough to live in the rail, where a
+      user who is annoyed by a notification can silence it in the same breath as reading it.</li>
+      <li><b>The groups stay Today · This week · Earlier</b>, and each row keeps its subject thumbnail so a
+      "new lead" line says which listing without opening it.</li>
+      <li><b>The bell in the header opens a 400px popover</b> with the last few unread and a "See all" —
+      the desktop convention, and it means the header bell is finally useful rather than a link to a page.</li>
+      <li><b>Dead-link state kept.</b> The app's "This is no longer available" line stays, because a
+      notification pointing at a deleted listing must say so rather than 404.</li>
+    </ul>
+  </div>
+
+  <div>
+    <p class="caption">B · The header bell popover — Desktop 1440</p>
+    <div class="scaler"><div class="frame" data-w="1440" style="width:1440px" data-tpl="pop"></div></div>
+  </div>
+
+  <div>
+    <p class="caption">C · Tablet 1024</p>
+    <div class="scaler"><div class="frame" data-w="1024" style="width:1024px" data-tpl="notif"></div></div>
+  </div>
+
+  <div>
+    <p class="caption">D · Tablet 768</p>
+    <div class="scaler"><div class="frame" data-w="768" style="width:768px" data-tpl="notif"></div></div>
+  </div>
+
+</div>
+
+<template id="tpl-notif">
+  <div class="app">
+    <div class="shell">
+      <div data-part="sidebar" data-active="Your activity"></div>
+      <div class="mainwrap">
+        <div class="ctop"><div><h1>Notifications</h1><div class="sub">3 unread</div></div><div class="sp"></div>
+          <a class="btn" href="#">Mark all as read</a>
+          <a class="btn" href="#">Clear all</a>
+          <span class="hicon"><svg class="i s24"><use href="#i-settings"/></svg></span></div>
+
+        <div class="content">
+          <div class="split">
+            <div class="ncol">
+              <div class="ngroup">Today</div>
+              <div class="nrow unread">
+                <span class="ic t-amber"><svg class="i s18"><use href="#i-filter"/></svg></span>
+                <span class="tx"><b>New lead on ₹ 62 Lakh · 2 BHK Flat</b><br>Amit Rathod wants a site visit this week.</span>
+                <span class="th ph" data-l=""></span><span class="tm">2h</span>
+              </div>
+              <div class="nrow unread">
+                <span class="ic t-green"><svg class="i s18"><use href="#i-check"/></svg></span>
+                <span class="tx"><b>Your listing is live</b><br>Residential plot · Pal passed review and is now on HomzList.</span>
+                <span class="th ph" data-l=""></span><span class="tm">5h</span>
+              </div>
+              <div class="nrow unread">
+                <span class="ic t-pink"><svg class="i s18"><use href="#i-pin"/></svg></span>
+                <span class="tx"><b>Visit confirmed</b><br>24 Aug, 5:30 pm · 2 BHK Flat, Vesu.</span>
+                <span class="th ph" data-l=""></span><span class="tm">8h</span>
+              </div>
+
+              <div class="ngroup">This week</div>
+              <div class="nrow">
+                <span class="ic t-blue"><svg class="i s18"><use href="#i-search"/></svg></span>
+                <span class="tx"><b>3 new requirements match your areas</b><br>Buyers looking in Vesu and Piplod.</span>
+                <span class="tm">2d</span>
+              </div>
+              <div class="nrow">
+                <span class="ic t-violet"><svg class="i s18"><use href="#i-rocket"/></svg></span>
+                <span class="tx"><b>Boost ends in 4 days</b><br>₹ 62 Lakh · 2 BHK Flat, Vesu.</span>
+                <span class="th ph" data-l=""></span><span class="tm">3d</span>
+              </div>
+              <div class="nrow">
+                <span class="ic t-green"><svg class="i s18"><use href="#i-receipt"/></svg></span>
+                <span class="tx"><b>Payment successful</b><br>₹ 2,999 · Owner Pro renewal. Invoice available.</span>
+                <span class="tm">4d</span>
+              </div>
+
+              <div class="ngroup">Earlier</div>
+              <div class="nrow">
+                <span class="ic t-amber"><svg class="i s18"><use href="#i-send"/></svg></span>
+                <span class="tx"><b>Your proposal was accepted</b><br>3 BHK · Adajan — the buyer's number is now shared.</span>
+                <span class="tm">9d</span>
+              </div>
+              <div class="nrow" style="opacity:.65">
+                <span class="ic" style="background:var(--surface-2);color:var(--ink-tertiary)"><svg class="i s18"><use href="#i-alert"/></svg></span>
+                <span class="tx"><b>This is no longer available</b><br>The listing this notification pointed to was removed.</span>
+                <span class="tm">14d</span>
+              </div>
+            </div>
+
+            <aside class="prefwrap">
+              <div class="prefcard">
+                <div style="display:flex;align-items:center;gap:9px;margin-bottom:6px">
+                  <div class="h3">Notifications</div><div style="flex:1"></div><span class="tag ok">Enabled</span>
+                </div>
+                <div class="trow">New leads <span class="sw on"></span></div>
+                <div class="trow">Requirement matches <span class="sw on"></span></div>
+                <div class="trow">Listing status <span class="sw on"></span></div>
+                <div class="trow">Boost &amp; billing <span class="sw on"></span></div>
+                <div class="trow">Offers and updates from HomzList <span class="sw"></span></div>
+              </div>
+              <div class="prefcard">
+                <div class="h3" style="margin-bottom:6px">Quiet hours</div>
+                <div class="trow">Pause 10 pm – 8 am <span class="sw on"></span></div>
+                <div class="trow">Weekly digest <span class="sw on"></span></div>
+                <p class="muted" style="margin:10px 0 0">Marketing messages off. You will still get leads and billing alerts.</p>
+              </div>
+              <div class="prefcard">
+                <div class="h3" style="margin-bottom:8px">Browser notifications</div>
+                <p class="muted" style="margin:0 0 10px">Get a desktop alert the moment a lead arrives.</p>
+                <a class="btn pri sm block" href="#">Enable notifications</a>
+                <a class="link" href="#" style="display:block;text-align:center;margin-top:9px">How to enable</a>
+              </div>
+            </aside>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div data-part="bnav" data-active="home"></div>
+  </div>
+</template>
+
+<template id="tpl-pop">
+  <div class="app">
+    <div class="relwrap">
+      <div data-part="header" data-active="Buy"></div>
+      <div class="pop">
+        <div class="pophead"><b style="font-size:15px">Notifications</b><div style="flex:1"></div><a class="link" href="#">Mark all as read</a></div>
+        <div class="nrow unread">
+          <span class="ic t-amber"><svg class="i s18"><use href="#i-filter"/></svg></span>
+          <span class="tx"><b>New lead</b><br>Amit R. on 2 BHK Flat, Vesu.</span><span class="tm">2h</span>
+        </div>
+        <div class="nrow unread">
+          <span class="ic t-green"><svg class="i s18"><use href="#i-check"/></svg></span>
+          <span class="tx"><b>Your listing is live</b><br>Residential plot · Pal.</span><span class="tm">5h</span>
+        </div>
+        <div class="nrow unread">
+          <span class="ic t-pink"><svg class="i s18"><use href="#i-pin"/></svg></span>
+          <span class="tx"><b>Visit confirmed</b><br>24 Aug, 5:30 pm.</span><span class="tm">8h</span>
+        </div>
+        <div style="padding:11px 16px;border-top:1px solid var(--divider);text-align:center">
+          <a class="link" href="#">See all notifications</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="container" style="padding-top:22px">
+      <section class="sec carousel">
+        <div class="sechead"><div><h2 class="h2">Newly-added properties</h2><div class="sub">126 properties in Surat</div></div><div class="sp"></div>
+          <div class="arrows"><span class="arrow" aria-disabled="true"><svg class="i s16"><use href="#i-left"/></svg></span><span class="arrow"><svg class="i s16"><use href="#i-right"/></svg></span></div></div>
+        <div class="rail">
+          <div class="pcard"><div class="shot ph" data-l="PHOTO"></div><div class="ttl">₹ 62 Lakh</div><div class="sub">2 BHK Flat · Vesu</div></div>
+          <div class="pcard"><div class="shot ph" data-l="PHOTO"></div><div class="ttl">₹ 1.15 Cr</div><div class="sub">3 BHK Flat · Adajan</div></div>
+          <div class="pcard"><div class="shot ph" data-l="PHOTO"></div><div class="ttl">₹ 38 Lakh</div><div class="sub">Plot · Pal</div></div>
+          <div class="pcard"><div class="shot ph" data-l="PHOTO"></div><div class="ttl">₹ 24,000 / mo</div><div class="sub">2 BHK Flat · Piplod</div></div>
+        </div>
+      </section>
+    </div>
+    <div data-part="footer"></div>
+    <div data-part="bnav" data-active="home"></div>
+  </div>
+</template>
+
+<script src="_kit.js"></script>
+</body>
+</html>

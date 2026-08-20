@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>HomzList — 07 · Story viewer (desktop + tablet)</title>
+<link rel="stylesheet" href="_kit.css" />
+<style>
+.viewer{background:#0b0b0b;min-height:640px;display:flex;align-items:center;justify-content:center;position:relative;padding:24px}
+.viewer .close{position:absolute;top:18px;right:20px;width:40px;height:40px;border-radius:999px;display:grid;place-items:center;color:#fff;background:rgba(255,255,255,.12)}
+.viewer .brand{position:absolute;top:20px;left:22px;color:#fff;font-size:19px;font-weight:700;letter-spacing:-.02em}
+.viewer .brand i{font-style:normal;color:#1db868}
+.stagerow{display:flex;align-items:center;gap:22px}
+.peek{display:none;width:150px;flex:0 0 150px;opacity:.42}
+.peek .box{aspect-ratio:9/16;border-radius:14px;background:#1b1b1b;position:relative;overflow:hidden}
+.peek .who{position:absolute;left:0;right:0;bottom:0;padding:10px;color:#fff;font-size:12px;font-weight:600;background:linear-gradient(transparent,rgba(0,0,0,.75))}
+.player{width:100%;max-width:400px;aspect-ratio:9/16;border-radius:18px;background:#161616;position:relative;overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,.6)}
+.player .bars{position:absolute;top:10px;left:10px;right:10px;display:flex;gap:4px;z-index:3}
+.player .bars i{height:3px;flex:1;border-radius:999px;background:rgba(255,255,255,.3);display:block}
+.player .bars i.done{background:#fff}
+.player .bars i.on{background:linear-gradient(90deg,#fff 55%,rgba(255,255,255,.3) 55%)}
+.player .top{position:absolute;top:24px;left:12px;right:12px;display:flex;align-items:center;gap:10px;z-index:3;color:#fff}
+.player .top .nm{font-size:13px;font-weight:700}
+.player .top .tm{font-size:11px;opacity:.75}
+.player .media{position:absolute;inset:0;display:grid;place-items:center;color:#3a3a3a;font-size:12px;font-weight:700;letter-spacing:.06em}
+.player .cta{position:absolute;left:12px;right:12px;bottom:14px;z-index:3;background:rgba(0,0,0,.55);backdrop-filter:blur(6px);border-radius:14px;padding:12px;color:#fff;display:flex;gap:11px;align-items:center}
+.player .cta .sh{width:46px;height:46px;border-radius:10px;background:#2a2a2a;flex:0 0 46px}
+.player .cta .t{font-size:13px;font-weight:700}
+.player .cta .s{font-size:11px;opacity:.8}
+.player .cta .go{margin-left:auto;background:#0f9d58;color:#fff;border-radius:9px;padding:8px 12px;font-size:12px;font-weight:700;white-space:nowrap}
+.nav{display:none;width:44px;height:44px;border-radius:999px;background:rgba(255,255,255,.14);color:#fff;place-items:center;flex:0 0 44px}
+.keyhint{position:absolute;bottom:18px;left:0;right:0;text-align:center;color:rgba(255,255,255,.45);font-size:11px}
+.trayrow{display:flex;gap:16px;overflow:hidden}
+@container (min-width:768px){
+  .nav{display:grid}
+  .player{max-width:360px}
+}
+@container (min-width:1200px){
+  .peek{display:block}
+  .player{max-width:400px}
+}
+</style>
+</head>
+<body>
+
+<div class="bar">
+  <b>07 · Story viewer</b>
+  <div class="seg"><button data-dark aria-pressed="false">Dark</button></div>
+  <div class="sp"></div>
+  <span class="note">The one screen that must NOT get a sidebar or a wider layout. A 9:16 story is a phone shape;
+  on desktop it keeps that shape and the page goes dark around it.</span>
+</div>
+
+<div class="stage">
+
+  <div>
+    <p class="caption">A · Desktop 1440 — centred player, previous/next posters either side</p>
+    <div class="scaler"><div class="frame" data-w="1440" style="width:1440px" data-tpl="viewer"></div></div>
+  </div>
+
+  <div class="annot">
+    <h3>Why this, and not a full-screen stretch</h3>
+    <ul>
+      <li><b>The story keeps its aspect.</b> 9:16 stretched to 1440×900 either letterboxes into black bars or
+      crops the poster's own framing. So the player stays 400×710 and the page dims around it — the treatment
+      every desktop user already knows from stories elsewhere.</li>
+      <li><b>The dead space earns its keep.</b> The previous and next posters sit either side at 42% opacity,
+      so the viewer can see whose story is coming and click straight to it. That is a desktop-only
+      affordance; on mobile the same move is a swipe.</li>
+      <li><b>Keyboard.</b> ← → move between posters, Space pauses, Esc closes. A mouse user has no thumb, so
+      without this the viewer is a click-only experience.</li>
+      <li><b>The listing CTA stays.</b> The story's attached property card keeps its place at the bottom of
+      the player with the same "View listing" action — that link is the entire commercial point of stories,
+      and it must not be a hover-only affordance.</li>
+      <li><b>Closing returns to the page underneath</b>, scroll position intact, because the viewer mounts
+      over the feed rather than replacing it. The <code>/story/[posterId]</code> route still works
+      standalone for a shared link; it just renders the same player on a dark page.</li>
+    </ul>
+  </div>
+
+  <div>
+    <p class="caption">B · Tablet 1024 — no side peeks, arrows stay</p>
+    <div class="scaler"><div class="frame" data-w="1024" style="width:1024px" data-tpl="viewer"></div></div>
+  </div>
+
+  <div>
+    <p class="caption">C · Tablet 768</p>
+    <div class="scaler"><div class="frame" data-w="768" style="width:768px" data-tpl="viewer"></div></div>
+  </div>
+
+  <div>
+    <p class="caption">D · The story row on the page underneath — Desktop 1440 (a carousel, like every other row)</p>
+    <div class="scaler"><div class="frame" data-w="1440" style="width:1440px" data-tpl="tray"></div></div>
+  </div>
+
+</div>
+
+<template id="tpl-viewer">
+  <div class="app" style="padding:0">
+    <div class="viewer">
+      <span class="brand">Homz<i>List</i></span>
+      <span class="close"><svg class="i s24"><use href="#i-close"/></svg></span>
+
+      <div class="stagerow">
+        <div class="peek">
+          <div class="box"><span class="who">Rajesh Patel · Broker</span></div>
+        </div>
+        <span class="nav"><svg class="i s24"><use href="#i-left"/></svg></span>
+
+        <div class="player">
+          <div class="bars"><i class="done"></i><i class="on"></i><i></i><i></i></div>
+          <div class="top">
+            <span class="avatar" style="background:var(--avatar-1);width:30px;height:30px;font-size:12px">S</span>
+            <span style="flex:1"><span class="nm">Shreeji Group</span><br><span class="tm">2 hours ago</span></span>
+            <svg class="i s24"><use href="#i-menu"/></svg>
+          </div>
+          <div class="media">STORY 9:16</div>
+          <div class="cta">
+            <span class="sh"></span>
+            <span style="min-width:0"><span class="t">Shreeji Heights</span><br><span class="s">₹ 58 L – 1.2 Cr · Vesu</span></span>
+            <span class="go">View project</span>
+          </div>
+        </div>
+
+        <span class="nav"><svg class="i s24"><use href="#i-right"/></svg></span>
+        <div class="peek">
+          <div class="box"><span class="who">Anand Infra · Builder</span></div>
+        </div>
+      </div>
+
+      <div class="keyhint">← → posters · Space pause · Esc close</div>
+    </div>
+  </div>
+</template>
+
+<template id="tpl-tray">
+  <div class="app">
+    <div data-part="header" data-active="Buy"></div>
+    <div class="container" style="padding-top:22px">
+      <section class="sec carousel">
+        <div class="sechead">
+          <div><h2 class="h2">Professionals posting today</h2><div class="sub">12 builders and brokers in Surat</div></div>
+          <div class="sp"></div>
+          <div class="arrows"><span class="arrow" aria-disabled="true"><svg class="i s16"><use href="#i-left"/></svg></span><span class="arrow"><svg class="i s16"><use href="#i-right"/></svg></span></div>
+          <a class="link" href="#">View all</a>
+        </div>
+        <div class="rail" style="grid-auto-columns:84px">
+          <div style="text-align:center"><div style="width:66px;height:66px;border-radius:999px;background:var(--ring-unseen-grad);display:grid;place-items:center;margin:0 auto"><div style="width:60px;height:60px;border-radius:999px;background:var(--avatar-1);display:grid;place-items:center;color:#fff;font-weight:700;border:2px solid var(--surface-1)">S</div></div><div style="font-size:11px;margin-top:6px;color:var(--ink-secondary)">Shreeji</div></div>
+          <div style="text-align:center"><div style="width:66px;height:66px;border-radius:999px;background:var(--ring-unseen-grad);display:grid;place-items:center;margin:0 auto"><div style="width:60px;height:60px;border-radius:999px;background:var(--avatar-3);display:grid;place-items:center;color:#fff;font-weight:700;border:2px solid var(--surface-1)">R</div></div><div style="font-size:11px;margin-top:6px;color:var(--ink-secondary)">Rajesh</div></div>
+          <div style="text-align:center"><div style="width:66px;height:66px;border-radius:999px;background:var(--ring-unseen-grad);display:grid;place-items:center;margin:0 auto"><div style="width:60px;height:60px;border-radius:999px;background:var(--avatar-5);display:grid;place-items:center;color:#fff;font-weight:700;border:2px solid var(--surface-1)">A</div></div><div style="font-size:11px;margin-top:6px;color:var(--ink-secondary)">Anand</div></div>
+          <div style="text-align:center"><div style="width:66px;height:66px;border-radius:999px;background:var(--surface-3);display:grid;place-items:center;margin:0 auto"><div style="width:60px;height:60px;border-radius:999px;background:var(--avatar-7);display:grid;place-items:center;color:#fff;font-weight:700;border:2px solid var(--surface-1)">M</div></div><div style="font-size:11px;margin-top:6px;color:var(--ink-secondary)">Mehul</div></div>
+          <div style="text-align:center"><div style="width:66px;height:66px;border-radius:999px;background:var(--surface-3);display:grid;place-items:center;margin:0 auto"><div style="width:60px;height:60px;border-radius:999px;background:var(--avatar-8);display:grid;place-items:center;color:#fff;font-weight:700;border:2px solid var(--surface-1)">K</div></div><div style="font-size:11px;margin-top:6px;color:var(--ink-secondary)">Krish</div></div>
+          <div style="text-align:center"><div style="width:66px;height:66px;border-radius:999px;background:var(--surface-3);display:grid;place-items:center;margin:0 auto"><div style="width:60px;height:60px;border-radius:999px;background:var(--avatar-4);display:grid;place-items:center;color:#fff;font-weight:700;border:2px solid var(--surface-1)">D</div></div><div style="font-size:11px;margin-top:6px;color:var(--ink-secondary)">Divya</div></div>
+          <div style="text-align:center"><div style="width:66px;height:66px;border-radius:999px;background:var(--surface-3);display:grid;place-items:center;margin:0 auto"><div style="width:60px;height:60px;border-radius:999px;background:var(--avatar-6);display:grid;place-items:center;color:#fff;font-weight:700;border:2px solid var(--surface-1)">P</div></div><div style="font-size:11px;margin-top:6px;color:var(--ink-secondary)">Paras</div></div>
+          <div style="text-align:center"><div style="width:66px;height:66px;border-radius:999px;background:var(--surface-3);display:grid;place-items:center;margin:0 auto"><div style="width:60px;height:60px;border-radius:999px;background:var(--avatar-2);display:grid;place-items:center;color:#fff;font-weight:700;border:2px solid var(--surface-1)">N</div></div><div style="font-size:11px;margin-top:6px;color:var(--ink-secondary)">Nirav</div></div>
+        </div>
+      </section>
+
+      <section class="sec carousel">
+        <div class="sechead"><div><h2 class="h2">Newly-added properties</h2><div class="sub">126 properties in Surat</div></div><div class="sp"></div>
+          <div class="arrows"><span class="arrow" aria-disabled="true"><svg class="i s16"><use href="#i-left"/></svg></span><span class="arrow"><svg class="i s16"><use href="#i-right"/></svg></span></div></div>
+        <div class="rail">
+          <div class="pcard"><div class="shot ph" data-l="PHOTO"></div><div class="ttl">₹ 62 Lakh</div><div class="sub">2 BHK Flat · Vesu</div></div>
+          <div class="pcard"><div class="shot ph" data-l="PHOTO"></div><div class="ttl">₹ 1.15 Cr</div><div class="sub">3 BHK Flat · Adajan</div></div>
+          <div class="pcard"><div class="shot ph" data-l="PHOTO"></div><div class="ttl">₹ 38 Lakh</div><div class="sub">Plot · Pal</div></div>
+          <div class="pcard"><div class="shot ph" data-l="PHOTO"></div><div class="ttl">₹ 24,000 / mo</div><div class="sub">2 BHK Flat · Piplod</div></div>
+        </div>
+      </section>
+    </div>
+    <div data-part="footer"></div>
+    <div data-part="bnav" data-active="home"></div>
+  </div>
+</template>
+
+<script src="_kit.js"></script>
+</body>
+</html>

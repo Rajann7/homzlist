@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>HomzList — 16 · Saved &amp; activity (desktop + tablet)</title>
+<link rel="stylesheet" href="_kit.css" />
+<style>
+.collrow{display:flex;gap:12px;overflow-x:auto;scrollbar-width:none;margin-bottom:18px}
+.collrow::-webkit-scrollbar{display:none}
+.coll{width:132px;flex:0 0 132px}
+.coll .sh{aspect-ratio:1;border-radius:14px;background:var(--surface-3);position:relative;overflow:hidden}
+.coll .nm{font-size:13px;font-weight:600;margin-top:8px}
+.coll .ct{font-size:11px;color:var(--ink-tertiary)}
+.coll.newc .sh{border:1.5px dashed var(--border);background:transparent;display:grid;place-items:center;color:var(--ink-tertiary)}
+.arow{display:flex;gap:12px;padding:13px 0;border-bottom:1px solid var(--divider);align-items:center}
+.arow:last-child{border-bottom:0}
+.arow .sh{width:64px;height:50px;border-radius:9px;background:var(--surface-3);flex:0 0 64px}
+.arow .bd{flex:1;min-width:0}
+.agroup{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-tertiary);margin:18px 0 4px}
+.ssrow{display:flex;gap:12px;padding:14px;border:1px solid var(--border);border-radius:14px;background:var(--surface-1);align-items:center}
+.emptybox{text-align:center;padding:46px 20px;border:1px dashed var(--border);border-radius:16px;background:var(--surface-1)}
+.tabsrow{display:flex;gap:22px;border-bottom:1px solid var(--border);margin:0 0 18px;overflow-x:auto;scrollbar-width:none}
+.tabsrow::-webkit-scrollbar{display:none}
+.tabsrow a{padding:11px 0;font-size:14px;font-weight:500;color:var(--ink-tertiary);white-space:nowrap;border-bottom:2px solid transparent;margin-bottom:-1px}
+.tabsrow a[aria-current]{color:var(--ink-primary);font-weight:600;border-bottom-color:var(--ink-primary)}
+@container (min-width:768px){ .coll{width:160px;flex:0 0 160px} }
+</style>
+</head>
+<body>
+
+<div class="bar">
+  <b>16 · Saved &amp; activity</b>
+  <div class="seg"><button data-dark aria-pressed="false">Dark</button></div>
+  <div class="sp"></div>
+  <span class="note">Real copy from <code>Saved.tsx</code> / <code>Activity.tsx</code> / <code>SavedSearches.tsx</code>:
+  New collection · Rename collection · Delete this collection? · Moved to collection · Nothing saved yet ·
+  Explore properties · RENTED · Recently viewed · Clear recently viewed · Saved searches · No matches yet.</span>
+</div>
+
+<div class="stage">
+
+  <div>
+    <p class="caption">A · Saved — Desktop 1440 (collections as a carousel, saved items below)</p>
+    <div class="scaler"><div class="frame" data-w="1440" style="width:1440px" data-tpl="saved"></div></div>
+  </div>
+
+  <div class="annot">
+    <h3>Decisions</h3>
+    <ul>
+      <li><b>Collections lead as a carousel.</b> They are the app's own grouping and the reason Saved is more
+      than a list; on desktop they sit across the top, and picking one filters the rail below.</li>
+      <li><b>The saved items themselves stay carousels</b> per collection — the owner rule holds here too, and
+      it reads better than a wall of identical cards.</li>
+      <li><b>Sold / rented items keep their overlay.</b> The app stamps RENTED on a saved item that has gone;
+      that stays, because a saved list that quietly hides things is worse than one that tells you.</li>
+      <li><b>Activity and Saved searches share the screen as tabs</b> at desktop width, since both are short
+      lists a user checks together. The routes are unchanged — the tabs are links, not a merge.</li>
+      <li><b>Saved searches carry their match count</b> and the app's own "No matches yet" state, with a
+      one-click path back into results.</li>
+    </ul>
+  </div>
+
+  <div>
+    <p class="caption">B · Your activity + Saved searches — Desktop 1440</p>
+    <div class="scaler"><div class="frame" data-w="1440" style="width:1440px" data-tpl="activity"></div></div>
+  </div>
+
+  <div>
+    <p class="caption">C · Saved (empty) — Desktop 1440</p>
+    <div class="scaler"><div class="frame" data-w="1440" style="width:1440px" data-tpl="empty"></div></div>
+  </div>
+
+  <div>
+    <p class="caption">D · Saved — Tablet 1024</p>
+    <div class="scaler"><div class="frame" data-w="1024" style="width:1024px" data-tpl="saved"></div></div>
+  </div>
+
+  <div>
+    <p class="caption">E · Saved — Tablet 768</p>
+    <div class="scaler"><div class="frame" data-w="768" style="width:768px" data-tpl="saved"></div></div>
+  </div>
+
+</div>
+
+<template id="tpl-saved">
+  <div class="app">
+    <div class="shell">
+      <div data-part="sidebar" data-active="Saved"></div>
+      <div class="mainwrap">
+        <div class="ctop"><div><h1>Saved</h1><div class="sub">18 properties · 4 collections</div></div><div class="sp"></div>
+          <a class="btn" href="#"><svg class="i s16"><use href="#i-plus-b"/></svg>New collection</a></div>
+
+        <div class="content">
+          <div class="tabsrow">
+            <a href="#" aria-current="page">Saved</a><a href="#">Your activity</a><a href="#">Saved searches</a>
+          </div>
+
+          <div class="agroup" style="margin-top:0">Collections</div>
+          <div class="collrow">
+            <div class="coll"><div class="sh ph" data-l="4 saved"></div><div class="nm">Ready to move</div><div class="ct">4 properties</div></div>
+            <div class="coll"><div class="sh ph" data-l="6 saved"></div><div class="nm">Vesu shortlist</div><div class="ct">6 properties</div></div>
+            <div class="coll"><div class="sh ph" data-l="3 saved"></div><div class="nm">For parents</div><div class="ct">3 properties</div></div>
+            <div class="coll"><div class="sh ph" data-l="5 saved"></div><div class="nm">Rent options</div><div class="ct">5 properties</div></div>
+            <div class="coll newc"><div class="sh"><svg class="i s24"><use href="#i-plus-b"/></svg></div><div class="nm">New collection</div><div class="ct">&nbsp;</div></div>
+          </div>
+
+          <section class="sec carousel">
+            <div class="sechead"><div><h2 class="h2">Ready to move</h2><div class="sub">4 properties</div></div><div class="sp"></div>
+              <div class="arrows"><span class="arrow" aria-disabled="true"><svg class="i s16"><use href="#i-left"/></svg></span><span class="arrow"><svg class="i s16"><use href="#i-right"/></svg></span></div>
+              <span class="hicon"><svg class="i s24"><use href="#i-menu"/></svg></span></div>
+            <div class="rail">
+              <div class="pcard"><div class="shot ph" data-l="PHOTO"></div><div class="ttl">₹ 62 Lakh</div><div class="sub">2 BHK Flat · Vesu</div><div class="facts"><span>1150 sq.ft</span></div></div>
+              <div class="pcard"><div class="shot ph" data-l="PHOTO"></div><div class="ttl">₹ 58 Lakh</div><div class="sub">2 BHK Flat · Piplod</div><div class="facts"><span>1080 sq.ft</span></div></div>
+              <div class="pcard"><div class="shot ph" data-l="PHOTO"></div><div class="ttl">₹ 66 Lakh</div><div class="sub">2 BHK Flat · Vesu</div><div class="facts"><span>1190 sq.ft</span></div></div>
+              <div class="pcard" style="opacity:.6"><div class="shot ph" data-l="PHOTO"><span class="tag mute" style="position:absolute;left:10px;top:10px">RENTED</span></div><div class="ttl">₹ 24,000 / mo</div><div class="sub">2 BHK Flat · Piplod</div></div>
+            </div>
+          </section>
+
+          <section class="sec carousel">
+            <div class="sechead"><div><h2 class="h2">Vesu shortlist</h2><div class="sub">6 properties</div></div><div class="sp"></div>
+              <div class="arrows"><span class="arrow" aria-disabled="true"><svg class="i s16"><use href="#i-left"/></svg></span><span class="arrow"><svg class="i s16"><use href="#i-right"/></svg></span></div>
+              <span class="hicon"><svg class="i s24"><use href="#i-menu"/></svg></span></div>
+            <div class="rail">
+              <div class="pcard"><div class="shot ph" data-l="PHOTO"></div><div class="ttl">₹ 1.15 Cr</div><div class="sub">3 BHK Flat · Vesu</div></div>
+              <div class="pcard"><div class="shot ph" data-l="PHOTO"></div><div class="ttl">₹ 92 Lakh</div><div class="sub">3 BHK Flat · Vesu</div></div>
+              <div class="pcard"><div class="shot ph" data-l="PHOTO"></div><div class="ttl">₹ 78 Lakh</div><div class="sub">2 BHK Flat · Vesu</div></div>
+              <div class="pcard"><div class="shot ph" data-l="PHOTO"></div><div class="ttl">₹ 2.1 Cr</div><div class="sub">4 BHK Flat · Vesu</div></div>
+              <div class="pcard"><div class="shot ph" data-l="PROJECT"></div><div class="ttl">Shreeji Heights</div><div class="sub">Vesu · 2, 3 BHK</div></div>
+            </div>
+          </section>
+
+          <section class="sec carousel">
+            <div class="sechead"><div><h2 class="h2">Not in a collection</h2><div class="sub">5 properties</div></div><div class="sp"></div>
+              <div class="arrows"><span class="arrow" aria-disabled="true"><svg class="i s16"><use href="#i-left"/></svg></span><span class="arrow"><svg class="i s16"><use href="#i-right"/></svg></span></div></div>
+            <div class="rail">
+              <div class="pcard"><div class="shot ph" data-l="PHOTO"></div><div class="ttl">₹ 38 Lakh</div><div class="sub">Plot · Pal</div></div>
+              <div class="pcard"><div class="shot ph" data-l="PHOTO"></div><div class="ttl">₹ 45 Lakh</div><div class="sub">1 BHK Flat · Varachha</div></div>
+              <div class="pcard"><div class="shot ph" data-l="PHOTO"></div><div class="ttl">₹ 92 Lakh</div><div class="sub">Office · Ring Road</div></div>
+              <div class="pcard"><div class="shot ph" data-l="PHOTO"></div><div class="ttl">₹ 1.35 Cr</div><div class="sub">Bungalow · Pal</div></div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+    <div data-part="bnav" data-active="profile"></div>
+  </div>
+</template>
+
+<template id="tpl-activity">
+  <div class="app">
+    <div class="shell">
+      <div data-part="sidebar" data-active="Your activity"></div>
+      <div class="mainwrap">
+        <div class="ctop"><div><h1>Your activity</h1><div class="sub">Recently viewed and saved searches</div></div><div class="sp"></div>
+          <a class="btn" href="#">Clear recently viewed</a></div>
+
+        <div class="content">
+          <div class="tabsrow">
+            <a href="#">Saved</a><a href="#" aria-current="page">Your activity</a><a href="#">Saved searches</a>
+          </div>
+
+          <div class="cols">
+            <div>
+              <div class="agroup" style="margin-top:0">Today</div>
+              <div class="card pad">
+                <div class="arow"><span class="sh ph" data-l=""></span><span class="bd"><b style="font-size:14px">₹ 62 Lakh · 2 BHK Flat</b><div class="muted">Vesu, Surat</div></span><span class="muted">11:20 am</span></div>
+                <div class="arow"><span class="sh ph" data-l=""></span><span class="bd"><b style="font-size:14px">Shreeji Heights</b><div class="muted">Vesu · project</div></span><span class="muted">10:48 am</span></div>
+                <div class="arow"><span class="sh ph" data-l=""></span><span class="bd"><b style="font-size:14px">₹ 1.15 Cr · 3 BHK Flat</b><div class="muted">Adajan, Surat</div></span><span class="muted">9:31 am</span></div>
+              </div>
+
+              <div class="agroup">Yesterday</div>
+              <div class="card pad">
+                <div class="arow"><span class="sh ph" data-l=""></span><span class="bd"><b style="font-size:14px">₹ 38 Lakh · Residential plot</b><div class="muted">Pal, Surat</div></span><span class="muted">7:04 pm</span></div>
+                <div class="arow"><span class="sh ph" data-l=""></span><span class="bd"><b style="font-size:14px">₹ 24,000 / mo · 2 BHK Flat</b><div class="muted">Piplod, Surat</div></span><span class="muted">6:12 pm</span></div>
+              </div>
+
+              <div class="agroup">Saved searches</div>
+              <div style="display:grid;gap:12px">
+                <div class="ssrow">
+                  <span class="hicon" style="background:var(--accent-soft);color:var(--accent)"><svg class="i s24"><use href="#i-search"/></svg></span>
+                  <span style="flex:1;min-width:0"><b style="font-size:14px">Vesu · 2 BHK · under ₹70 L</b><div class="muted">Ready to move · verified sellers</div></span>
+                  <span class="tag ok">6 new</span>
+                  <a class="btn sm" href="#">Open</a>
+                  <span class="hicon"><svg class="i s24"><use href="#i-menu"/></svg></span>
+                </div>
+                <div class="ssrow">
+                  <span class="hicon" style="background:var(--info-soft);color:var(--tone-blue)"><svg class="i s24"><use href="#i-search"/></svg></span>
+                  <span style="flex:1;min-width:0"><b style="font-size:14px">Adajan · Rent · 3 BHK</b><div class="muted">₹ 25 – 40k / month</div></span>
+                  <span class="tag mute">No matches yet</span>
+                  <a class="btn sm" href="#">Open</a>
+                  <span class="hicon"><svg class="i s24"><use href="#i-menu"/></svg></span>
+                </div>
+                <div class="ssrow">
+                  <span class="hicon" style="background:#f3ecfd;color:var(--tone-violet)"><svg class="i s24"><use href="#i-search"/></svg></span>
+                  <span style="flex:1;min-width:0"><b style="font-size:14px">Pal · Plots · 1500 – 2500 sq.ft</b><div class="muted">₹ 25 – 45 Lakh</div></span>
+                  <span class="tag ok">2 new</span>
+                  <a class="btn sm" href="#">Open</a>
+                  <span class="hicon"><svg class="i s24"><use href="#i-menu"/></svg></span>
+                </div>
+              </div>
+            </div>
+
+            <aside class="rail-side">
+              <div class="card pad">
+                <div class="h3" style="margin-bottom:8px">Picking up where you left off</div>
+                <p class="muted" style="margin:0 0 10px">Saved searches alert you the moment a matching property is posted.</p>
+                <a class="btn pri sm block" href="#">Save this search</a>
+              </div>
+              <div class="card pad">
+                <div class="h3" style="margin-bottom:8px">Recently viewed</div>
+                <p class="muted" style="margin:0 0 10px">Only you can see this. Clearing it does not affect your saved items.</p>
+                <a class="btn sm block" href="#">Clear recently viewed</a>
+              </div>
+            </aside>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div data-part="bnav" data-active="profile"></div>
+  </div>
+</template>
+
+<template id="tpl-empty">
+  <div class="app">
+    <div class="shell">
+      <div data-part="sidebar" data-active="Saved"></div>
+      <div class="mainwrap">
+        <div class="ctop"><div><h1>Saved</h1></div><div class="sp"></div></div>
+        <div class="content">
+          <div class="tabsrow"><a href="#" aria-current="page">Saved</a><a href="#">Your activity</a><a href="#">Saved searches</a></div>
+          <div class="emptybox" style="max-width:640px;margin:30px auto">
+            <svg class="i s32" style="color:var(--ink-disabled);margin:0 auto 14px"><use href="#i-heart"/></svg>
+            <b style="font-size:17px">Nothing saved yet</b>
+            <p class="muted" style="margin:8px 0 18px">Tap the heart on any property and it lands here. Group them into collections when the list grows.</p>
+            <a class="btn pri" href="#">Explore properties</a>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div data-part="bnav" data-active="profile"></div>
+  </div>
+</template>
+
+<script src="_kit.js"></script>
+</body>
+</html>

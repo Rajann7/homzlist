@@ -1,0 +1,348 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>HomzList — 19 · Payments &amp; boost (desktop + tablet)</title>
+<link rel="stylesheet" href="_kit.css" />
+<style>
+.paycols{display:block}
+.prow{display:flex;gap:14px;padding:14px;border:1px solid var(--border);border-radius:14px;background:var(--surface-1);align-items:center}
+.prow .ic{width:38px;height:38px;border-radius:10px;display:grid;place-items:center;flex:0 0 38px}
+.prow .bd{flex:1;min-width:0}
+.prow .amt{font-size:16px;font-weight:700;white-space:nowrap}
+.t-green{background:var(--accent-soft);color:var(--tone-green)}
+.t-red{background:var(--error-soft);color:var(--error)}
+.t-amber{background:var(--warning-soft);color:var(--tone-amber)}
+.t-orange{background:#fdeee5;color:var(--tone-orange)}
+.dark .t-orange{background:var(--surface-3)}
+.frail{background:var(--surface-1);border:1px solid var(--border);border-radius:14px;padding:4px 16px;align-self:start;position:sticky;top:88px}
+.brow{display:flex;gap:14px;padding:14px;border:1px solid var(--border);border-radius:14px;background:var(--surface-1);align-items:center}
+.brow .sh{width:96px;height:72px;border-radius:10px;background:var(--surface-3);flex:0 0 96px}
+.days{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ink-tertiary)}
+.dbar{height:6px;border-radius:999px;background:var(--surface-3);overflow:hidden;width:120px}
+.dbar i{display:block;height:100%;background:var(--accent)}
+.fblk{background:var(--surface-1);border:1px solid var(--border);border-radius:14px;padding:16px;margin:0 0 14px}
+.fblk h3{margin:0 0 12px;font-size:15px;font-weight:700}
+.opt{display:flex;align-items:center;gap:12px;padding:13px;border:1px solid var(--border);border-radius:12px;margin-bottom:10px}
+.opt.on{border:1.5px solid var(--accent);background:var(--accent-soft)}
+.opt .rd{width:18px;height:18px;border-radius:999px;border:1.5px solid var(--border);flex:0 0 18px}
+.opt.on .rd{border:5px solid var(--accent)}
+.sum{position:sticky;top:120px;background:var(--surface-1);border:1px solid var(--border);border-radius:16px;padding:18px}
+.sumrow{display:flex;justify-content:space-between;font-size:13px;padding:8px 0}
+.sumrow.tot{border-top:1px solid var(--divider);margin-top:8px;padding-top:12px;font-size:17px;font-weight:700}
+.buycols{display:block}
+.newtab{display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:12px;background:var(--info-soft);font-size:13px;color:var(--ink-secondary);margin-top:14px}
+@container (min-width:1200px){
+  .paycols{display:grid;grid-template-columns:280px minmax(0,1fr);gap:24px;align-items:start}
+  .buycols{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:28px;align-items:start}
+}
+</style>
+</head>
+<body>
+
+<div class="bar">
+  <b>19 · Payments &amp; boost</b>
+  <div class="seg"><button data-dark aria-pressed="false">Dark</button></div>
+  <div class="sp"></div>
+  <span class="note">Real copy: Filter payments · All time · Method · Invoice · Copy payment ID · Check status ·
+  Failed · No payments yet; Boost — Where to show · This area only · All India · Boosts start after admin approval ·
+  Under review · Boost active · Cancel this boost? · Not approved · No active boosts right now.</span>
+</div>
+
+<div class="stage">
+
+  <div>
+    <p class="caption">A · Payments — Desktop 1440 (filter rail + rows)</p>
+    <div class="scaler"><div class="frame" data-w="1440" style="width:1440px" data-tpl="pay"></div></div>
+  </div>
+
+  <div class="annot">
+    <h3>Decisions</h3>
+    <ul>
+      <li><b>Payments is a working list, so it is rows with a filter rail</b> — the same treatment as My
+      Listings. Each row carries the amount, what it paid for, the method, the status and the invoice link,
+      which is exactly the set the app already shows behind its "More options" sheet.</li>
+      <li><b>Failed payments keep "Check status"</b>, because a payment that failed at the gateway but
+      succeeded at the bank is the one case a user genuinely needs to re-query.</li>
+      <li><b>Boost status leads with what is running.</b> Active boosts show their days-left bar; pending ones
+      keep the app's own "Under review" and "Boosts start after admin approval" line, which is the single most
+      important expectation to set on a paid feature.</li>
+      <li><b>Buying a boost is options + sticky summary</b>: duration, where to show (This area only / All
+      India — the app's own two choices), and the price that follows. Razorpay's own window is flagged in the
+      same blue strip as checkout.</li>
+      <li>Empty states keep the app's words: "No payments yet", "No active boosts right now.",
+      "No past boosts yet.", "Nothing waiting for approval."</li>
+    </ul>
+  </div>
+
+  <div>
+    <p class="caption">B · Boosts — Desktop 1440</p>
+    <div class="scaler"><div class="frame" data-w="1440" style="width:1440px" data-tpl="boost"></div></div>
+  </div>
+
+  <div>
+    <p class="caption">C · Buy a boost — Desktop 1440</p>
+    <div class="scaler"><div class="frame" data-w="1440" style="width:1440px" data-tpl="buy"></div></div>
+  </div>
+
+  <div>
+    <p class="caption">D · Payments — Tablet 1024</p>
+    <div class="scaler"><div class="frame" data-w="1024" style="width:1024px" data-tpl="pay"></div></div>
+  </div>
+
+  <div>
+    <p class="caption">E · Boosts — Tablet 768</p>
+    <div class="scaler"><div class="frame" data-w="768" style="width:768px" data-tpl="boost"></div></div>
+  </div>
+
+</div>
+
+<template id="tpl-pay">
+  <div class="app">
+    <div class="shell">
+      <div data-part="sidebar" data-active="Payments"></div>
+      <div class="mainwrap">
+        <div class="ctop"><div><h1>Payments</h1><div class="sub">8 payments · all time</div></div><div class="sp"></div>
+          <a class="btn" href="#"><svg class="i s16"><use href="#i-download"/></svg>Download invoices</a></div>
+        <div class="content">
+          <div class="paycols">
+            <aside class="frail">
+              <div class="fgrp">
+                <h4>Period</h4>
+                <div style="display:flex;flex-wrap:wrap;gap:7px">
+                  <span class="pill" aria-pressed="true">All time</span><span class="pill">This year</span><span class="pill">Last 90 days</span>
+                </div>
+              </div>
+              <div class="fgrp">
+                <h4>Status</h4>
+                <div style="display:flex;flex-wrap:wrap;gap:7px">
+                  <span class="pill">Successful</span><span class="pill">Failed</span><span class="pill">Refunded</span>
+                </div>
+              </div>
+              <div class="fgrp">
+                <h4>What for</h4>
+                <div style="display:flex;flex-wrap:wrap;gap:7px">
+                  <span class="pill">Plans</span><span class="pill">Top up</span><span class="pill">Boosts</span>
+                </div>
+              </div>
+              <div class="fgrp">
+                <h4>Method</h4>
+                <div style="display:flex;flex-wrap:wrap;gap:7px">
+                  <span class="pill">UPI</span><span class="pill">Card</span><span class="pill">Net Banking</span>
+                </div>
+              </div>
+              <div class="fgrp" style="display:flex;align-items:center;justify-content:space-between;font-size:13px">
+                Email invoices to me
+                <span style="width:38px;height:22px;border-radius:999px;background:var(--accent);position:relative"><span style="position:absolute;top:3px;left:19px;width:16px;height:16px;border-radius:999px;background:#fff"></span></span>
+              </div>
+            </aside>
+
+            <div>
+              <div class="sechead"><b style="font-size:15px">8 payments</b><div class="sp"></div>
+                <span class="pill"><svg class="i s14"><use href="#i-filter"/></svg>Filter payments</span></div>
+
+              <div style="display:grid;gap:12px">
+                <div class="prow">
+                  <span class="ic t-green"><svg class="i s18"><use href="#i-check"/></svg></span>
+                  <span class="bd"><b style="font-size:14px">Owner Pro · 12 months</b><div class="muted">20 Aug 2026 · UPI · pay_QhT82kLm9</div></span>
+                  <span class="amt">₹ 2,745</span>
+                  <a class="btn sm" href="#"><svg class="i s16"><use href="#i-download"/></svg>Invoice</a>
+                  <span class="hicon"><svg class="i s24"><use href="#i-menu"/></svg></span>
+                </div>
+                <div class="prow">
+                  <span class="ic t-orange"><svg class="i s18"><use href="#i-rocket"/></svg></span>
+                  <span class="bd"><b style="font-size:14px">Boost · 2 BHK Flat, Vesu · 7 days</b><div class="muted">14 Aug 2026 · Card · pay_QfD41xZa2</div></span>
+                  <span class="amt">₹ 499</span>
+                  <a class="btn sm" href="#"><svg class="i s16"><use href="#i-download"/></svg>Invoice</a>
+                  <span class="hicon"><svg class="i s24"><use href="#i-menu"/></svg></span>
+                </div>
+                <div class="prow">
+                  <span class="ic t-red"><svg class="i s18"><use href="#i-close"/></svg></span>
+                  <span class="bd"><b style="font-size:14px">Top up · +5 listing slots</b><div class="muted">11 Aug 2026 · Net Banking · <span style="color:var(--error);font-weight:600">Failed</span></div></span>
+                  <span class="amt" style="color:var(--ink-tertiary)">₹ 499</span>
+                  <a class="btn sm" href="#">Check status</a>
+                  <span class="hicon"><svg class="i s24"><use href="#i-menu"/></svg></span>
+                </div>
+                <div class="prow">
+                  <span class="ic t-green"><svg class="i s18"><use href="#i-check"/></svg></span>
+                  <span class="bd"><b style="font-size:14px">Boost · Plot, Pal · 15 days</b><div class="muted">02 Aug 2026 · UPI · pay_Qb1907Rk8</div></span>
+                  <span class="amt">₹ 899</span>
+                  <a class="btn sm" href="#"><svg class="i s16"><use href="#i-download"/></svg>Invoice</a>
+                  <span class="hicon"><svg class="i s24"><use href="#i-menu"/></svg></span>
+                </div>
+                <div class="prow">
+                  <span class="ic t-amber"><svg class="i s18"><use href="#i-clock"/></svg></span>
+                  <span class="bd"><b style="font-size:14px">Boost · 3 BHK Flat, Katargam · 7 days</b><div class="muted">28 Jul 2026 · UPI · refunded — boost not approved</div></span>
+                  <span class="amt">₹ 499</span>
+                  <a class="btn sm" href="#">Copy payment ID</a>
+                  <span class="hicon"><svg class="i s24"><use href="#i-menu"/></svg></span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div data-part="bnav" data-active="profile"></div>
+  </div>
+</template>
+
+<template id="tpl-boost">
+  <div class="app">
+    <div class="shell">
+      <div data-part="sidebar" data-active="Boosts"></div>
+      <div class="mainwrap">
+        <div class="ctop"><div><h1>Boosts</h1><div class="sub">2 active · 1 under review</div></div><div class="sp"></div>
+          <a class="btn" href="#">How boost works</a>
+          <a class="btn pri" href="#"><svg class="i s16"><use href="#i-rocket"/></svg>Boost a Listing</a></div>
+        <div class="content">
+          <div class="cols">
+            <div>
+              <div class="sechead"><h2 class="h2">Active</h2><div class="sp"></div><span class="tag ok">2 running</span></div>
+              <div style="display:grid;gap:12px;margin-bottom:24px">
+                <div class="brow">
+                  <span class="sh ph" data-l=""></span>
+                  <span style="flex:1;min-width:0">
+                    <b style="font-size:15px">₹ 62 Lakh · 2 BHK Flat</b>
+                    <div class="muted">Vesu, Surat · This area only</div>
+                    <div class="days" style="margin-top:9px"><span class="dbar"><i style="width:57%"></i></span>4 of 7 days left</div>
+                  </span>
+                  <span class="tag ok">Boost active</span>
+                  <a class="btn sm" href="#">Cancel boost</a>
+                </div>
+                <div class="brow">
+                  <span class="sh ph" data-l=""></span>
+                  <span style="flex:1;min-width:0">
+                    <b style="font-size:15px">₹ 38 Lakh · Residential plot</b>
+                    <div class="muted">Pal, Surat · All India</div>
+                    <div class="days" style="margin-top:9px"><span class="dbar"><i style="width:80%"></i></span>12 of 15 days left</div>
+                  </span>
+                  <span class="tag ok">Boost active</span>
+                  <a class="btn sm" href="#">Cancel boost</a>
+                </div>
+              </div>
+
+              <div class="sechead"><h2 class="h2">Waiting for approval</h2></div>
+              <div style="display:grid;gap:12px;margin-bottom:24px">
+                <div class="brow">
+                  <span class="sh ph" data-l=""></span>
+                  <span style="flex:1;min-width:0">
+                    <b style="font-size:15px">₹ 24,000 / mo · 2 BHK Flat</b>
+                    <div class="muted">Piplod, Surat · This area only · 7 days</div>
+                    <div class="muted" style="margin-top:7px">Boosts start after admin approval. Paid 19 Aug.</div>
+                  </span>
+                  <span class="tag warn">Under review</span>
+                  <a class="btn sm" href="#">Cancel</a>
+                </div>
+              </div>
+
+              <div class="sechead"><h2 class="h2">Past</h2></div>
+              <div style="display:grid;gap:12px">
+                <div class="brow" style="opacity:.72">
+                  <span class="sh ph" data-l=""></span>
+                  <span style="flex:1;min-width:0">
+                    <b style="font-size:15px">₹ 78 Lakh · 3 BHK Flat</b>
+                    <div class="muted">Katargam, Surat · 7 days</div>
+                    <div class="muted" style="margin-top:7px">Not approved · ₹ 499 refunded on 30 Jul</div>
+                  </span>
+                  <span class="tag mute">Not approved</span>
+                </div>
+                <div class="brow" style="opacity:.72">
+                  <span class="sh ph" data-l=""></span>
+                  <span style="flex:1;min-width:0">
+                    <b style="font-size:15px">₹ 1.35 Cr · Bungalow</b>
+                    <div class="muted">Pal, Surat · 15 days</div>
+                    <div class="muted" style="margin-top:7px">Boost stopped automatically — listing marked sold</div>
+                  </span>
+                  <span class="tag mute">Ended</span>
+                </div>
+              </div>
+            </div>
+
+            <aside class="rail-side">
+              <div class="card pad">
+                <div class="h3" style="margin-bottom:8px">How boost works</div>
+                <div style="display:grid;gap:9px;font-size:13px">
+                  <div style="display:flex;gap:9px"><svg class="i s18" style="color:var(--accent)"><use href="#i-check"/></svg><span>Boosted listings appear in top picks and above others in search</span></div>
+                  <div style="display:flex;gap:9px"><svg class="i s18" style="color:var(--accent)"><use href="#i-check"/></svg><span>Choose This area only or All India</span></div>
+                  <div style="display:flex;gap:9px"><svg class="i s18" style="color:var(--accent)"><use href="#i-check"/></svg><span>Boosts start after admin approval</span></div>
+                  <div style="display:flex;gap:9px"><svg class="i s18" style="color:var(--accent)"><use href="#i-check"/></svg><span>A boost stops automatically if you mark the listing sold</span></div>
+                </div>
+              </div>
+              <div class="card pad">
+                <div class="h3" style="margin-bottom:8px">Boost eligible</div>
+                <p class="muted" style="margin:0 0 10px">Owner Pro lets you boost any live listing.</p>
+                <a class="btn pri sm block" href="#">Boost a Listing</a>
+              </div>
+            </aside>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div data-part="bnav" data-active="profile"></div>
+  </div>
+</template>
+
+<template id="tpl-buy">
+  <div class="app">
+    <div class="shell">
+      <div data-part="sidebar" data-active="Boosts"></div>
+      <div class="mainwrap">
+        <div class="ctop"><div><h1>Boost listing</h1><div class="sub">₹ 62 Lakh · 2 BHK Flat, Vesu</div></div><div class="sp"></div></div>
+        <div class="content">
+          <div class="buycols">
+            <div>
+              <div class="fblk">
+                <h3>What to boost</h3>
+                <div class="opt on"><span class="rd"></span><span class="sh ph" style="width:64px;height:48px;border-radius:8px;flex:0 0 64px" data-l=""></span>
+                  <span style="flex:1"><b style="font-size:14px">₹ 62 Lakh · 2 BHK Flat</b><div class="muted">Vesu, Surat · Listing</div></span></div>
+                <div class="opt"><span class="rd"></span><span class="sh ph" style="width:64px;height:48px;border-radius:8px;flex:0 0 64px" data-l=""></span>
+                  <span style="flex:1"><b style="font-size:14px">₹ 78 Lakh · 3 BHK Flat</b><div class="muted">Katargam, Surat · Listing</div></span></div>
+                <div class="opt"><span class="rd"></span><span class="sh ph" style="width:64px;height:48px;border-radius:8px;flex:0 0 64px" data-l=""></span>
+                  <span style="flex:1"><b style="font-size:14px">₹ 1.35 Cr · Bungalow</b><div class="muted">Pal, Surat · Listing</div></span></div>
+              </div>
+
+              <div class="fblk">
+                <h3>Where to show</h3>
+                <div class="opt on"><span class="rd"></span><span style="flex:1"><b style="font-size:14px">This area only</b><div class="muted">Buyers browsing Vesu and nearby</div></span><b>₹ 499</b></div>
+                <div class="opt"><span class="rd"></span><span style="flex:1"><b style="font-size:14px">All India</b><div class="muted">Everyone, in every city</div></span><b>₹ 1,299</b></div>
+              </div>
+
+              <div class="fblk">
+                <h3>For how long</h3>
+                <div style="display:flex;gap:8px;flex-wrap:wrap">
+                  <span class="pill" aria-pressed="true">7 days · ₹ 499</span>
+                  <span class="pill">15 days · ₹ 899</span>
+                  <span class="pill">30 days · ₹ 1,599</span>
+                </div>
+                <p class="muted" style="margin:12px 0 0">Those days have already been used on this listing this month are greyed out.</p>
+              </div>
+            </div>
+
+            <aside>
+              <div class="sum">
+                <div class="h3" style="margin-bottom:10px">Summary</div>
+                <div class="sumrow"><span class="muted">Boost · 7 days</span><span>₹ 423</span></div>
+                <div class="sumrow"><span class="muted">Where</span><span>This area only</span></div>
+                <div class="sumrow"><span class="muted">GST (18%)</span><span>₹ 76</span></div>
+                <div class="sumrow tot"><span>Total</span><span>₹ 499</span></div>
+                <a class="btn pri block" href="#" style="margin-top:14px;height:46px">Pay ₹ 499</a>
+                <div class="newtab">
+                  <svg class="i s18" style="color:var(--info)"><use href="#i-alert"/></svg>
+                  <span>A secure payment window opens in a new tab. Keep this page open — it confirms automatically.</span>
+                </div>
+                <p class="muted" style="margin:12px 0 0;text-align:center">Boosts start after admin approval. If it is not approved, you are refunded in full.</p>
+              </div>
+            </aside>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div data-part="bnav" data-active="profile"></div>
+  </div>
+</template>
+
+<script src="_kit.js"></script>
+</body>
+</html>

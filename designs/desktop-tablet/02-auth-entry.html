@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>HomzList — 02 · Login &amp; entry (desktop + tablet)</title>
+<link rel="stylesheet" href="_kit.css" />
+<style>
+/* two-pane auth page */
+.authpage{display:flex;flex-direction:column;min-height:640px;background:var(--bg-page)}
+.authpane{display:none}
+.authwrap{flex:1;display:flex;align-items:center;justify-content:center;padding:24px 16px}
+.authcard{width:100%;max-width:420px;background:var(--surface-1);border:1px solid var(--border);border-radius:18px;padding:26px}
+.authcard.wide{max-width:520px}
+.abrand{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
+.atitle{margin:0;font-size:24px;font-weight:700;letter-spacing:-.02em}
+.asub{margin:8px 0 0;font-size:15px;color:var(--ink-secondary)}
+.alabel{display:block;font-size:13px;font-weight:600;color:var(--ink-secondary);margin:20px 0 8px}
+.phone{display:flex;align-items:center;height:46px;border:1px solid var(--border);border-radius:10px;background:var(--surface-2);padding:0 14px;font-size:15px}
+.phone .cc{color:var(--ink-secondary);display:flex;align-items:center;gap:10px}
+.phone .cc span{width:1px;height:20px;background:var(--border)}
+.phone .val{margin-left:12px;color:var(--ink-tertiary)}
+.consent{margin:14px 0 0;font-size:11px;color:var(--ink-tertiary);text-align:center;line-height:1.6}
+.consent a{color:var(--accent)}
+.orline{display:flex;align-items:center;gap:14px;margin:22px 0}
+.orline span{height:1px;flex:1;background:var(--divider)}
+.orline b{font-size:13px;font-weight:400;color:var(--ink-tertiary)}
+.guest{display:block;text-align:center;font-size:15px;font-weight:600;color:var(--accent)}
+.steps{display:flex;gap:8px;margin-bottom:20px}
+.steps i{height:4px;width:22px;border-radius:999px;background:var(--surface-3);display:block}
+.steps i.on{background:var(--accent)}
+.rolecard{display:flex;align-items:center;gap:12px;padding:15px;border-radius:12px;border:1px solid var(--border);background:var(--surface-1);margin-bottom:11px}
+.rolecard.on{border:1.5px solid var(--accent);background:var(--accent-soft)}
+.rolecard .ric{width:48px;height:48px;border-radius:10px;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;flex:0 0 48px}
+.rolecard .rt{font-size:17px;font-weight:600}
+.rolecard .rl{font-size:13px;color:var(--ink-secondary)}
+.otpboxes{display:flex;gap:10px;margin-top:10px}
+.otpboxes i{flex:1;height:54px;border:1px solid var(--border);border-radius:10px;background:var(--surface-2);display:grid;place-items:center;font-size:20px;font-weight:700;font-style:normal}
+.otpboxes i.on{border:1.5px solid var(--accent);background:var(--surface-1)}
+.fld{height:46px;border:1px solid var(--border);border-radius:10px;background:var(--surface-2);display:flex;align-items:center;padding:0 14px;font-size:15px;color:var(--ink-tertiary)}
+.fld.filled{color:var(--ink-primary)}
+.chk{display:flex;align-items:center;gap:10px;margin-top:16px;font-size:13px;color:var(--ink-secondary)}
+.chk i{width:20px;height:20px;border-radius:6px;border:1.5px solid var(--border);display:block;flex:0 0 20px}
+
+/* the modal treatment over a live page */
+.scrim{position:relative;background:var(--scrim-sheet)}
+.modalhost{position:relative}
+.modalhost .veil{position:absolute;inset:0;background:rgba(0,0,0,.45);z-index:5}
+.modalhost .dialog{position:absolute;z-index:6;top:50%;left:50%;transform:translate(-50%,-50%);width:420px;
+  background:var(--surface-1);border-radius:20px;padding:26px;box-shadow:0 24px 70px rgba(0,0,0,.35)}
+
+.iconbtn{width:44px;height:44px;display:grid;place-items:center;position:relative}
+.hdr-actions{display:flex;align-items:center;gap:8px;margin-left:auto}
+
+@container (min-width:768px){
+  .authwrap{padding:40px 24px}
+  .authcard{padding:32px}
+}
+@container (min-width:1200px){
+  /* Two panes: the product on the left, the form on the right — the desktop
+     pattern the current project uses, and the reason a 1440 login stops looking
+     like a phone screen stretched to fill a monitor. */
+  .authpage{flex-direction:row}
+  .authpane{display:flex;flex:1;flex-direction:column;justify-content:center;gap:22px;
+    padding:56px;background:var(--accent-soft);border-right:1px solid var(--divider)}
+  .authpane h2{margin:0;font-size:34px;font-weight:700;letter-spacing:-.02em;line-height:1.2;max-width:460px}
+  .authpane p{margin:0;font-size:15px;color:var(--ink-secondary);max-width:420px}
+  .authpane .pt{display:flex;gap:12px;align-items:flex-start;max-width:440px}
+  .authpane .pt .pi{width:36px;height:36px;border-radius:10px;background:var(--surface-1);color:var(--accent);display:grid;place-items:center;flex:0 0 36px}
+  .authwrap{flex:0 0 560px;padding:48px}
+}
+</style>
+</head>
+<body>
+
+
+
+<div class="bar">
+  <b>02 · Login &amp; entry</b>
+  <div class="seg"><button data-dark aria-pressed="false">Dark</button></div>
+  <div class="sp"></div>
+  <span class="note">Every field, label and string is the live app's own (<code>components/auth/screens/*</code>):
+  "Phone number" · +91 · 98250 12345 · Continue · Terms &amp; Privacy · or · Browse as Guest · "I am a…" ·
+  Owner / Broker / Builder · Full name · 18+ · Start Exploring. Only the composition is new.</span>
+</div>
+
+<div class="stage">
+
+  <div>
+    <p class="caption">A · Login — Desktop 1440 (two-pane)</p>
+    <div class="scaler"><div class="frame" data-w="1440" style="width:1440px" data-tpl="login"></div></div>
+  </div>
+
+  <div class="annot">
+    <h3>Why two panes, and not a centred card on an empty page</h3>
+    <ul>
+      <li>The mobile login is a wordmark and a phone field on a white screen. Centred alone on a 1440
+      monitor that reads as an error page — there is nothing to look at and nothing that says what this
+      product is. The left pane carries the product promise (the same three things the app's own onboarding
+      coach screens say), the right pane carries the form, unchanged.</li>
+      <li><b>The form itself is untouched.</b> Same +91 prefix and divider, same "98250 12345" placeholder,
+      same disabled Continue until the number is valid, same 11px consent line with Terms and Privacy as
+      accent links, same "or" divider and "Browse as Guest".</li>
+      <li><b>The rate-limit and number-locked banners still sit at the very top</b> of the form pane, so a
+      returning user sees the reason before the field.</li>
+      <li>Below 1200 the left pane disappears entirely and the card centres — a tablet does not have the
+      width for a split, and a stretched split is exactly the failure this whole set exists to avoid.</li>
+    </ul>
+  </div>
+
+  <div>
+    <p class="caption">B · Role → OTP → Details — Desktop 1440 (the rest of the flow, same shell)</p>
+    <div class="scaler"><div class="frame" data-w="1440" style="width:1440px" data-tpl="role"></div></div>
+  </div>
+
+  <div>
+    <p class="caption">C · OTP + Details — Tablet 768</p>
+    <div class="scaler"><div class="frame" data-w="768" style="width:768px" data-tpl="otp"></div></div>
+  </div>
+
+  <div>
+    <p class="caption">D · The gate as a modal — a guest taps a gated action on a browse page (Desktop 1440)</p>
+    <div class="scaler"><div class="frame" data-w="1440" style="width:1440px" data-tpl="modal"></div></div>
+  </div>
+
+  <div class="annot">
+    <h3>The entry gate on desktop is a modal, not a route</h3>
+    <ul>
+      <li>On mobile, tapping a gated action (contact a seller, save, post) pushes <code>/login</code> — right
+      for a phone, where a full-screen change is how everything works.</li>
+      <li>On desktop the visitor is mid-browse with a page full of context. Throwing that away for a login
+      screen is the single most common way a portal loses a lead, so the same login mounts as a <b>centred
+      modal over the dimmed page</b>: number → OTP → back to exactly where they were, with the action they
+      tried already carried out.</li>
+      <li><code>/login</code> stays a real route and keeps working — deep links, bookmarks and the
+      seller host all still land on the full page. The modal is an <i>additional</i> mount of the same flow,
+      not a replacement, so there is one implementation and one set of strings.</li>
+      <li>The guest strip stays: browsing never requires an account, exactly as today.</li>
+    </ul>
+  </div>
+
+</div>
+
+<!-- ============ templates ============ -->
+<template id="tpl-login">
+  <div class="app">
+    <div class="authpage">
+      <div class="authpane">
+        <span class="wordmark" style="font-size:26px">Homz<i>List</i></span>
+        <h2>Flats, plots and projects — straight from owners, brokers and builders.</h2>
+        <div class="pt"><span class="pi"><svg class="i"><use href="#i-pin"/></svg></span><p><b>Change your city anytime</b> — your feed and stories update instantly.</p></div>
+        <div class="pt"><span class="pi"><svg class="i"><use href="#i-search"/></svg></span><p><b>Post what you need</b> — matching properties find you.</p></div>
+        <div class="pt"><span class="pi"><svg class="i"><use href="#i-leads"/></svg></span><p><b>All inquiries and leads live here</b> — no spam calls, photos and text only.</p></div>
+      </div>
+
+      <div class="authwrap">
+        <div class="authcard">
+          <div class="abrand">
+            <span class="wordmark" style="font-size:24px">Homz<i>List</i></span>
+            <span class="iconbtn" style="width:36px;height:36px;color:var(--ink-tertiary)"><svg class="i s24"><use href="#i-close"/></svg></span>
+          </div>
+          <h1 class="atitle">Log in or sign up</h1>
+          <p class="asub">We&rsquo;ll send a one-time code to your mobile number.</p>
+
+          <label class="alabel">Phone number</label>
+          <div class="phone"><span class="cc">+91 <span></span></span><span class="val">98250 12345</span></div>
+
+          <a class="btn pri block" href="#" style="margin-top:18px;height:46px">Continue</a>
+
+          <p class="consent">By continuing, you agree to our <a href="#">Terms</a> &amp; <a href="#">Privacy Policy</a></p>
+
+          <div class="orline"><span></span><b>or</b><span></span></div>
+          <a class="guest" href="#">Browse as Guest</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<template id="tpl-role">
+  <div class="app">
+    <div class="authpage">
+      <div class="authpane">
+        <span class="wordmark" style="font-size:26px">Homz<i>List</i></span>
+        <h2>One account, three ways to use it.</h2>
+        <p>Your role decides what you can post and which verification badges you can earn. You can always
+        ask for verification later from your profile.</p>
+      </div>
+
+      <div class="authwrap">
+        <div class="authcard wide">
+          <div class="steps"><i class="on"></i><i></i></div>
+          <h1 class="atitle">I am a…</h1>
+          <p class="asub">Choose how you&rsquo;ll use HomzList</p>
+
+          <div style="margin-top:22px">
+            <div class="rolecard on">
+              <span class="ric"><svg class="i s24"><use href="#i-home"/></svg></span>
+              <span style="flex:1"><span class="rt">Owner</span><br><span class="rl">Buy, sell or rent my own property</span></span>
+              <span style="color:var(--ink-tertiary)"><svg class="i s16"><use href="#i-right"/></svg></span>
+            </div>
+            <div class="rolecard">
+              <span class="ric"><svg class="i s24"><use href="#i-briefcase"/></svg></span>
+              <span style="flex:1"><span class="rt">Broker</span><br><span class="rl">List and manage client properties</span></span>
+              <span style="color:var(--ink-tertiary)"><svg class="i s16"><use href="#i-right"/></svg></span>
+            </div>
+            <div class="rolecard">
+              <span class="ric"><svg class="i s24"><use href="#i-building"/></svg></span>
+              <span style="flex:1"><span class="rt">Builder</span><br><span class="rl">Post my projects and reach buyers</span></span>
+              <span style="color:var(--ink-tertiary)"><svg class="i s16"><use href="#i-right"/></svg></span>
+            </div>
+          </div>
+
+          <a class="btn pri block" href="#" style="margin-top:20px;height:46px">Continue</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<template id="tpl-otp">
+  <div class="app">
+    <div class="authpage">
+      <div class="authwrap">
+        <div class="authcard">
+          <div class="abrand"><span class="wordmark" style="font-size:22px">Homz<i>List</i></span></div>
+          <h1 class="atitle">Enter the code</h1>
+          <p class="asub">Sent to +91 98250 12345 · <a href="#" style="color:var(--accent);font-weight:600">Change</a></p>
+          <div class="otpboxes"><i class="on">4</i><i>2</i><i>9</i><i></i><i></i><i></i></div>
+          <a class="btn pri block" href="#" style="margin-top:20px;height:46px">Verify</a>
+          <p class="consent">Didn&rsquo;t get it? <a href="#">Resend in 0:24</a></p>
+
+          <div class="orline"><span></span><b>then</b><span></span></div>
+
+          <h1 class="atitle" style="font-size:20px">Your details</h1>
+          <label class="alabel">Full name</label>
+          <div class="fld">e.g. Rupal Kachhadiya</div>
+          <label class="alabel">Email <span style="color:var(--ink-tertiary);font-weight:400">(optional)</span></label>
+          <div class="fld">you@example.com</div>
+          <label class="alabel">City</label>
+          <div class="fld" style="justify-content:space-between">Select your city<svg class="i s16" style="color:var(--ink-tertiary)"><use href="#i-right"/></svg></div>
+          <div class="chk"><i></i> I confirm I am 18 years or older</div>
+          <a class="btn pri block" href="#" style="margin-top:18px;height:46px">Start Exploring</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<template id="tpl-modal">
+  <div class="app">
+    <div data-part="header" data-guest="1" data-active="Buy"></div>
+
+    <div class="modalhost" style="flex:1">
+      <div class="content" style="max-width:1600px;margin:0 auto;width:100%">
+        <div class="sechead"><h2 class="h2">Newly-added properties</h2><div class="sp"></div><a class="link" href="#">View all</a></div>
+        <div class="rail">
+          <div class="pcard"><div class="shot ph" data-l="PHOTO"></div><div class="ttl">₹ 62 Lakh</div><div class="sub">2 BHK Flat · Vesu</div></div>
+          <div class="pcard"><div class="shot ph" data-l="PHOTO"></div><div class="ttl">₹ 1.15 Cr</div><div class="sub">3 BHK Flat · Adajan</div></div>
+          <div class="pcard"><div class="shot ph" data-l="PHOTO"></div><div class="ttl">₹ 38 Lakh</div><div class="sub">Plot · Pal</div></div>
+          <div class="pcard"><div class="shot ph" data-l="PHOTO"></div><div class="ttl">₹ 24,000 / mo</div><div class="sub">2 BHK Flat · Piplod</div></div>
+        </div>
+      </div>
+
+      <div class="veil"></div>
+      <div class="dialog">
+        <div class="abrand">
+          <span class="wordmark" style="font-size:22px">Homz<i>List</i></span>
+          <span class="iconbtn" style="width:34px;height:34px;color:var(--ink-tertiary)"><svg class="i s24"><use href="#i-close"/></svg></span>
+        </div>
+        <h1 class="atitle" style="font-size:21px">Log in to contact this seller</h1>
+        <p class="asub" style="font-size:14px">You&rsquo;ll come straight back to this page.</p>
+        <label class="alabel">Phone number</label>
+        <div class="phone"><span class="cc">+91 <span></span></span><span class="val">98250 12345</span></div>
+        <a class="btn pri block" href="#" style="margin-top:16px;height:46px">Continue</a>
+        <p class="consent">By continuing, you agree to our <a href="#">Terms</a> &amp; <a href="#">Privacy Policy</a></p>
+        <div class="orline"><span></span><b>or</b><span></span></div>
+        <a class="guest" href="#">Keep browsing as guest</a>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script src="_kit.js"></script>
+</body>
+</html>

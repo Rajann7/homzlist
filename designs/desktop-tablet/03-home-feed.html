@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>HomzList — 03 · Home (desktop + tablet)</title>
+<link rel="stylesheet" href="_kit.css" />
+<style>
+/* ---------- hero + search panel ---------- */
+.hero{background:var(--surface-2);border-bottom:1px solid var(--divider)}
+.hero .container{padding-top:26px;padding-bottom:22px}
+.hero h1{margin:0;font-size:26px;font-weight:700;letter-spacing:-.02em;line-height:1.15}
+.hero h1 em{font-style:normal;color:var(--accent)}
+.hero .sub{margin:8px 0 0;font-size:13px;color:var(--ink-secondary)}
+.panel{margin-top:16px;background:var(--surface-1);border:1px solid var(--border);border-radius:16px;padding:10px}
+.ptabs{display:flex;gap:4px;padding:2px;overflow-x:auto;scrollbar-width:none}
+.ptabs::-webkit-scrollbar{display:none}
+.ptabs button{height:34px;padding:0 14px;border-radius:999px;font-size:13px;font-weight:600;color:var(--ink-secondary);white-space:nowrap}
+.ptabs button[aria-selected="true"]{background:var(--ink-primary);color:var(--ink-inverse)}
+.prow{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.pcat,.pfield{display:flex;align-items:center;gap:8px;height:46px;padding:0 14px;border:1px solid var(--border);border-radius:12px;font-size:14px}
+.pcat{color:var(--ink-secondary);justify-content:space-between}
+.pfield{flex:1;color:var(--ink-tertiary);min-width:0;overflow:hidden;white-space:nowrap}
+.pgo{height:46px;border-radius:12px;background:var(--accent);color:var(--on-accent);font-weight:700;font-size:14px;padding:0 26px;display:grid;place-items:center}
+.pquick{display:flex;gap:8px;margin-top:10px;overflow-x:auto;scrollbar-width:none}
+.pquick::-webkit-scrollbar{display:none}
+
+/* ---------- stories: a carousel like everything else ---------- */
+.story{text-align:center}
+.story .ring{width:66px;height:66px;border-radius:999px;background:var(--ring-unseen-grad);display:grid;place-items:center;margin:0 auto}
+.story .ring.seen{background:var(--surface-3)}
+.story .av{width:60px;height:60px;border-radius:999px;display:grid;place-items:center;color:#fff;font-weight:700;font-size:20px;border:2px solid var(--surface-1)}
+.story .nm{font-size:11px;color:var(--ink-secondary);margin-top:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rail.stories{grid-auto-columns:76px}
+
+/* ---------- sell band ---------- */
+.sell{background:var(--accent-soft);border-radius:18px;padding:22px;display:grid;gap:18px}
+.sell h2{margin:0;font-size:20px;font-weight:700;letter-spacing:-.01em}
+.sell p{margin:6px 0 0;font-size:13px;color:var(--ink-secondary)}
+.sell .ctas{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+.sellstats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.sellstats div{background:var(--surface-1);border-radius:12px;padding:12px;text-align:center}
+.sellstats strong{display:block;font-size:17px}
+.sellstats span{font-size:11px;color:var(--ink-tertiary)}
+
+.toolbar{display:flex;align-items:center;gap:8px;margin:0 0 14px;overflow-x:auto;scrollbar-width:none}
+.toolbar::-webkit-scrollbar{display:none}
+.chip2{height:32px;padding:0 13px;border-radius:999px;background:var(--surface-2);font-size:13px;font-weight:600;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.chip2[aria-pressed="true"]{background:var(--accent-soft);color:var(--accent)}
+
+@container (min-width:768px){
+  .hero .container{padding-top:34px;padding-bottom:26px}
+  .hero h1{font-size:34px}
+  .hero .sub{font-size:14px}
+  .prow{flex-direction:row}
+  .pcat{width:210px;flex:0 0 210px}
+  .sell{grid-template-columns:1.4fr 1fr;align-items:center;padding:26px}
+  .rail.stories{grid-auto-columns:84px}
+}
+@container (min-width:1200px){
+  .hero .container{padding-top:44px;padding-bottom:30px;text-align:center}
+  .hero h1{font-size:42px}
+  .hero .sub{font-size:15px}
+  .panel{max-width:980px;margin:20px auto 0;text-align:left}
+  .sell{grid-template-columns:1.5fr 1fr;padding:30px 34px}
+  .sell h2{font-size:23px}
+}
+@container (min-width:1600px){ .hero h1{font-size:46px} }
+</style>
+</head>
+<body>
+
+<div class="bar">
+  <b>03 · Home</b>
+  <div class="seg"><button data-dark aria-pressed="false">Dark</button></div>
+  <div class="sp"></div>
+  <span class="note">The current project's header, ported as-is (logo · city · centred nav · Dashboard · bell · saved ·
+  avatar · Post Property; nav folds into the hamburger under 1080). Below it: hero search panel, then
+  <b>every section as a carousel</b> — no grids anywhere. Section titles, subtitles and chips are the live app's own
+  (<code>lib/feed/sections</code>, <code>FeedHome</code>, <code>SellCta</code>).</span>
+</div>
+
+<div class="stage">
+
+  <div>
+    <p class="caption">A · Desktop 1440 — signed in (owner)</p>
+    <div class="scaler"><div class="frame" data-w="1440" style="width:1440px" data-tpl="home"></div></div>
+  </div>
+
+  <div class="annot">
+    <h3>The rules this screen follows</h3>
+    <ul>
+      <li><b>Header = the current project's header.</b> Logo + city chip on the left, the primary nav centred
+      (Buy · Rent · Projects · Commercial · Plots · PG · Requirements — the app's own type categories from
+      <code>lib/listings/type-icon.ts</code>), and on the right Dashboard, bell, saved, avatar and the accent
+      Post Property. Under 1080 the nav collapses into the hamburger, exactly as that header does.</li>
+      <li><b>Carousels everywhere, never a grid.</b> Top picks, newly-added, developers, brokers, featured and
+      news are all rails: 4 cards at 1440, 5 at 1600, 2 at tablet, with prev/next arrows. Stories are a rail
+      too. Nothing on this page is a card grid.</li>
+      <li><b>The search becomes the hero.</b> On mobile, Search is a screen behind a nav icon; on desktop that
+      is a wasted front door, so the panel leads — Buy/Rent/Projects segment, category, query, Search, and the
+      quick filter chips underneath.</li>
+      <li><b>Mobile order is untouched:</b> stories → top picks → newly-added → developers → brokers →
+      featured → sell → news → footer.</li>
+      <li><b>The sell block becomes a band with proof</b> — same server-owned copy ("Have a property to sell?"
+      / "Post it free and reach buyers in Surat"), plus three real counts, which is what stops a desktop CTA
+      from reading as an empty strip.</li>
+    </ul>
+  </div>
+
+  <div>
+    <p class="caption">B · Desktop 1280</p>
+    <div class="scaler"><div class="frame" data-w="1280" style="width:1280px" data-tpl="home"></div></div>
+  </div>
+
+  <div>
+    <p class="caption">C · Tablet 1024 — the nav is in the hamburger below 1080, as in the current header</p>
+    <div class="scaler"><div class="frame" data-w="1024" style="width:1024px" data-tpl="home"></div></div>
+  </div>
+
+  <div>
+    <p class="caption">D · Tablet 768</p>
+    <div class="scaler"><div class="frame" data-w="768" style="width:768px" data-tpl="home"></div></div>
+  </div>
+
+</div>
+
+<template id="tpl-home">
+  <div class="app">
+    <div data-part="header" data-active="Buy"></div>
+
+    <section class="hero">
+      <div class="container">
+        <h1>Find your next <em>home</em> in Surat</h1>
+        <p class="sub">Flats, plots and projects from owners, brokers and builders — photos and text only, no spam calls.</p>
+        <div class="panel">
+          <div class="ptabs">
+            <button aria-selected="true">Buy</button><button>Rent</button>
+            <button>Projects</button><button>Requirements</button>
+          </div>
+          <div class="prow">
+            <span class="pcat">All residential<svg class="i s16" style="color:var(--ink-tertiary)"><use href="#i-chevron"/></svg></span>
+            <span class="pfield"><svg class="i"><use href="#i-search"/></svg>Search area, project or builder — “Vesu 3 BHK”</span>
+            <span class="pgo">Search</span>
+          </div>
+          <div class="pquick">
+            <span class="pill">Property type <svg class="i s14"><use href="#i-chevron"/></svg></span>
+            <span class="pill">Budget <svg class="i s14"><use href="#i-chevron"/></svg></span>
+            <span class="pill">BHK <svg class="i s14"><use href="#i-chevron"/></svg></span>
+            <span class="pill">Ready to move</span><span class="pill">RERA</span><span class="pill">Verified seller</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="container" style="padding-top:22px;padding-bottom:8px">
+
+      <!-- stories -->
+      <section class="sec carousel">
+        <div class="sechead">
+          <div><h2 class="h2">Professionals posting today</h2><div class="sub">12 builders and brokers in Surat</div></div>
+          <div class="sp"></div>
+          <div class="arrows"><span class="arrow" aria-disabled="true"><svg class="i s16"><use href="#i-left"/></svg></span><span class="arrow"><svg class="i s16"><use href="#i-right"/></svg></span></div>
+          <a class="link" href="#">View all</a>
+        </div>
+        <div class="rail stories">
+          <div class="story"><div class="ring"><div class="av" style="background:var(--avatar-1)">S</div></div><div class="nm">Shreeji</div></div>
+          <div class="story"><div class="ring"><div class="av" style="background:var(--avatar-3)">R</div></div><div class="nm">Rajesh</div></div>
+          <div class="story"><div class="ring"><div class="av" style="background:var(--avatar-5)">A</div></div><div class="nm">Anand</div></div>
+          <div class="story"><div class="ring"><div class="av" style="background:var(--avatar-7)">M</div></div><div class="nm">Mehul</div></div>
+          <div class="story"><div class="ring seen"><div class="av" style="background:var(--avatar-8)">K</div></div><div class="nm">Krish</div></div>
+          <div class="story"><div class="ring seen"><div class="av" style="background:var(--avatar-4)">D</div></div><div class="nm">Divya</div></div>
+          <div class="story"><div class="ring seen"><div class="av" style="background:var(--avatar-6)">P</div></div><div class="nm">Paras</div></div>
+          <div class="story"><div class="ring seen"><div class="av" style="background:var(--avatar-2)">N</div></div><div class="nm">Nirav</div></div>
+          <div class="story"><div class="ring seen"><div class="av" style="background:var(--avatar-1)">J</div></div><div class="nm">Jignesh</div></div>
+          <div class="story"><div class="ring seen"><div class="av" style="background:var(--avatar-5)">V</div></div><div class="nm">Viral</div></div>
+        </div>
+      </section>
+
+      <!-- 1 top picks -->
+      <section class="sec carousel">
+        <div class="sechead">
+          <div><h2 class="h2">HomzList top picks</h2><div class="sub">18 live projects in Surat</div></div>
+          <div class="sp"></div>
+          <div class="arrows"><span class="arrow" aria-disabled="true"><svg class="i s16"><use href="#i-left"/></svg></span><span class="arrow"><svg class="i s16"><use href="#i-right"/></svg></span></div>
+          <a class="link" href="#">View all</a>
+        </div>
+        <div class="rail">
+          <div class="pcard"><div class="shot ph" data-l="PROJECT"></div><div class="ttl">Shreeji Heights</div><div class="sub">Vesu, Surat · 2, 3 BHK</div><div class="facts"><span>₹ 58 L – 1.2 Cr</span><span class="tag ok">RERA</span></div></div>
+          <div class="pcard"><div class="shot ph" data-l="PROJECT"></div><div class="ttl">Sunrise Residency</div><div class="sub">Adajan, Surat · 3, 4 BHK</div><div class="facts"><span>₹ 92 L – 1.8 Cr</span><span class="tag ok">RERA</span></div></div>
+          <div class="pcard"><div class="shot ph" data-l="PROJECT"></div><div class="ttl">Green Valley</div><div class="sub">Pal, Surat · Plots</div><div class="facts"><span>₹ 28 L – 60 L</span><span class="tag ok">RERA</span></div></div>
+          <div class="pcard"><div class="shot ph" data-l="PROJECT"></div><div class="ttl">Aarohi Skyline</div><div class="sub">Piplod, Surat · 3 BHK</div><div class="facts"><span>₹ 1.1 – 1.6 Cr</span><span class="tag ok">RERA</span></div></div>
+          <div class="pcard"><div class="shot ph" data-l="PROJECT"></div><div class="ttl">Riverfront One</div><div class="sub">Athwa, Surat · 4 BHK</div><div class="facts"><span>₹ 2.1 Cr+</span></div></div>
+          <div class="pcard"><div class="shot ph" data-l="PROJECT"></div><div class="ttl">Maple Greens</div><div class="sub">Katargam, Surat · 2 BHK</div><div class="facts"><span>₹ 44 – 68 L</span></div></div>
+        </div>
+      </section>
+
+      <!-- 2 newly added -->
+      <section class="sec carousel">
+        <div class="sechead">
+          <div><h2 class="h2">Newly-added properties</h2><div class="sub">126 properties in Surat</div></div>
+          <div class="sp"></div>
+          <div class="arrows"><span class="arrow" aria-disabled="true"><svg class="i s16"><use href="#i-left"/></svg></span><span class="arrow"><svg class="i s16"><use href="#i-right"/></svg></span></div>
+          <a class="link" href="#">View all</a>
+        </div>
+        <div class="rail">
+          <div class="pcard"><div class="shot ph" data-l="PHOTO"></div><div class="ttl">₹ 62 Lakh</div><div class="sub">2 BHK Flat · Vesu</div><div class="facts"><span>1150 sq.ft</span><span>·</span><span>Ready to move</span></div></div>
+          <div class="pcard"><div class="shot ph" data-l="PHOTO"></div><div class="ttl">₹ 1.15 Cr</div><div class="sub">3 BHK Flat · Adajan</div><div class="facts"><span>1780 sq.ft</span><span>·</span><span>Under construction</span></div></div>
+          <div class="pcard"><div class="shot ph" data-l="PHOTO"></div><div class="ttl">₹ 38 Lakh</div><div class="sub">Residential plot · Pal</div><div class="facts"><span>2000 sq.ft</span></div></div>
+          <div class="pcard"><div class="shot ph" data-l="PHOTO"></div><div class="ttl">₹ 24,000 / mo</div><div class="sub">2 BHK Flat · Piplod</div><div class="facts"><span>1080 sq.ft</span><span>·</span><span>Semi-furnished</span></div></div>
+          <div class="pcard"><div class="shot ph" data-l="PHOTO"></div><div class="ttl">₹ 78 Lakh</div><div class="sub">3 BHK Flat · Katargam</div><div class="facts"><span>1420 sq.ft</span></div></div>
+          <div class="pcard"><div class="shot ph" data-l="PHOTO"></div><div class="ttl">₹ 55,000 / mo</div><div class="sub">Shop · Ring Road</div><div class="facts"><span>640 sq.ft</span></div></div>
+        </div>
+      </section>
+
+      <!-- 3 developers -->
+      <section class="sec carousel">
+        <div class="sechead">
+          <div><h2 class="h2">Featured Developers</h2><div class="sub">8 builders with live projects in Surat</div></div>
+          <div class="sp"></div>
+          <div class="arrows"><span class="arrow" aria-disabled="true"><svg class="i s16"><use href="#i-left"/></svg></span><span class="arrow"><svg class="i s16"><use href="#i-right"/></svg></span></div>
+          <a class="link" href="#">View all</a>
+        </div>
+        <div class="rail people">
+          <div class="card person"><div class="av" style="background:var(--avatar-1)">S</div><div class="nm">Shreeji Group</div><div class="rl">6 projects</div></div>
+          <div class="card person"><div class="av" style="background:var(--avatar-4)">A</div><div class="nm">Aarohi Infra</div><div class="rl">4 projects</div></div>
+          <div class="card person"><div class="av" style="background:var(--avatar-5)">G</div><div class="nm">Green Valley</div><div class="rl">3 projects</div></div>
+          <div class="card person"><div class="av" style="background:var(--avatar-7)">R</div><div class="nm">Riverfront</div><div class="rl">2 projects</div></div>
+          <div class="card person"><div class="av" style="background:var(--avatar-2)">S</div><div class="nm">Sunrise Build</div><div class="rl">5 projects</div></div>
+          <div class="card person"><div class="av" style="background:var(--avatar-8)">M</div><div class="nm">Maple Homes</div><div class="rl">2 projects</div></div>
+          <div class="card person"><div class="av" style="background:var(--avatar-3)">V</div><div class="nm">Vraj Developers</div><div class="rl">3 projects</div></div>
+          <div class="card person"><div class="av" style="background:var(--avatar-6)">O</div><div class="nm">Om Infra</div><div class="rl">1 project</div></div>
+        </div>
+      </section>
+
+      <!-- 4 brokers -->
+      <section class="sec carousel">
+        <div class="sechead">
+          <div><h2 class="h2">Featured Brokers</h2><div class="sub">14 brokers with live listings in Surat</div></div>
+          <div class="sp"></div>
+          <div class="arrows"><span class="arrow" aria-disabled="true"><svg class="i s16"><use href="#i-left"/></svg></span><span class="arrow"><svg class="i s16"><use href="#i-right"/></svg></span></div>
+          <a class="link" href="#">View all</a>
+        </div>
+        <div class="rail people">
+          <div class="card person"><div class="av" style="background:var(--avatar-3)">R</div><div class="nm">Rajesh Patel</div><div class="rl">28 listings</div></div>
+          <div class="card person"><div class="av" style="background:var(--avatar-6)">P</div><div class="nm">Paras Shah</div><div class="rl">19 listings</div></div>
+          <div class="card person"><div class="av" style="background:var(--avatar-2)">N</div><div class="nm">Nirav Desai</div><div class="rl">15 listings</div></div>
+          <div class="card person"><div class="av" style="background:var(--avatar-4)">D</div><div class="nm">Divya Mehta</div><div class="rl">12 listings</div></div>
+          <div class="card person"><div class="av" style="background:var(--avatar-1)">K</div><div class="nm">Krish Joshi</div><div class="rl">9 listings</div></div>
+          <div class="card person"><div class="av" style="background:var(--avatar-5)">M</div><div class="nm">Mehul Trivedi</div><div class="rl">7 listings</div></div>
+          <div class="card person"><div class="av" style="background:var(--avatar-7)">J</div><div class="nm">Jignesh Rana</div><div class="rl">6 listings</div></div>
+          <div class="card person"><div class="av" style="background:var(--avatar-8)">V</div><div class="nm">Viral Shah</div><div class="rl">5 listings</div></div>
+        </div>
+      </section>
+
+      <!-- 5 featured (toolbar + carousel) -->
+      <section class="sec carousel">
+        <div class="sechead">
+          <div><h2 class="h2">Featured properties</h2><div class="sub">40 properties and 12 projects in Surat</div></div>
+          <div class="sp"></div>
+          <div class="arrows"><span class="arrow" aria-disabled="true"><svg class="i s16"><use href="#i-left"/></svg></span><span class="arrow"><svg class="i s16"><use href="#i-right"/></svg></span></div>
+        </div>
+        <div class="toolbar">
+          <span class="chip2" aria-pressed="true">Properties</span><span class="chip2">Requirements</span>
+          <span style="width:1px;height:22px;background:var(--border);margin:0 4px"></span>
+          <span class="chip2">Buy</span><span class="chip2">Rent</span>
+          <div style="flex:1"></div>
+          <span class="chip2"><svg class="i s16"><use href="#i-sort"/></svg>Latest</span>
+        </div>
+        <div class="rail">
+          <div class="pcard"><div class="shot ph" data-l="PHOTO"></div><div class="ttl">₹ 62 Lakh</div><div class="sub">2 BHK Flat · Vesu</div><div class="facts"><span>1150 sq.ft</span><span class="tag ok">Verified</span></div></div>
+          <div class="pcard"><div class="shot ph" data-l="PHOTO"></div><div class="ttl">₹ 2.1 Cr</div><div class="sub">4 BHK Flat · Athwa</div><div class="facts"><span>2650 sq.ft</span><span class="tag warn">Boosted</span></div></div>
+          <div class="pcard"><div class="shot ph" data-l="PHOTO"></div><div class="ttl">₹ 45 Lakh</div><div class="sub">1 BHK Flat · Varachha</div><div class="facts"><span>720 sq.ft</span></div></div>
+          <div class="pcard"><div class="shot ph" data-l="PHOTO"></div><div class="ttl">₹ 18,500 / mo</div><div class="sub">2 BHK Flat · Vesu</div><div class="facts"><span>990 sq.ft</span></div></div>
+          <div class="pcard"><div class="shot ph" data-l="PHOTO"></div><div class="ttl">₹ 1.35 Cr</div><div class="sub">Bungalow · Pal</div><div class="facts"><span>3200 sq.ft</span></div></div>
+          <div class="pcard"><div class="shot ph" data-l="PHOTO"></div><div class="ttl">₹ 92 Lakh</div><div class="sub">Office · Ring Road</div><div class="facts"><span>1100 sq.ft</span></div></div>
+        </div>
+      </section>
+
+      <!-- 6 sell band -->
+      <section class="sec">
+        <div class="sell">
+          <div>
+            <h2>Have a property to sell?</h2>
+            <p>Post it free and reach buyers in Surat.</p>
+            <div class="ctas"><a class="btn pri" href="#">Post your property</a><a class="btn" href="#">See plans</a></div>
+          </div>
+          <div class="sellstats">
+            <div><strong>126</strong><span>live properties</span></div>
+            <div><strong>18</strong><span>RERA projects</span></div>
+            <div><strong>22</strong><span>verified sellers</span></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 7 news -->
+      <section class="sec carousel">
+        <div class="sechead">
+          <div><h2 class="h2">News and Articles</h2><div class="sub">9 articles</div></div>
+          <div class="sp"></div>
+          <div class="arrows"><span class="arrow" aria-disabled="true"><svg class="i s16"><use href="#i-left"/></svg></span><span class="arrow"><svg class="i s16"><use href="#i-right"/></svg></span></div>
+          <a class="link" href="#">View all</a>
+        </div>
+        <div class="rail news">
+          <div class="pcard"><div class="shot ph" data-l="COVER" style="aspect-ratio:16/9"></div><div class="ttl" style="font-size:14px">Surat's ring-road corridor: what changed for buyers in 2026</div><div class="muted">8 min read · 12 Jan</div></div>
+          <div class="pcard"><div class="shot ph" data-l="COVER" style="aspect-ratio:16/9"></div><div class="ttl" style="font-size:14px">RERA checks every buyer should run before booking</div><div class="muted">5 min read · 08 Jan</div></div>
+          <div class="pcard"><div class="shot ph" data-l="COVER" style="aspect-ratio:16/9"></div><div class="ttl" style="font-size:14px">Rent or buy in Vesu — the 2026 numbers</div><div class="muted">6 min read · 02 Jan</div></div>
+          <div class="pcard"><div class="shot ph" data-l="COVER" style="aspect-ratio:16/9"></div><div class="ttl" style="font-size:14px">Plot buying in Pal: paperwork, price bands and pitfalls</div><div class="muted">7 min read · 28 Dec</div></div>
+          <div class="pcard"><div class="shot ph" data-l="COVER" style="aspect-ratio:16/9"></div><div class="ttl" style="font-size:14px">What a verified seller badge actually means</div><div class="muted">4 min read · 21 Dec</div></div>
+        </div>
+      </section>
+    </div>
+
+    <div data-part="footer"></div>
+    <div data-part="bnav" data-active="home"></div>
+  </div>
+</template>
+
+<script src="_kit.js"></script>
+</body>
+</html>

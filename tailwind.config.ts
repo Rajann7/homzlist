@@ -53,7 +53,13 @@ const config: Config = {
       // code — mobile 390 / tablet 768 / desktop 1440 — and no CSS breakpoints of
       // its own. `md:` (768) already is the tablet band; `desktop:` adds the third.
       // A 1280px laptop therefore gets the design's TABLET layout, as intended.
-      screens: { desktop: "1440px" },
+      //
+      // The user-side desktop/tablet set (designs/desktop-tablet/00-SPEC.md §1)
+      // declares its own bands: tablet 768–1199, desktop 1200–1599, large 1600+.
+      // `md:` is already 768; `lg:` is retuned 1024 → 1200 and `xl:` 1280 → 1600
+      // so the Tailwind token and the spec are the same number. `xl:` had no
+      // users; `lg:` had exactly one (the amenities grid in detailBody).
+      screens: { desktop: "1440px", lg: "1200px", xl: "1600px" },
       // Default Tailwind spacing (1=4px…8=32px = Doc1's 4/8/12/16/24/32) is kept,
       // so component dimensions (h-11=44px touch target, h-9, h-12, w-5…) work.
       // Only these fixed layout constants are added (Doc1 §3). Usage discipline:

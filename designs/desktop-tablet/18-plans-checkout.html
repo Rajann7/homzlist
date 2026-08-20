@@ -1,0 +1,334 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>HomzList — 18 · Plans &amp; checkout (desktop + tablet)</title>
+<link rel="stylesheet" href="_kit.css" />
+<style>
+.plan{background:var(--surface-1);border:1px solid var(--border);border-radius:16px;padding:18px;display:flex;flex-direction:column;height:100%}
+.plan.on{border:1.5px solid var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.plan .pn{font-size:16px;font-weight:700}
+.plan .pp{font-size:26px;font-weight:700;letter-spacing:-.02em;margin:10px 0 2px}
+.plan .pd{font-size:12px;color:var(--ink-tertiary)}
+.plan ul{list-style:none;margin:14px 0 16px;padding:0;display:grid;gap:9px}
+.plan li{display:flex;gap:9px;font-size:13px;line-height:1.45}
+.plan li svg{color:var(--accent);margin-top:1px}
+.plan .foot{margin-top:auto}
+.ribbon{align-self:flex-start;background:var(--accent-soft);color:var(--accent);font-size:11px;font-weight:700;padding:3px 9px;border-radius:6px;margin-bottom:8px}
+.rail.plans{grid-auto-columns:86%}
+.ck{display:block}
+.ckblk{background:var(--surface-1);border:1px solid var(--border);border-radius:14px;padding:16px;margin:0 0 14px}
+.ckblk h3{margin:0 0 12px;font-size:15px;font-weight:700}
+.pay{display:flex;align-items:center;gap:12px;padding:13px;border:1px solid var(--border);border-radius:12px;margin-bottom:10px}
+.pay.on{border:1.5px solid var(--accent);background:var(--accent-soft)}
+.pay .rd{width:18px;height:18px;border-radius:999px;border:1.5px solid var(--border);flex:0 0 18px}
+.pay.on .rd{border:5px solid var(--accent)}
+.sum{position:sticky;top:120px;background:var(--surface-1);border:1px solid var(--border);border-radius:16px;padding:18px}
+.sumrow{display:flex;justify-content:space-between;font-size:13px;padding:8px 0}
+.sumrow.tot{border-top:1px solid var(--divider);margin-top:8px;padding-top:12px;font-size:17px;font-weight:700}
+.cpn{display:flex;gap:8px;margin:12px 0}
+.cpn .f{flex:1;height:42px;border:1px solid var(--border);border-radius:10px;display:flex;align-items:center;padding:0 12px;font-size:13px;color:var(--ink-tertiary)}
+.usage{display:flex;justify-content:space-between;font-size:12px;color:var(--ink-tertiary)}
+.bar2{height:6px;border-radius:999px;background:var(--surface-3);margin:7px 0 14px;overflow:hidden}
+.bar2 i{display:block;height:100%;background:var(--accent)}
+.okwrap{max-width:560px;margin:0 auto;text-align:center;padding:40px 0}
+.okwrap .ring{width:86px;height:86px;border-radius:999px;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;margin:0 auto 18px}
+.newtab{display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:12px;background:var(--info-soft);font-size:13px;color:var(--ink-secondary);margin-top:14px}
+@container (min-width:768px){ .rail.plans{grid-auto-columns:calc(50% - 9px)} }
+@container (min-width:1200px){
+  .rail.plans{grid-auto-columns:calc(33.333% - 14px)}
+  .ck{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:28px;align-items:start}
+}
+</style>
+</head>
+<body>
+
+<div class="bar">
+  <b>18 · Plans &amp; checkout</b>
+  <div class="seg"><button data-dark aria-pressed="false">Dark</button></div>
+  <div class="sp"></div>
+  <span class="note">Real copy: Buy a plan to post your listing · My plan · Top up · View Plans · Expiry reminders ·
+  Download invoices · Payment history · GSTIN "For claiming input tax credit." · Net Banking · All major banks ·
+  Instant · Invalid or expired code · Payment confirmed · Still processing.</span>
+</div>
+
+<div class="stage">
+
+  <div>
+    <p class="caption">A · Plans — Desktop 1440 (a carousel of plans, current plan in the rail)</p>
+    <div class="scaler"><div class="frame" data-w="1440" style="width:1440px" data-tpl="plans"></div></div>
+  </div>
+
+  <div class="annot">
+    <h3>Decisions</h3>
+    <ul>
+      <li><b>Plans ride a carousel</b>, per the owner rule — three visible at 1440, two at tablet, and the
+      currently-active plan is pinned in the right rail so the seller compares against what they already have
+      instead of guessing.</li>
+      <li><b>The plan wall keeps its exact sentence.</b> "Buy a plan to post your listing" (and the project /
+      requirement variants) is what the app says when a slot runs out, and it stays word for word — this is a
+      commercial screen and rewriting it would change the product.</li>
+      <li><b>Checkout is content + sticky order summary.</b> Coupon, GSTIN and the method choice on the left;
+      the amount, GST and total pinned on the right, so the number is never scrolled off while a buyer thinks.</li>
+      <li><b>Razorpay opens in its own window — and the page says so.</b> The blue strip under the pay button
+      tells the buyer a payment window will open and that this page will keep waiting. Without that line, a
+      popup-blocked or manually-closed window looks like a failed payment. The app's "Still processing" and
+      "Payment confirmed" states are both kept.</li>
+      <li><b>My plan gets a usage bar</b> with the real counter and the app's own options — Top up ·
+      Download invoices · Payment history · Expiry reminders on/off · Contact support.</li>
+    </ul>
+  </div>
+
+  <div>
+    <p class="caption">B · Checkout — Desktop 1440</p>
+    <div class="scaler"><div class="frame" data-w="1440" style="width:1440px" data-tpl="checkout"></div></div>
+  </div>
+
+  <div>
+    <p class="caption">C · My plan + payment confirmed — Desktop 1440</p>
+    <div class="scaler"><div class="frame" data-w="1440" style="width:1440px" data-tpl="myplan"></div></div>
+  </div>
+
+  <div>
+    <p class="caption">D · Plans — Tablet 1024</p>
+    <div class="scaler"><div class="frame" data-w="1024" style="width:1024px" data-tpl="plans"></div></div>
+  </div>
+
+  <div>
+    <p class="caption">E · Checkout — Tablet 768</p>
+    <div class="scaler"><div class="frame" data-w="768" style="width:768px" data-tpl="checkout"></div></div>
+  </div>
+
+</div>
+
+<template id="tpl-plans">
+  <div class="app">
+    <div class="shell">
+      <div data-part="sidebar" data-active="My plan"></div>
+      <div class="mainwrap">
+        <div class="ctop"><div><h1>Plans</h1><div class="sub">Buy a plan to post your listing</div></div><div class="sp"></div>
+          <a class="btn" href="#">Payment history</a></div>
+        <div class="content">
+          <div class="cols">
+            <div>
+              <section class="sec carousel">
+                <div class="sechead"><div><h2 class="h2">For owners &amp; brokers</h2><div class="sub">GST included · valid 12 months</div></div><div class="sp"></div>
+                  <div class="arrows"><span class="arrow" aria-disabled="true"><svg class="i s16"><use href="#i-left"/></svg></span><span class="arrow"><svg class="i s16"><use href="#i-right"/></svg></span></div></div>
+                <div class="rail plans">
+                  <div class="plan">
+                    <div class="pn">Starter</div>
+                    <div class="pp">₹ 999</div>
+                    <div class="pd">per year</div>
+                    <ul>
+                      <li><svg class="i s16"><use href="#i-check"/></svg>5 listing slots</li>
+                      <li><svg class="i s16"><use href="#i-check"/></svg>Leads with buyer numbers</li>
+                      <li><svg class="i s16"><use href="#i-check"/></svg>Verified badge after ID check</li>
+                    </ul>
+                    <div class="foot"><a class="btn block" href="#">Choose Starter</a></div>
+                  </div>
+
+                  <div class="plan on">
+                    <span class="ribbon">CURRENT PLAN</span>
+                    <div class="pn">Owner Pro</div>
+                    <div class="pp">₹ 2,999</div>
+                    <div class="pd">per year</div>
+                    <ul>
+                      <li><svg class="i s16"><use href="#i-check"/></svg>25 listing slots</li>
+                      <li><svg class="i s16"><use href="#i-check"/></svg>Buyer requirements unlocked</li>
+                      <li><svg class="i s16"><use href="#i-check"/></svg>Boost eligible</li>
+                      <li><svg class="i s16"><use href="#i-check"/></svg>Priority review</li>
+                    </ul>
+                    <div class="foot"><a class="btn block" href="#">Renew · ₹ 2,999</a></div>
+                  </div>
+
+                  <div class="plan">
+                    <div class="pn">Requirements only</div>
+                    <div class="pp">₹ 2,999</div>
+                    <div class="pd">per year</div>
+                    <ul>
+                      <li><svg class="i s16"><use href="#i-check"/></svg>Browse every buyer requirement</li>
+                      <li><svg class="i s16"><use href="#i-check"/></svg>Instant match alerts for your areas</li>
+                      <li><svg class="i s16"><use href="#i-check"/></svg>Direct chat after acceptance</li>
+                    </ul>
+                    <div class="foot"><a class="btn block" href="#">Choose this</a></div>
+                  </div>
+
+                  <div class="plan">
+                    <div class="pn">Builder</div>
+                    <div class="pp">₹ 9,999</div>
+                    <div class="pd">per year</div>
+                    <ul>
+                      <li><svg class="i s16"><use href="#i-check"/></svg>7 project slots</li>
+                      <li><svg class="i s16"><use href="#i-check"/></svg>Unit inventory &amp; RERA fields</li>
+                      <li><svg class="i s16"><use href="#i-check"/></svg>Requirements included</li>
+                      <li><svg class="i s16"><use href="#i-check"/></svg>Featured Developers placement</li>
+                    </ul>
+                    <div class="foot"><a class="btn block" href="#">Choose Builder</a></div>
+                  </div>
+                </div>
+              </section>
+
+              <section class="sec carousel">
+                <div class="sechead"><div><h2 class="h2">Top up</h2><div class="sub">extra slots on your current plan</div></div><div class="sp"></div>
+                  <div class="arrows"><span class="arrow" aria-disabled="true"><svg class="i s16"><use href="#i-left"/></svg></span><span class="arrow"><svg class="i s16"><use href="#i-right"/></svg></span></div></div>
+                <div class="rail plans">
+                  <div class="plan"><div class="pn">+5 listing slots</div><div class="pp">₹ 499</div><div class="pd">one time</div><div class="foot"><a class="btn block" href="#">Top up</a></div></div>
+                  <div class="plan"><div class="pn">+10 listing slots</div><div class="pp">₹ 899</div><div class="pd">one time</div><div class="foot"><a class="btn block" href="#">Top up</a></div></div>
+                  <div class="plan"><div class="pn">+1 project slot</div><div class="pp">₹ 1,499</div><div class="pd">one time · builders</div><div class="foot"><a class="btn block" href="#">Top up</a></div></div>
+                </div>
+              </section>
+            </div>
+
+            <aside class="rail-side">
+              <div class="card pad">
+                <div class="h3" style="margin-bottom:10px">Your plan</div>
+                <b style="font-size:16px">Owner Pro</b>
+                <div class="muted" style="margin:2px 0 12px">Renews 14 Sep 2026</div>
+                <div class="usage"><span>Listing slots</span><span>12 / 25</span></div>
+                <div class="bar2"><i style="width:48%"></i></div>
+                <div class="usage"><span>Requirement posts</span><span>2 / 5</span></div>
+                <div class="bar2"><i style="width:40%"></i></div>
+                <a class="btn sm block" href="#">Manage plan</a>
+              </div>
+              <div class="card pad">
+                <div class="h3" style="margin-bottom:8px">Boost eligible</div>
+                <p class="muted" style="margin:0 0 10px">Owner Pro lets you boost any live listing. Boosts are billed separately.</p>
+                <a class="btn sm block" href="#">How boost works</a>
+              </div>
+            </aside>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div data-part="bnav" data-active="profile"></div>
+  </div>
+</template>
+
+<template id="tpl-checkout">
+  <div class="app">
+    <div class="shell">
+      <div data-part="sidebar" data-active="My plan"></div>
+      <div class="mainwrap">
+        <div class="ctop"><div><h1>Checkout</h1><div class="sub">Owner Pro · 12 months</div></div><div class="sp"></div></div>
+        <div class="content">
+          <div class="ck">
+            <div>
+              <div class="ckblk">
+                <h3>Payment method</h3>
+                <div class="pay on"><span class="rd"></span><span style="flex:1"><b style="font-size:14px">UPI</b><div class="muted">Instant</div></span><svg class="i s24" style="color:var(--ink-tertiary)"><use href="#i-phone"/></svg></div>
+                <div class="pay"><span class="rd"></span><span style="flex:1"><b style="font-size:14px">Card</b><div class="muted">Credit or debit</div></span><svg class="i s24" style="color:var(--ink-tertiary)"><use href="#i-card"/></svg></div>
+                <div class="pay"><span class="rd"></span><span style="flex:1"><b style="font-size:14px">Net Banking</b><div class="muted">All major banks</div></span><svg class="i s24" style="color:var(--ink-tertiary)"><use href="#i-building"/></svg></div>
+              </div>
+
+              <div class="ckblk">
+                <h3>GSTIN <span class="muted" style="font-weight:400">(optional)</span></h3>
+                <div style="height:44px;border:1px solid var(--border);border-radius:10px;background:var(--surface-2);display:flex;align-items:center;padding:0 13px;font-size:14px;color:var(--ink-tertiary)">24ABCDE1234F1Z5</div>
+                <p class="muted" style="margin:9px 0 0">For claiming input tax credit.</p>
+              </div>
+
+              <div class="ckblk">
+                <h3>Billing</h3>
+                <div style="display:flex;justify-content:space-between;font-size:13px;padding:9px 0;border-bottom:1px solid var(--divider)"><span class="muted">Name</span><b>Rajan Patel</b></div>
+                <div style="display:flex;justify-content:space-between;font-size:13px;padding:9px 0;border-bottom:1px solid var(--divider)"><span class="muted">Email</span><b>rajan@example.com</b></div>
+                <div style="display:flex;justify-content:space-between;font-size:13px;padding:9px 0"><span class="muted">Invoice</span><b>Emailed after payment</b></div>
+              </div>
+            </div>
+
+            <aside>
+              <div class="sum">
+                <div class="h3" style="margin-bottom:10px">Order summary</div>
+                <div class="sumrow"><span class="muted">Owner Pro · 12 months</span><span>₹ 2,541</span></div>
+                <div class="sumrow"><span class="muted">GST (18%)</span><span>₹ 458</span></div>
+                <div class="cpn">
+                  <span class="f">Coupon code</span>
+                  <a class="btn sm" href="#">Apply</a>
+                </div>
+                <div class="sumrow" style="color:var(--accent)"><span>WELCOME10 applied</span><span>– ₹ 254</span></div>
+                <div class="sumrow tot"><span>Total</span><span>₹ 2,745</span></div>
+                <a class="btn pri block" href="#" style="margin-top:14px;height:46px">Pay ₹ 2,745</a>
+                <div class="newtab">
+                  <svg class="i s18" style="color:var(--info)"><use href="#i-alert"/></svg>
+                  <span>A secure payment window opens in a new tab. Keep this page open — it confirms automatically.</span>
+                </div>
+                <p class="muted" style="margin:12px 0 0;text-align:center">Invalid or expired codes are rejected before payment.</p>
+              </div>
+            </aside>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div data-part="bnav" data-active="profile"></div>
+  </div>
+</template>
+
+<template id="tpl-myplan">
+  <div class="app">
+    <div class="shell">
+      <div data-part="sidebar" data-active="My plan"></div>
+      <div class="mainwrap">
+        <div class="ctop"><div><h1>My plan</h1><div class="sub">Owner Pro · renews 14 Sep 2026</div></div><div class="sp"></div>
+          <a class="btn" href="#">View Plans</a><a class="btn pri" href="#">Top up</a></div>
+        <div class="content">
+          <div class="okwrap">
+            <div class="ring"><svg class="i s32"><use href="#i-check"/></svg></div>
+            <h2 style="margin:0;font-size:22px;font-weight:700">Payment confirmed</h2>
+            <p style="margin:10px 0 0;color:var(--ink-secondary);font-size:14px">₹ 2,745 paid · Owner Pro is active until 14 Sep 2026. Your invoice has been emailed.</p>
+            <div style="display:flex;gap:10px;justify-content:center;margin-top:20px;flex-wrap:wrap">
+              <a class="btn pri" href="#">Go to Dashboard</a>
+              <a class="btn" href="#"><svg class="i s16"><use href="#i-download"/></svg>Download invoice</a>
+            </div>
+          </div>
+
+          <div class="cols">
+            <div>
+              <div class="ckblk">
+                <h3>Plan usage</h3>
+                <div class="usage"><span>Listing slots</span><span>12 / 25</span></div>
+                <div class="bar2"><i style="width:48%"></i></div>
+                <div class="usage"><span>Requirement posts</span><span>2 / 5</span></div>
+                <div class="bar2"><i style="width:40%"></i></div>
+                <div class="usage"><span>Boost credits</span><span>2 running</span></div>
+                <div class="bar2"><i style="width:25%"></i></div>
+              </div>
+
+              <div class="ckblk">
+                <h3>Options</h3>
+                <div style="display:flex;align-items:center;justify-content:space-between;padding:11px 0;border-bottom:1px solid var(--divider);font-size:13px">
+                  Expiry reminders<span style="width:38px;height:22px;border-radius:999px;background:var(--accent);position:relative"><span style="position:absolute;top:3px;left:19px;width:16px;height:16px;border-radius:999px;background:#fff"></span></span>
+                </div>
+                <div style="display:flex;align-items:center;justify-content:space-between;padding:11px 0;border-bottom:1px solid var(--divider);font-size:13px">
+                  Email invoices to me<span style="width:38px;height:22px;border-radius:999px;background:var(--accent);position:relative"><span style="position:absolute;top:3px;left:19px;width:16px;height:16px;border-radius:999px;background:#fff"></span></span>
+                </div>
+                <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap">
+                  <a class="btn sm" href="#"><svg class="i s16"><use href="#i-download"/></svg>Download invoices</a>
+                  <a class="btn sm" href="#">Payment history</a>
+                  <a class="btn sm ghost" href="#">Contact support</a>
+                </div>
+              </div>
+            </div>
+
+            <aside class="rail-side">
+              <div class="card pad">
+                <div class="h3" style="margin-bottom:8px">Next renewal</div>
+                <b style="font-size:20px">₹ 2,999</b>
+                <div class="muted" style="margin-top:2px">on 14 Sep 2026</div>
+                <a class="btn sm block" href="#" style="margin-top:12px">Change plan</a>
+              </div>
+              <div class="card pad">
+                <div class="h3" style="margin-bottom:8px">Need more slots?</div>
+                <p class="muted" style="margin:0 0 10px">Top up without changing your renewal date.</p>
+                <a class="btn pri sm block" href="#">Top up</a>
+              </div>
+            </aside>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div data-part="bnav" data-active="profile"></div>
+  </div>
+</template>
+
+<script src="_kit.js"></script>
+</body>
+</html>

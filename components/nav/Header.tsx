@@ -21,14 +21,20 @@ export function Header({ left, title, centerTitle, right, sticky = true, border 
   return (
     <header
       className={cn(
-        "chrome z-header mx-auto w-full max-w-column bg-surface-1",
+        // `md:max-w-none` releases the 470px lock at 768+ (00-SPEC.md §1). The
+        // unprefixed classes are the mobile app and are untouched.
+        "chrome z-header mx-auto w-full max-w-column bg-surface-1 md:max-w-none",
         sticky && "sticky top-0",
         border && "border-b border-border",
         "pt-[env(safe-area-inset-top)]",
         className,
       )}
     >
-      <div className="relative flex h-header items-center gap-2 px-4">
+      {/* At md+ this row takes the console top bar's proportions from
+          01-shell.html — 64px / 68px at 1200 / 40px gutter at 1600, and a 20px
+          bold title. Same element, same slots: every screen keeps the actions
+          it renders into `left` and `right`, so nothing loses a control. */}
+      <div className="relative flex h-header items-center gap-2 px-4 md:h-16 md:px-5 lg:h-[68px] lg:px-7 xl:px-10">
         {left && <div className="flex items-center">{left}</div>}
         {title && (
           <div
@@ -39,7 +45,7 @@ export function Header({ left, title, centerTitle, right, sticky = true, border 
                 : "flex-1",
             )}
           >
-            <div className="truncate text-17 font-semibold text-ink-primary">{title}</div>
+            <div className="truncate text-17 font-semibold text-ink-primary md:text-20 md:font-bold md:tracking-[-0.01em]">{title}</div>
           </div>
         )}
         {!title && <div className="flex-1" />}

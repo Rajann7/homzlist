@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>HomzList — 10 · Dashboard (desktop + tablet)</title>
+<link rel="stylesheet" href="_kit.css" />
+<style>
+.tile{display:flex;gap:12px;padding:15px;border-radius:14px;background:var(--surface-1);border:1px solid var(--border)}
+.tile .ic{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;flex:0 0 38px}
+.tile .lb{font-size:14px;font-weight:600;line-height:1.25}
+.tile .sb{font-size:12px;color:var(--ink-tertiary);margin-top:2px}
+.tile .ct{margin-left:auto;align-self:flex-start;min-width:22px;height:20px;padding:0 7px;border-radius:999px;background:var(--accent-soft);color:var(--accent);font-size:11px;font-weight:700;display:grid;place-items:center}
+.tile .ct.urgent{background:var(--ink-primary);color:var(--ink-inverse)}
+.t-green{background:var(--accent-soft);color:var(--tone-green)}
+.t-amber{background:var(--warning-soft);color:var(--tone-amber)}
+.t-blue{background:var(--info-soft);color:var(--tone-blue)}
+.t-violet{background:#f3ecfd;color:var(--tone-violet)}
+.t-teal{background:#e3f4f2;color:var(--tone-teal)}
+.t-pink{background:#fdeaf1;color:var(--tone-pink)}
+.t-indigo{background:#ecebfd;color:var(--tone-indigo)}
+.t-cyan{background:#e2f2f6;color:var(--tone-cyan)}
+.t-orange{background:#fdeee5;color:var(--tone-orange)}
+.dark .t-violet,.dark .t-teal,.dark .t-pink,.dark .t-indigo,.dark .t-cyan,.dark .t-orange{background:var(--surface-3)}
+.rail.tiles{grid-auto-columns:80%}
+.greet{margin:0 0 4px;font-size:24px;font-weight:700;letter-spacing:-.02em}
+.greetsub{margin:0 0 20px;font-size:14px;color:var(--ink-secondary)}
+.kpi{display:flex;border:1px solid var(--border);border-radius:14px;overflow:hidden;background:var(--surface-1);margin-bottom:22px;flex-wrap:wrap}
+.kpi div{flex:1;min-width:130px;padding:15px 12px;border-right:1px solid var(--divider)}
+.kpi div:last-child{border-right:0}
+.kpi b{display:block;font-size:22px;font-weight:700;letter-spacing:-.01em}
+.kpi span{font-size:12px;color:var(--ink-tertiary)}
+.lrow{display:flex;align-items:center;gap:11px;padding:12px 0;border-bottom:1px solid var(--divider)}
+.lrow:last-child{border-bottom:0}
+@container (min-width:768px){ .rail.tiles{grid-auto-columns:calc(50% - 9px)} .greet{font-size:26px} }
+@container (min-width:1200px){ .rail.tiles{grid-auto-columns:calc(33.333% - 14px)} }
+</style>
+</head>
+<body>
+
+<div class="bar">
+  <b>10 · Dashboard</b>
+  <div class="seg"><button data-dark aria-pressed="false">Dark</button></div>
+  <div class="sp"></div>
+  <span class="note">The nine destinations, groups, subtitles, tones and urgent flags are
+  <code>lib/dashboard/items.ts</code> verbatim — Inventory · Requirements · Billing &amp; growth. Deliberately
+  not role-filtered, exactly as that file's comment requires.</span>
+</div>
+
+<div class="stage">
+
+  <div>
+    <p class="caption">A · Desktop 1440 — owner</p>
+    <div class="scaler"><div class="frame" data-w="1440" style="width:1440px" data-tpl="dash"></div></div>
+  </div>
+
+  <div class="annot">
+    <h3>Decisions</h3>
+    <ul>
+      <li><b>The hub sheet becomes the page.</b> On mobile the nine tiles live in a sheet behind the feed
+      header's grid icon. On desktop the sidebar already carries them as links, so this page does the thing a
+      sheet cannot: it puts the numbers <i>in front</i> of the tiles — Views, Leads, Live listings, Plan usage
+      — and keeps the tiles as the way through.</li>
+      <li><b>Tiles ride carousels, one per group</b>, keeping the app's own grouping and order.</li>
+      <li><b>The right rail carries what the seller checks daily</b>: plan usage with the real counter,
+      recent leads with the same "waiting on you" emphasis, and the boost state.</li>
+      <li><b>Builder variant.</b> A builder's dashboard is their home (they have no public browsing), so the
+      same page leads with projects instead of listings — the tiles themselves stay unfiltered because the
+      server gates by entitlement, not role.</li>
+    </ul>
+  </div>
+
+  <div>
+    <p class="caption">B · Desktop 1440 — builder (projects lead; Search absent from the sidebar)</p>
+    <div class="scaler"><div class="frame" data-w="1440" style="width:1440px" data-tpl="builder"></div></div>
+  </div>
+
+  <div>
+    <p class="caption">C · Tablet 1024</p>
+    <div class="scaler"><div class="frame" data-w="1024" style="width:1024px" data-tpl="dash"></div></div>
+  </div>
+
+  <div>
+    <p class="caption">D · Tablet 768</p>
+    <div class="scaler"><div class="frame" data-w="768" style="width:768px" data-tpl="dash"></div></div>
+  </div>
+
+</div>
+
+<template id="tpl-dash">
+  <div class="app">
+    <div class="shell">
+      <div data-part="sidebar" data-active="Dashboard"></div>
+      <div class="mainwrap">
+        <div class="ctop"><div><h1>Dashboard</h1><div class="sub">Everything on your account, in one place</div></div><div class="sp"></div>
+          <span class="hicon"><svg class="i s24"><use href="#i-help"/></svg></span>
+          <span class="hicon"><svg class="i s24"><use href="#i-bell"/></svg><span class="badge">3</span></span>
+          <a class="btn pri" href="#"><svg class="i s16"><use href="#i-plus-b"/></svg>Post property</a></div>
+
+        <div class="content">
+          <div class="cols">
+            <div>
+              <h2 class="greet">Good morning, Rajan</h2>
+              <p class="greetsub">3 new leads and 1 visit are waiting on you.</p>
+
+              <div class="kpi">
+                <div><b>12</b><span>Live listings</span></div>
+                <div><b>1,847</b><span>Views · 30 days</span></div>
+                <div><b>3</b><span>New leads</span></div>
+                <div><b>1</b><span>Visit coming up</span></div>
+                <div><b>2</b><span>Boosts running</span></div>
+              </div>
+
+              <section class="sec carousel">
+                <div class="sechead"><h2 class="h2">Inventory</h2><div class="sp"></div>
+                  <div class="arrows"><span class="arrow" aria-disabled="true"><svg class="i s16"><use href="#i-left"/></svg></span><span class="arrow"><svg class="i s16"><use href="#i-right"/></svg></span></div>
+                  <a class="link" href="#">My Listings</a></div>
+                <div class="rail tiles">
+                  <a class="tile" href="#"><span class="ic t-green"><svg class="i"><use href="#i-home"/></svg></span><span><span class="lb">My Listings</span><span class="sb">Live right now</span></span><span class="ct">12</span></a>
+                  <a class="tile" href="#"><span class="ic t-amber"><svg class="i"><use href="#i-filter"/></svg></span><span><span class="lb">Leads</span><span class="sb">New enquiries</span></span><span class="ct urgent">3</span></a>
+                  <a class="tile" href="#"><span class="ic t-blue"><svg class="i"><use href="#i-search"/></svg></span><span><span class="lb">Browse requirements</span><span class="sb">Buyers looking now</span></span><span class="ct">24</span></a>
+                </div>
+              </section>
+
+              <section class="sec carousel">
+                <div class="sechead"><h2 class="h2">Requirements</h2><div class="sp"></div>
+                  <div class="arrows"><span class="arrow" aria-disabled="true"><svg class="i s16"><use href="#i-left"/></svg></span><span class="arrow"><svg class="i s16"><use href="#i-right"/></svg></span></div></div>
+                <div class="rail tiles">
+                  <a class="tile" href="#"><span class="ic t-violet"><svg class="i"><use href="#i-file"/></svg></span><span><span class="lb">My requirements</span><span class="sb">Live right now</span></span><span class="ct">2</span></a>
+                  <a class="tile" href="#"><span class="ic t-teal"><svg class="i"><use href="#i-send"/></svg></span><span><span class="lb">My proposals</span><span class="sb">Awaiting a reply</span></span><span class="ct">5</span></a>
+                  <a class="tile" href="#"><span class="ic t-pink"><svg class="i"><use href="#i-pin"/></svg></span><span><span class="lb">My visits</span><span class="sb">Coming up</span></span><span class="ct urgent">1</span></a>
+                </div>
+              </section>
+
+              <section class="sec carousel">
+                <div class="sechead"><h2 class="h2">Billing &amp; growth</h2><div class="sp"></div>
+                  <div class="arrows"><span class="arrow" aria-disabled="true"><svg class="i s16"><use href="#i-left"/></svg></span><span class="arrow"><svg class="i s16"><use href="#i-right"/></svg></span></div></div>
+                <div class="rail tiles">
+                  <a class="tile" href="#"><span class="ic t-indigo"><svg class="i"><use href="#i-card"/></svg></span><span><span class="lb">My plan</span><span class="sb">Plan and renewal</span></span></a>
+                  <a class="tile" href="#"><span class="ic t-cyan"><svg class="i"><use href="#i-receipt"/></svg></span><span><span class="lb">Payments</span><span class="sb">Invoices and history</span></span></a>
+                  <a class="tile" href="#"><span class="ic t-orange"><svg class="i"><use href="#i-rocket"/></svg></span><span><span class="lb">Boosts</span><span class="sb">Running now</span></span><span class="ct">2</span></a>
+                </div>
+              </section>
+
+              <section class="sec carousel">
+                <div class="sechead"><div><h2 class="h2">Your listings</h2><div class="sub">most viewed this week</div></div><div class="sp"></div>
+                  <div class="arrows"><span class="arrow" aria-disabled="true"><svg class="i s16"><use href="#i-left"/></svg></span><span class="arrow"><svg class="i s16"><use href="#i-right"/></svg></span></div>
+                  <a class="link" href="#">View all</a></div>
+                <div class="rail">
+                  <div class="pcard"><div class="shot ph" data-l="PHOTO"></div><div class="ttl">₹ 62 Lakh</div><div class="sub">2 BHK Flat · Vesu</div><div class="facts"><span>412 views</span><span>·</span><span>6 leads</span></div></div>
+                  <div class="pcard"><div class="shot ph" data-l="PHOTO"></div><div class="ttl">₹ 24,000 / mo</div><div class="sub">2 BHK Flat · Piplod</div><div class="facts"><span>288 views</span><span>·</span><span>3 leads</span></div></div>
+                  <div class="pcard"><div class="shot ph" data-l="PHOTO"></div><div class="ttl">₹ 38 Lakh</div><div class="sub">Plot · Pal</div><div class="facts"><span>176 views</span><span>·</span><span>1 lead</span></div></div>
+                  <div class="pcard"><div class="shot ph" data-l="PHOTO"></div><div class="ttl">₹ 78 Lakh</div><div class="sub">3 BHK Flat · Katargam</div><div class="facts"><span>154 views</span></div></div>
+                </div>
+              </section>
+            </div>
+
+            <aside class="rail-side">
+              <div class="card pad">
+                <div class="h3" style="margin-bottom:10px">Owner Pro</div>
+                <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--ink-tertiary)"><span>Listings used</span><span>12 / 25</span></div>
+                <div style="height:6px;border-radius:999px;background:var(--surface-3);margin:7px 0 12px;overflow:hidden"><span style="display:block;width:48%;height:100%;background:var(--accent)"></span></div>
+                <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--ink-tertiary)"><span>Renews</span><span style="color:var(--ink-primary);font-weight:600">14 Sep 2026</span></div>
+                <a class="btn block sm" href="#" style="margin-top:12px">Manage plan</a>
+              </div>
+
+              <div class="card pad">
+                <div style="display:flex;align-items:center;margin-bottom:6px"><div class="h3">Leads waiting</div><div style="flex:1"></div><span class="tag err">3</span></div>
+                <div class="lrow"><span class="avatar" style="background:var(--avatar-1);width:30px;height:30px;font-size:12px">A</span><span style="flex:1;min-width:0"><b style="font-size:13px">Amit R.</b><br><span class="muted">Wants 2 BHK · Vesu</span></span><span class="muted">2h</span></div>
+                <div class="lrow"><span class="avatar" style="background:var(--avatar-5);width:30px;height:30px;font-size:12px">N</span><span style="flex:1;min-width:0"><b style="font-size:13px">Nisha P.</b><br><span class="muted">Visit requested</span></span><span class="muted">5h</span></div>
+                <div class="lrow"><span class="avatar" style="background:var(--avatar-7);width:30px;height:30px;font-size:12px">K</span><span style="flex:1;min-width:0"><b style="font-size:13px">Kunal S.</b><br><span class="muted">Asked for number</span></span><span class="muted">1d</span></div>
+                <a class="btn sm block" href="#" style="margin-top:10px">Open Leads</a>
+              </div>
+
+              <div class="card pad">
+                <div class="h3" style="margin-bottom:10px">Quick actions</div>
+                <div style="display:grid;gap:8px">
+                  <a class="btn sm block" href="#"><svg class="i s16"><use href="#i-plus-b"/></svg>Post a property</a>
+                  <a class="btn sm block" href="#"><svg class="i s16"><use href="#i-rocket"/></svg>Boost a listing</a>
+                  <a class="btn sm block" href="#"><svg class="i s16"><use href="#i-file"/></svg>Post a requirement</a>
+                </div>
+              </div>
+            </aside>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div data-part="bnav" data-active="home"></div>
+  </div>
+</template>
+
+<template id="tpl-builder">
+  <div class="app">
+    <div class="shell">
+      <aside class="side">
+        <div class="side-top"><span class="wordmark">Homz<i>List</i></span></div>
+        <div class="side-nav">
+          <div class="side-group"><a href="#"><span class="ic"><svg class="i"><use href="#i-home"/></svg></span><span class="lbl">Home</span></a></div>
+          <div class="side-group"><h4>Inventory</h4>
+            <a href="#" aria-current="page"><span class="ic"><svg class="i"><use href="#i-grid"/></svg></span><span class="lbl">Dashboard</span></a>
+            <a href="#"><span class="ic"><svg class="i"><use href="#i-building"/></svg></span><span class="lbl">My Projects</span><span class="cnt soft">6</span></a>
+            <a href="#"><span class="ic"><svg class="i"><use href="#i-filter"/></svg></span><span class="lbl">Leads</span><span class="cnt">7</span></a>
+          </div>
+          <div class="side-group"><h4>Requirements</h4>
+            <a href="#"><span class="ic"><svg class="i"><use href="#i-search"/></svg></span><span class="lbl">Browse requirements</span><span class="cnt soft">24</span></a>
+            <a href="#"><span class="ic"><svg class="i"><use href="#i-send"/></svg></span><span class="lbl">My proposals</span><span class="cnt soft">9</span></a>
+            <a href="#"><span class="ic"><svg class="i"><use href="#i-pin"/></svg></span><span class="lbl">My visits</span><span class="cnt">2</span></a>
+          </div>
+          <div class="side-group"><h4>Billing &amp; growth</h4>
+            <a href="#"><span class="ic"><svg class="i"><use href="#i-card"/></svg></span><span class="lbl">My plan</span></a>
+            <a href="#"><span class="ic"><svg class="i"><use href="#i-receipt"/></svg></span><span class="lbl">Payments</span></a>
+            <a href="#"><span class="ic"><svg class="i"><use href="#i-rocket"/></svg></span><span class="lbl">Boosts</span><span class="cnt soft">1</span></a>
+          </div>
+          <div class="side-group"><h4>You</h4>
+            <a href="#"><span class="ic"><svg class="i"><use href="#i-clock"/></svg></span><span class="lbl">Your activity</span></a>
+            <a href="#"><span class="ic"><svg class="i"><use href="#i-help"/></svg></span><span class="lbl">Help</span></a>
+            <a href="#"><span class="ic"><svg class="i"><use href="#i-settings"/></svg></span><span class="lbl">Settings</span></a>
+          </div>
+        </div>
+        <div class="side-foot"><a class="side-user" href="#"><span class="avatar" style="background:var(--avatar-1)">S</span>
+          <span style="min-width:0"><span class="nm">Shreeji Group</span><br><span class="rl">Builder · RERA verified</span></span></a></div>
+      </aside>
+
+      <div class="mainwrap">
+        <div class="ctop"><div><h1>Dashboard</h1><div class="sub">Builder account · 6 live projects</div></div><div class="sp"></div>
+          <span class="hicon"><svg class="i s24"><use href="#i-bell"/></svg><span class="badge">7</span></span>
+          <a class="btn pri" href="#"><svg class="i s16"><use href="#i-plus-b"/></svg>New project</a></div>
+
+        <div class="content">
+          <div class="cols">
+            <div>
+              <h2 class="greet">Good morning, Shreeji Group</h2>
+              <p class="greetsub">7 new leads across 6 projects. 1 project slot left.</p>
+
+              <div class="kpi">
+                <div><b>6</b><span>Live projects</span></div>
+                <div><b>218</b><span>Units available</span></div>
+                <div><b>7</b><span>New leads</span></div>
+                <div><b>2</b><span>Site visits</span></div>
+              </div>
+
+              <section class="sec carousel">
+                <div class="sechead"><div><h2 class="h2">Your projects</h2><div class="sub">most viewed this week</div></div><div class="sp"></div>
+                  <div class="arrows"><span class="arrow" aria-disabled="true"><svg class="i s16"><use href="#i-left"/></svg></span><span class="arrow"><svg class="i s16"><use href="#i-right"/></svg></span></div>
+                  <a class="link" href="#">View all</a></div>
+                <div class="rail">
+                  <div class="pcard"><div class="shot ph" data-l="PROJECT"></div><div class="ttl">Shreeji Heights</div><div class="sub">Vesu · 41 of 96 available</div><div class="facts"><span>2,140 views</span><span>·</span><span>34 leads</span></div></div>
+                  <div class="pcard"><div class="shot ph" data-l="PROJECT"></div><div class="ttl">Shreeji Aura</div><div class="sub">Adajan · 22 of 60 available</div><div class="facts"><span>1,320 views</span><span>·</span><span>18 leads</span></div></div>
+                  <div class="pcard"><div class="shot ph" data-l="PROJECT"></div><div class="ttl">Shreeji Elite</div><div class="sub">Pal · 64 of 120 available</div><div class="facts"><span>980 views</span><span>·</span><span>9 leads</span></div></div>
+                  <div class="pcard"><div class="shot ph" data-l="PROJECT"></div><div class="ttl">Shreeji Vista</div><div class="sub">Athwa · 12 of 40 available</div><div class="facts"><span>640 views</span></div></div>
+                </div>
+              </section>
+
+              <section class="sec carousel">
+                <div class="sechead"><h2 class="h2">Inventory</h2><div class="sp"></div>
+                  <div class="arrows"><span class="arrow" aria-disabled="true"><svg class="i s16"><use href="#i-left"/></svg></span><span class="arrow"><svg class="i s16"><use href="#i-right"/></svg></span></div></div>
+                <div class="rail tiles">
+                  <a class="tile" href="#"><span class="ic t-green"><svg class="i"><use href="#i-building"/></svg></span><span><span class="lb">My Projects</span><span class="sb">Live right now</span></span><span class="ct">6</span></a>
+                  <a class="tile" href="#"><span class="ic t-amber"><svg class="i"><use href="#i-filter"/></svg></span><span><span class="lb">Leads</span><span class="sb">New enquiries</span></span><span class="ct urgent">7</span></a>
+                  <a class="tile" href="#"><span class="ic t-blue"><svg class="i"><use href="#i-search"/></svg></span><span><span class="lb">Browse requirements</span><span class="sb">Buyers looking now</span></span><span class="ct">24</span></a>
+                </div>
+              </section>
+            </div>
+
+            <aside class="rail-side">
+              <div class="card pad">
+                <div class="h3" style="margin-bottom:10px">Builder plan</div>
+                <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--ink-tertiary)"><span>Project slots used</span><span>6 / 7</span></div>
+                <div style="height:6px;border-radius:999px;background:var(--surface-3);margin:7px 0 12px;overflow:hidden"><span style="display:block;width:86%;height:100%;background:var(--warning)"></span></div>
+                <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--ink-tertiary)"><span>Renews</span><span style="color:var(--ink-primary);font-weight:600">02 Nov 2026</span></div>
+                <a class="btn block sm" href="#" style="margin-top:12px">Manage plan</a>
+              </div>
+              <div class="card pad">
+                <div class="h3" style="margin-bottom:8px">RERA</div>
+                <p class="muted" style="margin:0 0 10px">All 6 projects carry a verified RERA number.</p>
+                <span class="tag ok">Verified</span>
+              </div>
+            </aside>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div data-part="bnav" data-active="home"></div>
+  </div>
+</template>
+
+<script src="_kit.js"></script>
+</body>
+</html>

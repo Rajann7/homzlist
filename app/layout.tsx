@@ -38,8 +38,10 @@ export async function generateMetadata(): Promise<Metadata> {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1, // prevent zoom-jank on inputs; app is a native-feel PWA
-  userScalable: false,
+  // `maximumScale: 1` / `userScalable: false` were here to stop zoom-jank on
+  // inputs in the PWA. They also block pinch and browser zoom on desktop, which
+  // is an accessibility failure once the app is a desktop product — so they are
+  // dropped (00-SPEC.md §5, the one deliberate exception in that section).
   viewportFit: "cover", // enable env(safe-area-inset-*) on notched devices
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#ffffff" },

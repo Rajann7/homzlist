@@ -1,0 +1,1034 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>HomzList — Home · Desktop + Tablet SAMPLE</title>
+<style>
+/* ==========================================================================
+   HomzList — Home page · Desktop + Tablet SAMPLE  (proposal only, no code)
+   ------------------------------------------------------------------------
+   Built FROM the live mobile home page (http://localhost:3000, read on
+   12 Aug 2026), not from the reference screenshot. Every section title,
+   subtitle, count, badge, price, facts strip, poster line and footer link
+   below is what the running app actually rendered, so the composition is
+   being judged against real content lengths rather than invented ones.
+
+   Real section order on home:
+     top picks → newly-added properties → featured developers →
+     featured brokers → featured properties → sell CTA → news → footer
+
+   · Mobile is NOT part of this proposal. The 390 frame is a schematic of the
+     existing screen, drawn only so the recomposition can be read against it.
+   · Tokens copied verbatim from app/globals.css (Doc1). No new colours.
+   · Layout switches on CONTAINER QUERIES over the device frame, so the frame
+     width behaves exactly like a real viewport width.
+   ========================================================================== */
+
+/* ---------- Doc1 tokens (verbatim from app/globals.css) ---------- */
+:root{
+  --bg-page:#ffffff; --bg-page-desktop:#fafafa;
+  --surface-1:#ffffff; --surface-2:#f5f5f5; --surface-3:#efefef;
+  --border:#dbdbdb; --divider:#efefef;
+  --ink-primary:#111111; --ink-secondary:#555555; --ink-tertiary:#6e6e6e;
+  --ink-disabled:#c7c7c7; --ink-inverse:#ffffff;
+  --accent:#0f9d58; --accent-pressed:#0c7c46; --accent-soft:#e6f4ec; --on-accent:#ffffff;
+  --avatar-1:#1565c0; --avatar-2:#0b7a43; --avatar-3:#ad1457; --avatar-4:#6a1b9a;
+  --avatar-5:#00695c; --avatar-6:#c62828; --avatar-7:#4527a0; --avatar-8:#d84315;
+  --error:#ed4956; --warning:#f5a623; --info:#0095f6;
+  --ring-unseen-grad:linear-gradient(45deg,var(--accent),var(--warning));
+  color-scheme:light;
+}
+.dark{
+  --bg-page:#000000; --bg-page-desktop:#000000;
+  --surface-1:#121212; --surface-2:#1e1e1e; --surface-3:#262626;
+  --border:#363636; --divider:#262626;
+  --ink-primary:#f5f5f5; --ink-secondary:#b0b0b0; --ink-tertiary:#8e8e8e;
+  --accent:#1db868; --accent-pressed:#17a05a; --accent-soft:#0e2b1c; --on-accent:#06180f;
+  --warning:#ffb74d; --info:#3ba7f8; --error:#ff5c6a;
+  color-scheme:dark;
+}
+
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  background:#e8eaed;color:var(--ink-primary)}
+body.dark{background:#0a0a0a}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+
+/* ================= sample chrome (NOT part of the design) ================= */
+.bar{position:sticky;top:0;z-index:50;display:flex;flex-wrap:wrap;gap:12px;align-items:center;
+  padding:10px 16px;background:#1c1f23;color:#fff}
+.bar b{font-size:13px}
+.bar .sp{flex:1}
+.seg{display:flex;background:#2b2f35;border-radius:999px;padding:3px;gap:2px}
+.seg button{padding:6px 12px;border-radius:999px;font-size:12px;font-weight:600;color:#c3c8d0}
+.seg button[aria-pressed="true"]{background:#fff;color:#111}
+.note{font-size:11px;color:#9aa1ab}
+.stage{padding:22px 16px 60px;display:flex;justify-content:center}
+.scaler{transform-origin:top center}
+.frame{
+  container-type:inline-size;background:var(--bg-page-desktop);
+  /* OUTLINE, not border: a border shrinks the content box by 2px and the
+     container queries (which measure the content box) miss 1600/1200/768. */
+  outline:1px solid rgba(0,0,0,.18);border-radius:14px;overflow:hidden;
+  box-shadow:0 18px 50px rgba(0,0,0,.22)
+}
+.caption{margin:0 0 10px;font-size:12px;font-weight:600;color:#5b6069;text-align:center}
+
+/* ================= shared primitives ================= */
+.app{background:var(--bg-page);min-height:600px;padding-bottom:64px}
+.wrap{width:100%;margin:0 auto;padding:0 16px}
+.wm{font-size:21px;font-weight:800;letter-spacing:-.5px;white-space:nowrap}
+.wm i{font-style:normal;color:var(--accent)}
+svg{fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.ico{display:inline-grid;place-items:center;width:40px;height:40px;border-radius:999px;position:relative}
+.ico svg{width:23px;height:23px}
+.ico .dot{position:absolute;top:5px;right:5px;min-width:16px;height:16px;padding:0 4px;border-radius:999px;
+  background:var(--error);color:#fff;font-size:10px;font-weight:700;display:grid;place-items:center}
+.chipbtn{display:inline-flex;align-items:center;gap:5px;background:var(--surface-2);border-radius:999px;
+  padding:7px 12px;font-size:13px;font-weight:600;white-space:nowrap}
+.chipbtn svg{width:15px;height:15px}
+.chipbtn .pin{color:var(--accent)}
+.chipbtn .cv{color:var(--ink-tertiary);width:14px;height:14px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;border-radius:8px;padding:0 16px;
+  height:40px;font-size:13px;font-weight:600;white-space:nowrap}
+.btn.primary{background:var(--accent);color:var(--on-accent)}
+.btn.outline{border:1px solid var(--border);color:var(--ink-primary);background:var(--surface-1)}
+.btn svg{width:16px;height:16px;stroke-width:2}
+.search{display:flex;align-items:center;gap:10px;background:var(--surface-2);border:1px solid transparent;
+  border-radius:999px;height:42px;padding:0 16px;color:var(--ink-tertiary);font-size:14px;min-width:0}
+.search svg{width:18px;height:18px;flex:none}
+.search span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* photo placeholders — sample only; real covers come from R2 */
+.photo{position:relative;background:var(--surface-3);overflow:hidden}
+.photo::after{content:"";position:absolute;inset:0;background:linear-gradient(140deg,var(--p1),var(--p2))}
+.p-a{--p1:#c8b6a6;--p2:#7d6b5d}.p-b{--p1:#a8c3d6;--p2:#5b7a91}
+.p-c{--p1:#cfd8c5;--p2:#7d8f6b}.p-d{--p1:#d9c3b0;--p2:#8a6f58}
+.p-e{--p1:#b9c6d9;--p2:#67788f}.p-f{--p1:#d8cbb8;--p2:#93815f}
+.p-g{--p1:#bcd2c6;--p2:#5f8676}.p-h{--p1:#d3c0c9;--p2:#816274}
+.p-i{--p1:#c6cdd8;--p2:#6d788a}.p-j{--p1:#d5cdb9;--p2:#8b8360}
+
+/* card chrome — mirrors components/feed/cardChrome.tsx */
+.ovchip{display:inline-flex;align-items:center;gap:6px;background:rgba(0,0,0,.55);color:#fff;border-radius:4px;
+  padding:4px 8px;font-size:11px;font-weight:600;line-height:1;backdrop-filter:blur(2px)}
+.ovchip.caps{text-transform:uppercase;letter-spacing:.3px}
+.ovchip .sd{width:6px;height:6px;border-radius:999px;flex:none}
+.sd.acc{background:var(--accent)}.sd.warn{background:var(--warning)}.sd.info{background:var(--info)}
+.meta{display:inline-flex;align-items:center;gap:4px;background:var(--surface-2);color:var(--ink-secondary);
+  border-radius:4px;padding:4px 8px;font-size:11px;font-weight:600;line-height:1}
+.meta.acc{background:var(--accent-soft);color:var(--accent)}
+.counter{position:absolute;right:12px;top:12px;background:rgba(0,0,0,.55);color:#fff;border-radius:4px;
+  padding:4px 8px;font-size:11px;font-weight:600;line-height:1;z-index:2}
+.scrim{position:absolute;inset-inline:0;bottom:0;display:flex;align-items:center;gap:6px;padding:32px 12px 10px;
+  background:linear-gradient(to top,rgba(0,0,0,.7),transparent);z-index:2}
+.dots{margin-left:auto;display:flex;gap:4px;align-items:center}
+.dots i{width:4px;height:4px;border-radius:999px;background:rgba(255,255,255,.5)}
+.dots i.on{width:6px;height:6px;background:#fff}
+.facts{display:flex;gap:2px;background:var(--surface-2);border-radius:8px;padding:10px 4px}
+.facts div{flex:1;min-width:0;text-align:center}
+.facts b{display:block;font-size:14px;font-weight:600;line-height:1.15;word-break:break-word}
+.facts span{display:block;margin-top:3px;font-size:11px;line-height:1.2;color:var(--ink-tertiary);word-break:break-word}
+.avatar{width:24px;height:24px;border-radius:999px;display:grid;place-items:center;color:#fff;
+  font-size:11px;font-weight:700;flex:none}
+
+.card{background:var(--surface-1);border:1px solid var(--border);border-radius:8px;overflow:hidden;
+  display:flex;flex-direction:column}
+.card .cover{position:relative;aspect-ratio:16/9;width:100%}
+.card .badges{position:absolute;left:12px;top:12px;display:flex;gap:6px;z-index:2}
+.card .body{padding:12px 16px 14px;display:flex;flex-direction:column;gap:8px;flex:1}
+.ttl{display:flex;gap:8px;align-items:flex-start}
+.ttl b{font-size:17px;font-weight:600;line-height:1.25;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.price{display:flex;align-items:baseline;gap:8px}
+.price b{font-size:20px;font-weight:700;line-height:1}
+.chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.chips .more{font-size:11px;font-weight:600;color:var(--ink-tertiary)}
+.loc{display:flex;align-items:center;gap:5px;font-size:13px;color:var(--ink-tertiary)}
+.loc svg{width:14px;height:14px}
+.poster{display:flex;align-items:center;gap:6px;font-size:13px;min-width:0}
+.poster b{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.poster .vf{width:14px;height:14px;color:var(--accent);flex:none}
+.poster .role{border-radius:4px;background:var(--surface-2);padding:2px 6px;font-size:11px;color:var(--ink-secondary);flex:none}
+.poster .ago{margin-left:auto;font-size:11px;color:var(--ink-tertiary);flex:none}
+.actions{display:flex;align-items:center;gap:8px;margin-top:auto;padding-top:4px}
+.sq{width:44px;height:40px;border:1px solid var(--border);border-radius:8px;display:grid;place-items:center;flex:none}
+.sq svg{width:18px;height:18px}
+.more-btn{width:36px;height:40px;display:grid;place-items:center;color:var(--ink-secondary);flex:none}
+.more-btn svg{width:22px;height:22px}
+
+/* section head */
+.sec{padding:18px 0 2px}
+.sechead{display:flex;align-items:flex-end;gap:12px;margin-bottom:12px}
+.sechead h2{margin:0;font-size:17px;font-weight:700;letter-spacing:-.2px}
+.sechead p{margin:3px 0 0;font-size:11px;color:var(--ink-tertiary)}
+.viewall{display:inline-flex;align-items:center;gap:4px;margin-left:auto;background:var(--accent-soft);
+  color:var(--accent);border-radius:999px;padding:6px 12px;font-size:13px;font-weight:600;white-space:nowrap}
+.viewall svg{width:14px;height:14px;stroke-width:2.2}
+
+/* ================= MOBILE base (existing screen — schematic) ============== */
+.topbar{display:flex;align-items:center;gap:8px;height:56px;padding:0 16px;background:var(--surface-1);
+  border-bottom:1px solid var(--border);position:sticky;top:0;z-index:9}
+.topbar .search,.topbar .signin,.topbar .postbtn{display:none}
+.topbar .spacer{margin-left:auto}
+.navrow,.storyarrow{display:none}
+
+.gueststrip{display:flex;align-items:center;gap:8px;background:var(--accent-soft);padding:8px 16px;
+  font-size:13px;color:var(--ink-secondary)}
+.gueststrip a{margin-left:auto;color:var(--accent);font-weight:600;text-decoration:none}
+
+.storybox{position:relative}
+.stories{display:flex;gap:14px;overflow-x:auto;scrollbar-width:none;padding:12px 16px;
+  border-bottom:1px solid var(--divider)}
+.stories::-webkit-scrollbar{display:none}
+.story{width:68px;flex:none;text-align:center}
+.ring{width:64px;height:64px;border-radius:999px;padding:2.5px;background:var(--ring-unseen-grad);margin:0 auto}
+.ring .in{width:100%;height:100%;border-radius:999px;border:2px solid var(--surface-1);display:grid;
+  place-items:center;color:#fff;font-weight:700;font-size:18px}
+.story span{display:block;margin-top:6px;font-size:11px;color:var(--ink-secondary);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+.banner{position:relative;display:flex;align-items:center;gap:14px;background:var(--accent);color:#fff;
+  border-radius:12px;padding:16px 44px 16px 16px;margin:14px 0}
+.banner .bi{width:52px;height:52px;border-radius:999px;background:rgba(255,255,255,.16);display:grid;
+  place-items:center;flex:none}
+.banner .bi svg{width:26px;height:26px;stroke:#fff}
+.banner h3{margin:0;font-size:17px;font-weight:700}
+.banner p{margin:3px 0 0;font-size:13px;opacity:.9}
+.banner .x{position:absolute;right:12px;top:12px;width:26px;height:26px;border-radius:999px;
+  background:rgba(0,0,0,.25);display:grid;place-items:center}
+.banner .x svg{width:14px;height:14px;stroke:#fff;stroke-width:2.4}
+
+.toolbar{padding:12px 0 8px}
+.segwrap{display:flex;justify-content:center}
+.modeseg{display:flex;background:var(--surface-2);border-radius:999px;padding:4px;width:100%;max-width:280px}
+.modeseg button{flex:1;border-radius:999px;padding:6px 0;font-size:13px;font-weight:600;color:var(--ink-tertiary)}
+.modeseg button[aria-pressed="true"]{background:var(--surface-1);color:var(--ink-primary);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.filters{display:flex;align-items:center;gap:8px;padding:10px 0 0}
+.fchip{border-radius:999px;padding:7px 13px;font-size:13px;font-weight:600;background:var(--surface-2)}
+.fchip[aria-pressed="true"]{background:var(--accent-soft);color:var(--accent)}
+.grow{flex:1}
+
+.grid{display:grid;grid-template-columns:1fr;gap:14px}
+.people{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.news{display:grid;grid-template-columns:1fr;gap:14px}
+
+.pcard{background:var(--surface-1);border:1px solid var(--border);border-radius:8px;padding:12px;
+  text-align:center;display:flex;flex-direction:column;align-items:center;gap:8px}
+.pcard .av{width:56px;height:56px;border-radius:999px;display:grid;place-items:center;color:#fff;
+  font-size:20px;font-weight:700}
+.pcard .nm{display:flex;align-items:flex-start;justify-content:center;gap:4px;font-size:13px;font-weight:600;line-height:1.25}
+.pcard .nm svg{width:13px;height:13px;color:var(--accent);flex:none;margin-top:2px}
+.pcard .st{font-size:11px;line-height:1.3;color:var(--ink-tertiary)}
+.pcard .vp{margin-top:auto;width:100%;height:32px;border:1px solid var(--border);border-radius:8px;
+  display:grid;place-items:center;font-size:13px;font-weight:600}
+
+.ncard{background:var(--surface-1);border:1px solid var(--border);border-radius:8px;overflow:hidden;
+  display:flex;flex-direction:column}
+.ncard .photo{aspect-ratio:16/9}
+.ncard .nb{padding:10px 12px;display:flex;flex-direction:column;gap:6px;flex:1}
+.ncard h4{margin:0;font-size:13px;font-weight:600;line-height:1.3}
+.ncard .rd{margin-top:auto;font-size:11px;color:var(--ink-tertiary)}
+
+.sellsec{border-bottom:8px solid var(--surface-2);background:var(--surface-1);padding:16px}
+.sellbox{display:flex;align-items:center;gap:12px;border-radius:12px;background:var(--accent-soft);padding:14px 16px}
+.sellbox .si{width:44px;height:44px;border-radius:999px;background:var(--accent);color:var(--on-accent);
+  display:grid;place-items:center;flex:none}
+.sellbox .si svg{width:22px;height:22px}
+.sellbox h3{margin:0;font-size:15px;font-weight:600;line-height:1.25}
+.sellbox p{margin:2px 0 0;font-size:11px;color:var(--ink-secondary)}
+.sellsec .btn{margin-top:12px;width:100%;height:44px}
+
+.foot{background:var(--surface-2);padding:28px 0 36px;margin-top:24px}
+.foot .tag{margin:6px 0 0;max-width:290px;font-size:13px;line-height:1.45;color:var(--ink-secondary)}
+.foot h5{margin:0 0 10px;font-size:11px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;color:var(--ink-tertiary)}
+.pillrow{display:flex;flex-wrap:wrap;gap:8px;margin-top:20px}
+.pill{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border);background:var(--surface-1);
+  border-radius:999px;padding:8px 12px;font-size:13px;font-weight:600}
+.pill svg{width:14px;height:14px;color:var(--ink-tertiary)}
+.legalhead{margin-top:28px}
+.legal{list-style:none;margin:10px 0 0;padding:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 12px}
+.legal li{font-size:13px;line-height:1.3}
+.footbar{display:flex;gap:6px;align-items:center;margin-top:28px;padding-top:16px;border-top:1px solid var(--border);
+  font-size:11px;color:var(--ink-tertiary)}
+.footcols{display:block}
+
+.bottomnav{position:sticky;bottom:0;display:flex;background:var(--surface-1);border-top:1px solid var(--border);
+  padding:8px 0 12px;margin-top:-64px}
+.bottomnav a{flex:1;display:grid;place-items:center;color:var(--ink-tertiary);text-decoration:none}
+.bottomnav a[aria-current]{color:var(--ink-primary)}
+.bottomnav svg{width:24px;height:24px}
+
+/* ================= TABLET 768–1199 ================= */
+@container (min-width:768px){
+  .app{padding-bottom:0}
+  .bottomnav{display:none}                    /* replaced by the top nav row */
+  .wrap{max-width:960px;padding:0 24px}
+  .topbar{height:60px;padding:0;border-bottom:0}
+  .topbar>.wrap{display:flex;align-items:center;gap:12px;height:100%}
+  .topbar .search{display:flex;flex:1;min-width:0}
+  .topbar .signin{display:inline-flex}
+  .topbar .spacer{margin-left:0}
+
+  .navrow{display:block;background:var(--surface-1);border-bottom:1px solid var(--border);
+    position:sticky;top:60px;z-index:8}
+  .navrow>.wrap{display:flex;align-items:center;gap:2px;height:44px;overflow-x:auto;scrollbar-width:none}
+  .navrow>.wrap::-webkit-scrollbar{display:none}
+  .navrow a{padding:7px 12px;border-radius:8px;font-size:14px;font-weight:600;color:var(--ink-secondary);
+    text-decoration:none;white-space:nowrap}
+  .navrow a[aria-current]{color:var(--accent);background:var(--accent-soft)}
+  /* Tablet keeps ONLY the browse destinations in this row. Messages / Saved /
+     Profile would push it into a scroll that cuts a word at the right edge, and
+     they are already reachable from the header icons — a second copy of them
+     here is the duplicate entry point, not a missing one. */
+  .navrow .navend{display:none}
+
+  .stories{padding:14px 24px;gap:18px}
+  /* The row scrolls, so padding cannot keep a story out from under the arrow —
+     whatever is at the right edge is there whatever the padding. A fade behind
+     the arrow is what makes it read as an overlay control instead of a button
+     dropped on someone's face, and it doubles as the "there is more" cue. */
+  .storybox{--story-bg:var(--bg-page)}
+  .storybox::after{content:"";position:absolute;right:0;top:0;bottom:1px;width:92px;pointer-events:none;
+    z-index:2;background:linear-gradient(to left,var(--story-bg) 46%,transparent)}
+  .story{width:84px}
+  .ring{width:76px;height:76px}
+  /* Touch still swipes the row; the arrow is the pointer-device affordance a
+     phone never needed. */
+  .storyarrow{display:grid;place-items:center;position:absolute;right:12px;top:50%;transform:translateY(-50%);
+    width:36px;height:36px;border-radius:999px;background:var(--surface-1);border:1px solid var(--border);
+    box-shadow:0 2px 8px rgba(0,0,0,.14);z-index:3}
+  .storyarrow svg{width:18px;height:18px;stroke-width:2.2}
+
+  .banner{padding:18px 52px 18px 20px}
+
+  .toolbar{position:sticky;top:104px;z-index:7;background:var(--bg-page);border-bottom:1px solid var(--divider);
+    padding:12px 0}
+  .toolbar>.wrap{display:flex;align-items:center;gap:14px}
+  .segwrap{justify-content:flex-start}
+  .modeseg{width:auto;max-width:none}
+  .modeseg button{padding:6px 24px}
+  .filters{padding:0}
+
+  .grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+  .people{grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+  .news{grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+  .sec{padding:24px 0 2px}
+  .sechead h2{font-size:19px}
+
+  .sellsec{border-bottom:0;padding:20px 0 0;background:transparent}
+  .sellsec>.wrap{padding:0}
+  .sellbox{padding:20px 24px}
+  .sellbox h3{font-size:18px}
+  .sellbox p{font-size:13px;margin-top:4px}
+  .sellsec .btn{margin:0 0 0 auto;width:auto;height:44px;padding:0 24px;flex:none}
+  .sellinner{display:flex;align-items:center;gap:20px}
+
+  .footcols{display:grid;grid-template-columns:1.3fr 1fr;gap:32px}
+  .pillrow{margin-top:0;flex-direction:column;align-items:flex-start}
+  .legalhead{margin-top:0}
+}
+
+/* ================= DESKTOP 1200–1599 ================= */
+@container (min-width:1200px){
+  .app{background:var(--bg-page-desktop)}
+  .wrap{max-width:1200px;padding:0 32px}
+  .topbar{height:68px}
+  .topbar>.wrap{gap:18px}
+  .topbar .search{max-width:520px;height:44px}
+  .topbar .postbtn{display:inline-flex}
+  .navrow{top:68px}
+  .navrow>.wrap{height:50px}
+  .navrow .navsp{flex:1}
+  .navrow .navend{display:flex;align-items:center;gap:2px}
+
+  .storybox{margin-top:20px}
+  .stories{background:var(--surface-1);border:1px solid var(--border);border-radius:12px;
+    padding:16px 20px;gap:22px}
+  /* The row is a bordered card up here, so the fade sits inside it and follows
+     the right-hand radius. */
+  .storybox{--story-bg:var(--surface-1)}
+  .storybox::after{right:1px;top:1px;border-radius:0 12px 12px 0}
+  .story{width:92px}
+  .ring{width:80px;height:80px}
+  .storyarrow{right:18px}
+
+  .banner{margin:16px 0 0;padding:22px 56px 22px 24px;border-radius:12px}
+  .banner h3{font-size:20px}
+  .banner p{font-size:14px}
+
+  .toolbar{top:118px;background:var(--bg-page-desktop);border-bottom:1px solid var(--border);
+    padding:14px 0;margin-top:18px}
+
+  .sec{padding:30px 0 2px}
+  .sechead h2{font-size:21px}
+  .sechead p{font-size:12px}
+  /* THREE, not four, from 1200 to 1439.
+     Four columns inside a 1200 container gives a 267px card — NARROWER than the
+     375px mobile card — and the property card's action row (bookmark + View +
+     Inquiry + overflow) needs 253px of the 235px that leaves. Rather than
+     shrink the buttons until the labels crowd, the grid drops a column here and
+     picks the fourth back up at 1440 where the card is 329px. */
+  .grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}
+  .people{grid-template-columns:repeat(6,minmax(0,1fr));gap:16px}
+  .news{grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}
+
+  .sellsec{padding:30px 0 0}
+  .sellbox{padding:24px 32px}
+  .sellbox h3{font-size:20px}
+  .sellbox .si{width:52px;height:52px}
+
+  .foot{margin-top:42px;padding:40px 0 32px}
+  .footcols{grid-template-columns:1.5fr 1fr 1fr 1fr;gap:40px}
+  .legal{grid-template-columns:1fr}
+}
+
+/* ================= LARGE DESKTOP 1600+ ================= */
+@container (min-width:1600px){
+  .wrap{max-width:1440px}         /* capped on purpose — never fluid to 1920 */
+  /* The fourth column arrives WITH the wider container, not before it. Adding
+     it at 1440 while the container was still 1200 produced the same 267px card
+     the 1200 step already rejected. */
+  .grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:24px}
+  .sec{padding:36px 0 2px}
+  .sechead h2{font-size:22px}
+}
+</style>
+</head>
+<body>
+
+<div class="bar">
+  <b>HomzList — Home · desktop &amp; tablet SAMPLE</b>
+  <div class="seg" id="devSeg">
+    <button data-w="1600" data-label="Large desktop 1600 — container capped at 1440">1600</button>
+    <button data-w="1440" data-label="Desktop 1440" aria-pressed="true">1440</button>
+    <button data-w="1280" data-label="Desktop 1280">1280</button>
+    <button data-w="1024" data-label="Tablet landscape 1024">1024</button>
+    <button data-w="820" data-label="Tablet portrait 820">820</button>
+    <button data-w="390" data-label="Mobile 390 — EXISTING screen, schematic only, not part of this proposal">390</button>
+  </div>
+  <div class="seg" id="themeSeg">
+    <button data-t="light" aria-pressed="true">Light</button>
+    <button data-t="dark">Dark</button>
+  </div>
+  <div class="sp"></div>
+  <span class="note">Proposal only · no app code changed · content read from the live home page</span>
+</div>
+
+<div class="stage">
+  <div>
+    <p class="caption" id="cap">Desktop 1440</p>
+    <div class="scaler" id="scaler">
+      <div class="frame" id="frame" style="width:1440px">
+        <div class="app">
+
+          <!-- ================= HEADER ROW 1 ================= -->
+          <header class="topbar">
+            <div class="wrap">
+              <span class="wm">Homz<i>List</i></span>
+
+              <button class="chipbtn">
+                <svg class="pin" viewBox="0 0 24 24"><path d="M12 21s7-5.3 7-11a7 7 0 1 0-14 0c0 5.7 7 11 7 11Z"/><circle cx="12" cy="10" r="2.6"/></svg>
+                Select city
+                <svg class="cv" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
+              </button>
+
+              <div class="search">
+                <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/></svg>
+                <span>Search by locality, project or builder</span>
+              </div>
+
+              <button class="btn primary postbtn">
+                <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> Post Property
+              </button>
+
+              <span class="ico spacer">
+                <svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 8-3 8h18s-3-1-3-8"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+              </span>
+              <span class="ico">
+                <svg viewBox="0 0 24 24"><path d="M20.8 5.6a5 5 0 0 0-7.1 0L12 7.3l-1.7-1.7a5 5 0 0 0-7.1 7.1l8.8 8.8 8.8-8.8a5 5 0 0 0 0-7.1Z"/></svg>
+              </span>
+              <button class="btn primary signin">Sign In</button>
+            </div>
+          </header>
+
+          <!-- ======= HEADER ROW 2 — carries the bottom nav's destinations ======= -->
+          <nav class="navrow">
+            <div class="wrap">
+              <a href="#" aria-current="page">Home</a>
+              <a href="#">Buy</a>
+              <a href="#">Rent</a>
+              <a href="#">New Projects</a>
+              <a href="#">Requirements</a>
+              <a href="#">Builders</a>
+              <a href="#">Brokers</a>
+              <a href="#">Blog</a>
+              <span class="navsp"></span>
+              <span class="navend">
+                <a href="#">Messages</a>
+                <a href="#">Saved</a>
+                <a href="#">Profile</a>
+              </span>
+            </div>
+          </nav>
+
+          <!-- ================= GUEST STRIP ================= -->
+          <div class="gueststrip">
+            <span>Sign in to save, inquire and chat</span>
+            <a href="#">Sign In</a>
+          </div>
+
+          <div class="wrap">
+
+            <!-- ================= PROFESSIONALS (story row) ================= -->
+            <div class="storybox">
+              <button class="storyarrow" aria-label="More professionals">
+                <svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg>
+              </button>
+              <div class="stories">
+                <div class="story"><div class="ring"><div class="in" style="background:var(--avatar-4)">A</div></div><span>Anand Estate</span></div>
+                <div class="story"><div class="ring"><div class="in" style="background:var(--avatar-1)">A</div></div><span>Anmol Infras…</span></div>
+                <div class="story"><div class="ring"><div class="in" style="background:var(--avatar-6)">A</div></div><span>Amit Shah</span></div>
+                <div class="story"><div class="ring"><div class="in" style="background:var(--avatar-3)">H</div></div><span>Hardik Detroja</span></div>
+                <div class="story"><div class="ring"><div class="in" style="background:var(--avatar-5)">B</div></div><span>Builder Test</span></div>
+                <div class="story"><div class="ring"><div class="in" style="background:var(--avatar-2)">S</div></div><span>Sagar Zalav…</span></div>
+                <div class="story"><div class="ring"><div class="in" style="background:var(--avatar-8)">T</div></div><span>Tushar Sorat…</span></div>
+                <div class="story"><div class="ring"><div class="in" style="background:var(--avatar-7)">V</div></div><span>Vraj Realtors</span></div>
+                <div class="story"><div class="ring"><div class="in" style="background:var(--avatar-1)">H</div></div><span>Hardik Sakhiya</span></div>
+                <div class="story"><div class="ring"><div class="in" style="background:var(--avatar-5)">S</div></div><span>Shivalik Realty</span></div>
+                <div class="story"><div class="ring"><div class="in" style="background:var(--avatar-3)">A</div></div><span>Aakruti Infra</span></div>
+                <div class="story"><div class="ring"><div class="in" style="background:var(--avatar-6)">M</div></div><span>Mobile Test</span></div>
+              </div>
+            </div>
+
+            <!-- ================= ADMIN BANNER ================= -->
+            <div class="banner">
+              <div class="bi"><svg viewBox="0 0 24 24"><path d="M3 10 12 4l9 6"/><path d="M5 10v9h14v-9"/><path d="M9 19v-5h6v5"/></svg></div>
+              <div>
+                <h3>Home loans @ 8.4%</h3>
+                <p>Pre-approved in 24 hour</p>
+              </div>
+              <button class="x" aria-label="Dismiss"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+            </div>
+          </div>
+
+          <!-- ================= CONTENT TOOLBAR (sticky) ================= -->
+          <div class="toolbar">
+            <div class="wrap">
+              <div class="segwrap">
+                <div class="modeseg">
+                  <button aria-pressed="true">Property</button>
+                  <button>Requirement</button>
+                </div>
+              </div>
+              <div class="filters">
+                <button class="fchip">Buy</button>
+                <button class="fchip">Rent</button>
+              </div>
+              <span class="grow"></span>
+              <button class="chipbtn">Latest <svg class="cv" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></button>
+            </div>
+          </div>
+
+          <div class="wrap">
+
+            <!-- ============ 1 · HomzList top picks ============ -->
+            <section class="sec">
+              <div class="sechead">
+                <div><h2>HomzList top picks</h2><p>48 live projects</p></div>
+                <a class="viewall" href="#">View all <svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></a>
+              </div>
+              <div class="grid">
+
+                <article class="card">
+                  <div class="cover photo p-a">
+                    <div class="badges"><span class="ovchip caps">New Project</span><span class="ovchip caps">Promoted</span></div>
+                    <div class="scrim">
+                      <span class="ovchip caps"><i class="sd warn"></i>Under construction</span>
+                      <span class="ovchip">Mixed use</span>
+                    </div>
+                  </div>
+                  <div class="body">
+                    <div class="ttl"><b>Krish Orchid Enclave</b><span class="meta acc">RERA</span></div>
+                    <div class="price"><b>₹73.63 Lakh – ₹3.94 Cr</b></div>
+                    <div class="chips"><span class="meta">2 BHK</span><span class="meta">1 BHK</span><span class="meta">Shop</span><span class="more">+2 more</span></div>
+                    <div class="facts">
+                      <div><b>Oct 2026</b><span>Possession</span></div>
+                      <div><b>5</b><span>Towers</span></div>
+                      <div><b>G+12</b><span>Floors</span></div>
+                      <div><b>138</b><span>Total units</span></div>
+                    </div>
+                    <div class="loc"><svg viewBox="0 0 24 24"><path d="M12 21s7-5.3 7-11a7 7 0 1 0-14 0c0 5.7 7 11 7 11Z"/><circle cx="12" cy="10" r="2.6"/></svg> Raiya, Rajkot</div>
+                    <div class="poster">
+                      <span class="avatar" style="background:var(--avatar-1)">A</span><b>Anmol Infrastructure</b>
+                      <svg class="vf" viewBox="0 0 24 24"><path d="m12 2 2.4 2.1 3.2-.4 1 3 2.8 1.6-1 3 1 3-2.8 1.6-1 3-3.2-.4L12 22l-2.4-2.1-3.2.4-1-3L2.6 15.7l1-3-1-3 2.8-1.6 1-3 3.2.4Z"/><path d="m9 12 2 2 4-4"/></svg>
+                      <span class="role">Builder</span><span class="ago">2 Aug</span>
+                    </div>
+                    <div class="actions">
+                      <span class="sq"><svg viewBox="0 0 24 24"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.2a2 2 0 0 1 2.1-.5c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2Z"/></svg></span>
+                      <span class="sq"><svg viewBox="0 0 24 24"><path d="M21 11.5a8.4 8.4 0 0 1-12.6 7.3L3 20.5l1.8-5.2A8.5 8.5 0 1 1 21 11.5Z"/></svg></span>
+                      <button class="btn primary" style="flex:1">View Project</button>
+                      <span class="more-btn"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></span>
+                    </div>
+                  </div>
+                </article>
+
+                <article class="card">
+                  <div class="cover photo p-b">
+                    <div class="badges"><span class="ovchip caps">New Project</span><span class="ovchip caps">Promoted</span></div>
+                    <div class="scrim">
+                      <span class="ovchip caps"><i class="sd warn"></i>Under construction</span>
+                      <span class="ovchip">Mixed use</span>
+                    </div>
+                  </div>
+                  <div class="body">
+                    <div class="ttl"><b>QA Mixed Use Project Rajkot</b><span class="meta acc">RERA</span></div>
+                    <div class="price"><b>₹60 Lakh onwards</b></div>
+                    <div class="chips"><span class="meta">1 BHK</span></div>
+                    <div class="facts">
+                      <div><b>5</b><span>Available</span></div>
+                      <div><b>6</b><span>Per floor</span></div>
+                      <div><b>30,000</b><span>Land area sqft</span></div>
+                      <div><b>40</b><span>Open area %</span></div>
+                    </div>
+                    <div class="loc"><svg viewBox="0 0 24 24"><path d="M12 21s7-5.3 7-11a7 7 0 1 0-14 0c0 5.7 7 11 7 11Z"/><circle cx="12" cy="10" r="2.6"/></svg> 150 Feet Ring Road, Rajkot</div>
+                    <div class="poster"><span class="avatar" style="background:var(--avatar-5)">B</span><b>Builder Test</b><span class="role">Builder</span><span class="ago">29 Jul</span></div>
+                    <div class="actions">
+                      <span class="sq"><svg viewBox="0 0 24 24"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.2a2 2 0 0 1 2.1-.5c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2Z"/></svg></span>
+                      <span class="sq"><svg viewBox="0 0 24 24"><path d="M21 11.5a8.4 8.4 0 0 1-12.6 7.3L3 20.5l1.8-5.2A8.5 8.5 0 1 1 21 11.5Z"/></svg></span>
+                      <button class="btn primary" style="flex:1">View Project</button>
+                      <span class="more-btn"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></span>
+                    </div>
+                  </div>
+                </article>
+
+                <article class="card">
+                  <div class="cover photo p-e">
+                    <div class="badges"><span class="ovchip caps">New Project</span></div>
+                    <div class="scrim">
+                      <span class="ovchip caps"><i class="sd warn"></i>Under construction</span>
+                      <span class="ovchip">Apartment / Flats</span>
+                    </div>
+                  </div>
+                  <div class="body">
+                    <div class="ttl"><b>Anmol Arcade</b><span class="meta acc">RERA</span></div>
+                    <div class="price"><b>₹76.17 Lakh – ₹4.11 Cr</b></div>
+                    <div class="chips"><span class="meta">4 BHK</span><span class="meta">1 BHK</span><span class="meta">2 BHK</span></div>
+                    <div class="facts">
+                      <div><b>Jan 2028</b><span>Possession</span></div>
+                      <div><b>1</b><span>Towers</span></div>
+                      <div><b>G+6</b><span>Floors</span></div>
+                      <div><b>168</b><span>Total units</span></div>
+                    </div>
+                    <div class="loc"><svg viewBox="0 0 24 24"><path d="M12 21s7-5.3 7-11a7 7 0 1 0-14 0c0 5.7 7 11 7 11Z"/><circle cx="12" cy="10" r="2.6"/></svg> Srpf Gr-Xiii Ghanteshwar, Rajkot</div>
+                    <div class="poster"><span class="avatar" style="background:var(--avatar-7)">S</span><b>Shivalik Realty</b><span class="role">Builder</span><span class="ago">2 Aug</span></div>
+                    <div class="actions">
+                      <span class="sq"><svg viewBox="0 0 24 24"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.2a2 2 0 0 1 2.1-.5c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2Z"/></svg></span>
+                      <span class="sq"><svg viewBox="0 0 24 24"><path d="M21 11.5a8.4 8.4 0 0 1-12.6 7.3L3 20.5l1.8-5.2A8.5 8.5 0 1 1 21 11.5Z"/></svg></span>
+                      <button class="btn primary" style="flex:1">View Project</button>
+                      <span class="more-btn"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></span>
+                    </div>
+                  </div>
+                </article>
+
+                <article class="card">
+                  <div class="cover photo p-c">
+                    <div class="badges"><span class="ovchip caps">New Project</span></div>
+                    <div class="scrim">
+                      <span class="ovchip caps"><i class="sd warn"></i>Under construction</span>
+                      <span class="ovchip">Bungalow / Villa scheme</span>
+                    </div>
+                  </div>
+                  <div class="body">
+                    <div class="ttl"><b>Aarambh Business Hub</b><span class="meta acc">RERA</span></div>
+                    <div class="price"><b>₹42.67 Lakh – ₹4.06 Cr</b></div>
+                    <div class="chips"><span class="meta">4 BHK Villa</span><span class="meta">5 BHK Villa</span><span class="more">+2 more</span></div>
+                    <div class="facts">
+                      <div><b>Apr 2028</b><span>Possession</span></div>
+                      <div><b>123</b><span>Total units</span></div>
+                      <div><b>107</b><span>Available</span></div>
+                      <div><b>1,704 sq yard</b><span>Land area</span></div>
+                    </div>
+                    <div class="loc"><svg viewBox="0 0 24 24"><path d="M12 21s7-5.3 7-11a7 7 0 1 0-14 0c0 5.7 7 11 7 11Z"/><circle cx="12" cy="10" r="2.6"/></svg> University Road, Rajkot</div>
+                    <div class="poster"><span class="avatar" style="background:var(--avatar-3)">A</span><b>Aakruti Infra</b><span class="role">Builder</span><span class="ago">2 Aug</span></div>
+                    <div class="actions">
+                      <span class="sq"><svg viewBox="0 0 24 24"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.2a2 2 0 0 1 2.1-.5c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2Z"/></svg></span>
+                      <span class="sq"><svg viewBox="0 0 24 24"><path d="M21 11.5a8.4 8.4 0 0 1-12.6 7.3L3 20.5l1.8-5.2A8.5 8.5 0 1 1 21 11.5Z"/></svg></span>
+                      <button class="btn primary" style="flex:1">View Project</button>
+                      <span class="more-btn"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></span>
+                    </div>
+                  </div>
+                </article>
+
+              </div>
+            </section>
+
+            <!-- ============ 2 · Newly-added properties ============ -->
+            <section class="sec">
+              <div class="sechead">
+                <div><h2>Newly-added properties</h2><p>98 properties</p></div>
+                <a class="viewall" href="#">View all <svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></a>
+              </div>
+              <div class="grid">
+
+                <article class="card">
+                  <div class="cover photo p-d">
+                    <div class="badges"><span class="ovchip caps">Promoted</span></div>
+                    <span class="counter">1/3</span>
+                    <div class="scrim">
+                      <span class="ovchip caps"><i class="sd acc"></i>For Sale</span>
+                      <span class="ovchip">Farm Land</span>
+                      <span class="dots"><i class="on"></i><i></i><i></i></span>
+                    </div>
+                  </div>
+                  <div class="body">
+                    <div class="ttl"><b>Farm Land, Gondal</b></div>
+                    <div class="price"><b>₹3.07 Cr</b></div>
+                    <div class="chips"><span class="meta">3,466 sqft</span><span class="meta">₹8,865/sqft</span></div>
+                    <div class="facts">
+                      <div><b>3,466 Acre</b><span>Land area</span></div>
+                      <div><b>57</b><span>Length ft</span></div>
+                      <div><b>73</b><span>Width ft</span></div>
+                      <div><b>27</b><span>Road ft</span></div>
+                    </div>
+                    <div class="loc"><svg viewBox="0 0 24 24"><path d="M12 21s7-5.3 7-11a7 7 0 1 0-14 0c0 5.7 7 11 7 11Z"/><circle cx="12" cy="10" r="2.6"/></svg> Gondal, Rajkot</div>
+                    <div class="poster"><span class="avatar" style="background:var(--avatar-4)">A</span><b>Anand Estate</b><span class="role">Broker</span><span class="ago">3d ago</span></div>
+                    <div class="actions">
+                      <span class="sq"><svg viewBox="0 0 24 24"><path d="M6 4h12v17l-6-4-6 4Z"/></svg></span>
+                      <button class="btn outline" style="flex:1">View</button>
+                      <button class="btn primary" style="flex:1">Inquiry</button>
+                      <span class="more-btn"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></span>
+                    </div>
+                  </div>
+                </article>
+
+                <article class="card">
+                  <div class="cover photo p-f">
+                    <div class="badges"><span class="ovchip caps">Promoted</span></div>
+                    <span class="counter">1/6</span>
+                    <div class="scrim">
+                      <span class="ovchip caps"><i class="sd warn"></i>For Rent</span>
+                      <span class="ovchip">Shop</span>
+                      <span class="dots"><i class="on"></i><i></i><i></i></span>
+                    </div>
+                  </div>
+                  <div class="body">
+                    <div class="ttl"><b>Shop on rent, Maninagar main road, Ahmedabad</b></div>
+                    <div class="price"><b>₹65,000</b><span class="meta">Negotiable</span></div>
+                    <div class="chips"><span class="meta">520 sqft</span></div>
+                    <div class="facts">
+                      <div><b>18</b><span>Frontage ft</span></div>
+                      <div><b>0 / 3</b><span>Floor</span></div>
+                    </div>
+                    <div class="loc"><svg viewBox="0 0 24 24"><path d="M12 21s7-5.3 7-11a7 7 0 1 0-14 0c0 5.7 7 11 7 11Z"/><circle cx="12" cy="10" r="2.6"/></svg> Maninagar, Ahmedabad</div>
+                    <div class="poster"><span class="avatar" style="background:var(--avatar-6)">A</span><b>Amit Shah</b><span class="role">Broker</span><span class="ago">23 Jul</span></div>
+                    <div class="actions">
+                      <span class="sq"><svg viewBox="0 0 24 24"><path d="M6 4h12v17l-6-4-6 4Z"/></svg></span>
+                      <button class="btn outline" style="flex:1">View</button>
+                      <button class="btn primary" style="flex:1">Inquiry</button>
+                      <span class="more-btn"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></span>
+                    </div>
+                  </div>
+                </article>
+
+                <article class="card">
+                  <div class="cover photo p-g">
+                    <div class="badges"><span class="ovchip caps">Promoted</span></div>
+                    <span class="counter">1/6</span>
+                    <div class="scrim">
+                      <span class="ovchip caps"><i class="sd acc"></i>For Sale</span>
+                      <span class="ovchip">Agriculture Land</span>
+                      <span class="dots"><i class="on"></i><i></i><i></i></span>
+                    </div>
+                  </div>
+                  <div class="body">
+                    <div class="ttl"><b>Agriculture Land in Kuvadva Road, Rajkot</b></div>
+                    <div class="price"><b>₹43.96 Lakh</b></div>
+                    <div class="chips"><span class="meta">16,438 sqft</span><span class="meta">₹267/sqft</span></div>
+                    <div class="facts">
+                      <div><b>16,438</b><span>Land area</span></div>
+                      <div><b>Bore</b><span>Water</span></div>
+                    </div>
+                    <div class="loc"><svg viewBox="0 0 24 24"><path d="M12 21s7-5.3 7-11a7 7 0 1 0-14 0c0 5.7 7 11 7 11Z"/><circle cx="12" cy="10" r="2.6"/></svg> Kuvadva Road, Rajkot</div>
+                    <div class="poster"><span class="avatar" style="background:var(--avatar-5)">B</span><b>Builder</b><span class="role">Owner</span><span class="ago">17 Jul</span></div>
+                    <div class="actions">
+                      <span class="sq"><svg viewBox="0 0 24 24"><path d="M6 4h12v17l-6-4-6 4Z"/></svg></span>
+                      <button class="btn outline" style="flex:1">View</button>
+                      <button class="btn primary" style="flex:1">Inquiry</button>
+                      <span class="more-btn"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></span>
+                    </div>
+                  </div>
+                </article>
+
+                <article class="card">
+                  <div class="cover photo p-h">
+                    <span class="counter">1/5</span>
+                    <div class="scrim">
+                      <span class="ovchip caps"><i class="sd acc"></i>For Sale</span>
+                      <span class="ovchip">Flat</span>
+                      <span class="dots"><i class="on"></i><i></i><i></i></span>
+                    </div>
+                  </div>
+                  <div class="body">
+                    <div class="ttl"><b>4 BHK Flat, Maliyasan</b></div>
+                    <div class="price"><b>Price on request</b></div>
+                    <div class="chips"><span class="meta">4 BHK</span><span class="meta">2,223 sqft</span></div>
+                    <div class="facts">
+                      <div><b>2</b><span>Baths</span></div>
+                      <div><b>1 / 7</b><span>Floor</span></div>
+                      <div><b>Fully furnished</b><span>Furnishing</span></div>
+                      <div><b>3</b><span>Parking</span></div>
+                    </div>
+                    <div class="loc"><svg viewBox="0 0 24 24"><path d="M12 21s7-5.3 7-11a7 7 0 1 0-14 0c0 5.7 7 11 7 11Z"/><circle cx="12" cy="10" r="2.6"/></svg> Mavdi, Rajkot</div>
+                    <div class="poster"><span class="avatar" style="background:var(--avatar-2)">K</span><b>Krishna Realty 8</b><span class="role">Broker</span><span class="ago">5d ago</span></div>
+                    <div class="actions">
+                      <span class="sq"><svg viewBox="0 0 24 24"><path d="M6 4h12v17l-6-4-6 4Z"/></svg></span>
+                      <button class="btn outline" style="flex:1">View</button>
+                      <button class="btn primary" style="flex:1">Inquiry</button>
+                      <span class="more-btn"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></span>
+                    </div>
+                  </div>
+                </article>
+
+              </div>
+            </section>
+
+            <!-- ============ 3 · Featured Developers ============ -->
+            <section class="sec">
+              <div class="sechead">
+                <div><h2>Featured Developers</h2><p>21 builders with live projects</p></div>
+                <a class="viewall" href="#">View all <svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></a>
+              </div>
+              <div class="people">
+                <div class="pcard"><span class="av" style="background:var(--avatar-5)">B</span><span class="nm">Builder Test</span><span class="meta">Builder</span><span class="st">11 projects · Usually responds in 1 min</span><span class="vp">View Profile</span></div>
+                <div class="pcard"><span class="av" style="background:var(--avatar-6)">M</span><span class="nm">Manish Agarwal</span><span class="meta">Builder</span><span class="st">4 projects · Usually responds in 1 min</span><span class="vp">View Profile</span></div>
+                <div class="pcard"><span class="av" style="background:var(--avatar-1)">S</span><span class="nm">Suresh Reddy</span><span class="meta">Builder</span><span class="st">3 projects · Usually responds in 1 hour</span><span class="vp">View Profile</span></div>
+                <div class="pcard"><span class="av" style="background:var(--avatar-2)">G</span><span class="nm">Green Acres Infra <svg viewBox="0 0 24 24"><path d="m12 2 2.4 2.1 3.2-.4 1 3 2.8 1.6-1 3 1 3-2.8 1.6-1 3-3.2-.4L12 22l-2.4-2.1-3.2.4-1-3L2.6 15.7l1-3-1-3 2.8-1.6 1-3 3.2.4Z"/><path d="m9 12 2 2 4-4"/></svg></span><span class="meta">Builder</span><span class="st">2 projects</span><span class="vp">View Profile</span></div>
+                <div class="pcard"><span class="av" style="background:var(--avatar-4)">A</span><span class="nm">Anmol Infrastructure</span><span class="meta">Builder</span><span class="st">2 projects</span><span class="vp">View Profile</span></div>
+                <div class="pcard"><span class="av" style="background:var(--avatar-8)">S</span><span class="nm">Shreeji Builders</span><span class="meta">Builder</span><span class="st">2 projects</span><span class="vp">View Profile</span></div>
+              </div>
+            </section>
+
+            <!-- ============ 4 · Featured Brokers ============ -->
+            <section class="sec">
+              <div class="sechead">
+                <div><h2>Featured Brokers</h2><p>26 brokers with live listings</p></div>
+                <a class="viewall" href="#">View all <svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></a>
+              </div>
+              <div class="people">
+                <div class="pcard"><span class="av" style="background:var(--avatar-4)">A</span><span class="nm">Anand Estate</span><span class="meta">Broker</span><span class="st">4 listings · Usually responds in 30 min</span><span class="vp">View Profile</span></div>
+                <div class="pcard"><span class="av" style="background:var(--avatar-3)">T</span><span class="nm">Tushar Savaliya</span><span class="meta">Broker</span><span class="st">2 listings</span><span class="vp">View Profile</span></div>
+                <div class="pcard"><span class="av" style="background:var(--avatar-7)">S</span><span class="nm">Shree Ganesh Estate</span><span class="meta">Broker</span><span class="st">2 listings · Usually responds in 1 hour</span><span class="vp">View Profile</span></div>
+                <div class="pcard"><span class="av" style="background:var(--avatar-2)">K</span><span class="nm">Krishna Realty 3</span><span class="meta">Broker</span><span class="st">2 listings · Usually responds in 1 hour</span><span class="vp">View Profile</span></div>
+                <div class="pcard"><span class="av" style="background:var(--avatar-1)">K</span><span class="nm">Kaushik Bhut</span><span class="meta">Broker</span><span class="st">2 listings</span><span class="vp">View Profile</span></div>
+                <div class="pcard"><span class="av" style="background:var(--avatar-6)">V</span><span class="nm">Vraj Realtors</span><span class="meta">Broker</span><span class="st">2 listings</span><span class="vp">View Profile</span></div>
+              </div>
+            </section>
+
+            <!-- ============ 5 · Featured properties (mixes both kinds) ======== -->
+            <section class="sec">
+              <div class="sechead">
+                <div><h2>Featured properties</h2><p>5 properties · 2 projects promoted</p></div>
+                <a class="viewall" href="#">View all <svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></a>
+              </div>
+              <div class="grid">
+
+                <article class="card">
+                  <div class="cover photo p-d">
+                    <div class="badges"><span class="ovchip caps">Promoted</span></div>
+                    <span class="counter">1/3</span>
+                    <div class="scrim"><span class="ovchip caps"><i class="sd acc"></i>For Sale</span><span class="ovchip">Farm Land</span><span class="dots"><i class="on"></i><i></i><i></i></span></div>
+                  </div>
+                  <div class="body">
+                    <div class="ttl"><b>Farm Land, Gondal</b></div>
+                    <div class="price"><b>₹3.07 Cr</b></div>
+                    <div class="chips"><span class="meta">3,466 sqft</span><span class="meta">₹8,865/sqft</span></div>
+                    <div class="facts"><div><b>3,466 Acre</b><span>Land area</span></div><div><b>57</b><span>Length ft</span></div><div><b>73</b><span>Width ft</span></div><div><b>27</b><span>Road ft</span></div></div>
+                    <div class="loc"><svg viewBox="0 0 24 24"><path d="M12 21s7-5.3 7-11a7 7 0 1 0-14 0c0 5.7 7 11 7 11Z"/><circle cx="12" cy="10" r="2.6"/></svg> Gondal, Rajkot</div>
+                    <div class="poster"><span class="avatar" style="background:var(--avatar-4)">A</span><b>Anand Estate</b><span class="role">Broker</span><span class="ago">3d ago</span></div>
+                    <div class="actions">
+                      <span class="sq"><svg viewBox="0 0 24 24"><path d="M6 4h12v17l-6-4-6 4Z"/></svg></span>
+                      <button class="btn outline" style="flex:1">View</button>
+                      <button class="btn primary" style="flex:1">Inquiry</button>
+                      <span class="more-btn"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></span>
+                    </div>
+                  </div>
+                </article>
+
+                <article class="card">
+                  <div class="cover photo p-a">
+                    <div class="badges"><span class="ovchip caps">New Project</span><span class="ovchip caps">Promoted</span></div>
+                    <div class="scrim"><span class="ovchip caps"><i class="sd warn"></i>Under construction</span><span class="ovchip">Mixed use</span></div>
+                  </div>
+                  <div class="body">
+                    <div class="ttl"><b>Krish Orchid Enclave</b><span class="meta acc">RERA</span></div>
+                    <div class="price"><b>₹73.63 Lakh – ₹3.94 Cr</b></div>
+                    <div class="chips"><span class="meta">2 BHK</span><span class="meta">1 BHK</span><span class="meta">Shop</span><span class="more">+2 more</span></div>
+                    <div class="facts"><div><b>Oct 2026</b><span>Possession</span></div><div><b>5</b><span>Towers</span></div><div><b>G+12</b><span>Floors</span></div><div><b>138</b><span>Total units</span></div></div>
+                    <div class="loc"><svg viewBox="0 0 24 24"><path d="M12 21s7-5.3 7-11a7 7 0 1 0-14 0c0 5.7 7 11 7 11Z"/><circle cx="12" cy="10" r="2.6"/></svg> Raiya, Rajkot</div>
+                    <div class="poster"><span class="avatar" style="background:var(--avatar-1)">A</span><b>Anmol Infrastructure</b><span class="role">Builder</span><span class="ago">2 Aug</span></div>
+                    <div class="actions">
+                      <span class="sq"><svg viewBox="0 0 24 24"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.2a2 2 0 0 1 2.1-.5c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2Z"/></svg></span>
+                      <span class="sq"><svg viewBox="0 0 24 24"><path d="M21 11.5a8.4 8.4 0 0 1-12.6 7.3L3 20.5l1.8-5.2A8.5 8.5 0 1 1 21 11.5Z"/></svg></span>
+                      <button class="btn primary" style="flex:1">View Project</button>
+                      <span class="more-btn"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></span>
+                    </div>
+                  </div>
+                </article>
+
+                <article class="card">
+                  <div class="cover photo p-f">
+                    <div class="badges"><span class="ovchip caps">Promoted</span></div>
+                    <span class="counter">1/6</span>
+                    <div class="scrim"><span class="ovchip caps"><i class="sd warn"></i>For Rent</span><span class="ovchip">Shop</span><span class="dots"><i class="on"></i><i></i><i></i></span></div>
+                  </div>
+                  <div class="body">
+                    <div class="ttl"><b>Shop on rent, Maninagar main road, Ahmedabad</b></div>
+                    <div class="price"><b>₹65,000</b><span class="meta">Negotiable</span></div>
+                    <div class="chips"><span class="meta">520 sqft</span></div>
+                    <div class="facts"><div><b>18</b><span>Frontage ft</span></div><div><b>0 / 3</b><span>Floor</span></div></div>
+                    <div class="loc"><svg viewBox="0 0 24 24"><path d="M12 21s7-5.3 7-11a7 7 0 1 0-14 0c0 5.7 7 11 7 11Z"/><circle cx="12" cy="10" r="2.6"/></svg> Maninagar, Ahmedabad</div>
+                    <div class="poster"><span class="avatar" style="background:var(--avatar-6)">A</span><b>Amit Shah</b><span class="role">Broker</span><span class="ago">23 Jul</span></div>
+                    <div class="actions">
+                      <span class="sq"><svg viewBox="0 0 24 24"><path d="M6 4h12v17l-6-4-6 4Z"/></svg></span>
+                      <button class="btn outline" style="flex:1">View</button>
+                      <button class="btn primary" style="flex:1">Inquiry</button>
+                      <span class="more-btn"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></span>
+                    </div>
+                  </div>
+                </article>
+
+                <article class="card">
+                  <div class="cover photo p-g">
+                    <div class="badges"><span class="ovchip caps">Promoted</span></div>
+                    <span class="counter">1/6</span>
+                    <div class="scrim"><span class="ovchip caps"><i class="sd acc"></i>For Sale</span><span class="ovchip">Agriculture Land</span><span class="dots"><i class="on"></i><i></i><i></i></span></div>
+                  </div>
+                  <div class="body">
+                    <div class="ttl"><b>Agriculture Land in Kuvadva Road, Rajkot</b></div>
+                    <div class="price"><b>₹43.96 Lakh</b></div>
+                    <div class="chips"><span class="meta">16,438 sqft</span><span class="meta">₹267/sqft</span></div>
+                    <div class="facts"><div><b>16,438</b><span>Land area</span></div><div><b>Bore</b><span>Water</span></div></div>
+                    <div class="loc"><svg viewBox="0 0 24 24"><path d="M12 21s7-5.3 7-11a7 7 0 1 0-14 0c0 5.7 7 11 7 11Z"/><circle cx="12" cy="10" r="2.6"/></svg> Kuvadva Road, Rajkot</div>
+                    <div class="poster"><span class="avatar" style="background:var(--avatar-5)">B</span><b>Builder</b><span class="role">Owner</span><span class="ago">17 Jul</span></div>
+                    <div class="actions">
+                      <span class="sq"><svg viewBox="0 0 24 24"><path d="M6 4h12v17l-6-4-6 4Z"/></svg></span>
+                      <button class="btn outline" style="flex:1">View</button>
+                      <button class="btn primary" style="flex:1">Inquiry</button>
+                      <span class="more-btn"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></span>
+                    </div>
+                  </div>
+                </article>
+
+              </div>
+            </section>
+          </div>
+
+          <!-- ============ 6 · Sell CTA ============ -->
+          <section class="sellsec">
+            <div class="wrap">
+              <div class="sellinner">
+                <div class="sellbox" style="flex:1">
+                  <span class="si"><svg viewBox="0 0 24 24"><path d="m3 10 9-7 9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/></svg></span>
+                  <div>
+                    <h3>Have a property to sell?</h3>
+                    <p>Post it free and reach buyers</p>
+                  </div>
+                </div>
+                <button class="btn primary">Post your property</button>
+              </div>
+            </div>
+          </section>
+
+          <div class="wrap">
+            <!-- ============ 7 · News and Articles ============ -->
+            <section class="sec">
+              <div class="sechead">
+                <div><h2>News and Articles</h2><p>8 articles</p></div>
+                <a class="viewall" href="#">View all <svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></a>
+              </div>
+              <div class="news">
+                <article class="ncard"><div class="photo p-b"></div><div class="nb"><span class="meta">Buying</span><h4>Buying a flat in Rajkot: a 2025 checklist</h4><span class="rd">8 min read · 12 Jan</span></div></article>
+                <article class="ncard"><div class="photo p-i"></div><div class="nb"><span class="meta">Buying</span><h4>How to check property documents before you pay a token</h4><span class="rd">6 min read · 8 Jan</span></div></article>
+                <article class="ncard"><div class="photo p-j"></div><div class="nb"><span class="meta">Rajkot market</span><h4>Mavdi vs University Road: which area fits you?</h4><span class="rd">7 min read · 5 Jan</span></div></article>
+                <article class="ncard"><div class="photo p-c"></div><div class="nb"><span class="meta">Legal</span><h4>RERA explained for first-time buyers</h4><span class="rd">7 min read · 2 Jan</span></div></article>
+              </div>
+            </section>
+          </div>
+
+          <!-- ================= FOOTER ================= -->
+          <footer class="foot">
+            <div class="wrap">
+              <div class="footcols">
+                <div>
+                  <span class="wm">Homz<i>List</i></span>
+                  <p class="tag">India's Most Trusted Property Listing Platform</p>
+                </div>
+                <div>
+                  <h5>Explore</h5>
+                  <div class="pillrow" style="margin-top:0">
+                    <span class="pill"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/></svg>Search</span>
+                    <span class="pill"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Post a property</span>
+                    <span class="pill"><svg viewBox="0 0 24 24"><path d="M4 5h16v15H4z"/><path d="M8 9h8M8 13h5"/></svg>Blog</span>
+                  </div>
+                </div>
+                <div>
+                  <h5 class="legalhead">Legal</h5>
+                  <ul class="legal">
+                    <li>Terms of Service</li><li>Privacy Policy</li><li>Refund Policy</li><li>Disclaimer</li>
+                  </ul>
+                </div>
+                <div>
+                  <h5 class="legalhead">&nbsp;</h5>
+                  <ul class="legal">
+                    <li>Community Guidelines</li><li>Grievance Officer</li><li>Cookie Policy</li><li>About HomzList</li>
+                  </ul>
+                </div>
+              </div>
+              <div class="footbar"><span>© 2026 HomzList</span><span>·</span><span>Made in India</span></div>
+            </div>
+          </footer>
+
+          <!-- ============ BOTTOM NAV — mobile only, hidden ≥768 ============ -->
+          <nav class="bottomnav">
+            <a href="#" aria-current="page"><svg viewBox="0 0 24 24"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1Z"/></svg></a>
+            <a href="#"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/></svg></a>
+            <a href="#"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="5"/><path d="M12 8v8M8 12h8"/></svg></a>
+            <a href="#"><svg viewBox="0 0 24 24"><path d="M22 3 11 14"/><path d="M22 3 15 21l-4-7-7-4Z"/></svg></a>
+            <a href="#"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/><path d="M6.5 19a6 6 0 0 1 11 0"/></svg></a>
+          </nav>
+
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  var frame=document.getElementById('frame'), scaler=document.getElementById('scaler'), cap=document.getElementById('cap');
+  function fit(){
+    var w=parseInt(frame.style.width,10);
+    var avail=document.querySelector('.stage').clientWidth-32;
+    var s=Math.min(1,avail/w);
+    scaler.style.transform='scale('+s+')';
+    scaler.style.height=(frame.offsetHeight*s)+'px';
+  }
+  document.getElementById('devSeg').addEventListener('click',function(e){
+    var b=e.target.closest('button'); if(!b) return;
+    [].forEach.call(this.querySelectorAll('button'),function(x){x.setAttribute('aria-pressed',String(x===b));});
+    frame.style.width=b.dataset.w+'px'; cap.textContent=b.dataset.label; fit();
+  });
+  document.getElementById('themeSeg').addEventListener('click',function(e){
+    var b=e.target.closest('button'); if(!b) return;
+    [].forEach.call(this.querySelectorAll('button'),function(x){x.setAttribute('aria-pressed',String(x===b));});
+    document.body.classList.toggle('dark',b.dataset.t==='dark'); fit();
+  });
+  window.addEventListener('resize',fit);
+  new ResizeObserver(fit).observe(frame);
+  fit();
+})();
+</script>
+</body>
+</html>
